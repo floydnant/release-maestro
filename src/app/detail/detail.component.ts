@@ -5,7 +5,7 @@ import { TranslateModule } from '@ngx-translate/core'
 @Component({
     selector: 'app-detail',
     templateUrl: './detail.component.html',
-    styleUrls: ['./detail.component.scss'],
+    styleUrls: ['./detail.component.css'],
     standalone: true,
     imports: [RouterLink, TranslateModule],
 })
