@@ -1,7 +1,92 @@
-<div class="container">
-    <h1 class="title">
-        {{ 'PAGES.DETAIL.TITLE' | translate }}
-    </h1>
+<div class="flex overflow-hidden">
+    <div class="sidebar | shrink-0">
+        <h1 class="title">
+            {{ 'PAGES.DETAIL.TITLE' | translate }}, {{ bandcampEmails()?.length }} Emails •
+            {{ unreadEmailsCount() }} Unread
+        </h1>
 
-    <a routerLink="/">{{ 'PAGES.DETAIL.BACK_TO_HOME' | translate }}</a>
+        <a routerLink="/">{{ 'PAGES.DETAIL.BACK_TO_HOME' | translate }}</a>
+
+        <div class="flex h-full items-center justify-end">
+            <div class="flex flex-col -translate-y-24 gap-3">
+                <button class="bg-tinted-500 p-2 rounded-md" (click)="scrollUp()">UP</button>
+                <button class="bg-tinted-500 p-2 rounded-md" (click)="scrollDown()">DOWN</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="snap-y snap-mandatory snap-always overflow-y-auto h-screen px-3">
+        @for (email of bandcampEmails(); track $index) {
+            <div
+                class="email-entry | snap-center my-32"
+                #emailEntry
+                (intersectionChange)="onIntersectionChange($event, email, $index)"
+                [intersectionThreshold]="1"
+                #emailEntryIntersection="appIntersection"
+            >
+                <div class="grid gap-3" style="grid-template-columns: 300px auto">
+                    @if ($index < 1 || furthestScrolledIndex() + 2 >= $index) {
+                        <iframe
+                            #bandcampIframe
+                            class="rounded-md"
+                            style="border: 0; height: 650px"
+                            [src]="email.iframeUrl | safe: 'resourceUrl'"
+                            seamless
+                        ></iframe>
+                    } @else {
+                        <div class="">
+                            <img
+                                class="album-cover | aspect-square shrink-0 rounded-md"
+                                width="300px"
+                                [src]="email.imageUrl"
+                                alt="Album cover for {{ email.subject }}"
+                            />
+                        </div>
+                    }
+
+                    <div class="px-2 py-1 bg-tinted-700 rounded-md">
+                        <h2 class="subject | text-3xl">{{ email.subject }}</h2>
+
+                        <p class="date | text-tinted-400">
+                            {{ email.dateReceived }} • {{ email.bandcampEmailType }}
+                        </p>
+
+                        <p class="links |">
+                            @for (link of email.musicLinks; track $index) {
+                                <a
+                                    [href]="link"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="wrap-nicely"
+                                >
+                                    {{ link }}
+                                </a>
+                                @if (!$last) {
+                                    ,
+                                }
+                            }
+                        </p>
+                        <p
+                            class="body | mt-6 text-sm text-tinted-200"
+                            [innerHTML]="email.plainBody | safe: 'html'"
+                        ></p>
+                        <ul class="text-sm">
+                            @for (link of email.links; track $index) {
+                                <li>
+                                    <a
+                                        [href]="link"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="wrap-nicely"
+                                    >
+                                        {{ link }}
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
 </div>

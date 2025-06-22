@@ -12,3 +12,8 @@ body {
     background: theme('colors.tinted.800');
     color: theme('colors.tinted.100');
 }
+
+a {
+    color: #0f91ff;
+    text-decoration: underline;
+}
