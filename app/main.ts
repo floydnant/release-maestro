@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { app, BrowserWindow, screen } from 'electron'
+import { app, BrowserWindow, screen, shell } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -22,6 +22,12 @@ function createWindow(): BrowserWindow {
             contextIsolation: false,
             webSecurity: !serve,
         },
+    })
+
+    // Open urls in the user's browser
+    win.webContents.setWindowOpenHandler(event => {
+        shell.openExternal(event.url)
+        return { action: 'deny' }
     })
 
     if (serve) {
