@@ -10,7 +10,7 @@
             "request": "attach",
             "port": 9876,
             "url": "http://localhost:4200",
-            "sourceMaps": true,  
+            "sourceMaps": true,
             "timeout": 10000,
             "trace": "verbose",
             "sourceMapPathOverrides": {
@@ -26,11 +26,7 @@
             "cwd": "${workspaceFolder}",
             "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron",
             "trace": "verbose",
-            "runtimeArgs": [
-                "--serve",
-                ".",
-                "--remote-debugging-port=9876"
-            ],
+            "runtimeArgs": ["--serve", ".", "--remote-debugging-port=9876"],
             "windows": {
                 "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"
             },
@@ -40,7 +36,7 @@
     "compounds": [
         {
             "name": "Application Debug",
-            "configurations": [ "Renderer", "Main" ]
+            "configurations": ["Renderer", "Main"]
         }
     ]
 }
