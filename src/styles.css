@@ -17,3 +17,20 @@ a {
     color: #0f91ff;
     text-decoration: underline;
 }
+
+* {
+    scrollbar-color: theme('colors.tinted.700') transparent;
+    scrollbar-width: thin;
+}
+@supports not (scrollbar-color: auto) {
+    ::-webkit-scrollbar {
+        width: 0.4rem;
+        height: 0.4rem;
+    }
+    ::-webkit-scrollbar-track {
+        @apply bg-transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        @apply bg-tinted-700 hover:bg-tinted-600 rounded-full;
+    }
+}

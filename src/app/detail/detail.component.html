@@ -1,7 +1,7 @@
 <div class="flex overflow-hidden">
-    <div class="sidebar | shrink-0">
+    <div class="sidebar | flex flex-col shrink-0">
         <h1 class="title">
-            {{ 'PAGES.DETAIL.TITLE' | translate }}, {{ bandcampEmails()?.length }} Emails •
+            {{ 'PAGES.DETAIL.TITLE' | translate }}, {{ bandcampEmailsResource.value()?.length }} Emails •
             {{ unreadEmailsCount() }} Unread
         </h1>
 
@@ -9,6 +9,12 @@
 
         <div class="flex h-full items-center justify-end">
             <div class="flex flex-col -translate-y-24 gap-3">
+                <button
+                    class="bg-tinted-500 p-2 rounded-md"
+                    (click)="audioPlayer.isPlaying() ? audioPlayer.pause() : audioPlayer.play()"
+                >
+                    {{ audioPlayer.isPlaying() ? 'PAUSE' : 'PLAY' }}
+                </button>
                 <button class="bg-tinted-500 p-2 rounded-md" (click)="scrollUp()">UP</button>
                 <button class="bg-tinted-500 p-2 rounded-md" (click)="scrollDown()">DOWN</button>
             </div>
@@ -16,62 +22,92 @@
     </div>
 
     <div class="snap-y snap-mandatory snap-always overflow-y-auto h-screen px-3 max-w-[65rem]">
-        @for (email of bandcampEmails(); track $index) {
+        @for (release of bandcampReleases(); track $index) {
             <div
-                class="email-entry | snap-center my-32"
-                #emailEntry
-                (intersectionChange)="onIntersectionChange($event, email, $index)"
+                class="feed-entry | snap-center my-32 min-h-[45vh] max-h-[800px] flex items-center transition-opacity duration-500"
+                [ngClass]="{ 'opacity-30': currentReleaseIndex() != $index }"
+                #feedEntry
+                (intersectionChange)="onIntersectionChange($event, release, $index)"
                 [intersectionThreshold]="1"
                 #emailEntryIntersection="appIntersection"
             >
-                <div class="grid gap-3" style="grid-template-columns: 300px auto">
-                    @if ($index < 1 || furthestScrolledIndex() + 2 >= $index) {
-                        <iframe
-                            #bandcampIframe
-                            class="rounded-md"
-                            style="border: 0; height: 650px"
-                            [src]="email.iframeUrl | safe: 'resourceUrl'"
-                            seamless
-                        ></iframe>
-                    } @else {
+                <div class="grid gap-3 w-full" style="grid-template-columns: 300px 1fr auto">
+                    <div class="">
                         <div class="">
                             <img
                                 class="album-cover | aspect-square shrink-0 rounded-md"
                                 width="300px"
-                                [src]="email.imageUrl"
-                                alt="Album cover for {{ email.subject }}"
+                                [src]="release.imageUrl"
+                                alt="Album cover for {{ release.releaseName }}"
                             />
                         </div>
-                    }
 
-                    <div class="px-2 py-1 bg-tinted-700 rounded-md">
-                        <h2 class="subject | text-3xl">{{ email.subject }}</h2>
-
-                        <p class="date | text-tinted-400">
-                            {{ email.dateReceived }} • {{ email.bandcampEmailType }}
-                        </p>
-
-                        <p class="links |">
-                            @for (link of email.musicLinks; track $index) {
-                                <a
-                                    [href]="link"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="wrap-nicely"
+                        <ul class="tracks | mt-2 overflow-y-auto max-h-[492px]">
+                            <!--                                     ^ height = 500px - 8px top margin -->
+                            @for (track of release.tracks; track $index) {
+                                <li
+                                    class="track | text-sm flex justify-between"
+                                    [attr.data-track-index]="$index"
+                                    [ngClass]="{
+                                        'text-tinted-400': !track.streamUrl,
+                                        'text-blue-300 font-bold':
+                                            track.streamUrl == audioPlayer.currentUrl(),
+                                        'mt-2': !$first,
+                                    }"
                                 >
-                                    {{ link }}
-                                </a>
-                                @if (!$last) {
-                                    ,
-                                }
+                                    <!-- @TODO: add track seeker for active track -->
+                                    <span>
+                                        @if (release.type == 'album') {
+                                            {{ $index + 1 }}.
+                                        }
+                                        {{ track.name }}</span
+                                    >
+                                    <span>{{ track.duration ? formatDuration(track.duration) : '' }}</span>
+                                </li>
                             }
-                        </p>
+                        </ul>
+                    </div>
+
+                    <div class="">
+                        <h2 class="release-name | text-3xl">
+                            <a
+                                [href]="release.releaseUrl"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-tinted-100 not-hover:no-underline"
+                            >
+                                {{ release.releaseName }}
+                            </a>
+                        </h2>
+                        <h2 class="artist | text-sm">by {{ release.artist?.name }}</h2>
+
+                        <div class="release-type | mt-3 flex gap-2 items-center">
+                            <span
+                                class="text-xs text-tinted-300 bg-tinted-800 border border-tinted-600 rounded-full px-1.5 py-px"
+                            >
+                                {{ release.type }}
+                            </span>
+
+                            <span
+                                class="text-xs bg-tinted-700 border border-tinted-500 rounded-full px-1.5 py-px"
+                            >
+                                releases {{ release.releaseDate | date }}</span
+                            >
+
+                            <span
+                                class="text-sm text-tinted-400"
+                                [title]="release.emailReceivedAt | date: 'medium'"
+                                >announced {{ formatDateRelative(release.emailReceivedAt) }}
+                            </span>
+                        </div>
+
                         <p
                             class="body | mt-6 text-sm text-tinted-200"
-                            [innerHTML]="email.plainBody | safe: 'html'"
+                            [innerHTML]="release.plainBody | safe: 'html'"
                         ></p>
-                        <ul class="text-sm">
-                            @for (link of email.links; track $index) {
+
+                        <ul class="other-links | text-sm">
+                            @for (link of release.links; track $index) {
                                 <li>
                                     <a
                                         [href]="link"
@@ -85,6 +121,22 @@
                             }
                         </ul>
                     </div>
+
+                    @if (release.label) {
+                        <div class="label | w-[100px]">
+                            @if (release.label.imageUrl; as imageUrl) {
+                                <img
+                                    class="label-image | aspect-square shrink-0 rounded-md"
+                                    width="100px"
+                                    [src]="imageUrl"
+                                    alt="Label image for {{ release.label.name }}"
+                                />
+                            }
+                            <p class="text-sm font-bold mt-2">{{ release.label.name }}</p>
+                            <p class="text-xs">{{ release.label.location }}</p>
+                            <p class="text-xs mt-2">{{ release.label.description }}</p>
+                        </div>
+                    }
                 </div>
             </div>
         }

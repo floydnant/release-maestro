@@ -63,4 +63,8 @@ export class ElectronService {
     get isElectron(): boolean {
         return !!(window && window.process && window.process.type)
     }
+
+    openUrl(url: string) {
+        this.ipcRenderer.invoke('open-url', url)
+    }
 }
