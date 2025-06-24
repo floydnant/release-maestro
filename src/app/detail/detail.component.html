@@ -1,8 +1,8 @@
 <div class="flex overflow-hidden">
     <div class="sidebar | flex flex-col shrink-0">
         <h1 class="title">
-            {{ 'PAGES.DETAIL.TITLE' | translate }}, {{ bandcampEmailsResource.value()?.length }} Emails •
-            {{ unreadEmailsCount() }} Unread
+            {{ 'PAGES.DETAIL.TITLE' | translate }}
+            <!-- @TODO: email count + unread can be brought back later -->
         </h1>
 
         <a routerLink="/">{{ 'PAGES.DETAIL.BACK_TO_HOME' | translate }}</a>
@@ -22,29 +22,31 @@
     </div>
 
     <div class="snap-y snap-mandatory snap-always overflow-y-auto h-screen px-3 max-w-[65rem]">
-        @for (release of bandcampReleases(); track $index) {
+        @for (feedItem of feed(); track $index) {
             <div
                 class="feed-entry | snap-center my-32 min-h-[45vh] max-h-[800px] flex items-center transition-opacity duration-500"
-                [ngClass]="{ 'opacity-30': currentReleaseIndex() != $index }"
+                [ngClass]="{ 'opacity-30': currentFeedIndex() != $index }"
                 #feedEntry
-                (intersectionChange)="onIntersectionChange($event, release, $index)"
+                (intersectionChange)="onIntersectionChange($event, feedItem, $index)"
                 [intersectionThreshold]="1"
                 #emailEntryIntersection="appIntersection"
             >
+                <!-- @TODO: handle all fee item types -->
+
                 <div class="grid gap-3 w-full" style="grid-template-columns: 300px 1fr auto">
                     <div class="">
                         <div class="">
                             <img
                                 class="album-cover | aspect-square shrink-0 rounded-md"
                                 width="300px"
-                                [src]="release.imageUrl"
-                                alt="Album cover for {{ release.releaseName }}"
+                                [src]="feedItem.data.imageUrl"
+                                alt="Album cover for {{ feedItem.data.releaseName }}"
                             />
                         </div>
 
                         <ul class="tracks | mt-2 overflow-y-auto max-h-[492px]">
                             <!--                                     ^ height = 500px - 8px top margin -->
-                            @for (track of release.tracks; track $index) {
+                            @for (track of feedItem.data.tracks; track $index) {
                                 <li
                                     class="track | text-sm flex justify-between"
                                     [attr.data-track-index]="$index"
@@ -57,7 +59,7 @@
                                 >
                                     <!-- @TODO: add track seeker for active track -->
                                     <span>
-                                        @if (release.type == 'album') {
+                                        @if (feedItem.data.releaseType == 'album') {
                                             {{ $index + 1 }}.
                                         }
                                         {{ track.name }}</span
@@ -71,43 +73,43 @@
                     <div class="">
                         <h2 class="release-name | text-3xl">
                             <a
-                                [href]="release.releaseUrl"
+                                [href]="feedItem.data.releaseUrl"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="text-tinted-100 not-hover:no-underline"
                             >
-                                {{ release.releaseName }}
+                                {{ feedItem.data.releaseName }}
                             </a>
                         </h2>
-                        <h2 class="artist | text-sm">by {{ release.artist?.name }}</h2>
+                        <h2 class="artist | text-sm">by {{ feedItem.data.artist?.name }}</h2>
 
                         <div class="release-type | mt-3 flex gap-2 items-center">
                             <span
                                 class="text-xs text-tinted-300 bg-tinted-800 border border-tinted-600 rounded-full px-1.5 py-px"
                             >
-                                {{ release.type }}
+                                {{ feedItem.data.releaseType }}
                             </span>
 
                             <span
                                 class="text-xs bg-tinted-700 border border-tinted-500 rounded-full px-1.5 py-px"
                             >
-                                releases {{ release.releaseDate | date }}</span
+                                releases {{ feedItem.data.releaseDate | date }}</span
                             >
 
                             <span
                                 class="text-sm text-tinted-400"
-                                [title]="release.emailReceivedAt | date: 'medium'"
-                                >announced {{ formatDateRelative(release.emailReceivedAt) }}
+                                [title]="feedItem.data.emailReceivedAt | date: 'medium'"
+                                >announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
                             </span>
                         </div>
 
                         <p
                             class="body | mt-6 text-sm text-tinted-200"
-                            [innerHTML]="release.plainBody | safe: 'html'"
+                            [innerHTML]="feedItem.data.plainBody | safe: 'html'"
                         ></p>
 
                         <ul class="other-links | text-sm">
-                            @for (link of release.links; track $index) {
+                            @for (link of feedItem.data.links; track $index) {
                                 <li>
                                     <a
                                         [href]="link"
@@ -122,19 +124,19 @@
                         </ul>
                     </div>
 
-                    @if (release.label) {
+                    @if (feedItem.data.label) {
                         <div class="label | w-[100px]">
-                            @if (release.label.imageUrl; as imageUrl) {
+                            @if (feedItem.data.label.imageUrl; as imageUrl) {
                                 <img
                                     class="label-image | aspect-square shrink-0 rounded-md"
                                     width="100px"
                                     [src]="imageUrl"
-                                    alt="Label image for {{ release.label.name }}"
+                                    alt="Label image for {{ feedItem.data.label.name }}"
                                 />
                             }
-                            <p class="text-sm font-bold mt-2">{{ release.label.name }}</p>
-                            <p class="text-xs">{{ release.label.location }}</p>
-                            <p class="text-xs mt-2">{{ release.label.description }}</p>
+                            <p class="text-sm font-bold mt-2">{{ feedItem.data.label.name }}</p>
+                            <p class="text-xs">{{ feedItem.data.label.location }}</p>
+                            <p class="text-xs mt-2">{{ feedItem.data.label.description }}</p>
                         </div>
                     }
                 </div>

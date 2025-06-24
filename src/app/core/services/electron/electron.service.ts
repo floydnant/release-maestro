@@ -1,12 +1,9 @@
 import { Injectable } from '@angular/core'
-
-// If you import a module but never use any of the imported values other than as TypeScript types,
-// the resulting javascript file will look as if you never imported the module at all.
 import { ipcRenderer, webFrame } from 'electron'
 import * as childProcess from 'child_process'
 import * as fs from 'fs'
 import * as fsPromises from 'fs/promises'
-import { z } from 'zod'
+import { appEnvSchema } from '../../../../shared/app-env.schema'
 
 @Injectable({
     providedIn: 'root',
@@ -18,11 +15,7 @@ export class ElectronService {
     fs!: typeof fs
     fsPromises!: typeof fsPromises
 
-    env = z
-        .object({
-            EMAIL_JSON_PATH: z.string(),
-        })
-        .parse(process.env)
+    env = appEnvSchema.parse(process.env)
 
     constructor() {
         // Conditional imports

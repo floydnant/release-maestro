@@ -16,6 +16,10 @@ export const entriesOf = <TObj extends Record<string, unknown>>(obj: TObj): Entr
     return Object.entries(obj) as EntryOf<TObj>[]
 }
 
+export type Prettify<T extends object> = {
+    [K in keyof T]: T[K]
+} & {}
+
 export type Unwrap<T> = T extends Promise<infer U> ? U : T extends Observable<infer U> ? U : T
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -3,6 +3,8 @@ import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import bandcampFetch from 'bandcamp-fetch'
+import { diContainer } from './di'
+import { FeedBackendService } from './feed/feed.backend.service'
 
 let win: BrowserWindow | null = null
 const args = process.argv.slice(1),
@@ -95,6 +97,8 @@ try {
     console.error('Error during Electron app initialization:', e)
 }
 
+// @TODO: we need some kind of controller/type-wrapper for the backend <> frontend comms
+
 ipcMain.handle('bandcamp-fetch-album', async (_event, albumUrl: string) => {
     return await bandcampFetch.album.getInfo({ albumUrl })
 })
@@ -107,4 +111,9 @@ ipcMain.handle('bandcamp-fetch-label', async (_event, bandUrl: string) => {
 
 ipcMain.handle('open-url', async (_event, url: string) => {
     shell.openExternal(url)
+})
+
+ipcMain.handle('load-feed', async (_event, index: number, count: number) => {
+    const feedService = await diContainer.get(FeedBackendService)
+    return await feedService.loadFeed(index, count)
 })
