@@ -48,11 +48,9 @@ export class DetailComponent {
 
     @HostListener('document:keydown.ArrowUp', ['$event'])
     @HostListener('document:keydown.K', ['$event'])
-    onArrowUp(event: KeyboardEvent) {
-        event.preventDefault()
-        this.scrollUp()
-    }
-    scrollUp() {
+    scrollUp(event?: KeyboardEvent) {
+        event?.preventDefault()
+
         const currentIndex = this.currentFeedIndex()
         if (currentIndex > 0) {
             this.currentFeedIndex.set(currentIndex - 1)
@@ -65,11 +63,9 @@ export class DetailComponent {
 
     @HostListener('document:keydown.ArrowDown', ['$event'])
     @HostListener('document:keydown.J', ['$event'])
-    onArrowDown(event: KeyboardEvent) {
-        event.preventDefault()
-        this.scrollDown()
-    }
-    scrollDown() {
+    scrollDown(event?: KeyboardEvent) {
+        event?.preventDefault()
+
         const currentIndex = this.currentFeedIndex()
         if (currentIndex < (this.feed()?.length || 0) - 1) {
             this.currentFeedIndex.set(currentIndex + 1)
@@ -93,6 +89,7 @@ export class DetailComponent {
         if (!streamUrl) {
             console.warn('No stream URL found for release:', feedItem)
         } else {
+            // @TODO: also check if a different track but from the same feed item is playing
             if (this.audioPlayer.currentUrl() == streamUrl) {
                 // Already playing the track, don't restart it
             } else {
@@ -252,4 +249,7 @@ export class DetailComponent {
 
     formatDuration = formatDuration
     formatDateRelative = formatDateRelative
+    isInThePast = (date: Date) => {
+        return new Date(date).getTime() < Date.now()
+    }
 }
