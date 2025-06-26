@@ -144,15 +144,15 @@
                             <div class="feed-controls | text-xl text-tinted-400 flex justify-end">
                                 <button
                                     class="flex gap-2 items-center hover:underline"
-                                    (click)="markCurrentFeedItemAsShowMeAgain()"
+                                    (click)="toggleCurrentFeedItemSnoozedState()"
                                     [title]="
-                                        feedItemsMarkedAsShowMeAgain.has(feedItem.id)
-                                            ? 'Click to not show again'
-                                            : 'Click to show again tomorrow'
+                                        snoozedFeedItems.has(feedItem.id)
+                                            ? 'Click to un-snooze (dont\'t show again)'
+                                            : 'Click to snooze (show again tomorrow)'
                                     "
                                 >
                                     <!-- @TODO: this may need to be made reactive -->
-                                    @if (feedItemsMarkedAsShowMeAgain.has(feedItem.id)) {
+                                    @if (snoozedFeedItems.has(feedItem.id)) {
                                         <i class="fas fa-alarm-snooze"></i>
                                     } @else {
                                         <i class="far fa-alarm-snooze"></i>

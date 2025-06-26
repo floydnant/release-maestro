@@ -9,9 +9,9 @@ import { BandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { PROVIDER_INIT } from '../utils/dependency-injection.util'
 
 /**
- * The time after which a feed item should be shown again if it was marked as "Show me again".
+ * The time after which a feed item should be shown again if it was marked as snoozed.
  */
-const SHOW_AGAIN_AFTER_MS = 1000 * 60 * 60 * 24 * 16
+const FEED_ITEM_SNOOZE_TIME_MS = 1000 * 60 * 60 * 24 * 16
 
 type FeedItemBase = {
     id: string
@@ -99,7 +99,7 @@ const feedItemStateObject = z.object({
     id: z.string(),
     type: z.enum(['BANDCAMP.NEW_RELEASE']) satisfies z.Schema<HydratedFeedItem['type']>,
     isViewed: z.boolean(),
-    isMarkedAsShowMeAgain: z.boolean(),
+    isSnoozed: z.boolean(),
 })
 export class FeedBackendService {
     constructor(
@@ -189,11 +189,11 @@ export class FeedBackendService {
         return (
             // Show if the item is unviewed
             !this.state.feedItemState[item.id]?.isViewed ||
-            // or marked as "Show me again"
-            (this.state.feedItemState[item.id]?.isMarkedAsShowMeAgain
-                ? // and hasn't been viewed in the configured time frame
+            // or marked as snoozed
+            (this.state.feedItemState[item.id]?.isSnoozed
+                ? // and hasn't been viewed in the configured snoozed time frame
                   (this.getLastFeedItemViewEvent(item.id)?.ts || 0) <
-                  new Date(Date.now() - SHOW_AGAIN_AFTER_MS)
+                  new Date(Date.now() - FEED_ITEM_SNOOZE_TIME_MS)
                 : false)
         )
     }
@@ -214,7 +214,7 @@ export class FeedBackendService {
         return await this.hydrateFeed(preHydrationFeed)
     }
 
-    async markFeedItemAsViewed(id: string, feedItemType: HydratedFeedItem['type'], showMeAgain: boolean) {
+    async markFeedItemAsViewed(id: string, feedItemType: HydratedFeedItem['type'], isSnoozed: boolean) {
         this.state.feedItemViewEvents.push({
             id: crypto.randomUUID(),
             feedItemId: id,
@@ -225,7 +225,7 @@ export class FeedBackendService {
             id,
             type: feedItemType,
             isViewed: true,
-            isMarkedAsShowMeAgain: showMeAgain,
+            isSnoozed: isSnoozed,
         }
 
         if (feedItemType == 'BANDCAMP.NEW_RELEASE') {

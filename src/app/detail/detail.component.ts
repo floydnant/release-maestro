@@ -110,30 +110,26 @@ export class DetailComponent {
         // item must have been in the viewport for X ms
         // (bc user might scroll through the feed quickly)
         this.feedService
-            .markFeedItemViewed(
-                feedItem.id,
-                feedItem.type,
-                this.feedItemsMarkedAsShowMeAgain.has(feedItem.id),
-            )
+            .markFeedItemViewed(feedItem.id, feedItem.type, this.snoozedFeedItems.has(feedItem.id))
             .catch(err => console.error(`Failed to mark feed item ${feedItem.id} as viewed:`, err))
     }
     viewedFeedItems = new Set<string>()
-    feedItemsMarkedAsShowMeAgain = new Set<string>()
+    snoozedFeedItems = new Set<string>()
 
     @HostListener('document:keydown.S', ['$event'])
-    markCurrentFeedItemAsShowMeAgain(event?: KeyboardEvent) {
+    toggleCurrentFeedItemSnoozedState(event?: KeyboardEvent) {
         event?.preventDefault()
         const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
         if (!currentFeedItem) {
-            console.warn('No current feed item to mark as "Show me again"')
+            console.warn('No current feed item to snooze')
             return
         }
 
-        if (this.feedItemsMarkedAsShowMeAgain.has(currentFeedItem.id)) {
-            this.feedItemsMarkedAsShowMeAgain.delete(currentFeedItem.id)
+        if (this.snoozedFeedItems.has(currentFeedItem.id)) {
+            this.snoozedFeedItems.delete(currentFeedItem.id)
             return
         }
-        this.feedItemsMarkedAsShowMeAgain.add(currentFeedItem.id)
+        this.snoozedFeedItems.add(currentFeedItem.id)
     }
 
     @HostListener('document:keydown.ArrowRight', ['$event'])

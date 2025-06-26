@@ -109,8 +109,8 @@ ipcMain.handle('load-feed', async (_event, index: number, count: number) => {
 
 ipcMain.handle(
     'mark-feed-item-viewed',
-    async (_event, id: string, feedItemType: HydratedFeedItem['type'], showMeAgain: boolean = false) => {
+    async (_event, id: string, feedItemType: HydratedFeedItem['type'], isSnoozed: boolean = false) => {
         const feedService = await diContainer.get(FeedBackendService)
-        return await feedService.markFeedItemAsViewed(id, feedItemType, showMeAgain)
+        return await feedService.markFeedItemAsViewed(id, feedItemType, isSnoozed)
     },
 )
