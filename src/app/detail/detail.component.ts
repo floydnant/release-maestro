@@ -128,7 +128,11 @@ export class DetailComponent {
             console.warn('No current feed item to mark as "Show me again"')
             return
         }
-        console.log(`Marking feed item ${currentFeedItem.id} as "Show me again"`)
+
+        if (this.feedItemsMarkedAsShowMeAgain.has(currentFeedItem.id)) {
+            this.feedItemsMarkedAsShowMeAgain.delete(currentFeedItem.id)
+            return
+        }
         this.feedItemsMarkedAsShowMeAgain.add(currentFeedItem.id)
     }
 

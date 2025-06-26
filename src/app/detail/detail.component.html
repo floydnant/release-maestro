@@ -24,7 +24,7 @@
             class="mx-auto max-w-[65rem]"
             style="--max-feed-item-height: min(100vh, 800px); --feed-item-padding-y: 1.5rem"
         >
-            @for (feedItem of feed(); track $index) {
+            @for (feedItem of feed(); track feedItem.id) {
                 <div
                     class="feed-entry | snap-center my-32 py-[calc(var(--feed-item-padding-y)/2)] min-h-[45vh] max-h-[var(--max-feed-item-height)] flex items-center transition-all duration-500"
                     [ngClass]="{ 'opacity-30 blur-sm': currentFeedIndex() != $index }"
@@ -74,64 +74,91 @@
                         </div>
 
                         <div
-                            class="text-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto"
+                            class="text-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto flex flex-col justify-between"
                         >
-                            <h2 class="release-name | text-3xl">
-                                <a
-                                    [href]="feedItem.data.releaseUrl"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="text-tinted-100 not-hover:no-underline"
-                                >
-                                    {{ feedItem.data.releaseName }}
-                                </a>
-                            </h2>
-                            <h2 class="artist | text-sm">by {{ feedItem.data.artist?.name }}</h2>
-                            <div class="dates | mt-3 flex gap-2 items-center">
-                                @if (feedItem.data.releaseDate) {
-                                    <span
-                                        class="text-xs bg-tinted-700 border border-tinted-500 rounded-full px-1.5 py-px"
-                                        [title]="
-                                            isInThePast(feedItem.data.releaseDate)
-                                                ? 'released ' +
-                                                  (feedItem.data.releaseDate | date) +
-                                                  ' • announced ' +
-                                                  formatDateRelative(feedItem.data.emailReceivedAt)
-                                                : (feedItem.data.releaseDate | date)
-                                        "
+                            <div class="">
+                                <h2 class="release-name | text-3xl">
+                                    <a
+                                        [href]="feedItem.data.releaseUrl"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="text-tinted-100 not-hover:no-underline"
                                     >
-                                        {{ isInThePast(feedItem.data.releaseDate) ? 'released' : 'releases' }}
-                                        {{ formatDateRelative(feedItem.data.releaseDate) }}</span
-                                    >
-                                }
-                                @if (!feedItem.data.releaseDate || !isInThePast(feedItem.data.releaseDate)) {
-                                    <span
-                                        class="text-sm text-tinted-400"
-                                        [title]="feedItem.data.emailReceivedAt | date: 'medium'"
-                                        >announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
-                                    </span>
-                                }
+                                        {{ feedItem.data.releaseName }}
+                                    </a>
+                                </h2>
+                                <h2 class="artist | text-sm">by {{ feedItem.data.artist?.name }}</h2>
+                                <div class="dates | mt-3 flex gap-2 items-center">
+                                    @if (feedItem.data.releaseDate) {
+                                        <span
+                                            class="text-xs bg-tinted-700 border border-tinted-500 rounded-full px-1.5 py-px"
+                                            [title]="
+                                                isInThePast(feedItem.data.releaseDate)
+                                                    ? 'released ' +
+                                                      (feedItem.data.releaseDate | date) +
+                                                      ' • announced ' +
+                                                      formatDateRelative(feedItem.data.emailReceivedAt)
+                                                    : (feedItem.data.releaseDate | date)
+                                            "
+                                        >
+                                            {{
+                                                isInThePast(feedItem.data.releaseDate)
+                                                    ? 'released'
+                                                    : 'releases'
+                                            }}
+                                            {{ formatDateRelative(feedItem.data.releaseDate) }}</span
+                                        >
+                                    }
+                                    @if (
+                                        !feedItem.data.releaseDate || !isInThePast(feedItem.data.releaseDate)
+                                    ) {
+                                        <span
+                                            class="text-sm text-tinted-400"
+                                            [title]="feedItem.data.emailReceivedAt | date: 'medium'"
+                                            >announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
+                                        </span>
+                                    }
+                                </div>
+
+                                <p
+                                    class="body | mt-6 text-sm text-tinted-200"
+                                    [innerHTML]="feedItem.data.plainBody | safe: 'html'"
+                                ></p>
+
+                                <ul class="other-links | text-sm">
+                                    @for (link of feedItem.data.links; track $index) {
+                                        <li>
+                                            <a
+                                                [href]="link"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="wrap-nicely"
+                                            >
+                                                {{ link }}
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
                             </div>
 
-                            <p
-                                class="body | mt-6 text-sm text-tinted-200"
-                                [innerHTML]="feedItem.data.plainBody | safe: 'html'"
-                            ></p>
-
-                            <ul class="other-links | text-sm">
-                                @for (link of feedItem.data.links; track $index) {
-                                    <li>
-                                        <a
-                                            [href]="link"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="wrap-nicely"
-                                        >
-                                            {{ link }}
-                                        </a>
-                                    </li>
-                                }
-                            </ul>
+                            <div class="feed-controls | text-xl text-tinted-400 flex justify-end">
+                                <button
+                                    class="flex gap-2 items-center hover:underline"
+                                    (click)="markCurrentFeedItemAsShowMeAgain()"
+                                    [title]="
+                                        feedItemsMarkedAsShowMeAgain.has(feedItem.id)
+                                            ? 'Click to not show again'
+                                            : 'Click to show again tomorrow'
+                                    "
+                                >
+                                    <!-- @TODO: this may need to be made reactive -->
+                                    @if (feedItemsMarkedAsShowMeAgain.has(feedItem.id)) {
+                                        <i class="fas fa-alarm-snooze"></i>
+                                    } @else {
+                                        <i class="far fa-alarm-snooze"></i>
+                                    }
+                                </button>
+                            </div>
                         </div>
 
                         @if (feedItem.data.label) {

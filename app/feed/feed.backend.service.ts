@@ -108,6 +108,7 @@ export class FeedBackendService {
     ) {}
 
     async [PROVIDER_INIT]() {
+        console.log('Initializing FeedBackendService')
         if (
             !(await fs
                 .stat('./state')
@@ -117,6 +118,7 @@ export class FeedBackendService {
             await fs.mkdir('./state')
         }
         await this.loadState()
+        console.log('FeedBackendService initialized')
     }
 
     private bandcampFeedCache: BandcampEmailFeedItem[] | null = null
@@ -125,8 +127,11 @@ export class FeedBackendService {
             return this.bandcampFeedCache!
         }
 
+        console.log('Loading Bandcamp emails...')
         const bandcampEmails = await this.bandcampEmailService.listBandcampEmails()
         this.bandcampFeedCache = bandcampEmails.map(mapBandcampEmailToFeedItem).filter(isTruthy)
+
+        console.log('Loaded', this.bandcampFeedCache.length, 'Bandcamp emails')
 
         return this.bandcampFeedCache
     }
@@ -157,12 +162,16 @@ export class FeedBackendService {
     }
 
     async hydrateFeed(items: BandcampEmailFeedItem[]): Promise<HydratedFeedItem[]> {
+        console.log('Hydrating feed items')
         const promises = items.map(async item => {
             if (item.type == 'BANDCAMP.NEW_RELEASE') return await this.hydrateBandcampFeedItem(item)
 
             return assertUnreachable(item.type, 'Unhandled feed item type: ' + item.type)
         })
-        return await Promise.all(promises)
+        const hydratedFeedItems = await Promise.all(promises)
+        console.log('Hydrated', hydratedFeedItems.length, 'feed items')
+
+        return hydratedFeedItems
     }
 
     getLastFeedItemViewEvent(itemId: string): FeedItemViewEvent | null {
