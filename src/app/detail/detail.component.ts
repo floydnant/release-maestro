@@ -78,27 +78,55 @@ export class DetailComponent {
     }
 
     onIntersectionChange(isIntersecting: boolean, feedItem: HydratedFeedItem, index: number) {
-        if (!isIntersecting) return
+        if (isIntersecting) {
+            this.currentFeedIndex.set(index)
+            this.furthestScrolledIndex.set(Math.max(this.furthestScrolledIndex(), index))
+            this.viewedFeedItems.add(feedItem.id)
 
-        this.currentFeedIndex.set(index)
-        this.furthestScrolledIndex.set(Math.max(this.furthestScrolledIndex(), index))
+            // @TODO: Handle all feed item types
 
-        // @TODO: Handle all feed item types
-
-        const streamUrl = feedItem.data.tracks?.find(track => track.streamUrl)?.streamUrl
-        if (!streamUrl) {
-            console.warn('No stream URL found for release:', feedItem)
-        } else {
-            // @TODO: also check if a different track but from the same feed item is playing
-            if (this.audioPlayer.currentUrl() == streamUrl) {
-                // Already playing the track, don't restart it
+            const streamUrl = feedItem.data.tracks?.find(track => track.streamUrl)?.streamUrl
+            if (!streamUrl) {
+                console.warn('No stream URL found for release:', feedItem)
             } else {
-                this.audioPlayer.playSource(streamUrl)
-                this.scrollCurrentTrackIntoView()
+                // @TODO: also check if a different track but from the same feed item is playing
+                if (this.audioPlayer.currentUrl() == streamUrl) {
+                    // Already playing the track, don't restart it
+                } else {
+                    this.audioPlayer.playSource(streamUrl)
+                    this.scrollCurrentTrackIntoView()
+                }
             }
+
+            return
         }
 
-        // @TODO: Mark feed item as viewed when it comes into view (or wait for a delay)
+        if (!this.viewedFeedItems.has(feedItem.id)) return
+
+        // @TODO: Wait a bit before marking the feed item as viewed:
+        // item must have been in the viewport for X ms
+        // (bc user might scroll through the feed quickly)
+        this.feedService
+            .markFeedItemViewed(
+                feedItem.id,
+                feedItem.type,
+                this.feedItemsMarkedAsShowMeAgain.has(feedItem.id),
+            )
+            .catch(err => console.error(`Failed to mark feed item ${feedItem.id} as viewed:`, err))
+    }
+    viewedFeedItems = new Set<string>()
+    feedItemsMarkedAsShowMeAgain = new Set<string>()
+
+    @HostListener('document:keydown.S', ['$event'])
+    markCurrentFeedItemAsShowMeAgain(event?: KeyboardEvent) {
+        event?.preventDefault()
+        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
+        if (!currentFeedItem) {
+            console.warn('No current feed item to mark as "Show me again"')
+            return
+        }
+        console.log(`Marking feed item ${currentFeedItem.id} as "Show me again"`)
+        this.feedItemsMarkedAsShowMeAgain.add(currentFeedItem.id)
     }
 
     @HostListener('document:keydown.ArrowRight', ['$event'])

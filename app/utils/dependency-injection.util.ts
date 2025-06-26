@@ -7,7 +7,7 @@ export const PROVIDER_INIT = Symbol('PROVIDER_INIT')
 export const PROVIDER_DESTROY = Symbol('PROVIDER_DESTROY')
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export class CustomInjectionToken<TValue extends object> {
+export class CustomInjectionToken<_TValue extends object> {
     constructor(public readonly name: string) {}
 }
 

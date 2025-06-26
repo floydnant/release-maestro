@@ -1,9 +1,17 @@
 import { Album, Artist, Label, Track } from 'bandcamp-fetch'
-import { Unwrap } from '../../src/app/shared/utils/object.utils'
+import * as fs from 'fs/promises'
+import { z } from 'zod'
+import { entriesOf } from '../../src/app/shared/utils/object.utils'
 import { assertUnreachable, isTruthy } from '../../src/app/shared/utils/type-guards.utils'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import { BandcampEmailBackendService } from '../bandcamp/bandcamp-email.backend.service'
 import { BandcampEmail } from '../bandcamp/bandcamp.email-parser'
+import { PROVIDER_INIT } from '../utils/dependency-injection.util'
+
+/**
+ * The time after which a feed item should be shown again if it was marked as "Show me again".
+ */
+const SHOW_AGAIN_AFTER_MS = 1000 * 60 * 60 * 24 * 16
 
 type FeedItemBase = {
     id: string
@@ -32,8 +40,6 @@ const mapLinkStashItemToFeedItem = (data: unknown) => {
         data,
     } satisfies FeedItemBase
 }
-
-export type HydratedFeedItem = Unwrap<ReturnType<FeedBackendService['loadFeed']>>[number]
 
 export const mapBandcampReleaseFeedItemToHydratedFeedItem = (
     { email, ...item }: Extract<BandcampEmailFeedItem, { type: 'BANDCAMP.NEW_RELEASE' }>,
@@ -79,11 +85,39 @@ export const mapBandcampReleaseFeedItemToHydratedFeedItem = (
 }
 export type HydratedBandcampReleaseFeedItem = ReturnType<typeof mapBandcampReleaseFeedItemToHydratedFeedItem>
 
+export type HydratedFeedItem = HydratedBandcampReleaseFeedItem
+
+const feedItemViewEventSchema = z.object({
+    id: z.string(),
+    feedItemId: z.string(),
+    ts: z.date({ coerce: true }),
+    type: z.enum(['BANDCAMP.NEW_RELEASE']) satisfies z.Schema<HydratedFeedItem['type']>,
+})
+export type FeedItemViewEvent = z.infer<typeof feedItemViewEventSchema>
+
+const feedItemStateObject = z.object({
+    id: z.string(),
+    type: z.enum(['BANDCAMP.NEW_RELEASE']) satisfies z.Schema<HydratedFeedItem['type']>,
+    isViewed: z.boolean(),
+    isMarkedAsShowMeAgain: z.boolean(),
+})
 export class FeedBackendService {
     constructor(
         private bandcampEmailService: BandcampEmailBackendService,
         private bandcampApiService: BandcampApiBackendService,
     ) {}
+
+    async [PROVIDER_INIT]() {
+        if (
+            !(await fs
+                .stat('./state')
+                .then(() => true)
+                .catch(() => false))
+        ) {
+            await fs.mkdir('./state')
+        }
+        await this.loadState()
+    }
 
     private bandcampFeedCache: BandcampEmailFeedItem[] | null = null
     async loadBandcampFeed() {
@@ -122,7 +156,7 @@ export class FeedBackendService {
         }
     }
 
-    async hydrateFeed(items: BandcampEmailFeedItem[]): Promise<HydratedBandcampReleaseFeedItem[]> {
+    async hydrateFeed(items: BandcampEmailFeedItem[]): Promise<HydratedFeedItem[]> {
         const promises = items.map(async item => {
             if (item.type == 'BANDCAMP.NEW_RELEASE') return await this.hydrateBandcampFeedItem(item)
 
@@ -131,7 +165,31 @@ export class FeedBackendService {
         return await Promise.all(promises)
     }
 
-    async loadFeed(index: number, count: number) {
+    getLastFeedItemViewEvent(itemId: string): FeedItemViewEvent | null {
+        for (let i = this.state.feedItemViewEvents.length - 1; i >= 0; i--) {
+            const event = this.state.feedItemViewEvents[i]!
+
+            if (event.feedItemId === itemId) {
+                return event
+            }
+        }
+        return null
+    }
+
+    shouldShowFeedItem(item: BandcampEmailFeedItem): boolean {
+        return (
+            // Show if the item is unviewed
+            !this.state.feedItemState[item.id]?.isViewed ||
+            // or marked as "Show me again"
+            (this.state.feedItemState[item.id]?.isMarkedAsShowMeAgain
+                ? // and hasn't been viewed in the configured time frame
+                  (this.getLastFeedItemViewEvent(item.id)?.ts || 0) <
+                  new Date(Date.now() - SHOW_AGAIN_AFTER_MS)
+                : false)
+        )
+    }
+
+    async loadFeed(index: number, count: number): Promise<HydratedFeedItem[]> {
         const bandcampReleaseFeed = await this.loadBandcampFeed()
 
         if (index < 0 || index >= bandcampReleaseFeed.length) {
@@ -140,8 +198,79 @@ export class FeedBackendService {
         }
 
         // @TODO: how would we merge multiple feeds? how do we rank/prioritize items?
-        const preHydrationFeed = bandcampReleaseFeed.slice(index, index + count)
+        const preHydrationFeed = bandcampReleaseFeed
+            .filter(item => this.shouldShowFeedItem(item))
+            .slice(index, index + count)
 
         return await this.hydrateFeed(preHydrationFeed)
+    }
+
+    async markFeedItemAsViewed(id: string, feedItemType: HydratedFeedItem['type'], showMeAgain: boolean) {
+        this.state.feedItemViewEvents.push({
+            id: crypto.randomUUID(),
+            feedItemId: id,
+            ts: new Date(),
+            type: feedItemType,
+        })
+        this.state.feedItemState[id] = {
+            id,
+            type: feedItemType,
+            isViewed: true,
+            isMarkedAsShowMeAgain: showMeAgain,
+        }
+
+        if (feedItemType == 'BANDCAMP.NEW_RELEASE') {
+            // @TODO: mark email as read
+        } else {
+            return assertUnreachable(feedItemType, 'Unhandled feed item type: ' + feedItemType)
+        }
+
+        // @TODO: throttle this
+        await this.commitState()
+    }
+
+    private stateFiles = {
+        feedItemViewEvents: {
+            path: './state/feed-item-view-events.json',
+            schema: feedItemViewEventSchema.array().catch([]),
+        },
+        feedItemState: {
+            path: './state/feed-items-state.json',
+            schema: z.record(z.string(), feedItemStateObject).catch({}),
+        },
+    } satisfies Record<string, { path: string; schema: z.ZodCatch<z.Schema> }>
+    private state!: {
+        [K in keyof typeof this.stateFiles]: z.infer<(typeof this.stateFiles)[K]['schema']>
+    }
+
+    private async loadState() {
+        try {
+            this.state = Object.fromEntries(
+                await Promise.all(
+                    entriesOf(this.stateFiles).map(async ([stateKey, file]) => {
+                        try {
+                            const contents = await fs.readFile(file.path, 'utf-8')
+                            const json = JSON.parse(contents)
+                            return [stateKey, file.schema.parse(json)]
+                        } catch (err) {
+                            console.log('Failed to load state file "' + file.path + '":', err)
+
+                            return [stateKey, file.schema.parse(null)]
+                        }
+                    }),
+                ),
+            )
+        } catch (err) {
+            console.error('Error loading viewed feed items state')
+            throw err
+        }
+    }
+    private async commitState() {
+        await Promise.all(
+            entriesOf(this.stateFiles).map(async ([stateKey, file]) => {
+                const contents = JSON.stringify(this.state[stateKey], null, 2)
+                await fs.writeFile(file.path, contents)
+            }),
+        )
     }
 }

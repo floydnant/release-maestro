@@ -2,9 +2,8 @@ import 'dotenv/config'
 import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import bandcampFetch from 'bandcamp-fetch'
 import { diContainer } from './di'
-import { FeedBackendService } from './feed/feed.backend.service'
+import { FeedBackendService, HydratedFeedItem } from './feed/feed.backend.service'
 
 let win: BrowserWindow | null = null
 const args = process.argv.slice(1),
@@ -99,16 +98,6 @@ try {
 
 // @TODO: we need some kind of controller/type-wrapper for the backend <> frontend comms
 
-ipcMain.handle('bandcamp-fetch-album', async (_event, albumUrl: string) => {
-    return await bandcampFetch.album.getInfo({ albumUrl })
-})
-ipcMain.handle('bandcamp-fetch-track', async (_event, trackUrl: string) => {
-    return await bandcampFetch.track.getInfo({ trackUrl })
-})
-ipcMain.handle('bandcamp-fetch-label', async (_event, bandUrl: string) => {
-    return await bandcampFetch.band.getInfo({ bandUrl })
-})
-
 ipcMain.handle('open-url', async (_event, url: string) => {
     shell.openExternal(url)
 })
@@ -117,3 +106,11 @@ ipcMain.handle('load-feed', async (_event, index: number, count: number) => {
     const feedService = await diContainer.get(FeedBackendService)
     return await feedService.loadFeed(index, count)
 })
+
+ipcMain.handle(
+    'mark-feed-item-viewed',
+    async (_event, id: string, feedItemType: HydratedFeedItem['type'], showMeAgain: boolean = false) => {
+        const feedService = await diContainer.get(FeedBackendService)
+        return await feedService.markFeedItemAsViewed(id, feedItemType, showMeAgain)
+    },
+)
