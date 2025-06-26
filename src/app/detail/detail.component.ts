@@ -11,6 +11,7 @@ import { FeedService } from '../core/services/feed.service'
 import { IntersectionDirective } from '../shared/directives/intersection.directive'
 import { SafePipe } from '../shared/pipes/safe.pipe'
 import { formatDateRelative, formatDuration } from '../shared/utils/formatting.utils'
+import { assertUnreachable } from '../shared/utils/type-guards.utils'
 
 @Component({
     selector: 'app-detail',
@@ -83,19 +84,21 @@ export class DetailComponent {
             this.furthestScrolledIndex.set(Math.max(this.furthestScrolledIndex(), index))
             this.viewedFeedItems.add(feedItem.id)
 
-            // @TODO: Handle all feed item types
-
-            const streamUrl = feedItem.data.tracks?.find(track => track.streamUrl)?.streamUrl
-            if (!streamUrl) {
-                console.warn('No stream URL found for release:', feedItem)
-            } else {
-                // @TODO: also check if a different track but from the same feed item is playing
-                if (this.audioPlayer.currentUrl() == streamUrl) {
-                    // Already playing the track, don't restart it
+            if (feedItem.type == 'BANDCAMP.NEW_RELEASE') {
+                const streamUrl = feedItem.data.tracks?.find(track => track.streamUrl)?.streamUrl
+                if (!streamUrl) {
+                    console.warn('No stream URL found for release:', feedItem)
                 } else {
-                    this.audioPlayer.playSource(streamUrl)
-                    this.scrollCurrentTrackIntoView()
+                    // @TODO: also check if a different track but from the same feed item is playing
+                    if (this.audioPlayer.currentUrl() == streamUrl) {
+                        // Already playing the track, don't restart it
+                    } else {
+                        this.audioPlayer.playSource(streamUrl)
+                        this.scrollCurrentTrackIntoView()
+                    }
                 }
+            } else {
+                assertUnreachable(feedItem.type, `Unhandled feed item type: ${feedItem.type}`)
             }
 
             return
@@ -157,31 +160,33 @@ export class DetailComponent {
     nextTrack(event?: KeyboardEvent) {
         event?.preventDefault()
 
-        // @TODO: Handle all feed item types
-        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]?.data
+        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
         if (!currentFeedItem) {
             console.log('No current feed item')
             return
         }
+        if (currentFeedItem.type == 'BANDCAMP.NEW_RELEASE') {
+            const currentPlayingTrackIndex = currentFeedItem.data.tracks.findIndex(
+                track => track.streamUrl == this.audioPlayer.currentUrl(),
+            )
+            if (currentPlayingTrackIndex == -1) {
+                console.log('No current playing track')
+                return
+            }
+            const nextPlayableTrack = currentFeedItem.data.tracks.find(
+                (track, index) => index > currentPlayingTrackIndex && !!track.streamUrl,
+            )
+            if (!nextPlayableTrack) {
+                console.log('No next track to play, scrolling down')
+                this.scrollDown()
+                return
+            }
 
-        const currentPlayingTrackIndex = currentFeedItem.tracks.findIndex(
-            track => track.streamUrl == this.audioPlayer.currentUrl(),
-        )
-        if (currentPlayingTrackIndex == -1) {
-            console.log('No current playing track')
-            return
+            this.audioPlayer.playSource(nextPlayableTrack.streamUrl!)
+            this.scrollCurrentTrackIntoView()
+        } else {
+            assertUnreachable(currentFeedItem.type, `Unhandled feed item type: ${currentFeedItem.type}`)
         }
-        const nextPlayableTrack = currentFeedItem.tracks.find(
-            (track, index) => index > currentPlayingTrackIndex && !!track.streamUrl,
-        )
-        if (!nextPlayableTrack) {
-            console.log('No next track to play, scrolling down')
-            this.scrollDown()
-            return
-        }
-
-        this.audioPlayer.playSource(nextPlayableTrack.streamUrl!)
-        this.scrollCurrentTrackIntoView()
     }
 
     _autoPlayNextTrackSubscription = this.audioPlayer.ended$.pipe(takeUntilDestroyed()).subscribe(() => {
@@ -193,85 +198,98 @@ export class DetailComponent {
     prevTrack(event?: KeyboardEvent) {
         event?.preventDefault()
 
-        // @TODO: Handle all feed item types
-        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]?.data
+        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
         if (!currentFeedItem) {
             console.warn('No current feed item')
             return
         }
-
-        const currentPlayingTrackIndex = currentFeedItem.tracks.findIndex(
-            track => track.streamUrl == this.audioPlayer.currentUrl(),
-        )
-        if (currentPlayingTrackIndex == -1) {
-            console.log('No current playing track')
-            return
-        }
-
-        let prevPlayableTrackIndex = -1
-        for (let index = currentPlayingTrackIndex - 1; index >= 0; index--) {
-            if (currentFeedItem.tracks[index]?.streamUrl) {
-                prevPlayableTrackIndex = index
-                break
+        if (currentFeedItem.type == 'BANDCAMP.NEW_RELEASE') {
+            const currentPlayingTrackIndex = currentFeedItem.data.tracks.findIndex(
+                track => track.streamUrl == this.audioPlayer.currentUrl(),
+            )
+            if (currentPlayingTrackIndex == -1) {
+                console.log('No current playing track')
+                return
             }
-        }
-        if (prevPlayableTrackIndex == -1) {
-            console.log('No prev track to play, scrolling up')
-            this.scrollUp()
-            return
-        }
 
-        this.audioPlayer.playSource(currentFeedItem.tracks[prevPlayableTrackIndex]!.streamUrl!)
-        this.scrollCurrentTrackIntoView()
+            let prevPlayableTrackIndex = -1
+            for (let index = currentPlayingTrackIndex - 1; index >= 0; index--) {
+                if (currentFeedItem.data.tracks[index]?.streamUrl) {
+                    prevPlayableTrackIndex = index
+                    break
+                }
+            }
+            if (prevPlayableTrackIndex == -1) {
+                console.log('No prev track to play, scrolling up')
+                this.scrollUp()
+                return
+            }
+
+            this.audioPlayer.playSource(currentFeedItem.data.tracks[prevPlayableTrackIndex]!.streamUrl!)
+            this.scrollCurrentTrackIntoView()
+        } else {
+            assertUnreachable(currentFeedItem.type, `Unhandled feed item type: ${currentFeedItem.type}`)
+        }
     }
 
     @HostListener('document:keydown.O', ['$event'])
     openCurrentFeedItemInBrowser(event: KeyboardEvent) {
         event.preventDefault()
 
-        // @TODO: Handle all feed item types
-        const url = this.feed()?.[this.currentFeedIndex()]?.data.releaseUrl
-        if (!url) {
-            console.warn('No current release url')
+        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
+        if (!currentFeedItem) {
+            console.warn('No current feed item to open in browser')
             return
         }
-        this.electronService.openUrl(url)
+        if (currentFeedItem.type == 'BANDCAMP.NEW_RELEASE') {
+            const url = currentFeedItem.data.releaseUrl
+            if (!url) {
+                console.warn('No current release url')
+                return
+            }
+            this.electronService.openUrl(url)
+        } else {
+            assertUnreachable(currentFeedItem.type, `Unhandled feed item type: ${currentFeedItem.type}`)
+        }
     }
 
     scrollCurrentTrackIntoView() {
-        // @TODO: Handle all feed item types
-        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]?.data
+        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
         if (!currentFeedItem) {
             console.log('No current feed item')
             return
         }
-        const currentPlayingTrackIndex = currentFeedItem.tracks.findIndex(
-            track => track.streamUrl == this.audioPlayer.currentUrl(),
-        )
-        if (currentPlayingTrackIndex == -1) {
-            console.log('No current playing track')
-            return
-        }
-        const currentTrackElement = this.feedEntries()[this.currentFeedIndex()]?.nativeElement.querySelector(
-            `.track[data-track-index="${currentPlayingTrackIndex}"]`,
-        )
+        if (currentFeedItem.type == 'BANDCAMP.NEW_RELEASE') {
+            const currentPlayingTrackIndex = currentFeedItem.data.tracks.findIndex(
+                track => track.streamUrl == this.audioPlayer.currentUrl(),
+            )
+            if (currentPlayingTrackIndex == -1) {
+                console.log('No current playing track')
+                return
+            }
+            const currentTrackElement = this.feedEntries()[
+                this.currentFeedIndex()
+            ]?.nativeElement.querySelector(`.track[data-track-index="${currentPlayingTrackIndex}"]`)
 
-        if (currentTrackElement) {
-            setTimeout(() => {
-                const trackRect = currentTrackElement.getBoundingClientRect()
-                const parentRect = currentTrackElement?.parentElement?.getBoundingClientRect()
-                if (!parentRect) {
-                    console.warn('Parent element not found for current track element')
-                }
+            if (currentTrackElement) {
+                setTimeout(() => {
+                    const trackRect = currentTrackElement.getBoundingClientRect()
+                    const parentRect = currentTrackElement?.parentElement?.getBoundingClientRect()
+                    if (!parentRect) {
+                        console.warn('Parent element not found for current track element')
+                    }
 
-                const isVisible =
-                    parentRect && trackRect.top >= parentRect.top && trackRect.bottom <= parentRect.bottom
-                if (!isVisible) {
-                    currentTrackElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                }
-            }, 100)
+                    const isVisible =
+                        parentRect && trackRect.top >= parentRect.top && trackRect.bottom <= parentRect.bottom
+                    if (!isVisible) {
+                        currentTrackElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    }
+                }, 100)
+            } else {
+                console.warn('Current track element not found in the DOM')
+            }
         } else {
-            console.warn('Current track element not found in the DOM')
+            assertUnreachable(currentFeedItem.type, `Unhandled feed item type: ${currentFeedItem.type}`)
         }
     }
 
