@@ -152,11 +152,11 @@
                                     "
                                 >
                                     <!-- @TODO: this may need to be made reactive -->
-                                    @if (snoozedFeedItems.has(feedItem.id)) {
-                                        <i class="fas fa-alarm-snooze"></i>
-                                    } @else {
-                                        <i class="far fa-alarm-snooze"></i>
-                                    }
+                                    <i
+                                        class="{{
+                                            snoozedFeedItems.has(feedItem.id) ? 'fas' : 'far'
+                                        }} fa-alarm-snooze"
+                                    ></i>
                                 </button>
                             </div>
                         </div>
