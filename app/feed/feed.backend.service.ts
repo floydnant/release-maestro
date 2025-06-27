@@ -13,6 +13,12 @@ import { PROVIDER_INIT } from '../utils/dependency-injection.util'
  */
 const FEED_ITEM_SNOOZE_TIME_MS = 1000 * 60 * 60 * 24 * 16
 
+/**
+ * Don't create view history entries for feed items that were viewed in the last 3 minutes.
+ * This is to prevent spamming the view history when the user is scrolling up and down the feed.
+ */
+const FEED_VIEW_HISTORY_THROTTLE_TIME_MS = 1000 * 60 * 3
+
 type FeedItemBase = {
     id: string
     type: string
@@ -87,19 +93,20 @@ export type HydratedBandcampReleaseFeedItem = ReturnType<typeof mapBandcampRelea
 
 export type HydratedFeedItem = HydratedBandcampReleaseFeedItem
 
-const feedItemViewEventSchema = z.object({
+const feedViewHistoryEntrySchema = z.object({
     id: z.string(),
     feedItemId: z.string(),
     ts: z.date({ coerce: true }),
     type: z.enum(['BANDCAMP_EMAIL.NEW_RELEASE']) satisfies z.Schema<HydratedFeedItem['type']>,
 })
-export type FeedItemViewEvent = z.infer<typeof feedItemViewEventSchema>
+export type FeedViewHistoryEntry = z.infer<typeof feedViewHistoryEntrySchema>
 
 const feedItemStateObject = z.object({
     id: z.string(),
     type: z.enum(['BANDCAMP_EMAIL.NEW_RELEASE']) satisfies z.Schema<HydratedFeedItem['type']>,
     isViewed: z.boolean(),
     isSnoozed: z.boolean(),
+    lastViewedAt: z.date({ coerce: true }),
 })
 export class FeedBackendService {
     constructor(
@@ -174,26 +181,16 @@ export class FeedBackendService {
         return hydratedFeedItems
     }
 
-    getLastFeedItemViewEvent(itemId: string): FeedItemViewEvent | null {
-        for (let i = this.state.feedItemViewEvents.length - 1; i >= 0; i--) {
-            const event = this.state.feedItemViewEvents[i]!
-
-            if (event.feedItemId === itemId) {
-                return event
-            }
-        }
-        return null
-    }
-
     shouldShowFeedItem(item: BandcampEmailFeedItem): boolean {
+        const feedItem = this.state.feedItemState[item.id]
+
         return (
             // Show if the item is unviewed
-            !this.state.feedItemState[item.id]?.isViewed ||
+            !feedItem?.isViewed ||
             // or marked as snoozed
-            (this.state.feedItemState[item.id]?.isSnoozed
+            (feedItem.isSnoozed
                 ? // and hasn't been viewed in the configured snoozed time frame
-                  (this.getLastFeedItemViewEvent(item.id)?.ts || 0) <
-                  new Date(Date.now() - FEED_ITEM_SNOOZE_TIME_MS)
+                  (feedItem.lastViewedAt || 0) < new Date(Date.now() - FEED_ITEM_SNOOZE_TIME_MS)
                 : false)
         )
     }
@@ -215,17 +212,27 @@ export class FeedBackendService {
     }
 
     async markFeedItemAsViewed(id: string, feedItemType: HydratedFeedItem['type'], isSnoozed: boolean) {
-        this.state.feedItemViewEvents.push({
-            id: crypto.randomUUID(),
-            feedItemId: id,
-            ts: new Date(),
-            type: feedItemType,
-        })
+        // Only create a view event if the item was not viewed in the last X mins
+        // (prevent spamming the view history when the user is e.g. scrolling up and down the feed)
+        if (
+            this.state.feedItemState[id]?.lastViewedAt
+                ? this.state.feedItemState[id].lastViewedAt <
+                  new Date(Date.now() - FEED_VIEW_HISTORY_THROTTLE_TIME_MS)
+                : true
+        ) {
+            this.state.feedItemViewEvents.push({
+                id: crypto.randomUUID(),
+                feedItemId: id,
+                ts: new Date(),
+                type: feedItemType,
+            })
+        }
         this.state.feedItemState[id] = {
             id,
             type: feedItemType,
             isViewed: true,
             isSnoozed: isSnoozed,
+            lastViewedAt: new Date(),
         }
 
         if (feedItemType == 'BANDCAMP_EMAIL.NEW_RELEASE') {
@@ -240,12 +247,18 @@ export class FeedBackendService {
 
     private stateFiles = {
         feedItemViewEvents: {
-            path: './state/feed-item-view-events.json',
-            schema: feedItemViewEventSchema.array().catch([]),
+            path: './state/feed-view-history.json',
+            schema: feedViewHistoryEntrySchema.array().catch(err => {
+                console.error('Failed to parse feed view history (falling back to default state):', err)
+                return []
+            }),
         },
         feedItemState: {
             path: './state/feed-items-state.json',
-            schema: z.record(z.string(), feedItemStateObject).catch({}),
+            schema: z.record(z.string(), feedItemStateObject).catch(err => {
+                console.error('Failed to parse feed items state (falling back to default state):', err)
+                return {}
+            }),
         },
     } satisfies Record<string, { path: string; schema: z.ZodCatch<z.Schema> }>
     private state!: {
