@@ -25,8 +25,8 @@ const mapBandcampEmailToFeedItem = (email: BandcampEmail) => {
     }
 
     return {
-        id: 'bandcamp-release-email.' + email.messageId,
-        type: `BANDCAMP.${email.bandcampEmailType}` as const,
+        id: 'bandcamp-email.' + email.messageId,
+        type: `BANDCAMP_EMAIL.${email.bandcampEmailType}` as const,
         email,
     } satisfies FeedItemBase
 }
@@ -42,7 +42,7 @@ const mapLinkStashItemToFeedItem = (data: unknown) => {
 }
 
 export const mapBandcampReleaseFeedItemToHydratedFeedItem = (
-    { email, ...item }: Extract<BandcampEmailFeedItem, { type: 'BANDCAMP.NEW_RELEASE' }>,
+    { email, ...item }: Extract<BandcampEmailFeedItem, { type: 'BANDCAMP_EMAIL.NEW_RELEASE' }>,
     releaseData: Album | Track | null,
     bandData: Label | Artist | null,
 ) => {
@@ -91,13 +91,13 @@ const feedItemViewEventSchema = z.object({
     id: z.string(),
     feedItemId: z.string(),
     ts: z.date({ coerce: true }),
-    type: z.enum(['BANDCAMP.NEW_RELEASE']) satisfies z.Schema<HydratedFeedItem['type']>,
+    type: z.enum(['BANDCAMP_EMAIL.NEW_RELEASE']) satisfies z.Schema<HydratedFeedItem['type']>,
 })
 export type FeedItemViewEvent = z.infer<typeof feedItemViewEventSchema>
 
 const feedItemStateObject = z.object({
     id: z.string(),
-    type: z.enum(['BANDCAMP.NEW_RELEASE']) satisfies z.Schema<HydratedFeedItem['type']>,
+    type: z.enum(['BANDCAMP_EMAIL.NEW_RELEASE']) satisfies z.Schema<HydratedFeedItem['type']>,
     isViewed: z.boolean(),
     isSnoozed: z.boolean(),
 })
@@ -164,7 +164,7 @@ export class FeedBackendService {
     async hydrateFeed(items: BandcampEmailFeedItem[]): Promise<HydratedFeedItem[]> {
         console.log('Hydrating feed items')
         const promises = items.map(async item => {
-            if (item.type == 'BANDCAMP.NEW_RELEASE') return await this.hydrateBandcampFeedItem(item)
+            if (item.type == 'BANDCAMP_EMAIL.NEW_RELEASE') return await this.hydrateBandcampFeedItem(item)
 
             return assertUnreachable(item.type, 'Unhandled feed item type: ' + item.type)
         })
@@ -228,7 +228,7 @@ export class FeedBackendService {
             isSnoozed: isSnoozed,
         }
 
-        if (feedItemType == 'BANDCAMP.NEW_RELEASE') {
+        if (feedItemType == 'BANDCAMP_EMAIL.NEW_RELEASE') {
             // @TODO: mark email as read
         } else {
             return assertUnreachable(feedItemType, 'Unhandled feed item type: ' + feedItemType)

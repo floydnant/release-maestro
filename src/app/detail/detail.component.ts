@@ -84,7 +84,7 @@ export class DetailComponent {
             this.furthestScrolledIndex.set(Math.max(this.furthestScrolledIndex(), index))
             this.viewedFeedItems.add(feedItem.id)
 
-            if (feedItem.type == 'BANDCAMP.NEW_RELEASE') {
+            if (feedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
                 const streamUrl = feedItem.data.tracks?.find(track => track.streamUrl)?.streamUrl
                 if (!streamUrl) {
                     console.warn('No stream URL found for release:', feedItem)
@@ -165,7 +165,7 @@ export class DetailComponent {
             console.log('No current feed item')
             return
         }
-        if (currentFeedItem.type == 'BANDCAMP.NEW_RELEASE') {
+        if (currentFeedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
             const currentPlayingTrackIndex = currentFeedItem.data.tracks.findIndex(
                 track => track.streamUrl == this.audioPlayer.currentUrl(),
             )
@@ -203,7 +203,7 @@ export class DetailComponent {
             console.warn('No current feed item')
             return
         }
-        if (currentFeedItem.type == 'BANDCAMP.NEW_RELEASE') {
+        if (currentFeedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
             const currentPlayingTrackIndex = currentFeedItem.data.tracks.findIndex(
                 track => track.streamUrl == this.audioPlayer.currentUrl(),
             )
@@ -241,7 +241,7 @@ export class DetailComponent {
             console.warn('No current feed item to open in browser')
             return
         }
-        if (currentFeedItem.type == 'BANDCAMP.NEW_RELEASE') {
+        if (currentFeedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
             const url = currentFeedItem.data.releaseUrl
             if (!url) {
                 console.warn('No current release url')
@@ -259,7 +259,7 @@ export class DetailComponent {
             console.log('No current feed item')
             return
         }
-        if (currentFeedItem.type == 'BANDCAMP.NEW_RELEASE') {
+        if (currentFeedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
             const currentPlayingTrackIndex = currentFeedItem.data.tracks.findIndex(
                 track => track.streamUrl == this.audioPlayer.currentUrl(),
             )
