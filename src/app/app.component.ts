@@ -1,7 +1,7 @@
 import { Component } from '@angular/core'
 import { ElectronService } from './core/services'
 import { TranslateService } from '@ngx-translate/core'
-import { APP_CONFIG } from '../environments/environment'
+import { webEnv } from '../environments/environment'
 import { RouterOutlet } from '@angular/router'
 
 @Component({
@@ -17,7 +17,7 @@ export class AppComponent {
         private translate: TranslateService,
     ) {
         this.translate.setDefaultLang('en')
-        console.log('APP_CONFIG', APP_CONFIG)
+        console.log('webEnv', webEnv)
 
         if (electronService.isElectron) {
             console.log('Run in electron')

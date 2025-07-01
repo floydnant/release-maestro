@@ -7,6 +7,8 @@ import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.serv
 import { BandcampEmailBackendService } from '../bandcamp/bandcamp-email.backend.service'
 import { BandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { PROVIDER_INIT } from '../utils/dependency-injection.util'
+import { appEnv } from '../app-env'
+import path from 'path'
 
 /**
  * The time after which a feed item should be shown again if it was marked as snoozed.
@@ -114,18 +116,19 @@ export class FeedBackendService {
         private bandcampApiService: BandcampApiBackendService,
     ) {}
 
+    private appDataPath = appEnv.APP_DATA_PATH
+    private stateBasePath = path.join(this.appDataPath, './state')
+
     async [PROVIDER_INIT]() {
-        console.log('Initializing FeedBackendService')
-        if (
-            !(await fs
-                .stat('./state')
-                .then(() => true)
-                .catch(() => false))
-        ) {
-            await fs.mkdir('./state')
+        const isExisting = await fs
+            .stat(this.stateBasePath)
+            .then(() => true)
+            .catch(() => false)
+        if (!isExisting) {
+            await fs.mkdir(this.stateBasePath, { recursive: true })
         }
+
         await this.loadState()
-        console.log('FeedBackendService initialized')
     }
 
     private bandcampFeedCache: BandcampEmailFeedItem[] | null = null
@@ -247,14 +250,14 @@ export class FeedBackendService {
 
     private stateFiles = {
         feedItemViewEvents: {
-            path: './state/feed-view-history.json',
+            path: path.join(this.stateBasePath, '/feed-view-history.json'),
             schema: feedViewHistoryEntrySchema.array().catch(err => {
                 console.error('Failed to parse feed view history (falling back to default state):', err)
                 return []
             }),
         },
         feedItemState: {
-            path: './state/feed-items-state.json',
+            path: path.join(this.stateBasePath, '/feed-items-state.json'),
             schema: z.record(z.string(), feedItemStateObject).catch(err => {
                 console.error('Failed to parse feed items state (falling back to default state):', err)
                 return {}

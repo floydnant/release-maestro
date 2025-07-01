@@ -5,7 +5,7 @@ import { importProvidersFrom } from '@angular/core'
 import { provideRouter } from '@angular/router'
 
 import { AppComponent } from './app/app.component'
-import { APP_CONFIG } from './environments/environment'
+import { webEnv } from './environments/environment'
 import { CoreModule } from './app/core/core.module'
 import { SharedModule } from './app/shared/shared.module'
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core'
@@ -19,7 +19,7 @@ import { DetailComponent } from './app/detail/detail.component'
 const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader =>
     new TranslateHttpLoader(http, './assets/i18n/', '.json')
 
-if (APP_CONFIG.production) {
+if (webEnv.production) {
     enableProdMode()
 }
 

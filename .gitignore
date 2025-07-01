@@ -41,7 +41,7 @@ testem.log
 /typings
 .nx
 .env
-state
+.app-data*
 
 # e2e
 /e2e/*.js
