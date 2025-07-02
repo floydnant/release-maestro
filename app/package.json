@@ -10,6 +10,7 @@
     "private": true,
     "dependencies": {
         "bandcamp-fetch": "^2.0.0",
+        "cheerio": "^1.1.0",
         "dotenv": "^17.0.1"
     }
 }

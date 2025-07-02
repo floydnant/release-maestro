@@ -3,12 +3,13 @@ import * as fs from 'fs/promises'
 import { z } from 'zod'
 import { entriesOf } from '../../src/app/shared/utils/object.utils'
 import { assertUnreachable, isTruthy } from '../../src/app/shared/utils/type-guards.utils'
-import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
+import { BandcampApiBackendService, ScrapedBandcampData } from '../bandcamp/bandcamp-api.backend.service'
 import { BandcampEmailBackendService } from '../bandcamp/bandcamp-email.backend.service'
 import { BandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { PROVIDER_INIT } from '../utils/dependency-injection.util'
 import { appEnv } from '../app-env'
 import path from 'path'
+import { ScrapedLinkMetadata, WebScrapingService } from '../web-scraping/web-scraping.service'
 
 /**
  * The time after which a feed item should be shown again if it was marked as snoozed.
@@ -49,10 +50,18 @@ const mapLinkStashItemToFeedItem = (data: unknown) => {
     } satisfies FeedItemBase
 }
 
+const BANDCAMP_FAN_UNSUBSCRIBE_PATH = 'fan_unsubscribe'
+const isUsefulUrlFromBandcampEmail = (link: string): boolean =>
+    !link.includes('f4.bcbits.com') &&
+    !link.includes('https://bandcamp.com/img/email/bc-logo-small-2.gif') &&
+    !link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH)
+
 export const mapBandcampReleaseFeedItemToHydratedFeedItem = (
     { email, ...item }: Extract<BandcampEmailFeedItem, { type: 'BANDCAMP_EMAIL.NEW_RELEASE' }>,
     releaseData: Album | Track | null,
     bandData: Label | Artist | null,
+    scrapedData: ScrapedBandcampData | null,
+    linkMetadataMap: Record<string, ScrapedLinkMetadata | null> | null,
 ) => {
     return {
         ...item,
@@ -66,23 +75,36 @@ export const mapBandcampReleaseFeedItemToHydratedFeedItem = (
             label: bandData,
             artist: releaseData?.artist,
             releaseType: email.releaseType,
-            plainBody: email.plainBody
-                .replace(/\s*\?\s*/g, '\n')
-                .replace(/�/g, '')
-                .replace(
-                    /((Unfollow|Unsubscribe) .+)(?=\n)/i,
-                    `<a href="${email.links?.find(link => link.includes('fan_unsubscribe'))}">$1</a>`,
-                )
-                .replace(/check it out here/i, match => `<a href="${email.releaseUrl}">${match}</a>`)
-                .trim()
-                .replace(/\n/g, '<br>'),
-            links: email.links?.filter(
-                link =>
-                    !link.includes('f4.bcbits.com') &&
-                    !link.includes('fan_unsubscribe') &&
-                    !link.includes('https://bandcamp.com/img/email/bc-logo-small-2.gif'),
-            ),
-            imageUrl: releaseData?.imageUrl || email.links?.find(link => link.includes('f4.bcbits.com')),
+            about:
+                scrapedData?.about
+                    .replace(/^\s*(released|releases).+\n/m, '')
+                    .replace(/(^((<br>)|\n|\s)+)|(((<br>)|\n|\s)+$)/g, '') ||
+                email.plainBody
+                    .replace(/(\s{2,}\?\s*)|(\s*\?\s{2,})/g, '\n')
+                    .replace(/�/g, '')
+                    .replace(
+                        /((Unfollow|Unsubscribe) .+)(?=\n)/i,
+                        `<a href="${email.links?.find(link => link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH))}">$1</a>`,
+                    )
+                    .replace(/check it out here/i, match => `<a href="${email.releaseUrl}">${match}</a>`)
+                    .trim()
+                    .replace(/\n/g, '<br>'),
+            links: [...new Set(email.links)]?.filter(isUsefulUrlFromBandcampEmail).map(url => {
+                const meta = linkMetadataMap?.[url]
+                return {
+                    title: meta?.title || url,
+                    favicon: meta?.favicon,
+                    url: url,
+                }
+            }),
+            unsubscribeUrl: email.links?.find(link => link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH)) || null,
+            unsubscribeText:
+                email.plainBody.match(/((Unfollow|Unsubscribe) .+)(?=\n)/i)?.[0].replace(/�/g, '') ||
+                'Unfollow',
+            imageUrl:
+                scrapedData?.artworkUrl ||
+                releaseData?.imageUrl?.replace('_9.jpg', '_16.jpg') || // Bump the image size for better quality
+                email.links?.find(link => link.includes('f4.bcbits.com'))?.replace('_9.jpg', '_16.jpg'),
             iframeUrl: releaseData?.id
                 ? `https://bandcamp.com/EmbeddedPlayer/${email.releaseType}=${releaseData.id}/size=large/bgcol=999999/linkcol=0687f5`
                 : null,
@@ -114,6 +136,7 @@ export class FeedBackendService {
     constructor(
         private bandcampEmailService: BandcampEmailBackendService,
         private bandcampApiService: BandcampApiBackendService,
+        private webScrapingService: WebScrapingService,
     ) {}
 
     private appDataPath = appEnv.APP_DATA_PATH
@@ -153,21 +176,34 @@ export class FeedBackendService {
         if (!item.email.releaseUrl) {
             console.warn('No release link found:', item.email)
 
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null)
+            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null, null)
         } else {
             const labelUrl = item.email.releaseUrl.match(/https?:\/\/[\w-]+\.bandcamp\.com/)?.[0]
 
-            const [releaseData, labelData] = await Promise.all([
-                this.bandcampApiService.fetchRelease(item.email.releaseUrl),
+            const [releaseData, labelData, scrapedData, linkMetadataMap] = await Promise.all([
+                this.bandcampApiService.getRelease(item.email.releaseUrl),
                 labelUrl
-                    ? this.bandcampApiService.fetchBand(labelUrl).catch(err => {
+                    ? this.bandcampApiService.getBand(labelUrl).catch(err => {
                           console.error('Failed to load band', err)
                           return null
                       })
                     : null,
+                this.bandcampApiService.scrapeRelease(item.email.releaseUrl),
+                this.webScrapingService
+                    .getLinkMetaDataBatch([...new Set(item.email.links.filter(isUsefulUrlFromBandcampEmail))])
+                    .catch(err => {
+                        console.error('Failed to scrape links', err)
+                        return null
+                    }),
             ])
 
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, releaseData, labelData)
+            return mapBandcampReleaseFeedItemToHydratedFeedItem(
+                item,
+                releaseData,
+                labelData,
+                scrapedData,
+                linkMetadataMap,
+            )
         }
     }
 

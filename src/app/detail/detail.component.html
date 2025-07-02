@@ -74,7 +74,7 @@
                         </div>
 
                         <div
-                            class="text-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto flex flex-col justify-between"
+                            class="text-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto flex flex-col justify-between relative"
                         >
                             <div class="">
                                 <h2 class="release-name | text-3xl">
@@ -121,43 +121,61 @@
                                 </div>
 
                                 <p
-                                    class="body | mt-6 text-sm text-tinted-200"
-                                    [innerHTML]="feedItem.data.plainBody | safe: 'html'"
+                                    class="about | mt-5 text-sm text-tinted-200"
+                                    [innerHTML]="feedItem.data.about | safe: 'html'"
                                 ></p>
 
-                                <ul class="other-links | text-sm">
+                                <!-- @TODO: abstract this into a <link-meta-previews /> -->
+                                <ul class="links | text-sm mt-6 flex flex-wrap gap-1">
                                     @for (link of feedItem.data.links; track $index) {
-                                        <li>
+                                        <li class="w-full flex">
                                             <a
-                                                [href]="link"
+                                                [href]="link.url"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                class="wrap-nicely"
+                                                class="flex items-center gap-1.5 bg-tinted-750 not-hover:text-tinted-400 rounded-md py-1 px-2 max-w-full truncate"
+                                                [title]="link.url"
                                             >
-                                                {{ link }}
+                                                <img
+                                                    class="favicon"
+                                                    [src]="link.favicon"
+                                                    alt="Favicon for {{ link.title }}"
+                                                    width="16"
+                                                    height="16"
+                                                />
+
+                                                <span class="inline-block truncate">{{ link.title }}</span>
                                             </a>
                                         </li>
                                     }
                                 </ul>
                             </div>
 
-                            <div class="feed-controls | text-xl text-tinted-400 flex justify-end">
-                                <button
-                                    class="flex gap-2 items-center hover:underline"
-                                    (click)="toggleCurrentFeedItemSnoozedState()"
-                                    [title]="
-                                        snoozedFeedItems.has(feedItem.id)
-                                            ? 'Click to un-snooze (dont\'t show again)'
-                                            : 'Click to snooze (show again tomorrow)'
-                                    "
+                            <div class="feed-controls | mt-4 sticky bottom-0 flex justify-end">
+                                <div
+                                    class="shadow-overlay | h-full w-full z-0 bg-gradient-to-b from-transparent to-tinted-800"
+                                ></div>
+
+                                <div
+                                    class="text-xl text-tinted-400 flex bg-tinted-800 rounded-tl-xl p-2 pr-4"
                                 >
-                                    <!-- @TODO: this may need to be made reactive -->
-                                    <i
-                                        class="{{
-                                            snoozedFeedItems.has(feedItem.id) ? 'fas' : 'far'
-                                        }} fa-alarm-snooze"
-                                    ></i>
-                                </button>
+                                    <button
+                                        class="flex gap-2 items-center hover:underline"
+                                        (click)="toggleCurrentFeedItemSnoozedState()"
+                                        [title]="
+                                            snoozedFeedItems.has(feedItem.id)
+                                                ? 'Click to un-snooze (dont\'t show again)'
+                                                : 'Click to snooze (show again tomorrow)'
+                                        "
+                                    >
+                                        <!-- @TODO: this may need to be made reactive -->
+                                        <i
+                                            class="{{
+                                                snoozedFeedItems.has(feedItem.id) ? 'fas' : 'far'
+                                            }} fa-alarm-snooze"
+                                        ></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -175,7 +193,20 @@
                                 }
                                 <p class="text-sm font-bold mt-2">{{ feedItem.data.label.name }}</p>
                                 <p class="text-xs">{{ feedItem.data.label.location }}</p>
-                                <p class="text-xs mt-2">{{ feedItem.data.label.description }}</p>
+                                @if (feedItem.data.unsubscribeUrl) {
+                                    <a
+                                        [href]="feedItem.data.unsubscribeUrl"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="block mt-2.5 rounded-md py-1 px-2 text-center text-sm bg-tinted-750 not-hover:text-tinted-400 not-hover:no-underline [&_.unfollow]:not-hover:hidden [&_.following]:hover:hidden relative"
+                                        [title]="feedItem.data.unsubscribeText"
+                                    >
+                                        <span class="opacity-0">Text</span>
+                                        <span class="following | absolute inset-0 py-1">Following</span>
+                                        <span class="unfollow | absolute inset-0 py-1">Unfollow</span>
+                                    </a>
+                                }
+                                <p class="text-xs mt-2.5">{{ feedItem.data.label.description }}</p>
                             </div>
                         }
                     </div>

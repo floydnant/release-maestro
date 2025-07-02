@@ -32,7 +32,7 @@ export class DetailComponent {
         toObservable(this.furthestScrolledIndex).pipe(
             mergeScan(
                 async (acc, furthestScrolledIndex) => {
-                    const numPrefetchItems = 4
+                    const numPrefetchItems = 5
                     const lastLoadedItemIndex = (acc?.length || 0) - 1
                     const itemCountToFetch =
                         furthestScrolledIndex + numPrefetchItems - Math.max(lastLoadedItemIndex, 0)
