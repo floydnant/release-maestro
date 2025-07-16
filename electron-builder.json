@@ -6,12 +6,22 @@
     "files": [
         "**/*",
         "!**/*.ts",
-        "!*.map",
+        "!**/*.map",
         "!package.json",
         "!package-lock.json",
         {
             "from": "../dist",
             "filter": ["**/*"]
+        },
+        {
+            "from": "../dist/out-tsc/app",
+            "to": ".",
+            "filter": ["**/*.js"]
+        },
+        {
+            "from": "../dist/out-tsc/src",
+            "to": ".",
+            "filter": ["**/*.js"]
         }
     ],
     "win": {

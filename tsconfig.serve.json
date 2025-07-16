@@ -1,11 +1,7 @@
 {
+    "extends": "./tsconfig.json",
     "compilerOptions": {
-        "sourceMap": true,
-        "declaration": false,
-        "moduleResolution": "node",
-        "emitDecoratorMetadata": true,
-        "experimentalDecorators": true,
-        "esModuleInterop": true,
+        "outDir": "./dist/out-tsc",
         "module": "commonjs",
         "target": "es2015",
         "types": ["node"],
