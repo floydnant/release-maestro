@@ -4,7 +4,6 @@ import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-i
 import { RouterLink } from '@angular/router'
 import { TranslateModule } from '@ngx-translate/core'
 import { mergeScan } from 'rxjs'
-import { HydratedFeedItem } from '../../../app/feed/feed.backend.service'
 import { ElectronService } from '../core/services'
 import { WebAudioPlayer } from '../core/services/audio-player.service'
 import { FeedService } from '../core/services/feed.service'
@@ -12,6 +11,7 @@ import { IntersectionDirective } from '../shared/directives/intersection.directi
 import { SafePipe } from '../shared/pipes/safe.pipe'
 import { formatDateRelative, formatDuration } from '../shared/utils/formatting.utils'
 import { assertUnreachable } from '../shared/utils/type-guards.utils'
+import { HydratedFeedItem } from '../../../app/feed/feed.schema'
 
 @Component({
     selector: 'app-detail',
@@ -84,7 +84,7 @@ export class DetailComponent {
             this.furthestScrolledIndex.set(Math.max(this.furthestScrolledIndex(), index))
             this.viewedFeedItems.add(feedItem.id)
 
-            if (feedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
+            if (feedItem.type == 'BANDCAMP.TRALBUM') {
                 const streamUrl = feedItem.data.tracks?.find(track => track.streamUrl)?.streamUrl
                 if (!streamUrl) {
                     console.warn('No stream URL found for release:', feedItem)
@@ -165,7 +165,7 @@ export class DetailComponent {
             console.log('No current feed item')
             return
         }
-        if (currentFeedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
+        if (currentFeedItem.type == 'BANDCAMP.TRALBUM') {
             const currentPlayingTrackIndex = currentFeedItem.data.tracks.findIndex(
                 track => track.streamUrl == this.audioPlayer.currentUrl(),
             )
@@ -203,7 +203,7 @@ export class DetailComponent {
             console.warn('No current feed item')
             return
         }
-        if (currentFeedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
+        if (currentFeedItem.type == 'BANDCAMP.TRALBUM') {
             const currentPlayingTrackIndex = currentFeedItem.data.tracks.findIndex(
                 track => track.streamUrl == this.audioPlayer.currentUrl(),
             )
@@ -241,7 +241,7 @@ export class DetailComponent {
             console.warn('No current feed item to open in browser')
             return
         }
-        if (currentFeedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
+        if (currentFeedItem.type == 'BANDCAMP.TRALBUM') {
             const url = currentFeedItem.data.releaseUrl
             if (!url) {
                 console.warn('No current release url')
@@ -259,7 +259,7 @@ export class DetailComponent {
             console.log('No current feed item')
             return
         }
-        if (currentFeedItem.type == 'BANDCAMP_EMAIL.NEW_RELEASE') {
+        if (currentFeedItem.type == 'BANDCAMP.TRALBUM') {
             const currentPlayingTrackIndex = currentFeedItem.data.tracks.findIndex(
                 track => track.streamUrl == this.audioPlayer.currentUrl(),
             )

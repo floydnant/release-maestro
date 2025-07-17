@@ -3,7 +3,15 @@ import { DiProviderNotFoundException } from './dependency-injection.exceptions'
 
 type AnyConstructor<TInstance> = new (...args: any[]) => TInstance
 
+/**
+ * Symbol to identify a provider method that is called automatically
+ * by the dependency injection system when the provider is instantiated
+ */
 export const PROVIDER_INIT = Symbol('PROVIDER_INIT')
+/**
+ * Symbol to identify a provider method that is called automatically
+ * by the dependency injection system when the provider is destroyed
+ */
 export const PROVIDER_DESTROY = Symbol('PROVIDER_DESTROY')
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

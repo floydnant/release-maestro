@@ -3,7 +3,9 @@ import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import { diContainer } from './di'
-import { FeedBackendService, HydratedFeedItem } from './feed/feed.backend.service'
+import { FeedBackendService } from './feed/feed.backend.service'
+import { HydratedFeedItem } from './feed/feed.schema'
+import { DatabaseClient } from './database/database.client'
 
 let win: BrowserWindow | null = null
 const args = process.argv.slice(1),
@@ -72,10 +74,18 @@ try {
     // initialization and is ready to create browser windows.
     // Some APIs can only be used after this event occurs.
     // Added 400 ms to fix the black background issue while using transparent window. More detais at https://github.com/electron/electron/issues/15947
-    app.on('ready', () => setTimeout(createWindow, 400))
+    app.on('ready', async () => {
+        // Initialize db client
+        await diContainer.get(DatabaseClient)
+
+        setTimeout(createWindow, 400)
+    })
 
     // Quit when all windows are closed.
-    app.on('window-all-closed', () => {
+    app.on('window-all-closed', async () => {
+        // Cleanup everything: db connection, etc.
+        await diContainer.destroyAll()
+
         // On OS X it is common for applications and their menu bar
         // to stay active until the user quits explicitly with Cmd + Q
         if (process.platform !== 'darwin') {
@@ -100,6 +110,11 @@ try {
 
 ipcMain.handle('open-url', async (_event, url: string) => {
     shell.openExternal(url)
+})
+
+ipcMain.handle('trigger-email-import', async _event => {
+    const feedService = await diContainer.get(FeedBackendService)
+    return await feedService.triggerEmailImport()
 })
 
 ipcMain.handle('load-feed', async (_event, index: number, count: number) => {

@@ -1,6 +1,7 @@
 import { BandcampApiBackendService } from './bandcamp/bandcamp-api.backend.service'
-import { BandcampEmailBackendService } from './bandcamp/bandcamp-email.backend.service'
-import { EmailBackendRepository } from './email/email.backend.repository'
+import { DatabaseClient } from './database/database.client'
+import { EmailBackendRepository, emailImporterPlugins } from './email/email.backend.repository'
+import { FeedBackendRepository } from './feed/feed.backend.repository'
 import { FeedBackendService } from './feed/feed.backend.service'
 import { DiContainer } from './utils/dependency-injection.util'
 import { WebScrapingService } from './web-scraping/web-scraping.service'
@@ -12,16 +13,13 @@ export const diContainer = new DiContainer({
             useFactory: () => new EmailBackendRepository(),
         },
         {
-            provide: BandcampEmailBackendService,
-            useFactory: async di => new BandcampEmailBackendService(await di.get(EmailBackendRepository)),
-        },
-        {
             provide: FeedBackendService,
             useFactory: async di =>
                 new FeedBackendService(
-                    await di.get(BandcampEmailBackendService),
+                    await di.get(EmailBackendRepository),
                     await di.get(BandcampApiBackendService),
                     await di.get(WebScrapingService),
+                    await di.get(FeedBackendRepository),
                 ),
         },
         {
@@ -31,6 +29,18 @@ export const diContainer = new DiContainer({
         {
             provide: WebScrapingService,
             useFactory: () => new WebScrapingService(),
+        },
+        ...Object.values(emailImporterPlugins).map(plugin => ({
+            provide: plugin,
+            useFactory: () => new plugin(),
+        })),
+        {
+            provide: FeedBackendRepository,
+            useFactory: async di => new FeedBackendRepository(await di.get(DatabaseClient)),
+        },
+        {
+            provide: DatabaseClient,
+            useFactory: () => new DatabaseClient(),
         },
     ],
 })

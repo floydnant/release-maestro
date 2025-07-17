@@ -5,6 +5,9 @@
             <!-- @TODO: email count + unread can be brought back later -->
         </h1>
 
+
+        <button (click)="feedService.triggerEmailImport()">trigger import</button>
+
         <a routerLink="/">{{ 'PAGES.DETAIL.BACK_TO_HOME' | translate }}</a>
 
         <div class="flex h-full items-center justify-center">

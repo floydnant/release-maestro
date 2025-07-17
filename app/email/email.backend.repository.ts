@@ -1,21 +1,16 @@
-import * as fs from 'fs/promises'
-import z from 'zod'
+import { diContainer } from '../di'
+import { AppleMailRepository } from './importers/apple-mail.repository'
+import { Email, EmailImporterPlugin } from './email.schema'
 
-const emailSchema = z.object({
-    messageId: z.string(),
-    subject: z.string(),
-    dateReceived: z.string(),
-    sender: z.string(),
-    plainBody: z.string(),
-    htmlBody: z.string(),
-    isRead: z.boolean({ coerce: true }),
-})
-export type Email = z.infer<typeof emailSchema>
+export const emailImporterPlugins = {
+    appleMail: AppleMailRepository,
+} satisfies Record<string, new () => EmailImporterPlugin>
 
 export class EmailBackendRepository {
-    async loadEmails(path: string): Promise<Email[]> {
-        return await fs.readFile(path, 'utf-8').then(data => {
-            return emailSchema.array().parse(JSON.parse(data))
-        })
+    async loadEmails(viaPlugin: keyof typeof emailImporterPlugins): Promise<Email[]> {
+        const plugin = await diContainer.get(emailImporterPlugins[viaPlugin])
+        const emails = await plugin.loadEmails()
+
+        return emails
     }
 }
