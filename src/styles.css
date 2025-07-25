@@ -13,11 +13,6 @@ body {
     color: theme('colors.tinted.100');
 }
 
-a {
-    color: #0f91ff;
-    text-decoration: underline;
-}
-
 * {
     scrollbar-color: theme('colors.tinted.700') transparent;
     scrollbar-width: thin;
@@ -32,5 +27,55 @@ a {
     }
     ::-webkit-scrollbar-thumb {
         @apply bg-tinted-700 hover:bg-tinted-600 rounded-full;
+    }
+}
+
+@layer components {
+    a:not(:where([class*='btn'])) {
+        color: #0f91ff;
+        text-decoration: underline;
+    }
+
+    a.active-link {
+        @apply bg-tinted-600 text-tinted-100;
+    }
+
+    .btn {
+        @apply px-2 py-0.5 rounded-md transition-colors duration-75 block;
+    }
+    .btn-neutral {
+        @apply btn bg-tinted-500 btn-nkd-neutral;
+    }
+    .btn-nkd-neutral {
+        @apply btn hover:bg-tinted-600;
+    }
+
+    .btn-primary {
+        @apply btn bg-submit-600 text-tinted-100 hover:bg-submit-700;
+    }
+
+    .btn-danger {
+        @apply btn bg-danger-600 text-tinted-100 hover:bg-danger-700;
+    }
+    .btn-nkd-danger {
+        @apply btn text-danger-400 hover:bg-tinted-600;
+    }
+
+    input,
+    textarea,
+    button,
+    [contenteditable],
+    a[tabindex] {
+        @apply accent-tinted-400 focus-visible:ring-2 ring-tinted-400 outline-none;
+    }
+
+    input[type='text'],
+    input[type='number'],
+    textarea {
+        @apply bg-transparent text-tinted-100 placeholder-tinted-300;
+    }
+
+    hr {
+        @apply border-tinted-600 my-3;
     }
 }

@@ -1,0 +1,22 @@
+.progress-ring {
+    transition: stroke-dashoffset 0.4s;
+    --rotation: -90deg;
+    transform: rotate(var(--rotation));
+    transform-origin: 50% 50%;
+    stroke-linecap: round;
+}
+.progress-ring-2 {
+    --rotation: -270deg;
+}
+.progress-ring.spin {
+    animation: custom-spin 700ms linear infinite;
+}
+
+@keyframes custom-spin {
+    0% {
+        transform: rotate(calc(var(--rotation) + 0deg));
+    }
+    100% {
+        transform: rotate(calc(var(--rotation) + 360deg));
+    }
+}

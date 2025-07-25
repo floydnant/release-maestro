@@ -41,7 +41,7 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
 }
 
 export class AppleMailRepository implements EmailImporterPlugin {
-    loadEmails(): Observable<EmailImportStreamPacket> {
+    loadEmails(abortSignal: AbortSignal): Observable<EmailImportStreamPacket> {
         // @TODO: this needs to be configurable via some plugin config mechanism
         const mailboxName = 'Bandcamp'
 
@@ -53,10 +53,14 @@ export class AppleMailRepository implements EmailImporterPlugin {
 
         const childProcess = exec(
             `osascript "${appleScriptPath}" "${mailboxName}" "${exportPath}"`,
+            { signal: abortSignal },
             error => {
                 if (error) {
-                    console.error('[AppleMailImporter] ', error)
-                    result$.error(error)
+                    // Only forward the error if it wasn't due to the abort signal
+                    if (!abortSignal.aborted) {
+                        console.error('[AppleMailImporter] ', error)
+                        result$.error(error)
+                    }
                 }
 
                 result$.complete()

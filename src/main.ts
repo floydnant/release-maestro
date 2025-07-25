@@ -14,6 +14,7 @@ import { HttpClient } from '@angular/common/http'
 import { PageNotFoundComponent } from './app/shared/components'
 import { HomeComponent } from './app/home/home.component'
 import { DetailComponent } from './app/detail/detail.component'
+import { ImportComponent } from './app/import/import.component'
 
 // AoT requires an exported function for factories
 const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader =>
@@ -37,8 +38,21 @@ bootstrapApplication(AppComponent, {
                 component: HomeComponent,
             },
             {
-                path: 'detail',
+                path: 'feed',
                 component: DetailComponent,
+            },
+            {
+                path: 'import',
+                component: ImportComponent,
+                children: [
+                    {
+                        path: 'apple-mail',
+                        loadComponent: () =>
+                            import('./app/import/importers/apple-mail/apple-mail.component').then(
+                                m => m.AppleMailImporterComponent,
+                            ),
+                    },
+                ],
             },
             {
                 path: '**',

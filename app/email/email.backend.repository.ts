@@ -8,9 +8,12 @@ export const emailImporterPlugins: Record<EmailVendor, new () => EmailImporterPl
 }
 
 export class EmailBackendRepository {
-    async loadEmails(vendor: EmailVendor): Promise<Observable<EmailImportStreamPacket>> {
+    async loadEmails(
+        vendor: EmailVendor,
+        abortSignal: AbortSignal,
+    ): Promise<Observable<EmailImportStreamPacket>> {
         const plugin = await diContainer.get(emailImporterPlugins[vendor])
 
-        return plugin.loadEmails()
+        return plugin.loadEmails(abortSignal)
     }
 }

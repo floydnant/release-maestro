@@ -113,18 +113,16 @@ ipcMain.handle('open-url', async (_event, url: string) => {
 })
 
 ipcMain.handle('trigger-email-import', async event => {
+    const abortController = new AbortController()
+    ipcMain.once('email-import-abort', () => abortController.abort())
+
     const feedService = await diContainer.get(FeedBackendService)
-    const result$ = await feedService.triggerEmailImport()
+    const result$ = await feedService.triggerEmailImport(abortController.signal)
 
     return new Promise<void>((resolve, reject) => {
         result$.subscribe({
-            next: ({ current, total, email }) => {
-                event.sender.send('email-import-progress', {
-                    current,
-                    total,
-                    // @TODO: we should not have any hardcoded strings in the backend
-                    message: 'Processed ' + email.subject,
-                })
+            next: progressEvent => {
+                event.sender.send('email-import-progress', progressEvent)
             },
             error: err => {
                 reject(err)

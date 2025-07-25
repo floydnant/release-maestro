@@ -23,5 +23,23 @@ export type EmailImportStreamPacket = {
 }
 
 export interface EmailImporterPlugin {
-    loadEmails(): Observable<EmailImportStreamPacket>
+    loadEmails(signal: AbortSignal): Observable<EmailImportStreamPacket>
 }
+
+export type EmailImportProgressUpdate =
+    | {
+          phase: 'processing'
+          current: number
+          total: number
+          message: string
+      }
+    | {
+          phase: 'completed'
+          totalProcessed: number
+          totalImported: number
+          newlyImported: number
+      }
+    | {
+          phase: 'error'
+          errorMessage: string
+      }

@@ -1,4 +1,4 @@
-import { Observable } from 'rxjs'
+import { Observable, tap, TapObserver } from 'rxjs'
 
 export const keysOf = <TObj extends Record<string, unknown>>(obj: TObj): (keyof TObj)[] => {
     return Object.keys(obj)
@@ -69,3 +69,27 @@ export type LeavesConcatenated<T, S extends string = '.', D extends number = 10>
 export const fulfilledOrNull = <T>(result: PromiseSettledResult<T>): T | null => {
     return result.status === 'fulfilled' ? result.value : null
 }
+
+export const debugObserver = <T>(
+    name: string,
+    {
+        subscribe = true,
+        unsubscribe = true,
+        next = true,
+        error = true,
+        complete = true,
+        finalize = false,
+    }: Partial<Record<keyof TapObserver<unknown>, boolean>> = {} as never,
+) =>
+    tap<T>({
+        subscribe: !subscribe
+            ? undefined
+            : () => console.log(`🧩 %csubscribed to %c${name}`, 'color:gray', ''),
+        unsubscribe: !unsubscribe
+            ? undefined
+            : () => console.log(`👋 %cunsubscribed from %c${name}`, 'color:gray', ''),
+        next: !next ? undefined : value => console.log(`🚀 %cnext %c${name}`, 'color:gray', '', value),
+        error: !error ? undefined : error => console.log(`🚨 %cerror %c${name}`, 'color:gray', '', error),
+        complete: !complete ? undefined : () => console.log(`✅ %ccomplete %c${name}`, 'color:gray', ''),
+        finalize: !finalize ? undefined : () => console.log(`🏁 %cfinalize %c${name}`, 'color:gray', ''),
+    })

@@ -1,8 +1,10 @@
-import { bufferCount, bufferTime, concatMap, from } from 'rxjs'
+import { bufferCount, concatMap, materialize, merge, Observable, switchMap } from 'rxjs'
+import { NEVER } from 'zod'
 import { assertUnreachable, isTruthy } from '../../src/app/shared/utils/type-guards.utils'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { EmailBackendRepository } from '../email/email.backend.repository'
+import { EmailImportProgressUpdate } from '../email/email.schema'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
 import { BandcampEmailFeedSourceItem } from './feed-source.schema'
 import { FeedBackendRepository } from './feed.backend.repository'
@@ -42,16 +44,37 @@ export class FeedBackendService {
         private feedBackendRepository: FeedBackendRepository,
     ) {}
 
-    async triggerEmailImport() {
+    async triggerEmailImport(abortSignal: AbortSignal): Promise<Observable<EmailImportProgressUpdate>> {
         console.log('Running email import...')
 
         const importStartedAt = new Date()
         let totalProcessed = 0
         let totalImported = 0
 
-        const emails$ = await this.emailRepo.loadEmails('APPLE_MAIL')
-        emails$
-            .pipe(
+        const emails$ = await this.emailRepo.loadEmails('APPLE_MAIL', abortSignal)
+
+        return merge(
+            emails$.pipe(
+                materialize(),
+                switchMap(async notification => {
+                    if (notification.kind == 'C' || notification.kind == 'E') {
+                        // The next values are already handled by the non-buffered observable in the first part of the merge
+                        return NEVER
+                    }
+                    if (notification.kind == 'N') {
+                        return {
+                            phase: 'processing' as const,
+                            current: notification.value.current,
+                            total: notification.value.total,
+                            // @TODO: this needs to be localized
+                            message: notification.value.email.subject.replace(/�/g, ''),
+                        }
+                    }
+
+                    return assertUnreachable(notification, 'Unhandled notification kind: ' + notification)
+                }),
+            ),
+            emails$.pipe(
                 bufferCount(50),
                 concatMap(async emailPackets => {
                     totalProcessed += emailPackets.length
@@ -67,24 +90,39 @@ export class FeedBackendService {
 
                     await this.feedBackendRepository.ingestFeedItems(feedItems)
                 }),
-            )
-            .subscribe({
-                // @TODO: we need a final summary report to the user
-                complete: async () => {
-                    const newlyImported =
-                        await this.feedBackendRepository.countItemsIngestedAfterDate(importStartedAt)
-                    console.log(
-                        'Email import completed. Total processed:',
-                        totalProcessed,
-                        'Imported:',
-                        totalImported,
-                        'New:',
-                        newlyImported,
-                    )
-                },
-            })
+                materialize(),
+                switchMap(async notification => {
+                    if (notification.kind == 'C') {
+                        const newlyImported =
+                            await this.feedBackendRepository.countItemsIngestedAfterDate(importStartedAt)
 
-        return emails$
+                        return {
+                            phase: 'completed' as const,
+                            totalProcessed,
+                            totalImported,
+                            newlyImported,
+                        }
+                    }
+                    if (notification.kind == 'E') {
+                        console.error('Error during email import:', notification.error)
+
+                        return {
+                            phase: 'error' as const,
+                            errorMessage:
+                                notification.error instanceof Error
+                                    ? notification.error.message
+                                    : 'Unknown error during email import',
+                        }
+                    }
+                    if (notification.kind == 'N') {
+                        // The next values are already handled by the non-buffered observable in the first part of the merge
+                        return NEVER
+                    }
+
+                    return assertUnreachable(notification, 'Unhandled notification kind: ' + notification)
+                }),
+            ),
+        )
     }
 
     // @TODO: error handling

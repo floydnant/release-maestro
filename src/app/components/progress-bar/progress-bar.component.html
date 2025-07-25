@@ -1,0 +1,21 @@
+<div
+    class="progress-container"
+    [class.glow]="shouldGlow()"
+    role="progressbar"
+    [attr.aria-valuenow]="totalPercent()"
+    [attr.aria-valuemin]="0"
+    [attr.aria-valuemax]="100"
+>
+    <div class="progress-bar | bg-tinted-600 flex h-1.5 grow rounded transition-colors">
+        @for (segment of segments(); track $index) {
+            <div
+                class="progress-segment | h-full"
+                [class.rounded-l]="$first"
+                [class.rounded-r]="$last"
+                [style.width]="segment.percent + '%'"
+                [style.background]="segment.colorValue"
+                [style.--color]="segment.colorValue"
+            ></div>
+        }
+    </div>
+</div>

@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common'
 import { Component, ElementRef, HostListener, inject, signal, viewChildren } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
-import { RouterLink } from '@angular/router'
 import { TranslateModule } from '@ngx-translate/core'
-import { mergeScan, Observable, tap, throttleTime } from 'rxjs'
+import { mergeScan } from 'rxjs'
+import { HydratedFeedItem } from '../../../app/feed/feed.schema'
+import { ProgressRingComponent } from '../components/progress-ring/progress-ring.component'
 import { ElectronService } from '../core/services'
 import { WebAudioPlayer } from '../core/services/audio-player.service'
 import { FeedService } from '../core/services/feed.service'
@@ -11,14 +12,14 @@ import { IntersectionDirective } from '../shared/directives/intersection.directi
 import { SafePipe } from '../shared/pipes/safe.pipe'
 import { formatDateRelative, formatDuration } from '../shared/utils/formatting.utils'
 import { assertUnreachable } from '../shared/utils/type-guards.utils'
-import { HydratedFeedItem } from '../../../app/feed/feed.schema'
 
 @Component({
     selector: 'app-detail',
     templateUrl: './detail.component.html',
     styleUrls: ['./detail.component.css'],
-    imports: [CommonModule, RouterLink, TranslateModule, SafePipe, IntersectionDirective],
+    imports: [CommonModule, TranslateModule, SafePipe, IntersectionDirective, ProgressRingComponent],
 })
+// @TODO: rename to FeedComponent
 export class DetailComponent {
     electronService = inject(ElectronService)
     feedService = inject(FeedService)
@@ -27,14 +28,6 @@ export class DetailComponent {
     feedEntries = viewChildren<ElementRef<HTMLElement>>('feedEntry')
     currentFeedIndex = signal(0)
     furthestScrolledIndex = signal(0)
-
-    importProgress = signal<Observable<{ current: number; total: number; message?: string }> | null>(null)
-    triggerEmailImport() {
-        const progress$ = this.feedService
-            .triggerEmailImport()
-            .pipe(tap({ finalize: () => this.importProgress.set(null) }))
-        this.importProgress.set(progress$)
-    }
 
     loadedFeedItemIds = new Set<string>()
     feed = toSignal(
