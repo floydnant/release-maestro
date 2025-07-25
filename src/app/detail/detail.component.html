@@ -5,8 +5,14 @@
             <!-- @TODO: email count + unread can be brought back later -->
         </h1>
 
-
-        <button (click)="feedService.triggerEmailImport()">trigger import</button>
+        @if (importProgress() | async; as progress) {
+            @if (progress.message) {
+                <span>{{ progress.message }}</span>
+            }
+            <progress [value]="progress.current" [max]="progress.total"></progress>
+        } @else {
+            <button (click)="triggerEmailImport()">trigger import</button>
+        }
 
         <a routerLink="/">{{ 'PAGES.DETAIL.BACK_TO_HOME' | translate }}</a>
 
@@ -47,6 +53,7 @@
                             />
 
                             <!-- @TODO: the height on this is very fragile, keep it up to date and come up with a better approach -->
+                            <!-- @TODO: we need to add the same kind of shadow effect on the scrolling list here as on the text-column -->
                             <ul
                                 class="tracks | mt-3 overflow-y-auto max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)]"
                             >
@@ -113,7 +120,8 @@
                                         >
                                     }
                                     @if (
-                                        !feedItem.data.releaseDate || !isInThePast(feedItem.data.releaseDate)
+                                        !feedItem.data.releaseDate ||
+                                        !isAfter(feedItem.data.releaseDate, feedItem.data.emailReceivedAt)
                                     ) {
                                         <span
                                             class="text-sm text-tinted-400"

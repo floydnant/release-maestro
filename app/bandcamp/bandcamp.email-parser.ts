@@ -15,6 +15,9 @@ export const parseBandcampEmail = (email: Email): BandcampEmailFeedSourceItem | 
     let musicLinks: string[] =
         email.htmlBody.match(/https?:\/\/[\w-]+\.bandcamp\.com\/(album|track)[^" ]+/g) || []
 
+    // @TODO: there are also "New releases" (plural) emails, which contain multiple releases.
+    // Right now, the subsequent releases are simply shown as additional links,
+    // but we could also parse them into separate feed items.
     if (email.subject.includes('New release')) {
         const checkItOutLink = email.htmlBody
             .match(/<a[^>]+>check it out here<\/a>/)?.[0]

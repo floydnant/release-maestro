@@ -1,4 +1,4 @@
-import { and, eq, lt, or } from 'drizzle-orm'
+import { and, count, desc, eq, gte, isNull, lt, or } from 'drizzle-orm'
 import { DatabaseClient } from '../database/database.client'
 import { feedItemHistoryEntriesTable, feedItemsTable } from '../database/drizzle.schema'
 import { FeedItemMaster, feedItemMasterSchema } from './feed.schema'
@@ -29,17 +29,27 @@ export class FeedBackendRepository {
             .from(feedItemsTable)
             .where(
                 or(
-                    eq(feedItemsTable.isViewed, false),
+                    isNull(feedItemsTable.lastViewedAt),
                     and(
                         eq(feedItemsTable.isSnoozed, true),
                         lt(feedItemsTable.lastViewedAt, new Date(Date.now() - FEED_ITEM_SNOOZE_TIME_MS)),
                     ),
                 ),
             )
+            .orderBy(desc(feedItemsTable.eventDate))
             .limit(count)
             .offset(index * count)
 
         return feedItemMasterSchema.array().parse(items)
+    }
+
+    async countItemsIngestedAfterDate(date: Date): Promise<number> {
+        const count_ = await this.db.db
+            .select({ count: count(feedItemsTable.id) })
+            .from(feedItemsTable)
+            .where(gte(feedItemsTable.ingestedAt, date))
+
+        return count_[0]?.count ?? 0
     }
 
     async markFeedItemViewed(id: string, type: FeedItemMaster['type'], isSnoozed: boolean): Promise<void> {
@@ -61,11 +71,7 @@ export class FeedBackendRepository {
         // Update the feed item
         await this.db.db
             .update(feedItemsTable)
-            .set({
-                isViewed: true,
-                isSnoozed,
-                lastViewedAt: now,
-            })
+            .set({ isSnoozed, lastViewedAt: now })
             .where(eq(feedItemsTable.id, id))
 
         // Add a view history entry if needed

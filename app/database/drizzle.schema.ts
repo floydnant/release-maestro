@@ -5,7 +5,7 @@ export const feedItemsTable = sqliteTable(
     {
         id: text('id').primaryKey(),
         ingestedAt: integer('ingested_at', { mode: 'timestamp' }).notNull(),
-        isViewed: integer('is_viewed', { mode: 'boolean' }).notNull(),
+        eventDate: integer('event_date', { mode: 'timestamp' }).notNull(),
         isSnoozed: integer('is_snoozed', { mode: 'boolean' }).notNull(),
         lastViewedAt: integer('last_viewed_at', { mode: 'timestamp' }),
         type: text('type').notNull(),

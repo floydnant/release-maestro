@@ -5,8 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1752790925910,
-      "tag": "0000_initial",
+      "when": 1753459263134,
+      "tag": "0000_initial-migration",
       "breakpoints": true
     }
   ]

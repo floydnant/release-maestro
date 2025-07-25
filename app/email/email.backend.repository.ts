@@ -1,16 +1,16 @@
 import { diContainer } from '../di'
 import { AppleMailRepository } from './importers/apple-mail.repository'
-import { Email, EmailImporterPlugin } from './email.schema'
+import { Email, EmailImporterPlugin, EmailImportStreamPacket, EmailVendor } from './email.schema'
+import { Observable } from 'rxjs'
 
-export const emailImporterPlugins = {
-    appleMail: AppleMailRepository,
-} satisfies Record<string, new () => EmailImporterPlugin>
+export const emailImporterPlugins: Record<EmailVendor, new () => EmailImporterPlugin> = {
+    APPLE_MAIL: AppleMailRepository,
+}
 
 export class EmailBackendRepository {
-    async loadEmails(viaPlugin: keyof typeof emailImporterPlugins): Promise<Email[]> {
-        const plugin = await diContainer.get(emailImporterPlugins[viaPlugin])
-        const emails = await plugin.loadEmails()
+    async loadEmails(vendor: EmailVendor): Promise<Observable<EmailImportStreamPacket>> {
+        const plugin = await diContainer.get(emailImporterPlugins[vendor])
 
-        return emails
+        return plugin.loadEmails()
     }
 }

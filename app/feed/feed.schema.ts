@@ -8,10 +8,17 @@ import {
 const feedItemBaseSchema = z.object({
     id: z.string(),
     /**
-     * Datetime the email was received at or datetime the link was pasted at.
+     * Datetime the item was ingested into the feed database.
      */
     ingestedAt: z.date(),
-    isViewed: z.boolean(),
+    /**
+     * Indicates the time of event the source of the feed item was originally generated at.
+     * E.g.
+     * - for emails: the datetime the email was received at
+     * - for links: the datetime the link was pasted into the stash
+     * - for rss feeds: the datetime the item was published at
+     */
+    eventDate: z.date(),
     isSnoozed: z.boolean(),
     lastViewedAt: z.date().nullable(),
     dedupeIdentifier: z.string(),

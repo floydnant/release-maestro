@@ -112,9 +112,28 @@ ipcMain.handle('open-url', async (_event, url: string) => {
     shell.openExternal(url)
 })
 
-ipcMain.handle('trigger-email-import', async _event => {
+ipcMain.handle('trigger-email-import', async event => {
     const feedService = await diContainer.get(FeedBackendService)
-    return await feedService.triggerEmailImport()
+    const result$ = await feedService.triggerEmailImport()
+
+    return new Promise<void>((resolve, reject) => {
+        result$.subscribe({
+            next: ({ current, total, email }) => {
+                event.sender.send('email-import-progress', {
+                    current,
+                    total,
+                    // @TODO: we should not have any hardcoded strings in the backend
+                    message: 'Processed ' + email.subject,
+                })
+            },
+            error: err => {
+                reject(err)
+            },
+            complete: () => {
+                resolve()
+            },
+        })
+    })
 })
 
 ipcMain.handle('load-feed', async (_event, index: number, count: number) => {

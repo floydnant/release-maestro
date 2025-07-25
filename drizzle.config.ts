@@ -7,6 +7,6 @@ export default defineConfig({
     dialect: 'sqlite',
     verbose: true,
     dbCredentials: {
-        url: appEnv.DATABASE_URL,
+        url: process.env.DATABASE_URL || appEnv.DATABASE_URL,
     },
 })

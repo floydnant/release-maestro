@@ -1,3 +1,4 @@
+import { bufferCount, bufferTime, concatMap, from } from 'rxjs'
 import { assertUnreachable, isTruthy } from '../../src/app/shared/utils/type-guards.utils'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
@@ -15,7 +16,7 @@ const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): Bandcam
             type: `BANDCAMP.TRALBUM`,
             dedupeIdentifier: email.releaseUrl,
             ingestedAt: new Date(),
-            isViewed: false,
+            eventDate: new Date(email.dateReceived),
             isSnoozed: false,
             lastViewedAt: null,
             data: {
@@ -41,24 +42,52 @@ export class FeedBackendService {
         private feedBackendRepository: FeedBackendRepository,
     ) {}
 
-    // @TODO: this needs to run in the background and not block the UI
     async triggerEmailImport() {
         console.log('Running email import...')
-        const emails = await this.emailRepo.loadEmails('appleMail')
-        console.log('Imported', emails.length, 'emails')
 
-        // @TODO: figure out strategised email parsing (i.e. plugins for different email types)
-        const emailFeedSourceItems = emails.map(parseBandcampEmail).filter(isTruthy)
-        console.log('Parsed', emailFeedSourceItems.length, 'Bandcamp feed source items')
+        const importStartedAt = new Date()
+        let totalProcessed = 0
+        let totalImported = 0
 
-        const feedItems = emailFeedSourceItems.map(mapBandcampEmailToFeedItem).filter(isTruthy)
-        console.log('Mapped', feedItems.length, 'Bandcamp feed items')
+        const emails$ = await this.emailRepo.loadEmails('APPLE_MAIL')
+        emails$
+            .pipe(
+                bufferCount(50),
+                concatMap(async emailPackets => {
+                    totalProcessed += emailPackets.length
+                    console.log('Processing batch of emails:', emailPackets.length)
 
-        await this.feedBackendRepository.ingestFeedItems(feedItems)
+                    const emailFeedSourceItems = emailPackets
+                        // @TODO: figure out strategised email parsing (i.e. plugins for different email types)
+                        .map(packet => parseBandcampEmail(packet.email))
+                        .filter(isTruthy)
 
-        console.log('Finished ingesting')
+                    const feedItems = emailFeedSourceItems.map(mapBandcampEmailToFeedItem).filter(isTruthy)
+                    totalImported += feedItems.length
+
+                    await this.feedBackendRepository.ingestFeedItems(feedItems)
+                }),
+            )
+            .subscribe({
+                // @TODO: we need a final summary report to the user
+                complete: async () => {
+                    const newlyImported =
+                        await this.feedBackendRepository.countItemsIngestedAfterDate(importStartedAt)
+                    console.log(
+                        'Email import completed. Total processed:',
+                        totalProcessed,
+                        'Imported:',
+                        totalImported,
+                        'New:',
+                        newlyImported,
+                    )
+                },
+            })
+
+        return emails$
     }
 
+    // @TODO: error handling
     async hydrateBandcampFeedItem(item: BandcampFeedItem): Promise<HydratedBandcampReleaseFeedItem> {
         if (!item.data.tralbumUrl) {
             console.warn('No release link found:', item)

@@ -8,7 +8,7 @@ CREATE TABLE `feed_item_history_entries` (
 CREATE TABLE `feed_items` (
 	`id` text PRIMARY KEY NOT NULL,
 	`ingested_at` integer NOT NULL,
-	`is_viewed` integer NOT NULL,
+	`event_date` integer NOT NULL,
 	`is_snoozed` integer NOT NULL,
 	`last_viewed_at` integer,
 	`type` text NOT NULL,

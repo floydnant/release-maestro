@@ -26,6 +26,7 @@
     "private": true,
     "scripts": {
         "postinstall": "electron-builder install-app-deps",
+        "rebuild": "electron-rebuild",
         "ng": "ng",
         "dev": "npm-run-all -p electron:serve:watch ng:serve",
         "ng:serve": "ng serve -c web",

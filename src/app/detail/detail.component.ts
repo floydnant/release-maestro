@@ -3,7 +3,7 @@ import { Component, ElementRef, HostListener, inject, signal, viewChildren } fro
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterLink } from '@angular/router'
 import { TranslateModule } from '@ngx-translate/core'
-import { mergeScan } from 'rxjs'
+import { mergeScan, Observable, tap, throttleTime } from 'rxjs'
 import { ElectronService } from '../core/services'
 import { WebAudioPlayer } from '../core/services/audio-player.service'
 import { FeedService } from '../core/services/feed.service'
@@ -28,6 +28,15 @@ export class DetailComponent {
     currentFeedIndex = signal(0)
     furthestScrolledIndex = signal(0)
 
+    importProgress = signal<Observable<{ current: number; total: number; message?: string }> | null>(null)
+    triggerEmailImport() {
+        const progress$ = this.feedService
+            .triggerEmailImport()
+            .pipe(tap({ finalize: () => this.importProgress.set(null) }))
+        this.importProgress.set(progress$)
+    }
+
+    loadedFeedItemIds = new Set<string>()
     feed = toSignal(
         toObservable(this.furthestScrolledIndex).pipe(
             mergeScan(
@@ -38,8 +47,16 @@ export class DetailComponent {
                         furthestScrolledIndex + numPrefetchItems - Math.max(lastLoadedItemIndex, 0)
 
                     const items = await this.feedService.loadFeed(lastLoadedItemIndex + 1, itemCountToFetch)
+                    const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
+                    if (items.length != newItems.length) {
+                        console.warn(
+                            'Duplicate feed items detected:',
+                            items.filter(item => this.loadedFeedItemIds.has(item.id)),
+                        )
+                    }
+                    newItems.forEach(item => this.loadedFeedItemIds.add(item.id))
 
-                    return (acc || []).concat(items)
+                    return (acc || []).concat(newItems)
                 },
                 null as HydratedFeedItem[] | null,
                 1, // Max concurrent requests: ensures we don't run into race conditions
@@ -297,5 +314,8 @@ export class DetailComponent {
     formatDateRelative = formatDateRelative
     isInThePast = (date: Date) => {
         return new Date(date).getTime() < Date.now()
+    }
+    isAfter = (date: Date, otherDate: Date) => {
+        return new Date(date).getTime() > new Date(otherDate).getTime()
     }
 }
