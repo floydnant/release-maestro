@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common'
 import { Component, computed, inject, linkedSignal } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
@@ -17,7 +16,7 @@ import { FeedService } from './core/services/feed.service'
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.css'],
     standalone: true,
-    imports: [CommonModule, RouterModule, TranslateModule, ProgressBarComponent],
+    imports: [RouterModule, TranslateModule, ProgressBarComponent],
 })
 export class AppComponent {
     constructor() {

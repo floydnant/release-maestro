@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core'
 
 export type ProgressBarSegment = {
@@ -11,7 +10,7 @@ export type ProgressBarSegment = {
     templateUrl: './progress-bar.component.html',
     styleUrls: ['./progress-bar.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [CommonModule],
+    imports: [],
 })
 export class ProgressBarComponent {
     isShownAsPercentage = true

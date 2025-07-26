@@ -1,10 +1,9 @@
-import { CommonModule } from '@angular/common'
 import { Component, Input, ViewEncapsulation } from '@angular/core'
 import colors from '../../../../../colors.json'
 
 @Component({
     selector: 'app-progress-ring',
-    imports: [CommonModule],
+    imports: [],
     templateUrl: './progress-ring.component.html',
     styleUrls: ['./progress-ring.component.css'],
     host: {

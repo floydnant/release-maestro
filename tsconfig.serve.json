@@ -1,6 +1,7 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
+        "moduleResolution": "node",
         "outDir": "./dist/out-tsc",
         "module": "commonjs",
         "target": "es2015",

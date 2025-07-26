@@ -20,16 +20,17 @@
         [attr.cx]="position"
         [attr.cy]="position"
     />
-    <circle
-        *ngIf="mode == 'spinning'"
-        class="progress-ring progress-ring-2 spin"
-        [attr.stroke-width]="strokeWidth"
-        [attr.stroke]="color"
-        [attr.stroke-dasharray]="strokeDasharray"
-        [attr.stroke-dashoffset]="offset"
-        fill="transparent"
-        [attr.r]="radius"
-        [attr.cx]="position"
-        [attr.cy]="position"
-    />
+    @if (mode == 'spinning') {
+        <circle
+            class="progress-ring progress-ring-2 spin"
+            [attr.stroke-width]="strokeWidth"
+            [attr.stroke]="color"
+            [attr.stroke-dasharray]="strokeDasharray"
+            [attr.stroke-dashoffset]="offset"
+            fill="transparent"
+            [attr.r]="radius"
+            [attr.cx]="position"
+            [attr.cy]="position"
+        />
+    }
 </svg>
