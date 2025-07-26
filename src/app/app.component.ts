@@ -4,19 +4,22 @@ import { RouterModule } from '@angular/router'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
 import { Observable } from 'rxjs'
 import { EmailImportProgressUpdate } from '../../app/email/email.schema'
-import colors from '../../colors.json'
 import { webEnv } from '../environments/environment'
-import { ProgressBarComponent } from './shared/components/progress-bar/progress-bar.component'
 import { ElectronService } from './core/services'
 import { WebAudioPlayer } from './core/services/audio-player.service'
 import { FeedService } from './core/services/feed.service'
+import { IconComponent } from './shared/components/icon/icon.component'
+import {
+    ProgressBarComponent,
+    ProgressBarSegment,
+} from './shared/components/progress-bar/progress-bar.component'
 
 @Component({
     selector: 'app-root',
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.css'],
     standalone: true,
-    imports: [RouterModule, TranslateModule, ProgressBarComponent],
+    imports: [RouterModule, TranslateModule, ProgressBarComponent, IconComponent],
 })
 export class AppComponent {
     constructor() {
@@ -50,20 +53,18 @@ export class AppComponent {
     )
     importProgress = linkedSignal(() => this.importProgress_())
 
-    progressBarSegments = computed(() => {
+    progressBarSegments = computed((): ProgressBarSegment[] => {
         const progress = this.importProgress()
         if (!progress || progress.phase === 'idle') return []
 
         if (progress.phase === 'error') {
-            return [{ percent: 100, colorValue: colors.danger[400] }]
+            return [{ percent: 100, color: 'danger-400' }]
         }
         if (progress.phase === 'completed') {
-            return [{ percent: 100, colorValue: colors.submit[400] }]
+            return [{ percent: 100, color: 'submit-400' }]
         }
 
         const percent = (progress.current / progress.total) * 100
-        return [{ percent, colorValue: colors.submit[400] }]
+        return [{ percent, color: 'submit-400' }]
     })
-
-    colors = colors
 }

@@ -2,7 +2,7 @@
     <circle
         class="progress-bg"
         [attr.stroke-width]="strokeWidth"
-        [attr.stroke]="bgColor"
+        [attr.stroke]="bgColor()"
         fill="transparent"
         [attr.r]="radius"
         [attr.cx]="position"
@@ -12,7 +12,7 @@
         class="progress-ring"
         [class.spin]="mode == 'spinning'"
         [attr.stroke-width]="strokeWidth"
-        [attr.stroke]="color"
+        [attr.stroke]="color()"
         [attr.stroke-dasharray]="strokeDasharray"
         [attr.stroke-dashoffset]="offset"
         fill="transparent"
@@ -24,7 +24,7 @@
         <circle
             class="progress-ring progress-ring-2 spin"
             [attr.stroke-width]="strokeWidth"
-            [attr.stroke]="color"
+            [attr.stroke]="color()"
             [attr.stroke-dasharray]="strokeDasharray"
             [attr.stroke-dashoffset]="offset"
             fill="transparent"

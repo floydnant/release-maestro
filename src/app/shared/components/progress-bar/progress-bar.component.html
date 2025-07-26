@@ -13,8 +13,8 @@
                 [class.rounded-l]="$first"
                 [class.rounded-r]="$last"
                 [style.width]="segment.percent + '%'"
-                [style.background]="segment.colorValue"
-                [style.--color]="segment.colorValue"
+                [style.background]="colorFrom(segment.color)"
+                [style.--color]="colorFrom(segment.color)"
             ></div>
         }
     </div>

@@ -1,5 +1,5 @@
-import { Component, Input, ViewEncapsulation } from '@angular/core'
-import colors from '../../../../../colors.json'
+import { Component, input, Input, ViewEncapsulation } from '@angular/core'
+import { colorFrom, ColorIdentifier } from '../../colors'
 
 @Component({
     selector: 'app-progress-ring',
@@ -18,8 +18,12 @@ export class ProgressRingComponent {
     @Input() progress = 0
     @Input() mode: 'progress' | 'spinning' = 'progress'
 
-    @Input() color = colors.tinted[100]
-    @Input() bgColor = colors.tinted[500]
+    color = input<string | undefined, ColorIdentifier | undefined>(colorFrom('tinted-100'), {
+        transform: v => v && colorFrom(v),
+    })
+    bgColor = input<string | undefined, ColorIdentifier | undefined>(colorFrom('tinted-500'), {
+        transform: v => v && colorFrom(v),
+    })
 
     get position() {
         return this.diameter / 2

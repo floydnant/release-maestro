@@ -39,6 +39,7 @@
             } @else if (importStatus.phase == 'completed') {
                 <hr />
                 <p class="text-sm">
+                    <app-icon name="octCheckCircleFill" color="submit-400" class="align-middle"></app-icon>
                     Done! Processed {{ importStatus.totalProcessed }} emails, imported
                     {{ importStatus.newlyImported }} new ones.
                 </p>
@@ -48,6 +49,7 @@
             } @else if (importStatus.phase == 'error') {
                 <app-progress-bar class="mt-4" [segments]="progressBarSegments() || []"></app-progress-bar>
                 <p class="mt-3 text-sm">
+                    <app-icon name="octXCircleFill" color="danger-400" class="align-middle"></app-icon>
                     {{ importStatus.errorMessage }}
                 </p>
                 <button class="btn-primary mt-2" (click)="triggerEmailImport()">Retry</button>

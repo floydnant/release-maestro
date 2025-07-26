@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core'
+import { colorFrom, ColorIdentifier } from '../../colors'
 
 export type ProgressBarSegment = {
     percent: number
-    colorValue: string
+    color: ColorIdentifier
 }
 
 @Component({
@@ -22,4 +23,6 @@ export class ProgressBarComponent {
     totalPercent = computed(() => this.segments().reduce((acc, segment) => acc + segment.percent, 0))
 
     shouldGlow = input<boolean>(true)
+
+    colorFrom = colorFrom
 }
