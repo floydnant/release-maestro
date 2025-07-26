@@ -1,21 +1,21 @@
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing'
 
-import { DetailComponent } from './detail.component'
+import { FeedComponent } from './feed.component'
 import { TranslateModule } from '@ngx-translate/core'
 import { provideRouter } from '@angular/router'
 
 describe('DetailComponent', () => {
-    let component: DetailComponent
-    let fixture: ComponentFixture<DetailComponent>
+    let component: FeedComponent
+    let fixture: ComponentFixture<FeedComponent>
 
     beforeEach(waitForAsync(() => {
         void TestBed.configureTestingModule({
             declarations: [],
-            imports: [DetailComponent, TranslateModule.forRoot()],
+            imports: [FeedComponent, TranslateModule.forRoot()],
             providers: [provideRouter([])],
         }).compileComponents()
 
-        fixture = TestBed.createComponent(DetailComponent)
+        fixture = TestBed.createComponent(FeedComponent)
         component = fixture.componentInstance
         fixture.detectChanges()
     }))

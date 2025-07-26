@@ -3,24 +3,23 @@ import { Component, ElementRef, HostListener, inject, signal, viewChildren } fro
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { TranslateModule } from '@ngx-translate/core'
 import { mergeScan } from 'rxjs'
-import { HydratedFeedItem } from '../../../app/feed/feed.schema'
-import { ProgressRingComponent } from '../components/progress-ring/progress-ring.component'
-import { ElectronService } from '../core/services'
-import { WebAudioPlayer } from '../core/services/audio-player.service'
-import { FeedService } from '../core/services/feed.service'
-import { IntersectionDirective } from '../shared/directives/intersection.directive'
-import { SafePipe } from '../shared/pipes/safe.pipe'
-import { formatDateRelative, formatDuration } from '../shared/utils/formatting.utils'
-import { assertUnreachable } from '../shared/utils/type-guards.utils'
+import { HydratedFeedItem } from '../../../../app/feed/feed.schema'
+import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
+import { ElectronService } from '../../core/services'
+import { WebAudioPlayer } from '../../core/services/audio-player.service'
+import { FeedService } from '../../core/services/feed.service'
+import { IntersectionDirective } from '../../shared/directives/intersection.directive'
+import { SafePipe } from '../../shared/pipes/safe.pipe'
+import { formatDateRelative, formatDuration } from '../../shared/utils/formatting.utils'
+import { assertUnreachable } from '../../shared/utils/type-guards.utils'
 
 @Component({
-    selector: 'app-detail',
-    templateUrl: './detail.component.html',
-    styleUrls: ['./detail.component.css'],
+    selector: 'app-feed',
+    templateUrl: './feed.component.html',
+    styleUrls: ['./feed.component.css'],
     imports: [CommonModule, TranslateModule, SafePipe, IntersectionDirective, ProgressRingComponent],
 })
-// @TODO: rename to FeedComponent
-export class DetailComponent {
+export class FeedComponent {
     electronService = inject(ElectronService)
     feedService = inject(FeedService)
     audioPlayer = inject(WebAudioPlayer)
