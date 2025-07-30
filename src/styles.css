@@ -65,14 +65,13 @@ body {
     textarea,
     button,
     [contenteditable],
+    a[href],
     a[tabindex] {
-        @apply accent-tinted-400 focus-visible:ring-2 ring-tinted-400 outline-none;
+        @apply accent-tinted-300 focus-visible:ring-2 ring-tinted-300 outline-none;
     }
 
-    input[type='text'],
-    input[type='number'],
-    textarea {
-        @apply bg-transparent text-tinted-100 placeholder-tinted-300;
+    .input {
+        @apply rounded-md border border-tinted-500 px-2 py-0.5 bg-transparent text-tinted-100 placeholder-tinted-300;
     }
 
     hr {

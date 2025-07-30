@@ -1,5 +1,6 @@
 import { Observable } from 'rxjs'
 import z from 'zod'
+import { SettingsBackendService } from '../settings.backend.service'
 
 export const emailVendorSchema = z.enum(['APPLE_MAIL'])
 export type EmailVendor = z.infer<typeof emailVendorSchema>
@@ -11,7 +12,7 @@ export const emailSchema = z.object({
     sender: z.string(),
     plainBody: z.string(),
     htmlBody: z.string(),
-    isRead: z.boolean({ coerce: true }),
+    isRead: z.coerce.boolean(),
     vendor: emailVendorSchema,
 })
 export type Email = z.infer<typeof emailSchema>
@@ -25,6 +26,7 @@ export type EmailImportStreamPacket = {
 export interface EmailImporterPlugin {
     loadEmails(signal: AbortSignal): Observable<EmailImportStreamPacket>
 }
+export type EmailImporterPluginConstructor = new (settings: SettingsBackendService) => EmailImporterPlugin
 
 export type EmailImportProgressUpdate =
     | {

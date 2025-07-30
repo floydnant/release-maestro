@@ -1,9 +1,9 @@
-import { diContainer } from '../di'
-import { AppleMailRepository } from './importers/apple-mail.repository'
-import { Email, EmailImporterPlugin, EmailImportStreamPacket, EmailVendor } from './email.schema'
 import { Observable } from 'rxjs'
+import { diContainer } from '../di'
+import { EmailImporterPluginConstructor, EmailImportStreamPacket, EmailVendor } from './email.schema'
+import { AppleMailRepository } from './importers/apple-mail.repository'
 
-export const emailImporterPlugins: Record<EmailVendor, new () => EmailImporterPlugin> = {
+export const emailImporterPlugins: Record<EmailVendor, EmailImporterPluginConstructor> = {
     APPLE_MAIL: AppleMailRepository,
 }
 

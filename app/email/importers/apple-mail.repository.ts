@@ -4,6 +4,7 @@ import * as fs from 'fs/promises'
 import { join } from 'path'
 import { Observable, Subject } from 'rxjs'
 import { Email, EmailImporterPlugin, EmailImportStreamPacket, emailSchema } from '../email.schema'
+import { SettingsBackendService } from '../../settings.backend.service'
 
 const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string): Email | null => {
     const data = {
@@ -41,11 +42,17 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
 }
 
 export class AppleMailRepository implements EmailImporterPlugin {
-    loadEmails(abortSignal: AbortSignal): Observable<EmailImportStreamPacket> {
-        // @TODO: this needs to be configurable via some plugin config mechanism
-        const mailboxName = 'Bandcamp'
+    // @TODO: the plugins should not have direct access to the settings service
+    constructor(private settings: SettingsBackendService) {}
 
+    loadEmails(abortSignal: AbortSignal): Observable<EmailImportStreamPacket> {
         const result$ = new Subject<EmailImportStreamPacket>()
+
+        const mailboxName = this.settings.store.get('emailPluginConfig.APPLE_MAIL.mailboxName')
+        if (!mailboxName) {
+            result$.error(new Error('[AppleMailImporter] Mailbox name is not set in settings'))
+            return result$
+        }
 
         const exportPath = join(app.getPath('temp'), 'apple-mail-export')
         // @TODO: this may need to be fixed for production builds
@@ -58,8 +65,16 @@ export class AppleMailRepository implements EmailImporterPlugin {
                 if (error) {
                     // Only forward the error if it wasn't due to the abort signal
                     if (!abortSignal.aborted) {
-                        console.error('[AppleMailImporter] ', error)
-                        result$.error(error)
+                        const parsedErrorMessage = error.message.match(/Mail got an error: (.+)/)?.[1]
+                        if (parsedErrorMessage) {
+                            console.error('[AppleMailImporter] ', parsedErrorMessage)
+                            // @TODO: we need to differentiate between user facing error messages and ones
+                            // that are only valuable for devs and need to be made more user friendly/generic
+                            result$.error(new Error(`[AppleMailImporter] ${parsedErrorMessage}`))
+                        } else {
+                            console.error('[AppleMailImporter] ', error)
+                            result$.error(error)
+                        }
                     }
                 }
 

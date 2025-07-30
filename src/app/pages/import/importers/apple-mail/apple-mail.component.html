@@ -1,2 +1,20 @@
-<!-- @TODO: -->
-<p>apple-mail works!</p>
+<div class="settings-item">
+    <label for="setting-mailboxName-input">Mailbox Name</label>
+    <p class="description | text-sm text-tinted-400" id="setting-mailboxName-description">
+        The name of the mailbox to import from Apple Mail.
+    </p>
+
+    <input
+        class="input w-full max-w-xs mt-3"
+        id="setting-mailboxName-input"
+        aria-describedby="setting-mailboxName-description"
+        [(ngModel)]="mailboxName"
+        placeholder="Not set"
+    />
+</div>
+
+@if (hasChanges()) {
+    <hr class="mt-6" />
+
+    <button class="btn-primary" (click)="saveSettings()">Save</button>
+}

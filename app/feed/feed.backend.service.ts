@@ -58,7 +58,7 @@ export class FeedBackendService {
                 materialize(),
                 switchMap(async notification => {
                     if (notification.kind == 'C' || notification.kind == 'E') {
-                        // The next values are already handled by the non-buffered observable in the first part of the merge
+                        // The complete and error values are handled by the buffered stream below
                         return NEVER
                     }
                     if (notification.kind == 'N') {

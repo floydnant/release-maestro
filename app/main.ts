@@ -6,6 +6,7 @@ import { diContainer } from './di'
 import { FeedBackendService } from './feed/feed.backend.service'
 import { HydratedFeedItem } from './feed/feed.schema'
 import { DatabaseClient } from './database/database.client'
+import { SettingsBackendService } from './settings.backend.service'
 
 let win: BrowserWindow | null = null
 const args = process.argv.slice(1),
@@ -75,8 +76,9 @@ try {
     // Some APIs can only be used after this event occurs.
     // Added 400 ms to fix the black background issue while using transparent window. More detais at https://github.com/electron/electron/issues/15947
     app.on('ready', async () => {
-        // Initialize db client
+        // Initialize stuff
         await diContainer.get(DatabaseClient)
+        await diContainer.get(SettingsBackendService)
 
         setTimeout(createWindow, 400)
     })
@@ -114,7 +116,8 @@ ipcMain.handle('open-url', async (_event, url: string) => {
 
 ipcMain.handle('trigger-email-import', async event => {
     const abortController = new AbortController()
-    ipcMain.once('email-import-abort', () => abortController.abort())
+    const abortHandler = () => abortController.abort()
+    ipcMain.once('email-import-abort', abortHandler)
 
     const feedService = await diContainer.get(FeedBackendService)
     const result$ = await feedService.triggerEmailImport(abortController.signal)
@@ -126,9 +129,11 @@ ipcMain.handle('trigger-email-import', async event => {
             },
             error: err => {
                 reject(err)
+                ipcMain.removeListener('email-import-abort', abortHandler)
             },
             complete: () => {
                 resolve()
+                ipcMain.removeListener('email-import-abort', abortHandler)
             },
         })
     })
@@ -146,3 +151,12 @@ ipcMain.handle(
         return await feedService.markFeedItemAsViewed(id, feedItemType, isSnoozed)
     },
 )
+
+ipcMain.handle('get-settings', async _event => {
+    const settingsService = await diContainer.get(SettingsBackendService)
+    return settingsService.store.store
+})
+ipcMain.handle('set-settings', async (_event, store) => {
+    const settingsService = await diContainer.get(SettingsBackendService)
+    settingsService.store.store = store
+})
