@@ -4,20 +4,37 @@ import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-i
 import { TranslateModule } from '@ngx-translate/core'
 import { mergeScan } from 'rxjs'
 import { HydratedFeedItem } from '../../../../app/feed/feed.schema'
-import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { FeedService } from '../../core/services/feed.service'
+import { IconComponent } from '../../shared/components/icon/icon.component'
+import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
 import { IntersectionDirective } from '../../shared/directives/intersection.directive'
 import { SafePipe } from '../../shared/pipes/safe.pipe'
 import { formatDateRelative, formatDuration } from '../../shared/utils/formatting.utils'
 import { assertUnreachable } from '../../shared/utils/type-guards.utils'
 
+const getErrorMessage = (error: unknown) => {
+    if (typeof error == 'string') return error
+    if (typeof error == 'object' && error != null) {
+        if ('userFacingMessage' in error) return String(error.userFacingMessage)
+    }
+
+    return undefined
+}
+
 @Component({
     selector: 'app-feed',
     templateUrl: './feed.component.html',
     styleUrls: ['./feed.component.css'],
-    imports: [CommonModule, TranslateModule, SafePipe, IntersectionDirective, ProgressRingComponent],
+    imports: [
+        CommonModule,
+        TranslateModule,
+        SafePipe,
+        IntersectionDirective,
+        ProgressRingComponent,
+        IconComponent,
+    ],
 })
 export class FeedComponent {
     electronService = inject(ElectronService)
@@ -29,6 +46,7 @@ export class FeedComponent {
     furthestScrolledIndex = signal(0)
 
     loadedFeedItemIds = new Set<string>()
+    feedError = signal<null | string>(null)
     feed = toSignal(
         toObservable(this.furthestScrolledIndex).pipe(
             mergeScan(
@@ -38,7 +56,16 @@ export class FeedComponent {
                     const itemCountToFetch =
                         furthestScrolledIndex + numPrefetchItems - Math.max(lastLoadedItemIndex, 0)
 
-                    const items = await this.feedService.loadFeed(lastLoadedItemIndex + 1, itemCountToFetch)
+                    const items = await this.feedService
+                        .loadFeed(lastLoadedItemIndex + 1, itemCountToFetch)
+                        .catch(err => {
+                            console.error(err)
+
+                            this.feedError.set(getErrorMessage(err) || 'Failed to load')
+                            return null
+                        })
+                    if (!items) return null
+
                     const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
                     if (items.length != newItems.length) {
                         console.warn(

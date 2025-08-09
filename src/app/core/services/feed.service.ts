@@ -1,7 +1,8 @@
 import { inject, Injectable } from '@angular/core'
-import { fromEventPattern, map, merge, of, share, switchMap, timer } from 'rxjs'
+import { fromEventPattern, map, share } from 'rxjs'
 import { EmailImportProgressUpdate } from '../../../../app/email/email.schema'
 import { HydratedFeedItem } from '../../../../app/feed/feed.schema'
+import { UiSideException } from '../../shared/ui-facing.exceptions'
 import { ElectronService } from './electron/electron.service'
 
 @Injectable({
@@ -25,8 +26,13 @@ export class FeedService {
         this.electronService.ipcRenderer.send('email-import-abort')
     }
 
-    loadFeed(index: number, count: number): Promise<HydratedFeedItem[]> {
-        return this.electronService.ipcRenderer.invoke('load-feed', index, count)
+    async loadFeed(index: number, count: number): Promise<HydratedFeedItem[]> {
+        const result = await this.electronService.ipcRenderer.invoke('load-feed', index, count)
+        if (result.isError) {
+            throw new UiSideException(result.message, result.userFacingMessage)
+        }
+
+        return result
     }
 
     markFeedItemViewed(

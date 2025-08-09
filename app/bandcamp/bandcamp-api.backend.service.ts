@@ -1,43 +1,138 @@
-import bandcampFetch, { Album, Artist, Label, Track } from 'bandcamp-fetch'
-import { load as cheerioLoad } from 'cheerio'
+import bandcampFetch, { Artist, Label } from 'bandcamp-fetch'
+import { CheerioAPI, load as cheerioLoad } from 'cheerio'
+import z from 'zod'
+import { FetchFailedException } from '../base.exceptions'
+import {
+    BandcampApiErrorWhileFetchingTralbumException,
+    BandcampApiMalformedTralbumDataException,
+} from './bandcamp-api.exceptions'
 
-export type ScrapedBandcampData = {
-    artworkUrl: string
+export type ScrapedTralbumInfo = {
+    title: string | null
+    artist: string | null
+    releaseDate: string | null
+    type: 'album' | 'track'
+    id: number | null
+    artworkUrl: string | null
     about: string
     aboutLinks: { url: string; text: string }[]
+    band: BandData | null
+    tracks: {
+        title: string
+        id: number | null
+        artist: string | null
+        duration: number
+        titleLink: string | null
+        albumPreorder: boolean
+        streamUrl: string | null
+    }[]
+}
+
+const tralbumDataAttrSchema = z.object({
+    current: z.object({
+        title: z.string(),
+        artist: z.string().nullish(),
+        about: z.string().nullish(),
+        credits: z.string().nullish(),
+        release_date: z.string().nullish(),
+        type: z.enum(['album', 'track']),
+        id: z.number(),
+    }),
+    is_preorder: z.boolean().nullish(),
+    album_is_preorder: z.boolean().nullish(),
+    album_release_date: z.string().nullish(),
+    trackinfo: z
+        .object({
+            title: z.string(),
+            duration: z.number(),
+            id: z.number().nullish(),
+            artist: z.string().nullish(),
+            title_link: z.string().nullish(),
+            album_preorder: z.boolean(),
+            file: z.object({ 'mp3-128': z.string() }).nullish(),
+        })
+        .array(),
+})
+export type AttributeTralbumData = z.infer<typeof tralbumDataAttrSchema>
+
+const parseTralbumData = ($: CheerioAPI): AttributeTralbumData => {
+    const tralbumJson = $('[data-tralbum]').attr('data-tralbum')
+    if (!tralbumJson) throw new Error('No tralbum data found')
+
+    const parsed = JSON.parse(tralbumJson)
+    return tralbumDataAttrSchema.parse(parsed)
+}
+
+export type BandData = {
+    name: string
+    imageUrl: string | null
+    location: string | null
+    bio: string | null
+    links: { url: string; text: string }[]
+}
+
+const parseBandData = ($: CheerioAPI): BandData | null => {
+    const bandImageUrl = $('#bio-container img').attr('src')
+    const bandName = $('#bio-container #band-name-location .title').text()
+    const bandLocation = $('#bio-container #band-name-location .location').text()
+    const bandBioText =
+        $('#bio-container #bio-text').contents().first().text() +
+        $('#bio-container #bio-text .peekaboo-text').text()
+    // @TODO: the recommended link could prove useful for crawling the network of labels/artists in the future
+    const bandLinks = $('#bio-container #band-links a, #bio-container #recommended a')
+        .map((_, link) => {
+            const cheerioLink = $(link)
+            return {
+                url: cheerioLink.attr('href') || '',
+                text: cheerioLink.text().trim(),
+            }
+        })
+        .get()
+
+    return {
+        name: bandName,
+        imageUrl: bandImageUrl || null,
+        location: bandLocation || null,
+        bio: bandBioText || null,
+        links: bandLinks,
+    }
 }
 
 export class BandcampApiBackendService {
-    async getAlbum(url: string): Promise<Album> {
-        return await bandcampFetch.album.getInfo({ albumUrl: url })
-    }
-
-    async getTrack(url: string): Promise<Track> {
-        return await bandcampFetch.track.getInfo({ trackUrl: url })
-    }
-
     async getBand(url: string): Promise<Label | Artist> {
         return await bandcampFetch.band.getInfo({ bandUrl: url })
     }
 
-    async getRelease(url: string): Promise<Album | Track> {
-        const isTrack = url.includes('/track/')
-        if (isTrack) {
-            return await bandcampFetch.track.getInfo({ trackUrl: url })
-        }
-        return await bandcampFetch.album.getInfo({ albumUrl: url })
-    }
-
-    async scrapeRelease(url: string): Promise<ScrapedBandcampData> {
-        const result = await fetch(url)
+    async scrapeTralbumInfo(url: string): Promise<ScrapedTralbumInfo> {
+        const result = await fetch(url).catch(err => {
+            if (err instanceof Error) {
+                throw new FetchFailedException(
+                    'Failed to fetch tralbum',
+                    url,
+                    err,
+                    'Check your internet connection and retry.',
+                )
+            }
+            throw err
+        })
         if (!result.ok) {
-            throw new Error(
-                `Failed to fetch release from Bandcamp: ${result.statusText}, ${JSON.stringify(result.json(), null, 2)}`,
-            )
+            throw new BandcampApiErrorWhileFetchingTralbumException(url, result.status)
         }
+
         const html = await result.text()
         const $ = cheerioLoad(html)
-        const artworkUrl = $('#tralbumArt > a > img').attr('src') || ''
+
+        const artworkUrl = $('#tralbumArt img').attr('src') || null
+        let tralbumData: AttributeTralbumData | null = null
+        try {
+            tralbumData = parseTralbumData($)
+        } catch (err) {
+            if (err instanceof Error) {
+                throw new BandcampApiMalformedTralbumDataException(url, err)
+            }
+            throw err
+        }
+        const bandData = parseBandData($)
 
         let about = $('#trackInfoInner > div.tralbumData.tralbum-about').html() || ''
         const aboutLinks = $('#trackInfoInner > div.tralbumData.tralbum-about a')
@@ -67,8 +162,32 @@ export class BandcampApiBackendService {
 
         return {
             artworkUrl,
+            title: tralbumData?.current.title || null,
+            artist: tralbumData?.current.artist || null,
+            releaseDate: tralbumData?.album_release_date || tralbumData?.current.release_date || null,
+            type: tralbumData?.current.type || 'album',
+            id: tralbumData?.current.id || null,
             about: about + credits,
             aboutLinks: [...aboutLinks, ...creditsLinks],
+            band: bandData
+                ? {
+                      name: bandData.name,
+                      imageUrl: bandData.imageUrl,
+                      location: bandData.location,
+                      bio: bandData.bio,
+                      links: bandData.links,
+                  }
+                : null,
+            tracks:
+                tralbumData?.trackinfo.map(track => ({
+                    title: track.title,
+                    id: track.id || null,
+                    artist: track.artist || null,
+                    duration: track.duration,
+                    titleLink: track.title_link || null,
+                    albumPreorder: track.album_preorder,
+                    streamUrl: track.file ? track.file['mp3-128'] : null,
+                })) || [],
         }
     }
 }

@@ -1,5 +1,4 @@
-import { Album, Track, Label, Artist } from 'bandcamp-fetch'
-import { ScrapedBandcampData } from '../bandcamp/bandcamp-api.backend.service'
+import { ScrapedTralbumInfo } from '../bandcamp/bandcamp-api.backend.service'
 import { ScrapedLinkMetadata } from '../web-scraping/web-scraping.service'
 import { BandcampFeedItem, HydratedBandcampReleaseFeedItem } from './feed.schema'
 
@@ -11,9 +10,7 @@ export const isUsefulUrlFromBandcampEmail = (link: string): boolean =>
 
 export function mapBandcampReleaseFeedItemToHydratedFeedItem(
     { data, source, ...item }: Extract<BandcampFeedItem, { type: 'BANDCAMP.TRALBUM' }>,
-    releaseData: Album | Track | null,
-    bandData: Label | Artist | null,
-    scrapedData: ScrapedBandcampData | null,
+    tralbum: ScrapedTralbumInfo | null,
     linkMetadataMap: Record<string, ScrapedLinkMetadata | null> | null,
 ): HydratedBandcampReleaseFeedItem {
     if (source.type != 'EMAIL.BANDCAMP_NEW_RELEASE')
@@ -23,16 +20,16 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
         ...item,
         data: {
             releaseUrl: data.tralbumUrl,
-            releaseDate: releaseData?.releaseDate ? new Date(releaseData?.releaseDate) : null,
+            releaseDate: tralbum?.releaseDate ? new Date(tralbum?.releaseDate) : null,
             emailReceivedAt: new Date(source.dateReceived),
             isEmailRead: source.isRead,
             emailId: source.messageId,
-            releaseName: releaseData?.name || source.subject,
-            label: bandData,
-            artist: releaseData?.artist,
+            releaseName: tralbum?.title || source.subject,
+            band: tralbum?.band || null,
+            artist: tralbum?.artist || null,
             releaseType: source.releaseType,
             about:
-                scrapedData?.about
+                tralbum?.about
                     .replace(/^\s*(released|releases).+\n/m, '')
                     .replace(/(^((<br>)|\n|\s)+)|(((<br>)|\n|\s)+$)/g, '') ||
                 source.plainBody
@@ -58,14 +55,12 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
                 source.plainBody.match(/((Unfollow|Unsubscribe) .+)(?=\n)/i)?.[0].replace(/�/g, '') ||
                 'Unfollow',
             imageUrl:
-                scrapedData?.artworkUrl ||
-                releaseData?.imageUrl?.replace('_9.jpg', '_16.jpg') || // Bump the image size for better quality
+                tralbum?.artworkUrl ||
                 source.links?.find(link => link.includes('f4.bcbits.com'))?.replace('_9.jpg', '_16.jpg'),
-            iframeUrl: releaseData?.id
-                ? `https://bandcamp.com/EmbeddedPlayer/${source.releaseType}=${releaseData.id}/size=large/bgcol=999999/linkcol=0687f5`
+            iframeUrl: tralbum?.id
+                ? `https://bandcamp.com/EmbeddedPlayer/${source.releaseType}=${tralbum.id}/size=large/bgcol=999999/linkcol=0687f5`
                 : null,
-            tracks:
-                releaseData?.type == 'album' ? releaseData?.tracks || [] : releaseData ? [releaseData] : [],
+            tracks: tralbum?.tracks || [],
         },
     }
 }

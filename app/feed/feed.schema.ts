@@ -1,5 +1,5 @@
-import type { Artist, Label, Track } from 'bandcamp-fetch'
 import z from 'zod'
+import { BandData, ScrapedTralbumInfo } from '../bandcamp/bandcamp-api.backend.service'
 import {
     bandcampEmailFansBoughtMusicFeedSourceItemSchema,
     bandcampEmailNewReleaseFeedSourceItemSchema,
@@ -52,8 +52,8 @@ export type HydratedBandcampReleaseFeedItem = {
         isEmailRead: boolean
         emailId: string
         releaseName: string
-        label: Label | Artist | null
-        artist: Omit<Artist, 'type'> | undefined
+        band: BandData | null
+        artist: string | null
         releaseType: 'album' | 'track'
         about: string
         links: { title: string; favicon: string | undefined; url: string }[]
@@ -61,7 +61,7 @@ export type HydratedBandcampReleaseFeedItem = {
         unsubscribeText: string
         imageUrl: string | undefined
         iframeUrl: string | null
-        tracks: Omit<Track, 'type'>[]
+        tracks: ScrapedTralbumInfo['tracks']
     }
     id: string
     type: 'BANDCAMP.TRALBUM'

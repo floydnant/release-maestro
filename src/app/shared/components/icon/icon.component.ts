@@ -9,7 +9,9 @@ export type IconIdentitfier = keyof typeof icons
 @Component({
     selector: 'app-icon',
     imports: [NgIcon],
-    template: ` <ng-icon [name]="name()" [color]="color()" [strokeWidth]="strokeWidth()"></ng-icon> `,
+    template: `
+        <ng-icon [name]="name()" [color]="color()" [strokeWidth]="strokeWidth()" [size]="size()"></ng-icon>
+    `,
     styles: ``,
     changeDetection: ChangeDetectionStrategy.OnPush,
     viewProviders: [provideIcons(icons)],
@@ -23,4 +25,5 @@ export class IconComponent {
         transform: v => v && colorFrom(v),
     })
     strokeWidth = input<number | undefined>()
+    size = input<string>('')
 }

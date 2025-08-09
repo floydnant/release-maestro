@@ -7,6 +7,7 @@ import { FeedBackendService } from './feed/feed.backend.service'
 import { HydratedFeedItem } from './feed/feed.schema'
 import { DatabaseClient } from './database/database.client'
 import { SettingsBackendService } from './settings.backend.service'
+import { Exception } from './base.exceptions'
 
 let win: BrowserWindow | null = null
 const args = process.argv.slice(1),
@@ -141,7 +142,20 @@ ipcMain.handle('trigger-email-import', async event => {
 
 ipcMain.handle('load-feed', async (_event, index: number, count: number) => {
     const feedService = await diContainer.get(FeedBackendService)
-    return await feedService.loadFeed(index, count)
+
+    return await feedService
+        .loadFeed(index, count)
+        // @TODO: this should be some generic mechanism
+        .catch(err => {
+            if (err instanceof Exception) {
+                return {
+                    isError: true,
+                    ...err,
+                }
+            }
+
+            throw err
+        })
 })
 
 ipcMain.handle(

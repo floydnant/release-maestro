@@ -3,14 +3,22 @@
         class="mx-auto max-w-[65rem]"
         style="--max-feed-item-height: min(100vh, 800px); --feed-item-padding-y: 1.5rem"
     >
-        @if (!feed()) {
+        @if (!feed() && !feedError()) {
             <div class="absolute inset-0 flex flex-col items-center justify-center -translate-y-22">
                 <app-progress-ring [diameter]="150" [strokeWidth]="8" mode="spinning"></app-progress-ring>
                 <p class="text-tinted-300 font-bold">Loading...</p>
             </div>
         }
+        @if (feedError()) {
+            <div class="absolute inset-0 flex flex-col items-center justify-center -translate-y-22">
+                <p class="text-tinted-300 font-bold">
+                    <app-icon name="octXCircleFill" color="danger-400" size="3rem"></app-icon>
+                </p>
+                <p class="mt-2 max-w-52 text-center text-danger-400 font-bold">{{ feedError() }}</p>
+            </div>
+        }
 
-        @for (feedItem of feed(); track feedItem.id) {
+        @for (feedItem of !feedError() && feed(); track feedItem.id) {
             <div
                 class="feed-entry | snap-center my-32 py-[calc(var(--feed-item-padding-y)/2)] min-h-[45vh] max-h-[var(--max-feed-item-height)] flex items-center transition-all duration-500"
                 [ngClass]="{ 'opacity-30 blur-sm': currentFeedIndex() != $index }"
@@ -50,7 +58,7 @@
                                         @if (feedItem.data.releaseType == 'album') {
                                             {{ $index + 1 }}.
                                         }
-                                        {{ track.name }}</span
+                                        {{ track.title }}</span
                                     >
                                     <span>
                                         {{ track.duration ? formatDuration(track.duration) : '' }}
@@ -74,7 +82,9 @@
                                     {{ feedItem.data.releaseName }}
                                 </a>
                             </h2>
-                            <h2 class="artist | text-sm">by {{ feedItem.data.artist?.name }}</h2>
+                            @if (feedItem.data.artist) {
+                                <h2 class="artist | text-sm">by {{ feedItem.data.artist }}</h2>
+                            }
                             <div class="dates | mt-3 flex gap-2 items-center">
                                 @if (feedItem.data.releaseDate) {
                                     <span
@@ -151,6 +161,7 @@
                                     "
                                 >
                                     <!-- @TODO: this may need to be made reactive -->
+                                    <!-- @TODO: use ngx-icons here as well  -->
                                     <i
                                         class="{{
                                             snoozedFeedItems.has(feedItem.id) ? 'fas' : 'far'
@@ -161,20 +172,20 @@
                         </div>
                     </div>
 
-                    @if (feedItem.data.label) {
+                    @if (feedItem.data.band) {
                         <div
                             class="label-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto"
                         >
-                            @if (feedItem.data.label.imageUrl; as imageUrl) {
+                            @if (feedItem.data.band.imageUrl; as imageUrl) {
                                 <img
                                     class="label-image | shrink-0 rounded-md"
                                     width="120px"
                                     [src]="imageUrl"
-                                    alt="Label image for {{ feedItem.data.label.name }}"
+                                    alt="Label image for {{ feedItem.data.band.name }}"
                                 />
                             }
-                            <p class="text-sm font-bold mt-2">{{ feedItem.data.label.name }}</p>
-                            <p class="text-xs">{{ feedItem.data.label.location }}</p>
+                            <p class="text-sm font-bold mt-2">{{ feedItem.data.band.name }}</p>
+                            <p class="text-xs text-tinted-300">{{ feedItem.data.band.location }}</p>
                             @if (feedItem.data.unsubscribeUrl) {
                                 <a
                                     [href]="feedItem.data.unsubscribeUrl"
@@ -188,7 +199,23 @@
                                     <span class="unfollow | absolute inset-0 py-1">Unfollow</span>
                                 </a>
                             }
-                            <p class="text-xs mt-2.5">{{ feedItem.data.label.description }}</p>
+                            <p class="text-xs mt-2.5">{{ feedItem.data.band.bio }}</p>
+
+                            <ul class="label-links | text-xs mt-2.5">
+                                @for (link of feedItem.data.band.links; track $index) {
+                                    <li class="leading-5 truncate">
+                                        <a
+                                            [href]="link.url"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="max-w-full truncate text-tinted-100 not-hover:no-underline"
+                                            [title]="link.url"
+                                        >
+                                            {{ link.text }}
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
                         </div>
                     }
                 </div>

@@ -127,41 +127,34 @@ export class FeedBackendService {
 
     // @TODO: error handling
     async hydrateBandcampFeedItem(item: BandcampFeedItem): Promise<HydratedBandcampReleaseFeedItem> {
+        const sourceLinks =
+            item.source.type == 'EMAIL.BANDCAMP_NEW_RELEASE'
+                ? [...new Set(item.source.links.filter(isUsefulUrlFromBandcampEmail))]
+                : null
+
         if (!item.data.tralbumUrl) {
-            console.warn('No release link found:', item)
-
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null, null)
-        } else {
-            const labelUrl = item.data.tralbumUrl.match(/https?:\/\/[\w-]+\.bandcamp\.com/)?.[0]
-
-            const [releaseData, labelData, scrapedData, linkMetadataMap] = await Promise.all([
-                this.bandcampApiService.getRelease(item.data.tralbumUrl),
-                labelUrl
-                    ? this.bandcampApiService.getBand(labelUrl).catch(err => {
-                          console.error('Failed to load band', err)
-                          return null
-                      })
-                    : null,
-                this.bandcampApiService.scrapeRelease(item.data.tralbumUrl),
-                item.source.type == 'EMAIL.BANDCAMP_NEW_RELEASE'
-                    ? this.webScrapingService
-                          .getLinkMetaDataBatch([
-                              ...new Set(item.source.links.filter(isUsefulUrlFromBandcampEmail)),
-                          ])
-                          .catch(err => {
-                              console.error('Failed to scrape links', err)
-                              return null
-                          })
-                    : null,
-            ])
+            console.warn('No tralbum link found:', item)
 
             return mapBandcampReleaseFeedItemToHydratedFeedItem(
                 item,
-                releaseData,
-                labelData,
-                scrapedData,
-                linkMetadataMap,
+                null,
+                sourceLinks &&
+                    (await this.webScrapingService.getLinkMetaDataBatch(sourceLinks).catch(err => {
+                        console.error('Failed to scrape links', err)
+                        return null
+                    })),
             )
+        } else {
+            const [scrapedData, linkMetadataMap] = await Promise.all([
+                this.bandcampApiService.scrapeTralbumInfo(item.data.tralbumUrl),
+                sourceLinks &&
+                    (await this.webScrapingService.getLinkMetaDataBatch(sourceLinks).catch(err => {
+                        console.error('Failed to scrape links', err)
+                        return null
+                    })),
+            ])
+
+            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedData, linkMetadataMap)
         }
     }
 
