@@ -14,212 +14,239 @@
                 <p class="text-tinted-300 font-bold">
                     <app-icon name="octXCircleFill" color="danger-400" size="3rem"></app-icon>
                 </p>
-                <p class="mt-2 max-w-52 text-center text-danger-400 font-bold">{{ feedError() }}</p>
+                <p class="mt-2 max-w-52 text-center text-danger-400 font-bold">
+                    {{ feedError() }}
+                </p>
+
+                <button class="btn-nkd-neutral mt-3" (click)="retryNotifier$.next()">Retry</button>
             </div>
         }
 
-        @for (feedItem of !feedError() && feed(); track feedItem.id) {
-            <div
-                class="feed-entry | snap-center my-32 py-[calc(var(--feed-item-padding-y)/2)] min-h-[45vh] max-h-[var(--max-feed-item-height)] flex items-center transition-all duration-500"
-                [ngClass]="{ 'opacity-30 blur-sm': currentFeedIndex() != $index }"
-                #feedEntry
-                (intersectionChange)="onIntersectionChange($event, feedItem, $index)"
-                [intersectionThreshold]="1"
-                #emailEntryIntersection="appIntersection"
-            >
-                <!-- @TODO: handle all feed item types -->
-                <div class="inner-container | grid gap-4 w-full grid-cols-[300px_1fr_120px] h-full">
-                    <div class="artwork-column | h-full grid grid-rows-[300px_1fr]">
-                        <img
-                            class="album-cover | aspect-square shrink-0 rounded-md"
-                            width="300px"
-                            [src]="feedItem.data.imageUrl"
-                            alt="Album cover for {{ feedItem.data.releaseName }}"
-                        />
+        @if (!feedError()) {
+            @for (feedItem of feed(); track feedItem.id) {
+                <div
+                    class="feed-entry | snap-center my-32 py-[calc(var(--feed-item-padding-y)/2)] min-h-[45vh] max-h-[var(--max-feed-item-height)] flex items-center transition-all duration-500"
+                    [ngClass]="{ 'opacity-30 blur-sm': currentFeedIndex() != $index }"
+                    #feedEntry
+                    (intersectionChange)="onIntersectionChange($event, feedItem, $index)"
+                    [intersectionThreshold]="1"
+                    #emailEntryIntersection="appIntersection"
+                >
+                    <!-- @TODO: handle all feed item types -->
+                    <div class="inner-container | grid gap-4 w-full grid-cols-[300px_1fr_120px] h-full">
+                        <div class="artwork-column | h-full grid grid-rows-[300px_1fr]">
+                            <img
+                                class="album-cover | aspect-square shrink-0 rounded-md"
+                                width="300px"
+                                [src]="feedItem.data.imageUrl"
+                                alt="Album cover for {{ feedItem.data.releaseName }}"
+                            />
 
-                        <!-- @TODO: the height on this is very fragile, keep it up to date and come up with a better approach -->
-                        <!-- @TODO: we need to add the same kind of shadow effect on the scrolling list here as on the text-column -->
-                        <ul
-                            class="tracks | mt-3 overflow-y-auto max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)]"
-                        >
-                            @for (track of feedItem.data.tracks; track $index) {
-                                <li
-                                    class="track | text-sm flex justify-between gap-2"
-                                    [attr.data-track-index]="$index"
-                                    [ngClass]="{
-                                        'text-tinted-400': !track.streamUrl,
-                                        'text-blue-300 font-bold':
-                                            track.streamUrl == audioPlayer.currentUrl(),
-                                        'mt-2': !$first,
-                                    }"
-                                >
-                                    <!-- @TODO: add track seeker for active track -->
-                                    <span>
-                                        @if (feedItem.data.releaseType == 'album') {
-                                            {{ $index + 1 }}.
-                                        }
-                                        {{ track.title }}</span
+                            <!-- @TODO: the height on this is very fragile, keep it up to date and come up with a better approach -->
+                            <!-- @TODO: we need to add the same kind of shadow effect on the scrolling list here as on the text-column -->
+                            <ul
+                                class="tracks | mt-3 overflow-y-auto max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)]"
+                            >
+                                @for (track of feedItem.data.tracks; track $index) {
+                                    <li
+                                        class="track | text-sm flex justify-between gap-2"
+                                        [attr.data-track-index]="$index"
+                                        [ngClass]="{
+                                            'text-tinted-400': !track.streamUrl,
+                                            'text-blue-300 font-bold':
+                                                track.streamUrl == audioPlayer.currentUrl(),
+                                            'mt-2': !$first,
+                                        }"
                                     >
-                                    <span>
-                                        {{ track.duration ? formatDuration(track.duration) : '' }}
-                                    </span>
-                                </li>
-                            }
-                        </ul>
-                    </div>
+                                        <!-- @TODO: add track seeker for active track -->
+                                        <span>
+                                            @if (feedItem.data.releaseType == 'album') {
+                                                {{ $index + 1 }}.
+                                            }
+                                            {{ track.title }}</span
+                                        >
+                                        <span>
+                                            {{ track.duration ? formatDuration(track.duration) : '' }}
+                                        </span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
 
-                    <div
-                        class="text-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto flex flex-col justify-between relative"
-                    >
-                        <div class="">
-                            <h2 class="tralbum-title | text-3xl">
-                                <a
-                                    [href]="feedItem.data.releaseUrl"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="text-tinted-100 not-hover:no-underline"
+                        <div
+                            class="text-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto flex flex-col justify-between relative"
+                        >
+                            <div class="">
+                                @if (feedItem.error; as error) {
+                                    <div class="error | flex gap-2 items-center mb-1.5">
+                                        <p class="text-tinted-300 font-bold">
+                                            <app-icon name="octXCircleFill"
+                                                color="danger-400"
+                                                size="1.3rem"
+                                                class=" translate-y-[3px]"
+                                            ></app-icon>
+                                        </p>
+                                        <p class="text-danger-400 font-semibold">
+                                            {{ error.message || 'Error loading feed item' }}
+                                        </p>
+                                    </div>
+                                }
+
+                                <h2 class="tralbum-title | text-3xl">
+                                    <a
+                                        [href]="feedItem.data.releaseUrl"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="text-tinted-100 not-hover:no-underline"
+                                    >
+                                        {{ feedItem.data.releaseName }}
+                                    </a>
+                                </h2>
+                                @if (feedItem.data.artist) {
+                                    <h2 class="artist | text-sm">by {{ feedItem.data.artist }}</h2>
+                                }
+                                <div class="dates | mt-3 flex gap-2 items-center">
+                                    @if (feedItem.data.releaseDate) {
+                                        <span
+                                            class="text-xs bg-tinted-700 border border-tinted-500 rounded-full px-1.5 py-px"
+                                            [title]="
+                                                isInThePast(feedItem.data.releaseDate)
+                                                    ? 'released ' +
+                                                      (feedItem.data.releaseDate | date) +
+                                                      ' • announced ' +
+                                                      formatDateRelative(feedItem.data.emailReceivedAt)
+                                                    : (feedItem.data.releaseDate | date)
+                                            "
+                                        >
+                                            {{
+                                                isInThePast(feedItem.data.releaseDate)
+                                                    ? 'released'
+                                                    : 'releases'
+                                            }}
+                                            {{ formatDateRelative(feedItem.data.releaseDate) }}</span
+                                        >
+                                    }
+                                    @if (
+                                        !feedItem.data.releaseDate ||
+                                        !isAfter(feedItem.data.releaseDate, feedItem.data.emailReceivedAt)
+                                    ) {
+                                        <span
+                                            class="text-sm text-tinted-400"
+                                            [title]="feedItem.data.emailReceivedAt | date: 'medium'"
+                                            >announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
+                                        </span>
+                                    }
+                                </div>
+
+                                <p
+                                    class="about | mt-5 text-sm text-tinted-200"
+                                    [innerHTML]="feedItem.data.about | safe: 'html'"
+                                ></p>
+
+                                <!-- @TODO: abstract this into a <link-meta-previews /> -->
+                                <ul class="links | text-sm mt-6 flex flex-wrap gap-1">
+                                    @for (link of feedItem.data.links; track $index) {
+                                        <li class="w-full flex">
+                                            <a
+                                                [href]="link.url"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="flex items-center gap-1.5 bg-tinted-750 not-hover:text-tinted-400 rounded-md py-1 px-2 max-w-full truncate"
+                                                [title]="link.url"
+                                            >
+                                                <img
+                                                    class="favicon"
+                                                    [src]="link.favicon"
+                                                    alt="Favicon for {{ link.title }}"
+                                                    width="16"
+                                                    height="16"
+                                                />
+
+                                                <span class="inline-block truncate">{{ link.title }}</span>
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+
+                            <div class="feed-controls | mt-4 sticky bottom-0 flex justify-end">
+                                <div
+                                    class="shadow-overlay | h-full w-full z-0 bg-gradient-to-b from-transparent to-tinted-800"
+                                ></div>
+
+                                <div
+                                    class="text-xl text-tinted-400 flex bg-tinted-800 rounded-tl-xl p-2 pr-4"
                                 >
-                                    {{ feedItem.data.releaseName }}
-                                </a>
-                            </h2>
-                            @if (feedItem.data.artist) {
-                                <h2 class="artist | text-sm">by {{ feedItem.data.artist }}</h2>
-                            }
-                            <div class="dates | mt-3 flex gap-2 items-center">
-                                @if (feedItem.data.releaseDate) {
-                                    <span
-                                        class="text-xs bg-tinted-700 border border-tinted-500 rounded-full px-1.5 py-px"
+                                    <button
+                                        class="flex gap-2 items-center hover:underline"
+                                        (click)="toggleCurrentFeedItemSnoozedState()"
                                         [title]="
-                                            isInThePast(feedItem.data.releaseDate)
-                                                ? 'released ' +
-                                                  (feedItem.data.releaseDate | date) +
-                                                  ' • announced ' +
-                                                  formatDateRelative(feedItem.data.emailReceivedAt)
-                                                : (feedItem.data.releaseDate | date)
+                                            snoozedFeedItems.has(feedItem.id)
+                                                ? 'Click to un-snooze (dont\'t show again)'
+                                                : 'Click to snooze (show again tomorrow)'
                                         "
                                     >
-                                        {{ isInThePast(feedItem.data.releaseDate) ? 'released' : 'releases' }}
-                                        {{ formatDateRelative(feedItem.data.releaseDate) }}</span
-                                    >
-                                }
-                                @if (
-                                    !feedItem.data.releaseDate ||
-                                    !isAfter(feedItem.data.releaseDate, feedItem.data.emailReceivedAt)
-                                ) {
-                                    <span
-                                        class="text-sm text-tinted-400"
-                                        [title]="feedItem.data.emailReceivedAt | date: 'medium'"
-                                        >announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
-                                    </span>
-                                }
+                                        <!-- @TODO: this may need to be made reactive -->
+                                        <!-- @TODO: use ngx-icons here as well  -->
+                                        <i
+                                            class="{{
+                                                snoozedFeedItems.has(feedItem.id) ? 'fas' : 'far'
+                                            }} fa-alarm-snooze"
+                                        ></i>
+                                    </button>
+                                </div>
                             </div>
-
-                            <p
-                                class="about | mt-5 text-sm text-tinted-200"
-                                [innerHTML]="feedItem.data.about | safe: 'html'"
-                            ></p>
-
-                            <!-- @TODO: abstract this into a <link-meta-previews /> -->
-                            <ul class="links | text-sm mt-6 flex flex-wrap gap-1">
-                                @for (link of feedItem.data.links; track $index) {
-                                    <li class="w-full flex">
-                                        <a
-                                            [href]="link.url"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="flex items-center gap-1.5 bg-tinted-750 not-hover:text-tinted-400 rounded-md py-1 px-2 max-w-full truncate"
-                                            [title]="link.url"
-                                        >
-                                            <img
-                                                class="favicon"
-                                                [src]="link.favicon"
-                                                alt="Favicon for {{ link.title }}"
-                                                width="16"
-                                                height="16"
-                                            />
-
-                                            <span class="inline-block truncate">{{ link.title }}</span>
-                                        </a>
-                                    </li>
-                                }
-                            </ul>
                         </div>
 
-                        <div class="feed-controls | mt-4 sticky bottom-0 flex justify-end">
+                        @if (feedItem.data.band) {
                             <div
-                                class="shadow-overlay | h-full w-full z-0 bg-gradient-to-b from-transparent to-tinted-800"
-                            ></div>
-
-                            <div class="text-xl text-tinted-400 flex bg-tinted-800 rounded-tl-xl p-2 pr-4">
-                                <button
-                                    class="flex gap-2 items-center hover:underline"
-                                    (click)="toggleCurrentFeedItemSnoozedState()"
-                                    [title]="
-                                        snoozedFeedItems.has(feedItem.id)
-                                            ? 'Click to un-snooze (dont\'t show again)'
-                                            : 'Click to snooze (show again tomorrow)'
-                                    "
-                                >
-                                    <!-- @TODO: this may need to be made reactive -->
-                                    <!-- @TODO: use ngx-icons here as well  -->
-                                    <i
-                                        class="{{
-                                            snoozedFeedItems.has(feedItem.id) ? 'fas' : 'far'
-                                        }} fa-alarm-snooze"
-                                    ></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    @if (feedItem.data.band) {
-                        <div
-                            class="label-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto"
-                        >
-                            @if (feedItem.data.band.imageUrl; as imageUrl) {
-                                <img
-                                    class="label-image | shrink-0 rounded-md"
-                                    width="120px"
-                                    [src]="imageUrl"
-                                    alt="Label image for {{ feedItem.data.band.name }}"
-                                />
-                            }
-                            <p class="text-sm font-bold mt-2">{{ feedItem.data.band.name }}</p>
-                            <p class="text-xs text-tinted-300">{{ feedItem.data.band.location }}</p>
-                            @if (feedItem.data.unsubscribeUrl) {
-                                <a
-                                    [href]="feedItem.data.unsubscribeUrl"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="block mt-2.5 rounded-md py-1 px-2 text-center text-sm bg-tinted-750 not-hover:text-tinted-400 not-hover:no-underline [&_.unfollow]:not-hover:hidden [&_.following]:hover:hidden relative"
-                                    [title]="feedItem.data.unsubscribeText"
-                                >
-                                    <span class="opacity-0">Text</span>
-                                    <span class="following | absolute inset-0 py-1">Following</span>
-                                    <span class="unfollow | absolute inset-0 py-1">Unfollow</span>
-                                </a>
-                            }
-                            <p class="text-xs mt-2.5">{{ feedItem.data.band.bio }}</p>
-
-                            <ul class="label-links | text-xs mt-2.5">
-                                @for (link of feedItem.data.band.links; track $index) {
-                                    <li class="leading-5 truncate">
-                                        <a
-                                            [href]="link.url"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="max-w-full truncate text-tinted-100 not-hover:no-underline"
-                                            [title]="link.url"
-                                        >
-                                            {{ link.text }}
-                                        </a>
-                                    </li>
+                                class="label-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto"
+                            >
+                                @if (feedItem.data.band.imageUrl; as imageUrl) {
+                                    <img
+                                        class="label-image | shrink-0 rounded-md"
+                                        width="120px"
+                                        [src]="imageUrl"
+                                        alt="Label image for {{ feedItem.data.band.name }}"
+                                    />
                                 }
-                            </ul>
-                        </div>
-                    }
+                                <p class="text-sm font-bold mt-2">{{ feedItem.data.band.name }}</p>
+                                <p class="text-xs text-tinted-300">{{ feedItem.data.band.location }}</p>
+                                @if (feedItem.data.unsubscribeUrl) {
+                                    <a
+                                        [href]="feedItem.data.unsubscribeUrl"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="block mt-2.5 rounded-md py-1 px-2 text-center text-sm bg-tinted-750 not-hover:text-tinted-400 not-hover:no-underline [&_.unfollow]:not-hover:hidden [&_.following]:hover:hidden relative"
+                                        [title]="feedItem.data.unsubscribeText"
+                                    >
+                                        <span class="opacity-0">Text</span>
+                                        <span class="following | absolute inset-0 py-1">Following</span>
+                                        <span class="unfollow | absolute inset-0 py-1">Unfollow</span>
+                                    </a>
+                                }
+                                <p class="text-xs mt-2.5">{{ feedItem.data.band.bio }}</p>
+
+                                <ul class="label-links | text-xs mt-2.5">
+                                    @for (link of feedItem.data.band.links; track $index) {
+                                        <li class="leading-5 truncate">
+                                            <a
+                                                [href]="link.url"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="max-w-full truncate text-tinted-100 not-hover:no-underline"
+                                                [title]="link.url"
+                                            >
+                                                {{ link.text }}
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    </div>
                 </div>
-            </div>
+            }
         }
     </div>
 </div>

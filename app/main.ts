@@ -147,6 +147,8 @@ ipcMain.handle('load-feed', async (_event, index: number, count: number) => {
         .loadFeed(index, count)
         // @TODO: this should be some generic mechanism
         .catch(err => {
+            console.error('Error loading feed:', err)
+            
             if (err instanceof Exception) {
                 return {
                     isError: true,

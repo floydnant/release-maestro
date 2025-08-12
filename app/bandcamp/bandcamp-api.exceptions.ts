@@ -2,7 +2,7 @@ import { Exception } from '../base.exceptions'
 
 export class BandcampApiException extends Exception {}
 
-export class BandcampApiErrorWhileFetchingTralbumException extends BandcampApiException {
+export class BandcampApiFailedToFetchTralbumException extends BandcampApiException {
     constructor(
         public url: string,
         public status: number,

@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common'
 import { Component, ElementRef, HostListener, inject, signal, viewChildren } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { TranslateModule } from '@ngx-translate/core'
-import { mergeScan } from 'rxjs'
+import { combineLatestWith, fromEvent, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
 import { HydratedFeedItem } from '../../../../app/feed/feed.schema'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
@@ -45,12 +45,17 @@ export class FeedComponent {
     currentFeedIndex = signal(0)
     furthestScrolledIndex = signal(0)
 
-    loadedFeedItemIds = new Set<string>()
     feedError = signal<null | string>(null)
+    retryNotifier$ = new Subject<void>()
+
+    loadedFeedItemIds = new Set<string>()
     feed = toSignal(
         toObservable(this.furthestScrolledIndex).pipe(
+            combineLatestWith(
+                this.retryNotifier$.pipe(mergeWith(fromEvent(window, 'online')), startWith(null)),
+            ),
             mergeScan(
-                async (acc, furthestScrolledIndex) => {
+                async (acc, [furthestScrolledIndex]) => {
                     const numPrefetchItems = 5
                     const lastLoadedItemIndex = (acc?.length || 0) - 1
                     const itemCountToFetch =
@@ -59,12 +64,13 @@ export class FeedComponent {
                     const items = await this.feedService
                         .loadFeed(lastLoadedItemIndex + 1, itemCountToFetch)
                         .catch(err => {
-                            console.error(err)
+                            console.error('Error loading feed items', err)
 
                             this.feedError.set(getErrorMessage(err) || 'Failed to load')
                             return null
                         })
                     if (!items) return null
+                    this.feedError.set(null)
 
                     const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
                     if (items.length != newItems.length) {

@@ -10,6 +10,10 @@ import { BandcampEmailFeedSourceItem } from './feed-source.schema'
 import { FeedBackendRepository } from './feed.backend.repository'
 import { isUsefulUrlFromBandcampEmail, mapBandcampReleaseFeedItemToHydratedFeedItem } from './feed.mappers'
 import { BandcampFeedItem, HydratedBandcampReleaseFeedItem, HydratedFeedItem } from './feed.schema'
+import {
+    BandcampApiFailedToFetchTralbumException,
+    BandcampApiMalformedTralbumDataException,
+} from '../bandcamp/bandcamp-api.exceptions'
 
 const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): BandcampFeedItem | null => {
     if (email.type == 'EMAIL.BANDCAMP_NEW_RELEASE') {
@@ -143,10 +147,21 @@ export class FeedBackendService {
                         console.error('Failed to scrape links', err)
                         return null
                     })),
+                null,
             )
         } else {
             const [scrapedData, linkMetadataMap] = await Promise.all([
-                this.bandcampApiService.scrapeTralbumInfo(item.data.tralbumUrl),
+                this.bandcampApiService.scrapeTralbumInfo(item.data.tralbumUrl).catch(error => {
+                    if (
+                        error instanceof BandcampApiFailedToFetchTralbumException ||
+                        error instanceof BandcampApiMalformedTralbumDataException
+                    ) {
+                        console.log(error)
+                        return { isError: true as const, error }
+                    }
+                    console.error('Failed to load tralbum:', item.data.tralbumUrl, error)
+                    throw error
+                }),
                 sourceLinks &&
                     (await this.webScrapingService.getLinkMetaDataBatch(sourceLinks).catch(err => {
                         console.error('Failed to scrape links', err)
@@ -154,7 +169,15 @@ export class FeedBackendService {
                     })),
             ])
 
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedData, linkMetadataMap)
+            if ('isError' in scrapedData)
+                return mapBandcampReleaseFeedItemToHydratedFeedItem(
+                    item,
+                    null,
+                    linkMetadataMap,
+                    scrapedData.error,
+                )
+
+            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedData, linkMetadataMap, null)
         }
     }
 

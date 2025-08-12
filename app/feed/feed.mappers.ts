@@ -12,12 +12,14 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
     { data, source, ...item }: Extract<BandcampFeedItem, { type: 'BANDCAMP.TRALBUM' }>,
     tralbum: ScrapedTralbumInfo | null,
     linkMetadataMap: Record<string, ScrapedLinkMetadata | null> | null,
+    error: { userFacingMessage: string } | null,
 ): HydratedBandcampReleaseFeedItem {
     if (source.type != 'EMAIL.BANDCAMP_NEW_RELEASE')
         throw new Error('Cannot map fans bought music email to hydrated feed item')
 
     return {
         ...item,
+        error: error?.userFacingMessage ? { message: error.userFacingMessage } : null,
         data: {
             releaseUrl: data.tralbumUrl,
             releaseDate: tralbum?.releaseDate ? new Date(tralbum?.releaseDate) : null,

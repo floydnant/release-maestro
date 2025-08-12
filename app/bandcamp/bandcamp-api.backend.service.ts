@@ -3,7 +3,7 @@ import { CheerioAPI, load as cheerioLoad } from 'cheerio'
 import z from 'zod'
 import { FetchFailedException } from '../base.exceptions'
 import {
-    BandcampApiErrorWhileFetchingTralbumException,
+    BandcampApiFailedToFetchTralbumException,
     BandcampApiMalformedTralbumDataException,
 } from './bandcamp-api.exceptions'
 
@@ -116,7 +116,7 @@ export class BandcampApiBackendService {
             throw err
         })
         if (!result.ok) {
-            throw new BandcampApiErrorWhileFetchingTralbumException(url, result.status)
+            throw new BandcampApiFailedToFetchTralbumException(url, result.status)
         }
 
         const html = await result.text()

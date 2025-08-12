@@ -63,6 +63,7 @@ export type HydratedBandcampReleaseFeedItem = {
         iframeUrl: string | null
         tracks: ScrapedTralbumInfo['tracks']
     }
+    error: { message: string } | null
     id: string
     type: 'BANDCAMP.TRALBUM'
 }
