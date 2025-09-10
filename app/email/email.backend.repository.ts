@@ -1,7 +1,13 @@
 import { Observable } from 'rxjs'
 import { diContainer } from '../di'
-import { EmailImporterPluginConstructor, EmailImportStreamPacket, EmailVendor } from './email.schema'
+import { EmailImportStreamPacket, EmailVendor } from '../../shared/schemas/email.schema'
 import { AppleMailRepository } from './importers/apple-mail.repository'
+import { SettingsBackendService } from '../settings.backend.service'
+
+export interface EmailImporterPlugin {
+    loadEmails(signal: AbortSignal): Observable<EmailImportStreamPacket>
+}
+export type EmailImporterPluginConstructor = new (settings: SettingsBackendService) => EmailImporterPlugin
 
 export const emailImporterPlugins: Record<EmailVendor, EmailImporterPluginConstructor> = {
     APPLE_MAIL: AppleMailRepository,

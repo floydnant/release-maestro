@@ -1,4 +1,4 @@
-import { Email } from '../email/email.schema'
+import { Email } from '../../shared/schemas/email.schema'
 import { BandcampEmailFeedSourceItem } from '../feed/feed-source.schema'
 
 // export type BandcampEmailType =

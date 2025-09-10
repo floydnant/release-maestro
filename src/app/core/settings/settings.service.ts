@@ -1,5 +1,5 @@
 import { inject, Injectable, resource } from '@angular/core'
-import { AppSettings } from '../../../shared/app-settings.schema'
+import { AppSettings } from '../../../../shared/schemas/app-settings.schema'
 import { ElectronService } from '../services'
 
 @Injectable({

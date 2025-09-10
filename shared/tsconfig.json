@@ -1,0 +1,15 @@
+{
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "declaration": true,
+        "outDir": "../dist/out-tsc/shared",
+        "rootDir": "."
+    },
+    "include": [
+        "**/*.ts"
+    ],
+    "exclude": [
+        "**/*.spec.ts",
+        "**/*.test.ts"
+    ]
+}

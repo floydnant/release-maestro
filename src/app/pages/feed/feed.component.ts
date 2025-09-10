@@ -12,7 +12,7 @@ import { ProgressRingComponent } from '../../shared/components/progress-ring/pro
 import { IntersectionDirective } from '../../shared/directives/intersection.directive'
 import { SafePipe } from '../../shared/pipes/safe.pipe'
 import { formatDateRelative, formatDuration } from '../../shared/utils/formatting.utils'
-import { assertUnreachable } from '../../shared/utils/type-guards.utils'
+import { assertUnreachable } from '../../../../shared/utils/type-guards.utils'
 
 const getErrorMessage = (error: unknown) => {
     if (typeof error == 'string') return error

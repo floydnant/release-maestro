@@ -1,6 +1,6 @@
 import type tailwindColors from 'tailwindcss/colors'
 import colorsJson from '../../../colors.json'
-import { LeavesConcatenated } from './utils/object.utils'
+import { LeavesConcatenated } from '../../../shared/utils/object.utils'
 
 export const colors = {
     ...colorsJson,

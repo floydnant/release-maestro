@@ -3,7 +3,6 @@ import { ipcRenderer, webFrame } from 'electron'
 import * as childProcess from 'child_process'
 import * as fs from 'fs'
 import * as fsPromises from 'fs/promises'
-import { appEnvSchema } from '../../../../shared/app-env.schema'
 
 @Injectable({
     providedIn: 'root',
@@ -14,8 +13,6 @@ export class ElectronService {
     childProcess!: typeof childProcess
     fs!: typeof fs
     fsPromises!: typeof fsPromises
-
-    env = appEnvSchema.parse(process.env)
 
     constructor() {
         // Conditional imports

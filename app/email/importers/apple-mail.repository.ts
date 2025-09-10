@@ -3,8 +3,9 @@ import { app } from 'electron'
 import * as fs from 'fs/promises'
 import { join } from 'path'
 import { Observable, Subject } from 'rxjs'
-import { Email, EmailImporterPlugin, EmailImportStreamPacket, emailSchema } from '../email.schema'
+import { Email, EmailImportStreamPacket, emailSchema } from '../../../shared/schemas/email.schema'
 import { SettingsBackendService } from '../../settings.backend.service'
+import type { EmailImporterPlugin } from '../email.backend.repository'
 
 const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string): Email | null => {
     const data = {

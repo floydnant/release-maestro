@@ -1,4 +1,4 @@
-import { entriesOf, Prettify } from '../src/app/shared/utils/object.utils'
+import { entriesOf, Prettify } from '../shared/utils/object.utils'
 import { BandcampApiBackendService } from './bandcamp/bandcamp-api.backend.service'
 import { DatabaseClient } from './database/database.client'
 import { EmailBackendRepository, emailImporterPlugins } from './email/email.backend.repository'

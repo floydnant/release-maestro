@@ -1,6 +1,6 @@
 import Conf from 'conf'
 import z from 'zod'
-import { AppSettings, appSetingsSchema } from '../src/shared/app-settings.schema'
+import { AppSettings, appSetingsSchema } from '../shared/schemas/app-settings.schema'
 
 export class SettingsBackendService {
     store = new Conf<AppSettings>({

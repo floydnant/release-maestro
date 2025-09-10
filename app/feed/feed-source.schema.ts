@@ -1,5 +1,5 @@
 import z from 'zod'
-import { emailSchema } from '../email/email.schema'
+import { emailSchema } from '../../shared/schemas/email.schema'
 
 export const bandcampEmailNewReleaseFeedSourceItemSchema = emailSchema.extend({
     type: z.literal('EMAIL.BANDCAMP_NEW_RELEASE'),

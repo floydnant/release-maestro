@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core'
 import { fromEventPattern, map, share } from 'rxjs'
-import { EmailImportProgressUpdate } from '../../../../app/email/email.schema'
+import { EmailImportProgressUpdate } from '../../../../shared/schemas/email.schema'
 import { HydratedFeedItem } from '../../../../app/feed/feed.schema'
 import { UiSideException } from '../../shared/ui-facing.exceptions'
 import { ElectronService } from './electron/electron.service'

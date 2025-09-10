@@ -1,5 +1,5 @@
 import z from 'zod'
-import { EmailVendor } from '../../app/email/email.schema'
+import { EmailVendor } from './email.schema'
 
 export const appSetingsSchema = z.object({
     emailPluginConfig: z

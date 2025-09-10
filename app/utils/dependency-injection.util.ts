@@ -1,4 +1,4 @@
-import { Prettify } from '../../src/app/shared/utils/object.utils'
+import { Prettify } from '../../shared/utils/object.utils'
 import { DiProviderNotFoundException } from './dependency-injection.exceptions'
 
 type AnyConstructor<TInstance> = new (...args: any[]) => TInstance

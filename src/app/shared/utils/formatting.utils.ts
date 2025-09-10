@@ -1,4 +1,4 @@
-import { entriesOf } from './object.utils'
+import { entriesOf } from '../../../../shared/utils/object.utils'
 
 export const formatDuration = (duration: number): string => {
     // If the duration is longer than 10 hours, its probably in milliseconds
