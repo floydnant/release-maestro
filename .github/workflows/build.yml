@@ -132,7 +132,7 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                   name: macos-build
-                  path: release/
+                  path: release/*.dmg
 
     build-windows:
         strategy:
