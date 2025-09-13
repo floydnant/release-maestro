@@ -12,7 +12,6 @@ export type IconIdentitfier = keyof typeof icons
     template: `
         <ng-icon [name]="name()" [color]="color()" [strokeWidth]="strokeWidth()" [size]="size()"></ng-icon>
     `,
-    styles: ``,
     changeDetection: ChangeDetectionStrategy.OnPush,
     viewProviders: [provideIcons(icons)],
     host: {

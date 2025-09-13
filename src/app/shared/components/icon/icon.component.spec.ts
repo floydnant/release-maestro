@@ -11,6 +11,7 @@ describe('IconComponent', () => {
         }).compileComponents()
 
         fixture = TestBed.createComponent(IconComponent)
+        fixture.componentRef.setInput('name', 'octCheckCircleFill')
         component = fixture.componentInstance
         fixture.detectChanges()
     })
