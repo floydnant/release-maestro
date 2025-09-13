@@ -1,8 +1,9 @@
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
+import fs from 'fs/promises'
 import { join } from 'path'
-import { app } from 'electron'
+import { appPaths } from '../app-env'
 import { PROVIDER_DESTROY, PROVIDER_INIT } from '../utils/dependency-injection.util'
 import * as schema from './drizzle.schema'
 
@@ -37,16 +38,21 @@ export class DatabaseClient {
             return
         }
 
-        const userDataPath = app.getPath('userData')
-        const dbPath = join(userDataPath, 'mailbox-tool.db')
+        const dbPath = join(appPaths.data, 'mailbox-tool.db')
+        // @TODO: this directory creation should be done in a more central place
+        const exists = await fs
+            .stat(dbPath)
+            .then(() => true)
+            .catch(() => false)
+        if (!exists) {
+            await fs.mkdir(appPaths.data, { recursive: true })
+        }
         console.log(`Initializing database at: ${dbPath}`)
 
         this._sqlite = new Database(dbPath)
         this._db = drizzle(this._sqlite, { schema })
 
         await this.runMigrations()
-
-        console.log('Database initialized successfully')
     }
 
     async disconnect(): Promise<void> {
@@ -63,14 +69,9 @@ export class DatabaseClient {
         }
 
         try {
-            console.log('Running database migrations...')
-
-            const appPath = app.getAppPath()
-            const migrationsPath = join(appPath, 'drizzle')
-
+            const migrationsPath = join(appPaths.resources, 'drizzle')
+            console.log('Running database migrations from:', migrationsPath)
             migrate(this._db, { migrationsFolder: migrationsPath })
-
-            console.log('Database migrations completed successfully')
         } catch (error) {
             console.error('Failed to run migrations:', error)
             throw error

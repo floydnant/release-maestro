@@ -7,9 +7,7 @@
         "**/*",
         "!**/*.ts",
         "!**/*.map",
-        "!package.json",
         "!package-lock.json",
-        "drizzle/**/*",
         {
             "from": "../dist",
             "filter": ["**/*"]
@@ -25,6 +23,13 @@
             "filter": ["**/*.js"]
         }
     ],
+    "extraFiles": [
+        {
+            "from": "drizzle",
+            "to": "drizzle",
+            "filter": ["**/*"]
+        }
+    ],
     "win": {
         "icon": "dist/assets/icons",
         "target": ["portable"]
@@ -38,6 +43,7 @@
         "extraFiles": [
             {
                 "from": "apple-scripts",
+                "filter": ["**/*"],
                 "to": "apple-scripts"
             }
         ]

@@ -1,27 +1,7 @@
 {
-    "name": "angular-electron",
-    "version": "15.0.0",
-    "description": "Angular 19 with Electron 36 (Typescript + SASS + Hot Reload)",
-    "homepage": "https://github.com/maximegris/angular-electron",
-    "author": {
-        "name": "Maxime GRIS",
-        "email": "maxime.gris@gmail.com"
-    },
-    "keywords": [
-        "angular",
-        "angular 19",
-        "electron",
-        "electron 36",
-        "nodejs",
-        "typescript",
-        "jest",
-        "playwright",
-        "eslint",
-        "sass",
-        "windows",
-        "mac",
-        "linux"
-    ],
+    "name": "release-maestro",
+    "productName": "Release Maestro",
+    "version": "1.0.0",
     "main": "dist/out-tsc/app/main.js",
     "private": true,
     "scripts": {

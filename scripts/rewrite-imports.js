@@ -27,7 +27,9 @@ function rewriteImports(filePath) {
     const content = fs.readFileSync(filePath, 'utf8')
 
     // Replace imports from ../shared/ to ./out-tsc/shared/
-    const updatedContent = content.replace(/\.\.\/shared\//g, './out-tsc/shared/')
+    const updatedContent = content
+        .replace(/\.\.\/shared\//g, './out-tsc/shared/')
+        .replace(/\.\.\/package\.json/g, './package.json')
 
     if (content !== updatedContent) {
         fs.writeFileSync(filePath, updatedContent)

@@ -1,7 +1,7 @@
 import z from 'zod'
 import { EmailVendor } from './email.schema'
 
-export const appSetingsSchema = z.object({
+export const appSettingsSchema = z.object({
     emailPluginConfig: z
         .object({
             APPLE_MAIL: z.object({
@@ -9,6 +9,7 @@ export const appSetingsSchema = z.object({
                 mailboxName: z.string().optional(),
             }),
         } satisfies Record<EmailVendor, z.ZodObject>)
-        .partial(),
+        .partial()
+        .catch({}),
 })
-export type AppSettings = z.infer<typeof appSetingsSchema>
+export type AppSettings = z.infer<typeof appSettingsSchema>

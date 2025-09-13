@@ -6,7 +6,7 @@
     "version": 1,
     "newProjectRoot": "projects",
     "projects": {
-        "angular-electron": {
+        "release-maestro": {
             "root": "",
             "sourceRoot": "src",
             "projectType": "application",
@@ -107,27 +107,27 @@
                 "serve": {
                     "builder": "@angular-builders/custom-webpack:dev-server",
                     "options": {
-                        "buildTarget": "angular-electron:build"
+                        "buildTarget": "release-maestro:build"
                     },
                     "configurations": {
                         "dev": {
-                            "buildTarget": "angular-electron:build:dev"
+                            "buildTarget": "release-maestro:build:dev"
                         },
                         "production": {
-                            "buildTarget": "angular-electron:build:production"
+                            "buildTarget": "release-maestro:build:production"
                         },
                         "web": {
-                            "buildTarget": "angular-electron:build:web"
+                            "buildTarget": "release-maestro:build:web"
                         },
                         "web-production": {
-                            "buildTarget": "angular-electron:build:web-production"
+                            "buildTarget": "release-maestro:build:web-production"
                         }
                     }
                 },
                 "extract-i18n": {
                     "builder": "@angular/build:extract-i18n",
                     "options": {
-                        "buildTarget": "angular-electron:build"
+                        "buildTarget": "release-maestro:build"
                     }
                 },
                 "test": {
@@ -146,7 +146,7 @@
                 }
             }
         },
-        "angular-electron-e2e": {
+        "release-maestro-e2e": {
             "root": "e2e",
             "projectType": "application",
             "architect": {

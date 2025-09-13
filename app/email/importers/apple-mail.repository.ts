@@ -4,6 +4,7 @@ import * as fs from 'fs/promises'
 import { join } from 'path'
 import { Observable, Subject } from 'rxjs'
 import { Email, EmailImportStreamPacket, emailSchema } from '../../../shared/schemas/email.schema'
+import { appPaths } from '../../app-env'
 import { SettingsBackendService } from '../../settings.backend.service'
 import type { EmailImporterPlugin } from '../email.backend.repository'
 
@@ -56,8 +57,7 @@ export class AppleMailRepository implements EmailImporterPlugin {
         }
 
         const exportPath = join(app.getPath('temp'), 'apple-mail-export')
-        // @TODO: this may need to be fixed for production builds
-        const appleScriptPath = join(process.cwd(), 'apple-scripts', 'export-emails.applescript')
+        let appleScriptPath = join(appPaths.resources, 'apple-scripts', 'export-emails.applescript')
 
         const childProcess = exec(
             `osascript "${appleScriptPath}" "${mailboxName}" "${exportPath}"`,

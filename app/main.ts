@@ -2,12 +2,12 @@ import 'dotenv/config'
 import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
+import { Exception } from './base.exceptions'
+import { DatabaseClient } from './database/database.client'
 import { diContainer } from './di'
 import { FeedBackendService } from './feed/feed.backend.service'
 import { HydratedFeedItem } from './feed/feed.schema'
-import { DatabaseClient } from './database/database.client'
 import { SettingsBackendService } from './settings.backend.service'
-import { Exception } from './base.exceptions'
 
 let win: BrowserWindow | null = null
 const args = process.argv.slice(1),
@@ -148,7 +148,7 @@ ipcMain.handle('load-feed', async (_event, index: number, count: number) => {
         // @TODO: this should be some generic mechanism
         .catch(err => {
             console.error('Error loading feed:', err)
-            
+
             if (err instanceof Exception) {
                 return {
                     isError: true,
