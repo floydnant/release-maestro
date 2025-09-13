@@ -33,6 +33,11 @@ jobs:
                       ${{ runner.os }}-build-
                       ${{ runner.os }}-
 
+            - name: Setup node
+              uses: actions/setup-node@v5
+              with:
+                  node-version: 22
+
             - name: Install Dependencies
               run: npm i
 
@@ -50,10 +55,6 @@ jobs:
                   run: npm run e2e
 
     build-linux:
-        strategy:
-            matrix:
-                node-version: [22]
-
         runs-on: ubuntu-latest
 
         steps:
@@ -72,10 +73,10 @@ jobs:
                       ${{ runner.os }}-build-
                       ${{ runner.os }}-
 
-            - name: Use Node.js ${{ matrix.node-version }}
+            - name: Setup node
               uses: actions/setup-node@v5
               with:
-                  node-version: ${{ matrix.node-version }}
+                  node-version: 22
 
             - name: Install linux dependencies
               run: |
@@ -92,10 +93,6 @@ jobs:
                   path: release/
 
     build-macos:
-        strategy:
-            matrix:
-                node-version: [22]
-
         runs-on: macos-latest
 
         steps:
@@ -114,10 +111,10 @@ jobs:
                       ${{ runner.os }}-build-
                       ${{ runner.os }}-
 
-            - name: Use Node.js ${{ matrix.node-version }}
+            - name: Setup node
               uses: actions/setup-node@v5
               with:
-                  node-version: ${{ matrix.node-version }}
+                  node-version: 22
 
             - name: Install Dependencies
               run: npm i && npm i -D cli-truncate iconv-corefoundation
@@ -135,10 +132,6 @@ jobs:
                   path: release/*.dmg
 
     build-windows:
-        strategy:
-            matrix:
-                node-version: [22]
-
         runs-on: windows-latest
 
         steps:
@@ -157,10 +150,10 @@ jobs:
                       ${{ runner.os }}-build-
                       ${{ runner.os }}-
 
-            - name: Use Node.js ${{ matrix.node-version }}
+            - name: Setup node
               uses: actions/setup-node@v5
               with:
-                  node-version: ${{ matrix.node-version }}
+                  node-version: 22
 
             - name: Install Dependencies
               run: npm i
