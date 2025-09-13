@@ -3,6 +3,7 @@ import {
     Directive,
     ElementRef,
     EventEmitter,
+    inject,
     Input,
     OnDestroy,
     Output,
@@ -14,7 +15,7 @@ import {
     exportAs: 'appIntersection',
 })
 export class IntersectionDirective implements AfterViewInit, OnDestroy {
-    constructor(private elemRef: ElementRef<HTMLElement>) {}
+    private elemRef = inject(ElementRef) as ElementRef<HTMLElement>
 
     @Input() intersectionThreshold = 1
     @Output() intersectionChange = new EventEmitter<boolean>()

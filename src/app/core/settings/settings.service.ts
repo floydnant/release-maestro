@@ -10,6 +10,7 @@ export class SettingsService {
 
     private async getSettings(): Promise<AppSettings> {
         // @TODO: error handling
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return await this.electronService.ipcRenderer.invoke('get-settings')
     }
     async setSettings(settings: AppSettings): Promise<void> {

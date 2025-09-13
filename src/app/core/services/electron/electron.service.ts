@@ -17,12 +17,17 @@ export class ElectronService {
     constructor() {
         // Conditional imports
         if (this.isElectron) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
             this.ipcRenderer = (window as any).require('electron').ipcRenderer
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
             this.webFrame = (window as any).require('electron').webFrame
 
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
             this.fs = (window as any).require('fs')
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
             this.fsPromises = (window as any).require('fs/promises')
 
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
             this.childProcess = (window as any).require('child_process')
             this.childProcess.exec('node -v', (error, stdout, stderr) => {
                 if (error) {
@@ -51,10 +56,11 @@ export class ElectronService {
     }
 
     get isElectron(): boolean {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         return !!(window && window.process && window.process.type)
     }
 
-    openUrl(url: string) {
-        this.ipcRenderer.invoke('open-url', url)
+    async openUrl(url: string) {
+        await this.ipcRenderer.invoke('open-url', url)
     }
 }

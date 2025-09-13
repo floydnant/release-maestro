@@ -19,19 +19,23 @@ export class FeedService {
         share({ resetOnRefCountZero: true }),
     )
 
-    triggerEmailImport() {
-        this.electronService.ipcRenderer.invoke('trigger-email-import')
+    async triggerEmailImport() {
+        await this.electronService.ipcRenderer.invoke('trigger-email-import')
     }
     cancelEmailImport() {
         this.electronService.ipcRenderer.send('email-import-abort')
     }
 
     async loadFeed(index: number, count: number): Promise<HydratedFeedItem[]> {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const result = await this.electronService.ipcRenderer.invoke('load-feed', index, count)
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (result.isError) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
             throw new UiSideException(result.message, result.userFacingMessage)
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return result
     }
 

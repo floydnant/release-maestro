@@ -15,6 +15,7 @@ describe('AppComponent', () => {
 
     it('should create the app', waitForAsync(() => {
         const fixture = TestBed.createComponent(AppComponent)
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const app = fixture.debugElement.componentInstance
         expect(app).toBeTruthy()
     }))

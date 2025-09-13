@@ -25,15 +25,20 @@ export class WebAudioPlayer {
             this.ended$.next()
         })
         this.audioElem.addEventListener('error', e => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
             switch ((e.target as any)?.error.code) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
                 case (e.target as any)?.error.MEDIA_ERR_ABORTED:
                     break
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
                 case (e.target as any)?.error.MEDIA_ERR_NETWORK:
                     this.logError('A network error caused the audio download to fail.')
                     break
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
                 case (e.target as any)?.error.MEDIA_ERR_DECODE:
                     this.logError('The audio playback was aborted due to a decoding issue.')
                     break
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
                 case (e.target as any)?.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
                     this.logError(
                         'The audio could not be loaded, either because network failed or due to an issue with the format.',
@@ -93,7 +98,9 @@ export class WebAudioPlayer {
     play() {
         if (!this.audioElem.src) return
 
-        this.audioElem.play()
+        this.audioElem.play().catch(err => {
+            this.logError('Failed to play audio:', err)
+        })
 
         this.playerTime.set(this.audioElem.currentTime)
         clearInterval(this.interval)
@@ -117,11 +124,11 @@ export class WebAudioPlayer {
         }
     }
 
-    logInfo(message: string, ...args: any[]) {
+    logInfo(message: string, ...args: unknown[]) {
         // @TODO: Use proper logging
         console.log(`[${WebAudioPlayer.name.replace(/^_/, '')}] ` + message, ...args)
     }
-    logError(message: string, ...args: any[]) {
+    logError(message: string, ...args: unknown[]) {
         // @TODO: Use proper logging
         console.error(`[${WebAudioPlayer.name.replace(/^_/, '')}] ` + message, ...args)
     }

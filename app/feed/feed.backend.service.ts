@@ -37,7 +37,7 @@ const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): Bandcam
         return null
     }
 
-    return assertUnreachable(email, 'Unhandled Bandcamp email type: ' + JSON.stringify(email))
+    return assertUnreachable(email, 'Unhandled Bandcamp email type:')
 }
 
 export class FeedBackendService {
@@ -75,7 +75,7 @@ export class FeedBackendService {
                         }
                     }
 
-                    return assertUnreachable(notification, 'Unhandled notification kind: ' + notification)
+                    return assertUnreachable(notification, 'Unhandled notification kind:')
                 }),
             ),
             emails$.pipe(
@@ -123,7 +123,7 @@ export class FeedBackendService {
                         return NEVER
                     }
 
-                    return assertUnreachable(notification, 'Unhandled notification kind: ' + notification)
+                    return assertUnreachable(notification, 'Unhandled notification kind:')
                 }),
             ),
         )
@@ -186,7 +186,7 @@ export class FeedBackendService {
         const promises = items.map(async item => {
             if (item.type == 'BANDCAMP.TRALBUM') return await this.hydrateBandcampFeedItem(item)
 
-            return assertUnreachable(item.type, 'Unhandled feed item type: ' + item.type)
+            return assertUnreachable(item.type, 'Unhandled feed item type:')
         })
         const hydratedFeedItems = await Promise.all(promises)
         console.log('Hydrated', hydratedFeedItems.length, 'feed items')

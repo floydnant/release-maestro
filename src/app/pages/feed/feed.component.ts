@@ -140,7 +140,7 @@ export class FeedComponent {
                     }
                 }
             } else {
-                assertUnreachable(feedItem.type, `Unhandled feed item type: ${feedItem.type}`)
+                assertUnreachable(feedItem.type, `Unhandled feed item type:`)
             }
 
             return
@@ -227,7 +227,7 @@ export class FeedComponent {
             this.audioPlayer.playSource(nextPlayableTrack.streamUrl!)
             this.scrollCurrentTrackIntoView()
         } else {
-            assertUnreachable(currentFeedItem.type, `Unhandled feed item type: ${currentFeedItem.type}`)
+            assertUnreachable(currentFeedItem.type, `Unhandled feed item type:`)
         }
     }
 
@@ -270,7 +270,7 @@ export class FeedComponent {
             this.audioPlayer.playSource(currentFeedItem.data.tracks[prevPlayableTrackIndex]!.streamUrl!)
             this.scrollCurrentTrackIntoView()
         } else {
-            assertUnreachable(currentFeedItem.type, `Unhandled feed item type: ${currentFeedItem.type}`)
+            assertUnreachable(currentFeedItem.type, `Unhandled feed item type:`)
         }
     }
 
@@ -289,9 +289,11 @@ export class FeedComponent {
                 console.warn('No current release url')
                 return
             }
-            this.electronService.openUrl(url)
+            this.electronService.openUrl(url).catch(err => {
+                console.error('Failed to open url in browser:', err)
+            })
         } else {
-            assertUnreachable(currentFeedItem.type, `Unhandled feed item type: ${currentFeedItem.type}`)
+            assertUnreachable(currentFeedItem.type, `Unhandled feed item type:`)
         }
     }
 
@@ -331,7 +333,7 @@ export class FeedComponent {
                 console.warn('Current track element not found in the DOM')
             }
         } else {
-            assertUnreachable(currentFeedItem.type, `Unhandled feed item type: ${currentFeedItem.type}`)
+            assertUnreachable(currentFeedItem.type, `Unhandled feed item type:`)
         }
     }
 

@@ -20,7 +20,7 @@ test.describe('Check Home Page', () => {
     test('Launch electron app', async () => {
         const windowState: { isVisible: boolean; isDevToolsOpened: boolean; isCrashed: boolean } =
             await app.evaluate(async process => {
-                const mainWindow = process.BrowserWindow.getAllWindows()[0]
+                const mainWindow = process.BrowserWindow.getAllWindows()[0]!
 
                 const getState = () => ({
                     isVisible: mainWindow.isVisible(),

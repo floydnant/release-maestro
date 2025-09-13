@@ -1,8 +1,7 @@
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing'
-
-import { HomeComponent } from './home.component'
-import { TranslateModule } from '@ngx-translate/core'
 import { provideRouter } from '@angular/router'
+import { TranslateModule } from '@ngx-translate/core'
+import { HomeComponent } from './home.component'
 
 describe('HomeComponent', () => {
     let component: HomeComponent
@@ -25,7 +24,9 @@ describe('HomeComponent', () => {
     })
 
     it('should render title in a h1 tag', waitForAsync(() => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const compiled = fixture.debugElement.nativeElement
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         expect(compiled.querySelector('h1').textContent).toContain('PAGES.HOME.TITLE')
     }))
 })

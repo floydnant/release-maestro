@@ -41,7 +41,9 @@ export class AppComponent {
     audioPlayer = inject(WebAudioPlayer)
 
     triggerEmailImport() {
-        this.feedService.triggerEmailImport()
+        this.feedService.triggerEmailImport().catch(err => {
+            console.error('Failed to trigger email import:', err)
+        })
     }
     cancelEmailImport() {
         this.feedService.cancelEmailImport()

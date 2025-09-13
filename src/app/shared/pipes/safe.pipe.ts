@@ -1,4 +1,4 @@
-import { Pipe, PipeTransform } from '@angular/core'
+import { inject, Pipe, PipeTransform } from '@angular/core'
 import {
     DomSanitizer,
     SafeHtml,
@@ -15,20 +15,8 @@ import {
     name: 'safe',
 })
 export class SafePipe implements PipeTransform {
-    /**
-     * Pipe Constructor
-     *
-     * @param _sanitizer: DomSanitezer
-     */
-    // tslint:disable-next-line
-    constructor(protected _sanitizer: DomSanitizer) {}
+    protected _sanitizer = inject(DomSanitizer)
 
-    /**
-     * Transform
-     *
-     * @param value: string
-     * @param type: string
-     */
     transform(
         value: string,
         type: 'html' | 'style' | 'script' | 'url' | 'resourceUrl',
