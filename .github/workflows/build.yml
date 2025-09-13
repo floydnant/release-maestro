@@ -1,0 +1,178 @@
+name: 'Build'
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Cache node modules
+              uses: actions/cache@v4
+              env:
+                  cache-name: cache-node-modules
+              with:
+                  # npm cache files are stored in `~/.npm` on Linux/macOS
+                  path: ~/.npm
+                  key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-build-${{ env.cache-name }}-
+                      ${{ runner.os }}-build-
+                      ${{ runner.os }}-
+
+            - name: Install Dependencies
+              run: npm i
+
+            - name: Check lint
+              run: npm run lint
+
+            - name: Run headless unit test
+              uses: GabrielBB/xvfb-action@v1
+              with:
+                  run: npm run test
+
+            - name: Run headless e2e test
+              uses: GabrielBB/xvfb-action@v1
+              with:
+                  run: npm run e2e
+
+    build-linux:
+        strategy:
+            matrix:
+                node-version: [22]
+
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Cache node modules
+              uses: actions/cache@v4
+              env:
+                  cache-name: cache-node-modules
+              with:
+                  # npm cache files are stored in `~/.npm` on Linux/macOS
+                  path: ~/.npm
+                  key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-build-${{ env.cache-name }}-
+                      ${{ runner.os }}-build-
+                      ${{ runner.os }}-
+
+            - name: Use Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v5
+              with:
+                  node-version: ${{ matrix.node-version }}
+
+            - name: Install linux dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libgtk-3-dev webkit2gtk-4.0 libappindicator3-dev librsvg2-dev patchelf
+
+            - name: Build the app
+              run: npm run electron:build
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v3
+              with:
+                  name: linux-build
+                  path: release/
+
+    build-macos:
+        strategy:
+            matrix:
+                node-version: [22]
+
+        runs-on: macos-latest
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Cache node modules
+              uses: actions/cache@v4
+              env:
+                  cache-name: cache-node-modules
+              with:
+                  # npm cache files are stored in `~/.npm` on Linux/macOS
+                  path: ~/.npm
+                  key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-build-${{ env.cache-name }}-
+                      ${{ runner.os }}-build-
+                      ${{ runner.os }}-
+
+            - name: Use Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v5
+              with:
+                  node-version: ${{ matrix.node-version }}
+
+            - name: Install Dependencies
+              run: npm i && npm i -D cli-truncate iconv-corefoundation
+
+            # - name: Run headless e2e test
+            #   run: npm run e2e
+
+            - name: Build the app
+              run: npm run electron:build
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v3
+              with:
+                  name: macos-build
+                  path: release/
+
+    build-windows:
+        strategy:
+            matrix:
+                node-version: [22]
+
+        runs-on: windows-latest
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Cache node modules
+              uses: actions/cache@v4
+              env:
+                  cache-name: cache-node-modules
+              with:
+                  # npm cache files are stored in `~/.npm`
+                  path: ~/.npm
+                  key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-build-${{ env.cache-name }}-
+                      ${{ runner.os }}-build-
+                      ${{ runner.os }}-
+
+            - name: Use Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v5
+              with:
+                  node-version: ${{ matrix.node-version }}
+
+            - name: Install Dependencies
+              run: npm i
+
+            # - name: Run headless e2e test
+            #   run: npm run e2e
+
+            - name: Build the app
+              run: npm run electron:build
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v3
+              with:
+                  name: windows-build
+                  path: release/
