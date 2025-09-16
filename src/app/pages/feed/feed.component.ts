@@ -13,6 +13,7 @@ import { IntersectionDirective } from '../../shared/directives/intersection.dire
 import { SafePipe } from '../../shared/pipes/safe.pipe'
 import { formatDateRelative, formatDuration } from '../../shared/utils/formatting.utils'
 import { assertUnreachable } from '../../../../shared/utils/type-guards.utils'
+import { RouterModule } from '@angular/router'
 
 const getErrorMessage = (error: unknown) => {
     if (typeof error == 'string') return error
@@ -34,6 +35,7 @@ const getErrorMessage = (error: unknown) => {
         IntersectionDirective,
         ProgressRingComponent,
         IconComponent,
+        RouterModule,
     ],
 })
 export class FeedComponent {

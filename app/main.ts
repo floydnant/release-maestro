@@ -159,6 +159,16 @@ ipcMain.handle('load-feed', async (_event, index: number, count: number) => {
             throw err
         })
 })
+ipcMain.handle('has-feed', async () => {
+    const feedService = await diContainer.get(FeedBackendService)
+
+    // @TODO: proper error handling
+    return await feedService.hasFeed().catch(err => {
+        console.error('Error checking if feed exists:', err)
+
+        return false
+    })
+})
 
 ipcMain.handle(
     'mark-feed-item-viewed',

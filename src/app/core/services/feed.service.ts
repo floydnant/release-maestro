@@ -39,6 +39,14 @@ export class FeedService {
         return result
     }
 
+    async hasFeed(): Promise<boolean> {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const hasFeed = await this.electronService.ipcRenderer.invoke('has-feed')
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return hasFeed
+    }
+
     markFeedItemViewed(
         id: string,
         feedItemType: HydratedFeedItem['type'],

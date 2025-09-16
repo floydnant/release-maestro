@@ -8,7 +8,7 @@ import { AppComponent } from './app/app.component'
 import { CoreModule } from './app/core/core.module'
 import { FeedComponent } from './app/pages/feed/feed.component'
 import { HomeComponent } from './app/pages/home/home.component'
-import { ImportComponent } from './app/pages/import/import.component'
+import { SettingsComponent } from './app/pages/settings/settings.component'
 import { PageNotFoundComponent } from './app/pages/page-not-found/page-not-found.component'
 import { SharedModule } from './app/shared/shared.module'
 import { webEnv } from './environments/environment'
@@ -39,13 +39,13 @@ bootstrapApplication(AppComponent, {
                 component: FeedComponent,
             },
             {
-                path: 'import',
-                component: ImportComponent,
+                path: 'settings',
+                component: SettingsComponent,
                 children: [
                     {
                         path: 'apple-mail',
                         loadComponent: () =>
-                            import('./app/pages/import/importers/apple-mail/apple-mail.component').then(
+                            import('./app/pages/settings/importers/apple-mail/apple-mail.component').then(
                                 m => m.AppleMailImporterComponent,
                             ),
                     },

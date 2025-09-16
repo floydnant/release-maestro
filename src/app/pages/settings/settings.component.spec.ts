@@ -1,14 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing'
 import { ActivatedRoute } from '@angular/router'
-import { ImportComponent } from './import.component'
+import { SettingsComponent } from './settings.component'
 
-describe(ImportComponent.name, () => {
-    let component: ImportComponent
-    let fixture: ComponentFixture<ImportComponent>
+describe(SettingsComponent.name, () => {
+    let component: SettingsComponent
+    let fixture: ComponentFixture<SettingsComponent>
 
     beforeEach(async () => {
         await TestBed.configureTestingModule({
-            imports: [ImportComponent],
+            imports: [SettingsComponent],
             providers: [
                 {
                     provide: ActivatedRoute,
@@ -17,7 +17,7 @@ describe(ImportComponent.name, () => {
             ],
         }).compileComponents()
 
-        fixture = TestBed.createComponent(ImportComponent)
+        fixture = TestBed.createComponent(SettingsComponent)
         component = fixture.componentInstance
         fixture.detectChanges()
     })

@@ -10,11 +10,13 @@
             </div>
         }
         @if (feedError()) {
-            <div class="absolute inset-0 flex flex-col items-center justify-center -translate-y-22">
+            <div
+                class="max-w-64 mx-auto absolute inset-0 flex flex-col items-center justify-center -translate-y-22"
+            >
                 <p class="text-tinted-300 font-bold">
                     <app-icon name="octXCircleFill" color="danger-400" size="3rem"></app-icon>
                 </p>
-                <p class="mt-2 max-w-52 text-center text-danger-400 font-bold">
+                <p class="mt-2 text-center text-danger-400 font-bold">
                     {{ feedError() }}
                 </p>
 
@@ -22,7 +24,26 @@
             </div>
         }
 
-        @if (!feedError()) {
+        @if (!feedError() && feed()) {
+            @if (feed()?.length == 0) {
+                <div
+                    class="max-w-64 mx-auto absolute inset-0 flex flex-col items-center justify-center -translate-y-22 px-3 text-center"
+                >
+                    <p class="text-tinted-300 font-bold">No new releases</p>
+                    @if (this.feedService.hasFeed() | async) {
+                        <p class="text-tinted-400 mt-2">
+                            You're all caught up! Check back later for new releases.
+                        </p>
+                    } @else {
+                        <p class="text-tinted-400 mt-2">
+                            It looks like you haven't set up your feed yet. Go to
+                            <a class="" routerLink="/settings">settings</a>
+                            to get started.
+                        </p>
+                    }
+                </div>
+            }
+
             @for (feedItem of feed(); track feedItem.id) {
                 <div
                     class="feed-entry | snap-center my-32 py-[calc(var(--feed-item-padding-y)/2)] min-h-[45vh] max-h-[var(--max-feed-item-height)] flex items-center transition-all duration-500"
@@ -80,10 +101,11 @@
                                 @if (feedItem.error; as error) {
                                     <div class="error | flex gap-2 items-center mb-1.5">
                                         <p class="text-tinted-300 font-bold">
-                                            <app-icon name="octXCircleFill"
+                                            <app-icon
+                                                name="octXCircleFill"
                                                 color="danger-400"
                                                 size="1.3rem"
-                                                class=" translate-y-[3px]"
+                                                class="translate-y-[3px]"
                                             ></app-icon>
                                         </p>
                                         <p class="text-danger-400 font-semibold">

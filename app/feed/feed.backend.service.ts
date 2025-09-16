@@ -200,6 +200,9 @@ export class FeedBackendService {
 
         return await this.hydrateFeed(preHydrationFeed)
     }
+    async hasFeed(): Promise<boolean> {
+        return await this.feedBackendRepository.hasFeedItems()
+    }
 
     async markFeedItemAsViewed(id: string, feedItemType: HydratedFeedItem['type'], isSnoozed: boolean) {
         await this.feedBackendRepository.markFeedItemViewed(id, feedItemType, isSnoozed)

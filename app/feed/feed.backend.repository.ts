@@ -42,6 +42,11 @@ export class FeedBackendRepository {
 
         return feedItemMasterSchema.array().parse(items)
     }
+    async hasFeedItems(): Promise<boolean> {
+        const items = await this.db.db.select().from(feedItemsTable).limit(1)
+
+        return items.length > 0
+    }
 
     async countItemsIngestedAfterDate(date: Date): Promise<number> {
         const count_ = await this.db.db

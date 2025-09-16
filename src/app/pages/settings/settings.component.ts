@@ -4,7 +4,7 @@ import { RouterModule } from '@angular/router'
 @Component({
     selector: 'app-import',
     imports: [RouterModule],
-    templateUrl: './import.component.html',
+    templateUrl: './settings.component.html',
     styles: `
         :host {
             @apply flex w-full;
@@ -12,4 +12,4 @@ import { RouterModule } from '@angular/router'
     `,
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ImportComponent {}
+export class SettingsComponent {}
