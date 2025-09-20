@@ -1,0 +1,7 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {},
+    "files": ["src/main.ts", "src/polyfills.ts"],
+    "include": ["**/*.ts", "**/*.d.ts"],
+    "exclude": ["**/*.spec.ts", "src/test/**"]
+}

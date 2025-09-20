@@ -1,4 +1,4 @@
-import { Exception } from '../base.exceptions'
+import { Exception } from '@release-maestro/core'
 
 export class BandcampApiException extends Exception {}
 

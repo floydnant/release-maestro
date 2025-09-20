@@ -37,12 +37,19 @@ testem.log
 .app-data*
 
 # e2e
-/e2e/*.js
-!/e2e/protractor.conf.js
-/e2e/*.map
-/e2e/tracing
-/e2e/screenshots
+/apps/release-maestro-e2e/*.js
+!/apps/release-maestro-e2e/protractor.conf.js
+/apps/release-maestro-e2e/*.map
+/apps/release-maestro-e2e/tracing
+/apps/release-maestro-e2e/screenshots
 
 # System Files
 .DS_Store
 Thumbs.db
+
+
+
+.nx/cache
+.nx/workspace-data
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md

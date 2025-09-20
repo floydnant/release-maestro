@@ -1,0 +1,142 @@
+{
+    "name": "maestro-renderer",
+    "$schema": "../../node_modules/nx/schemas/project-schema.json",
+    "sourceRoot": "apps/maestro-renderer/src",
+    "projectType": "application",
+    "generators": {
+        "@schematics/angular:application": {
+            "strict": true
+        },
+        "@schematics/angular:component": {
+            "style": "css"
+        }
+    },
+    "prefix": "app",
+    "targets": {
+        "build": {
+            "executor": "@angular-builders/custom-webpack:browser",
+            "options": {
+                "outputPath": "dist",
+                "index": "apps/maestro-renderer/src/index.html",
+                "main": "apps/maestro-renderer/src/main.ts",
+                "tsConfig": "apps/maestro-renderer/tsconfig.app.json",
+                "polyfills": "apps/maestro-renderer/src/polyfills.ts",
+                "inlineStyleLanguage": "css",
+                "assets": ["apps/maestro-renderer/src/favicon.ico", "apps/maestro-renderer/src/assets"],
+                "styles": ["apps/maestro-renderer/src/styles.css"],
+                "scripts": [],
+                "customWebpackConfig": {
+                    "path": "./angular.webpack.js",
+                    "replaceDuplicatePlugins": true
+                }
+            },
+            "configurations": {
+                "dev": {
+                    "optimization": false,
+                    "outputHashing": "none",
+                    "sourceMap": true,
+                    "namedChunks": false,
+                    "aot": false,
+                    "extractLicenses": true,
+                    "vendorChunk": false,
+                    "buildOptimizer": false,
+                    "fileReplacements": [
+                        {
+                            "replace": "apps/maestro-renderer/src/environments/environment.ts",
+                            "with": "apps/maestro-renderer/src/environments/environment.dev.ts"
+                        }
+                    ]
+                },
+                "production": {
+                    "optimization": true,
+                    "outputHashing": "all",
+                    "sourceMap": false,
+                    "namedChunks": false,
+                    "aot": true,
+                    "extractLicenses": true,
+                    "vendorChunk": false,
+                    "buildOptimizer": true,
+                    "fileReplacements": [
+                        {
+                            "replace": "apps/maestro-renderer/src/environments/environment.ts",
+                            "with": "apps/maestro-renderer/src/environments/environment.prod.ts"
+                        }
+                    ]
+                },
+                "web": {
+                    "optimization": false,
+                    "outputHashing": "none",
+                    "sourceMap": true,
+                    "namedChunks": false,
+                    "aot": false,
+                    "extractLicenses": true,
+                    "vendorChunk": false,
+                    "buildOptimizer": false,
+                    "fileReplacements": [
+                        {
+                            "replace": "apps/maestro-renderer/src/environments/environment.ts",
+                            "with": "apps/maestro-renderer/src/environments/environment.web.ts"
+                        }
+                    ]
+                },
+                "web-production": {
+                    "optimization": true,
+                    "outputHashing": "all",
+                    "sourceMap": false,
+                    "namedChunks": false,
+                    "aot": true,
+                    "extractLicenses": true,
+                    "vendorChunk": false,
+                    "buildOptimizer": true,
+                    "fileReplacements": [
+                        {
+                            "replace": "apps/maestro-renderer/src/environments/environment.ts",
+                            "with": "apps/maestro-renderer/src/environments/environment.web.prod.ts"
+                        }
+                    ]
+                }
+            }
+        },
+        "serve": {
+            "executor": "@angular-builders/custom-webpack:dev-server",
+            "options": {
+                "buildTarget": "maestro-renderer:build"
+            },
+            "configurations": {
+                "dev": {
+                    "buildTarget": "maestro-renderer:build:dev"
+                },
+                "production": {
+                    "buildTarget": "maestro-renderer:build:production"
+                },
+                "web": {
+                    "buildTarget": "maestro-renderer:build:web"
+                },
+                "web-production": {
+                    "buildTarget": "maestro-renderer:build:web-production"
+                }
+            }
+        },
+        "extract-i18n": {
+            "executor": "@angular/build:extract-i18n",
+            "options": {
+                "buildTarget": "maestro-renderer:build"
+            }
+        },
+        "test": {
+            "executor": "@angular-builders/jest:run",
+            "options": {
+                "polyfills": ["src/polyfills-test.ts"],
+                "tsConfig": "tsconfig.spec.json",
+                "jestConfig": [ "jest.config.ts" ],
+                "globalMocks": ["styleTransform", "matchMedia", "getComputedStyle"]
+            }
+        },
+        "lint": {
+            "executor": "@nx/eslint:lint",
+            "options": {
+                "lintFilePatterns": ["apps/maestro-renderer/**/*.ts", "apps/maestro-renderer/**/*.html"]
+            }
+        }
+    }
+}
