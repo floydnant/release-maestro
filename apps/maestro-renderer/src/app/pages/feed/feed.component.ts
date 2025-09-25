@@ -92,7 +92,7 @@ export class FeedComponent {
 
     @HostListener('document:keydown.ArrowUp', ['$event'])
     @HostListener('document:keydown.K', ['$event'])
-    scrollUp(event?: KeyboardEvent) {
+    scrollUp(event?: Event) {
         event?.preventDefault()
 
         const currentIndex = this.currentFeedIndex()
@@ -107,7 +107,7 @@ export class FeedComponent {
 
     @HostListener('document:keydown.ArrowDown', ['$event'])
     @HostListener('document:keydown.J', ['$event'])
-    scrollDown(event?: KeyboardEvent) {
+    scrollDown(event?: Event) {
         event?.preventDefault()
 
         const currentIndex = this.currentFeedIndex()
@@ -160,7 +160,7 @@ export class FeedComponent {
     snoozedFeedItems = new Set<string>()
 
     @HostListener('document:keydown.S', ['$event'])
-    toggleCurrentFeedItemSnoozedState(event?: KeyboardEvent) {
+    toggleCurrentFeedItemSnoozedState(event?: Event) {
         event?.preventDefault()
         const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
         if (!currentFeedItem) {
@@ -177,19 +177,19 @@ export class FeedComponent {
 
     @HostListener('document:keydown.ArrowRight', ['$event'])
     @HostListener('document:keydown.L', ['$event'])
-    seekBackward(event: KeyboardEvent) {
+    seekBackward(event: Event) {
         event.preventDefault()
         this.audioPlayer.seekBy(15)
     }
     @HostListener('document:keydown.ArrowLeft', ['$event'])
     @HostListener('document:keydown.H', ['$event'])
-    seekForward(event: KeyboardEvent) {
+    seekForward(event: Event) {
         event.preventDefault()
         this.audioPlayer.seekBy(-15)
     }
 
     @HostListener('document:keydown.Space', ['$event'])
-    togglePlay(event: KeyboardEvent) {
+    togglePlay(event: Event) {
         event.preventDefault()
         if (this.audioPlayer.isPlaying()) {
             this.audioPlayer.pause()
@@ -200,7 +200,7 @@ export class FeedComponent {
 
     @HostListener('document:keydown.Shift.ArrowDown', ['$event'])
     @HostListener('document:keydown.Shift.J', ['$event'])
-    nextTrack(event?: KeyboardEvent) {
+    nextTrack(event?: Event) {
         event?.preventDefault()
 
         const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
@@ -238,7 +238,7 @@ export class FeedComponent {
 
     @HostListener('document:keydown.Shift.ArrowUp', ['$event'])
     @HostListener('document:keydown.Shift.K', ['$event'])
-    prevTrack(event?: KeyboardEvent) {
+    prevTrack(event?: Event) {
         event?.preventDefault()
 
         const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
@@ -276,7 +276,7 @@ export class FeedComponent {
     }
 
     @HostListener('document:keydown.O', ['$event'])
-    openCurrentFeedItemInBrowser(event: KeyboardEvent) {
+    openCurrentFeedItemInBrowser(event: Event) {
         event.preventDefault()
 
         const currentFeedItem = this.feed()?.[this.currentFeedIndex()]

@@ -7,7 +7,6 @@
         "esModuleInterop": true,
         "sourceMap": true,
         "declaration": false,
-        "moduleResolution": "bundler",
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true,
         "allowJs": false,

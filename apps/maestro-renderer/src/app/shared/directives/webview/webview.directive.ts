@@ -1,7 +1,7 @@
 import { Directive } from '@angular/core'
 
 @Directive({
-    selector: 'webview',
+    selector: '[appWebview]',
     standalone: true,
 })
 export class WebviewDirective {}

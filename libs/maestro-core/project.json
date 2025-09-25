@@ -14,6 +14,9 @@
                 "tsConfig": "libs/maestro-core/tsconfig.lib.json",
                 "assets": ["libs/maestro-core/*.md"]
             }
+        },
+        "lint": {
+            "executor": "@nx/eslint:lint"
         }
     }
 }

@@ -9,6 +9,7 @@
         // "noImplicitReturns": true,
         // "noFallthroughCasesInSwitch": true,
         // "noPropertyAccessFromIndexSignature": true
+        "moduleResolution": "bundler",
         "declaration": true,
         "outDir": "../../dist/out-tsc/shared",
         "rootDir": "."

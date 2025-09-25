@@ -1,0 +1,2 @@
+- [ ] Migrate electron backend process
+- [x] Get linting to work again

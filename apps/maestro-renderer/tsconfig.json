@@ -1,9 +1,28 @@
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
-        "types": ["node"]
+        "noPropertyAccessFromIndexSignature": true,
+        "importHelpers": true,
+        "isolatedModules": true,
+        "emitDecoratorMetadata": false,
+        "moduleResolution": "bundler",
+        "module": "preserve"
+    },
+    "angularCompilerOptions": {
+        "enableI18nLegacyMessageIdFormat": false,
+        "strictInjectionParameters": true,
+        "strictInputAccessModifiers": true,
+        "typeCheckHostBindings": true,
+        "strictTemplates": true
     },
     "files": [],
-    "include": ["**/*.ts", "**/*.d.ts"],
-    "exclude": ["**/*.spec.ts", "test/**", "../../.nx"]
+    "include": [],
+    "references": [
+        {
+            "path": "./tsconfig.app.json"
+        },
+        {
+            "path": "./tsconfig.spec.json"
+        }
+    ]
 }

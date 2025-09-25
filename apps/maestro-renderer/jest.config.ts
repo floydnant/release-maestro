@@ -1,27 +1,21 @@
-const esModules = [].join('|')
-
 export default {
-    // rootDir: './',
-    // transformIgnorePatterns: [`<rootDir>/node_modules/(?!${esModules})`],
-    // transform: {
-    //     '^.+\\.tsx?$': [
-    //         'ts-jest',
-    //         {
-    //             allowSyntheticDefaultImports: true,
-    //         },
-    //     ],
-    //     '^.+\\.js$': 'babel-jest',
-    // },
-
-    ////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////
-
     displayName: 'maestro-renderer',
     preset: '../../jest.preset.js',
-    testEnvironment: 'node',
+    setupFilesAfterEnv: ['<rootDir>/src/test/test-setup.ts'],
+    coverageDirectory: '../../coverage/apps/maestro-renderer',
     transform: {
-        '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
+        '^.+\\.(ts|mjs|js|html)$': [
+            'jest-preset-angular',
+            {
+                tsconfig: '<rootDir>/tsconfig.spec.json',
+                stringifyContentPathRegex: '\\.(html|svg)$',
+            },
+        ],
     },
-    moduleFileExtensions: ['ts', 'js', 'html'],
-    coverageDirectory: '../../coverage/maestro-renderer',
+    transformIgnorePatterns: ['node_modules/(?!.*\\.mjs$)'],
+    snapshotSerializers: [
+        'jest-preset-angular/build/serializers/no-ng-attributes',
+        'jest-preset-angular/build/serializers/ng-snapshot',
+        'jest-preset-angular/build/serializers/html-comment',
+    ],
 }
