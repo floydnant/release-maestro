@@ -1,0 +1,59 @@
+{
+    "name": "maestro-electron",
+    "$schema": "../../node_modules/nx/schemas/project-schema.json",
+    "sourceRoot": "apps/maestro-electron/src",
+    "projectType": "application",
+    "targets": {
+        "build": {
+            "executor": "nx-electron:build",
+            "outputs": ["{options.outputPath}"],
+            "options": {
+                "outputPath": "dist/apps/maestro-electron",
+                "main": "apps/maestro-electron/src/main.ts",
+                "tsConfig": "apps/maestro-electron/tsconfig.app.json",
+                "assets": ["apps/maestro-electron/src/assets"]
+            },
+            "configurations": {
+                "production": {
+                    "optimization": true,
+                    "extractLicenses": true,
+                    "inspect": false,
+                    "fileReplacements": [
+                        {
+                            "replace": "apps/maestro-electron/src/environments/environment.ts",
+                            "with": "apps/maestro-electron/src/environments/environment.prod.ts"
+                        }
+                    ]
+                }
+            }
+        },
+        "serve": {
+            "executor": "nx-electron:execute",
+            "options": {
+                "buildTarget": "maestro-electron:build"
+            }
+        },
+        "package": {
+            "executor": "nx-electron:package",
+            "options": {
+                "name": "maestro-electron",
+                "frontendProject": "maestro-renderer",
+                "sourcePath": "dist/apps",
+                "outputPath": "dist/packages",
+                "prepackageOnly": true
+            }
+        },
+        "make": {
+            "executor": "nx-electron:make",
+            "options": {
+                "name": "maestro-electron",
+                "frontendProject": "maestro-renderer",
+                "sourcePath": "dist/apps",
+                "outputPath": "dist/executables"
+            }
+        },
+        "lint": {
+            "command": "eslint apps/maestro-electron/**/*.ts"
+        }
+    }
+}

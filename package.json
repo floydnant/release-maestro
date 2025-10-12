@@ -29,7 +29,15 @@
         "version": "conventional-changelog -i CHANGELOG.md -s -r 0 && git add CHANGELOG.md",
         "lint": "nx lint",
         "format": "prettier --write \"./**/*.ts\" \"./**/*.html\" \"./**/*.css\" \"./**/*.json\"",
-        "format:check": "prettier --check \"./**/*.ts\" \"./**/*.html\" \"./**/*.css\" \"./**/*.json\""
+        "format:check": "prettier --check \"./**/*.ts\" \"./**/*.html\" \"./**/*.css\" \"./**/*.json\"",
+        "nxe:build:frontend": "nx build maestro-renderer",
+        "nxe:build:backend": "nx build maestro-electron",
+        "nxe:serve:frontend": "nx serve maestro-renderer",
+        "nxe:serve:backend": "nx serve maestro-electron",
+        "nxe:test:frontend": "nx test maestro-renderer",
+        "nxe:test:backend": "nx test maestro-electron",
+        "nxe:package:app": "nx run maestro-electron:make --prepackageOnly",
+        "nxe:make:app": "nx run maestro-electron:make"
     },
     "dependencies": {
         "@angular/cdk": "20.2.4",
@@ -103,7 +111,7 @@
         "eslint-plugin-import": "2.31.0",
         "eslint-plugin-jsdoc": "50.7.1",
         "eslint-plugin-playwright": "^1.6.2",
-        "jest": "29.7.0",
+        "jest": "^30.0.2",
         "jest-environment-jsdom": "29.7.0",
         "jest-environment-node": "^30.0.2",
         "jest-preset-angular": "14.6.1",
@@ -112,6 +120,7 @@
         "node-polyfill-webpack-plugin": "4.1.0",
         "npm-run-all": "4.1.5",
         "nx": "21.5.2",
+        "nx-electron": "21.0.1",
         "playwright": "1.52.0",
         "postcss": "8.5.6",
         "prettier": "3.5.3",

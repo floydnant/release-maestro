@@ -57,7 +57,10 @@
                     "buildTarget": "maestro-renderer:build:development"
                 }
             },
-            "defaultConfiguration": "development"
+            "defaultConfiguration": "development",
+            "options": {
+                "proxyConfig": "apps/maestro-renderer/proxy.conf.json"
+            }
         },
         "extract-i18n": {
             "executor": "@angular/build:extract-i18n",
