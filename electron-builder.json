@@ -30,16 +30,31 @@
             "filter": ["**/*"]
         }
     ],
+    "publish": {
+        "provider": "github",
+        "owner": "floydnant",
+        "repo": "release-maestro"
+    },
     "win": {
         "icon": "dist/assets/icons",
-        "target": ["portable"]
+        "target": [
+            {
+                "target": "nsis",
+                "arch": ["x64"]
+            }
+        ]
     },
     "portable": {
         "splashImage": "dist/assets/icons/electron.bmp"
     },
     "mac": {
         "icon": "dist/assets/icons",
-        "target": ["dmg"],
+        "target": [
+            {
+                "target": "default",
+                "arch": ["universal"]
+            }
+        ],
         "extraFiles": [
             {
                 "from": "apple-scripts",

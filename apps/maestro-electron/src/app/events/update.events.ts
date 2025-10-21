@@ -1,32 +1,35 @@
-import { app, autoUpdater, dialog, MessageBoxOptions } from 'electron'
-import { platform, arch } from 'os'
-import { updateServerUrl } from '../constants'
+// TODO: Install electron-updater: npm install electron-updater
+// import { autoUpdater } from 'electron-updater'
+// import { dialog, MessageBoxOptions } from 'electron'
 import App from '../app'
 
 export default class UpdateEvents {
-    // initialize auto update service - most be invoked only in production
+    // initialize auto update service - must be invoked only in production
     static initAutoUpdateService() {
-        const platform_arch = platform() === 'win32' ? platform() : platform() + '_' + arch()
-        const version = app.getVersion()
-        const feed: Electron.FeedURLOptions = { url: `${updateServerUrl}/update/${platform_arch}/${version}` }
-
         if (!App.isDevelopmentMode()) {
             console.log('Initializing auto update service...\n')
 
-            autoUpdater.setFeedURL(feed)
-            UpdateEvents.checkForUpdates()
+            // TODO: Uncomment when electron-updater is installed
+            // Configure update server (GitHub Releases by default)
+            // autoUpdater.setFeedURL('https://your-update-server.com')
+
+            // UpdateEvents.checkForUpdates()
         }
     }
 
-    // check for updates - most be invoked after initAutoUpdateService() and only in production
+    // check for updates - must be invoked after initAutoUpdateService() and only in production
     static checkForUpdates() {
-        if (!App.isDevelopmentMode() && autoUpdater.getFeedURL() !== '') {
-            autoUpdater.checkForUpdates()
+        if (!App.isDevelopmentMode()) {
+            // TODO: Uncomment when electron-updater is installed
+            // autoUpdater.checkForUpdatesAndNotify()
+            console.log('Auto-updater not configured yet')
         }
     }
 }
 
-autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName, releaseDate) => {
+// TODO: Uncomment when electron-updater is installed
+/*
+autoUpdater.on('update-downloaded', (_event, releaseNotes, releaseName, _releaseDate) => {
     const dialogOpts: MessageBoxOptions = {
         type: 'info' as const,
         buttons: ["Let's do it!", 'Ask me Later'],
@@ -56,7 +59,8 @@ autoUpdater.on('before-quit-for-update', () => {
     console.log('Application update is about to begin...\n')
 })
 
-autoUpdater.on('error', message => {
+autoUpdater.on('error', (error: Error) => {
     console.error('There was a problem updating the application')
-    console.error(message, '\n')
+    console.error(error.message, '\n')
 })
+*/

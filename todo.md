@@ -4,6 +4,7 @@
   - [ ] Copy Business logic
   - [ ] Test obv
   - [ ] Understand update/release process
+  - [ ] Move drizzle inside the app directory
 
 ## What we just did
 
