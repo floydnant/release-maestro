@@ -7,13 +7,13 @@ import { format } from 'url'
 export default class App {
     // Keep a global reference of the window object, if you don't, the window will
     // be closed automatically when the JavaScript object is garbage collected.
-    static mainWindow: Electron.BrowserWindow
+    static mainWindow: Electron.BrowserWindow | null = null
     static application: Electron.App
-    static BrowserWindow
+    static BrowserWindow: typeof BrowserWindow
 
     public static isDevelopmentMode() {
         const isEnvironmentSet: boolean = 'ELECTRON_IS_DEV' in process.env
-        const getFromEnvironment: boolean = parseInt(process.env.ELECTRON_IS_DEV, 10) === 1
+        const getFromEnvironment: boolean = parseInt(process.env.ELECTRON_IS_DEV || '0', 10) === 1
 
         return isEnvironmentSet ? getFromEnvironment : !environment.production
     }
@@ -31,22 +31,46 @@ export default class App {
         App.mainWindow = null
     }
 
-    private static onRedirect(event: any, url: string) {
-        if (url !== App.mainWindow.webContents.getURL()) {
+    private static onRedirect(event: Electron.Event, url: string) {
+        if (App.mainWindow && url !== App.mainWindow.webContents.getURL()) {
             // this is a normal external redirect, open it in a new browser window
             event.preventDefault()
             shell.openExternal(url)
         }
     }
 
-    private static onReady() {
+    private static async onReady() {
         // This method will be called when Electron has finished
         // initialization and is ready to create browser windows.
         // Some APIs can only be used after this event occurs.
-        if (rendererAppName) {
-            App.initMainWindow()
-            App.loadMainWindow()
+        
+        // Initialize DI container and services
+        try {
+            await App.initializeServices()
+        } catch (error) {
+            console.error('Failed to initialize services:', error)
         }
+        
+        if (rendererAppName) {
+            // Added delay to fix black background issue (from original code)
+            setTimeout(() => {
+                App.initMainWindow()
+                App.loadMainWindow()
+            }, 400)
+        }
+    }
+
+    private static async initializeServices() {
+        // Import and initialize DI container
+        const { diContainer } = await import('./di')
+        const { DatabaseClient } = await import('./database/database.client')
+        const { SettingsBackendService } = await import('./services/settings.backend.service')
+        
+        // Initialize core services
+        await diContainer.get(DatabaseClient)
+        await diContainer.get(SettingsBackendService)
+        
+        console.log('Services initialized successfully')
     }
 
     private static onActivate() {
@@ -58,27 +82,29 @@ export default class App {
     }
 
     private static initMainWindow() {
-        const workAreaSize = screen.getPrimaryDisplay().workAreaSize
-        const width = Math.min(1280, workAreaSize.width || 1280)
-        const height = Math.min(720, workAreaSize.height || 720)
+        const size = screen.getPrimaryDisplay().workAreaSize
 
-        // Create the browser window.
+        // Create the browser window with settings similar to old app
         App.mainWindow = new BrowserWindow({
-            width: width,
-            height: height,
+            x: 0,
+            y: 0,
+            width: size.width,
+            height: size.height,
             show: false,
             webPreferences: {
-                contextIsolation: true,
+                nodeIntegration: true,
+                allowRunningInsecureContent: !App.isDevelopmentMode(),
+                contextIsolation: false,
+                webSecurity: false, // Disabled to allow cross-origin audio/media from Bandcamp CDN
                 backgroundThrottling: false,
-                preload: join(__dirname, 'main.preload.js'),
+                // preload: join(__dirname, 'main.preload.js'), // Disabled for compatibility
             },
         })
         App.mainWindow.setMenu(null)
-        App.mainWindow.center()
 
         // if main window is ready to show, close the splash window and show the main window
         App.mainWindow.once('ready-to-show', () => {
-            App.mainWindow.show()
+            App.mainWindow?.show()
         })
 
         // handle all external redirects in a new browser window
@@ -99,11 +125,11 @@ export default class App {
     private static loadMainWindow() {
         // load the index.html of the app.
         if (!App.application.isPackaged) {
-            App.mainWindow.loadURL(`http://localhost:${rendererAppPort}`)
+            App.mainWindow?.loadURL(`http://localhost:${rendererAppPort}`)
         } else {
-            App.mainWindow.loadURL(
+            App.mainWindow?.loadURL(
                 format({
-                    pathname: join(__dirname, '..', rendererAppName, 'index.html'),
+                    pathname: join(__dirname, rendererAppName, 'index.html'),
                     protocol: 'file:',
                     slashes: true,
                 }),

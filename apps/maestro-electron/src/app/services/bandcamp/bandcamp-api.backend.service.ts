@@ -1,16 +1,16 @@
 import bandcampFetch, { Artist, Label } from 'bandcamp-fetch'
 import { CheerioAPI, load as cheerioLoad } from 'cheerio'
-import { FetchFailedException } from '@release-maestro/core'
+import {
+    FetchFailedException,
+    AttributeTralbumData,
+    BandData,
+    ScrapedTralbumInfo,
+    tralbumDataAttrSchema,
+} from '@release-maestro/core'
 import {
     BandcampApiFailedToFetchTralbumException,
     BandcampApiMalformedTralbumDataException,
 } from './bandcamp-api.exceptions'
-import {
-    AttributeTralbumData,
-    tralbumDataAttrSchema,
-    ScrapedTralbumInfo,
-    BandData,
-} from '../../libs/maestro-core/src/schemas/bandcamp-api.schema'
 
 const parseTralbumData = ($: CheerioAPI): AttributeTralbumData => {
     const tralbumJson = $('[data-tralbum]').attr('data-tralbum')
@@ -87,7 +87,7 @@ export class BandcampApiBackendService {
         const aboutLinks = $('#trackInfoInner > div.tralbumData.tralbum-about a')
             .toArray()
             .map(link => ({ url: $(link).attr('href') || '', text: $(link).text().trim() }))
-        let credits = $('#trackInfoInner > div.tralbumData.tralbum-credits').html() || ''
+        const credits = $('#trackInfoInner > div.tralbumData.tralbum-credits').html() || ''
         const creditsLinks = $('#trackInfoInner > div.tralbumData.tralbum-credits a')
             .toArray()
             .map(link => ({ url: $(link).attr('href') || '', text: $(link).text().trim() }))
@@ -135,7 +135,7 @@ export class BandcampApiBackendService {
                     duration: track.duration,
                     titleLink: track.title_link || null,
                     albumPreorder: track.album_preorder,
-                    streamUrl: track.file ? track.file['mp3-128'] : null,
+                    streamUrl: track.file ? track.file['mp3-128'] || null : null,
                 })) || [],
         }
     }

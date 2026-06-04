@@ -1,5 +1,5 @@
 import { load as cheerioLoad } from 'cheerio'
-import { ScrapedLinkMetadata } from '../../libs/maestro-core/src/schemas/web-scraping.schema'
+import { ScrapedLinkMetadata } from '@release-maestro/core'
 
 export class WebScrapingService {
     async getLinkMetaData(url: string): Promise<ScrapedLinkMetadata> {

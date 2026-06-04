@@ -39,7 +39,6 @@ export class DatabaseClient {
         }
 
         const dbPath = join(appPaths.data, 'mailbox-tool.db')
-        // @TODO: this directory creation should be done in a more central place
         const exists = await fs
             .stat(dbPath)
             .then(() => true)

@@ -1,25 +1,32 @@
 import { bufferCount, concatMap, materialize, merge, Observable, switchMap } from 'rxjs'
-import { NEVER } from 'zod'
-import { assertUnreachable, isTruthy } from '../../shared/utils/type-guards.utils'
+import {
+    BandcampEmailFeedSourceItem,
+    BandcampFeedItem,
+    EmailImportProgressUpdate,
+    HydratedBandcampReleaseFeedItem,
+    HydratedFeedItem,
+    isTruthy,
+    assertUnreachable,
+    isUsefulUrlFromBandcampEmail,
+    mapBandcampReleaseFeedItemToHydratedFeedItem,
+} from '@release-maestro/core'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
-import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
-import { EmailBackendRepository } from '../email/email.backend.repository'
-import { EmailImportProgressUpdate } from '../../shared/schemas/email.schema'
-import { WebScrapingService } from '../web-scraping/web-scraping.service'
-import { BandcampEmailFeedSourceItem } from './feed-source.schema'
-import { FeedBackendRepository } from './feed.backend.repository'
-import { isUsefulUrlFromBandcampEmail, mapBandcampReleaseFeedItemToHydratedFeedItem } from './feed.mappers'
-import { BandcampFeedItem, HydratedBandcampReleaseFeedItem, HydratedFeedItem } from './feed.schema'
 import {
     BandcampApiFailedToFetchTralbumException,
     BandcampApiMalformedTralbumDataException,
 } from '../bandcamp/bandcamp-api.exceptions'
+import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
+import { EmailBackendRepository } from '../email/email.backend.repository'
+import { WebScrapingService } from '../web-scraping/web-scraping.service'
+import { FeedBackendRepository } from './feed.backend.repository'
 
 const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): BandcampFeedItem | null => {
     if (email.type == 'EMAIL.BANDCAMP_NEW_RELEASE') {
+        if (!email.releaseUrl) return null
+        
         return {
             id: crypto.randomUUID(),
-            type: `BANDCAMP.TRALBUM`,
+            type: 'BANDCAMP.TRALBUM',
             dedupeIdentifier: email.releaseUrl,
             ingestedAt: new Date(),
             eventDate: new Date(email.dateReceived),
@@ -37,7 +44,7 @@ const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): Bandcam
         return null
     }
 
-    return assertUnreachable(email, 'Unhandled Bandcamp email type:')
+    return assertUnreachable(email as never, 'Unhandled Bandcamp email type:')
 }
 
 export class FeedBackendService {
@@ -63,7 +70,7 @@ export class FeedBackendService {
                 switchMap(async notification => {
                     if (notification.kind == 'C' || notification.kind == 'E') {
                         // The complete and error values are handled by the buffered stream below
-                        return NEVER
+                        return null
                     }
                     if (notification.kind == 'N') {
                         return {
@@ -120,13 +127,13 @@ export class FeedBackendService {
                     }
                     if (notification.kind == 'N') {
                         // The next values are already handled by the non-buffered observable in the first part of the merge
-                        return NEVER
+                        return null
                     }
 
                     return assertUnreachable(notification, 'Unhandled notification kind:')
                 }),
             ),
-        )
+        ) as unknown as Observable<EmailImportProgressUpdate>
     }
 
     // @TODO: error handling
@@ -186,7 +193,7 @@ export class FeedBackendService {
         const promises = items.map(async item => {
             if (item.type == 'BANDCAMP.TRALBUM') return await this.hydrateBandcampFeedItem(item)
 
-            return assertUnreachable(item.type, 'Unhandled feed item type:')
+            return assertUnreachable(item.type as never, 'Unhandled feed item type:')
         })
         const hydratedFeedItems = await Promise.all(promises)
         console.log('Hydrated', hydratedFeedItems.length, 'feed items')
@@ -198,8 +205,9 @@ export class FeedBackendService {
         // @TODO: how would we merge multiple feeds? how do we rank/prioritize items?
         const preHydrationFeed = await this.feedBackendRepository.listFeedItems(index, count)
 
-        return await this.hydrateFeed(preHydrationFeed)
+        return await this.hydrateFeed(preHydrationFeed as BandcampFeedItem[])
     }
+    
     async hasFeed(): Promise<boolean> {
         return await this.feedBackendRepository.hasFeedItems()
     }

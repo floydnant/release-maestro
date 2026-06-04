@@ -27,11 +27,15 @@
                 }
             }
         },
-        "serve": {
+        "serve-internal": {
             "executor": "nx-electron:execute",
             "options": {
                 "buildTarget": "maestro-electron:build"
             }
+        },
+        "serve": {
+            "dependsOn": ["maestro-renderer:serve"],
+            "command": "wait-on tcp:4200 && nx serve-internal maestro-electron"
         },
         "package": {
             "executor": "nx-electron:package",

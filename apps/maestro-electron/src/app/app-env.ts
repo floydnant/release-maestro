@@ -1,17 +1,14 @@
 import { app } from 'electron'
 import envPaths, { Paths } from 'env-paths'
 import { join } from 'path'
-import packageJson from '../package.json'
-import { appEnvSchema } from '../shared/schemas/app-env.schema'
-
-export const appEnv = appEnvSchema.parse(process.env)
+// App environment paths configuration
 
 export type AppPaths = Paths & { resources: string }
 
 const localDevPath = '.app-data.dev'
 export const appPaths: AppPaths = app.isPackaged
     ? {
-          ...envPaths(packageJson.name, { suffix: '' }),
+          ...envPaths('release-maestro', { suffix: '' }),
           resources: join(process.resourcesPath, '..'),
       }
     : {

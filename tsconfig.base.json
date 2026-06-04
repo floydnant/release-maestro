@@ -34,6 +34,7 @@
             "@release-maestro/core": ["libs/maestro-core/src/index.ts"]
         },
         "baseUrl": ".",
+        "ignoreDeprecations": "5.0",
         "rootDir": "."
     },
     "exclude": ["node_modules", "tmp", ".nx"],

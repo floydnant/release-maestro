@@ -5,6 +5,7 @@
   - [ ] Test obv
   - [ ] Understand update/release process
   - [ ] Move drizzle inside the app directory
+- [ ] Rewrite or replace scaffold-derived files listed in LICENSE.md, or add the required upstream third-party notices
 
 ## What we just did
 

@@ -3,6 +3,7 @@
     "compilerOptions": {
         "outDir": "../dist/out-tsc",
         "declaration": true,
+        "ignoreDeprecations": "5.0",
         "types": ["node"]
     },
     "include": ["src/**/*.ts"],

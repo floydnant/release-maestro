@@ -1,15 +1,5 @@
-import { Email } from '../../shared/schemas/email.schema'
-import { BandcampEmailFeedSourceItem } from '../feed/feed-source.schema'
-
-// export type BandcampEmailType =
-//     | 'NEW_MESSAGE'
-//     | 'NEW_RELEASE'
-//     | 'SHIPMENT_NOTIFICATION'
-//     | 'FANS_BOUGHT_NEW_STUFF'
-//     | 'THANK_YOU'
-//     | 'LISTENING_PARTY'
-//     | 'JUST_RELEASED' // notification for when an already purchased pre-order is now fully available
-//     | 'OTHER'
+import { Email } from '@release-maestro/core'
+import { BandcampEmailFeedSourceItem } from '@release-maestro/core'
 
 export const parseBandcampEmail = (email: Email): BandcampEmailFeedSourceItem | null => {
     let musicLinks: string[] =
@@ -28,7 +18,7 @@ export const parseBandcampEmail = (email: Email): BandcampEmailFeedSourceItem | 
         const releaseUrl = musicLinks.shift()
         if (!releaseUrl) return null
 
-        const links = (email.htmlBody.match(/https?:\/\/[\w-\.]+\.\w+\/[^" ]+/g) || []).filter(
+        const links = (email.htmlBody.match(/https?:\/\/[\w-.]+\.\w+\/[^" ]+/g) || []).filter(
             l => !l.includes('bandcamp.com/album') && !l.includes('bandcamp.com/track'),
         )
         links.unshift(...musicLinks)

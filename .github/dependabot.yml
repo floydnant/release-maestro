@@ -21,14 +21,3 @@ updates:
               update-types:
                   - 'minor'
                   - 'patch'
-
-    - package-ecosystem: 'npm'
-      directory: '/app'
-      schedule:
-          interval: 'weekly'
-      groups:
-          minor-and-patch:
-              applies-to: version-updates
-              update-types:
-                  - 'minor'
-                  - 'patch'

@@ -1,7 +1,6 @@
 import { Observable } from 'rxjs'
-import { diContainer } from '../di'
-import { EmailImportStreamPacket, EmailVendor } from '../../shared/schemas/email.schema'
-import { AppleMailRepository } from './importers/apple-mail.repository'
+import { EmailImportStreamPacket, EmailVendor } from '@release-maestro/core'
+import { AppleMailRepository } from './apple-mail.repository'
 import { SettingsBackendService } from '../settings.backend.service'
 
 export interface EmailImporterPlugin {
@@ -14,11 +13,14 @@ export const emailImporterPlugins: Record<EmailVendor, EmailImporterPluginConstr
 }
 
 export class EmailBackendRepository {
+    constructor(private settingsService: SettingsBackendService) {}
+
     async loadEmails(
         vendor: EmailVendor,
         abortSignal: AbortSignal,
     ): Promise<Observable<EmailImportStreamPacket>> {
-        const plugin = await diContainer.get(emailImporterPlugins[vendor])
+        const PluginClass = emailImporterPlugins[vendor]
+        const plugin = new PluginClass(this.settingsService)
 
         return plugin.loadEmails(abortSignal)
     }

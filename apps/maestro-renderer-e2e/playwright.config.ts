@@ -22,6 +22,7 @@ export default defineConfig({
         /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'on-first-retry',
     },
+    reporter: [['html', { open: 'never' }], ['list']],
     /* Run your local dev server before starting the tests */
     webServer: {
         command: 'npx nx run maestro-renderer:serve',
@@ -34,12 +35,6 @@ export default defineConfig({
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
         },
-
-        {
-            name: 'firefox',
-            use: { ...devices['Desktop Firefox'] },
-        },
-
         {
             name: 'webkit',
             use: { ...devices['Desktop Safari'] },

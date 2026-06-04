@@ -3,10 +3,18 @@ import { app } from 'electron'
 import * as fs from 'fs/promises'
 import { join } from 'path'
 import { Observable, Subject } from 'rxjs'
-import { Email, EmailImportStreamPacket, emailSchema } from '../../../shared/schemas/email.schema'
+import { Email, EmailImportStreamPacket, emailSchema } from '@release-maestro/core'
 import { appPaths } from '../../app-env'
-import { SettingsBackendService } from '../../settings.backend.service'
-import type { EmailImporterPlugin } from '../email.backend.repository'
+import { SettingsBackendService } from '../settings.backend.service'
+// Import will be fixed after creating email.backend.repository.ts
+export interface EmailImporterPlugin {
+    loadEmails(signal: AbortSignal): Observable<EmailImportStreamPacket>
+}
+
+const validateEmail = (data: unknown): Email | null => {
+    const result = emailSchema.safeParse(data)
+    return result.success ? result.data : null
+}
 
 const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string): Email | null => {
     const data = {
@@ -17,7 +25,7 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
     )
     data.plainBody = plainTextBody?.trim() || ''
     data.htmlBody = htmlFileContents
-        ?.replace(/^(.|\n)*Content-Type: text\/html\; charset=.+\nContent-Transfer-Encoding: .+\n/, '')
+        ?.replace(/^(.|\n)*Content-Type: text\/html; charset=.+\nContent-Transfer-Encoding: .+\n/, '')
         .replace(/--it_was_only_a_kiss--/g, '') // What the heck is this?
         .trim()
 
@@ -34,17 +42,11 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
             data[key] = true
         }
     }
-    const validationResult = emailSchema.safeParse(data)
-    if (!validationResult.success) {
-        console.error(`Invalid email data: ${JSON.stringify(validationResult.error)}`)
-        return null
-    }
-
-    return validationResult.data
+    
+    return validateEmail(data)
 }
 
 export class AppleMailRepository implements EmailImporterPlugin {
-    // @TODO: the plugins should not have direct access to the settings service
     constructor(private settings: SettingsBackendService) {}
 
     loadEmails(abortSignal: AbortSignal): Observable<EmailImportStreamPacket> {
@@ -57,7 +59,7 @@ export class AppleMailRepository implements EmailImporterPlugin {
         }
 
         const exportPath = join(app.getPath('temp'), 'apple-mail-export')
-        let appleScriptPath = join(appPaths.resources, 'apple-scripts', 'export-emails.applescript')
+        const appleScriptPath = join(appPaths.resources, 'apple-scripts', 'export-emails.applescript')
 
         const childProcess = exec(
             `osascript "${appleScriptPath}" "${mailboxName}" "${exportPath}"`,
@@ -69,8 +71,6 @@ export class AppleMailRepository implements EmailImporterPlugin {
                         const parsedErrorMessage = error.message.match(/Mail got an error: (.+)/)?.[1]
                         if (parsedErrorMessage) {
                             console.error('[AppleMailImporter] ', parsedErrorMessage)
-                            // @TODO: we need to differentiate between user facing error messages and ones
-                            // that are only valuable for devs and need to be made more user friendly/generic
                             result$.error(new Error(`[AppleMailImporter] ${parsedErrorMessage}`))
                         } else {
                             console.error('[AppleMailImporter] ', error)
@@ -107,17 +107,12 @@ export class AppleMailRepository implements EmailImporterPlugin {
                         console.error('[AppleMailImporter] Error reading data file', filePath, ':', err)
                         return null
                     }),
-                    fs.readFile(filePath.replace(/\.txt$/, '.html'), 'utf-8').catch(err => {
-                        console.error(
-                            '[AppleMailImporter] Error reading HTML file',
-                            filePath.replace(/\.txt$/, '.html'),
-                            ':',
-                            err,
-                        )
-                        return null
+                    fs.readFile(filePath.replace(/\.txt$/, '.html'), 'utf-8').catch(() => {
+                        // HTML file may not exist if the email had no HTML body
+                        return ''
                     }),
                 ])
-                if (!dataFileContents || !htmlFileContents) {
+                if (!dataFileContents) {
                     return
                 }
 

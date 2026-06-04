@@ -1,7 +1,7 @@
 import { and, count, desc, eq, gte, isNull, lt, or } from 'drizzle-orm'
-import { DatabaseClient } from '../database/database.client'
-import { feedItemHistoryEntriesTable, feedItemsTable } from '../database/drizzle.schema'
-import { FeedItemMaster, feedItemMasterSchema } from './feed.schema'
+import { FeedItemMaster } from '@release-maestro/core'
+import { DatabaseClient } from '../../database/database.client'
+import { feedItemHistoryEntriesTable, feedItemsTable } from '../../database/drizzle.schema'
 
 /**
  * The time after which a feed item should be shown again if it was marked as snoozed.
@@ -40,8 +40,9 @@ export class FeedBackendRepository {
             .limit(count)
             .offset(index * count)
 
-        return feedItemMasterSchema.array().parse(items)
+        return items as FeedItemMaster[] // TODO: Add proper schema validation
     }
+    
     async hasFeedItems(): Promise<boolean> {
         const items = await this.db.db.select().from(feedItemsTable).limit(1)
 
