@@ -42,6 +42,7 @@ testem.log
 /apps/release-maestro-e2e/*.map
 /apps/release-maestro-e2e/tracing
 /apps/release-maestro-e2e/screenshots
+playwright-report
 
 # System Files
 .DS_Store

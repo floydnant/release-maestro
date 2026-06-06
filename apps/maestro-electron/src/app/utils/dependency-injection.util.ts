@@ -16,7 +16,7 @@ export const PROVIDER_DESTROY = Symbol('PROVIDER_DESTROY')
 
 export class CustomInjectionToken<TValue extends object> {
     constructor(public readonly name: string) {}
-    
+
     // This property exists only for type inference, never at runtime
     private readonly _value!: TValue
 }

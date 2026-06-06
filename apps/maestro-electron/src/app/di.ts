@@ -19,11 +19,11 @@ export const diContainer = new DiContainer({
         },
         {
             provide: EmailBackendRepository,
-            useFactory: async (di) => new EmailBackendRepository(await di.get(SettingsBackendService)),
+            useFactory: async di => new EmailBackendRepository(await di.get(SettingsBackendService)),
         },
         {
             provide: FeedBackendRepository,
-            useFactory: async (di) => new FeedBackendRepository(await di.get(DatabaseClient)),
+            useFactory: async di => new FeedBackendRepository(await di.get(DatabaseClient)),
         },
         {
             provide: BandcampApiBackendService,
@@ -35,7 +35,7 @@ export const diContainer = new DiContainer({
         },
         {
             provide: FeedBackendService,
-            useFactory: async (di) =>
+            useFactory: async di =>
                 new FeedBackendService(
                     await di.get(EmailBackendRepository),
                     await di.get(BandcampApiBackendService),

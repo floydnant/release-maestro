@@ -42,7 +42,7 @@ export class FeedBackendRepository {
 
         return items as FeedItemMaster[] // TODO: Add proper schema validation
     }
-    
+
     async hasFeedItems(): Promise<boolean> {
         const items = await this.db.db.select().from(feedItemsTable).limit(1)
 

@@ -20,7 +20,7 @@ export default defineConfig([
             ],
         },
         languageOptions: {
-            parser: await import('jsonc-eslint-parser'),
+            parser: (await import('jsonc-eslint-parser')).default,
         },
     },
     {

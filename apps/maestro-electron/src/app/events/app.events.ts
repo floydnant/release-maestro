@@ -62,21 +62,19 @@ ipcMain.handle('load-feed', async (_event, index: number, count: number) => {
     const { FeedBackendService } = await import('../services/feed/feed.backend.service')
     const feedService = await diContainer.get(FeedBackendService)
 
-    return await feedService
-        .loadFeed(index, count)
-        .catch(err => {
-            console.error('Error loading feed:', err)
+    return await feedService.loadFeed(index, count).catch(err => {
+        console.error('Error loading feed:', err)
 
-            if (err instanceof Error) {
-                return {
-                    isError: true,
-                    message: err.message,
-                    name: err.name,
-                }
+        if (err instanceof Error) {
+            return {
+                isError: true,
+                message: err.message,
+                name: err.name,
             }
+        }
 
-            throw err
-        })
+        throw err
+    })
 })
 
 // Check if feed has items

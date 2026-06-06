@@ -42,7 +42,7 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
             data[key] = true
         }
     }
-    
+
     return validateEmail(data)
 }
 

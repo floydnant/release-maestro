@@ -23,7 +23,7 @@ import { FeedBackendRepository } from './feed.backend.repository'
 const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): BandcampFeedItem | null => {
     if (email.type == 'EMAIL.BANDCAMP_NEW_RELEASE') {
         if (!email.releaseUrl) return null
-        
+
         return {
             id: crypto.randomUUID(),
             type: 'BANDCAMP.TRALBUM',
@@ -207,7 +207,7 @@ export class FeedBackendService {
 
         return await this.hydrateFeed(preHydrationFeed as BandcampFeedItem[])
     }
-    
+
     async hasFeed(): Promise<boolean> {
         return await this.feedBackendRepository.hasFeedItems()
     }

@@ -35,7 +35,6 @@ module.exports = {
                 },
                 '.child-focus-ring': {
                     '&:has(:focus, :focus-visible)': {
-                        // eslint-disable-next-line capitalized-comments
                         // ring-2
                         '--tw-ring-offset-shadow':
                             'var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color)',

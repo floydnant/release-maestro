@@ -43,14 +43,14 @@ export default class App {
         // This method will be called when Electron has finished
         // initialization and is ready to create browser windows.
         // Some APIs can only be used after this event occurs.
-        
+
         // Initialize DI container and services
         try {
             await App.initializeServices()
         } catch (error) {
             console.error('Failed to initialize services:', error)
         }
-        
+
         if (rendererAppName) {
             // Added delay to fix black background issue (from original code)
             setTimeout(() => {
@@ -65,11 +65,11 @@ export default class App {
         const { diContainer } = await import('./di')
         const { DatabaseClient } = await import('./database/database.client')
         const { SettingsBackendService } = await import('./services/settings.backend.service')
-        
+
         // Initialize core services
         await diContainer.get(DatabaseClient)
         await diContainer.get(SettingsBackendService)
-        
+
         console.log('Services initialized successfully')
     }
 
