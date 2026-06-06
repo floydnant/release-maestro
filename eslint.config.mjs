@@ -24,7 +24,7 @@ export default defineConfig([
         },
     },
     {
-        files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
+        files: ['**/*.ts', '**/*.tsx', '**/*.cts', '**/*.mts', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
         rules: {
             '@nx/enforce-module-boundaries': [
                 'warn',
@@ -39,25 +39,6 @@ export default defineConfig([
                     ],
                 },
             ],
-        },
-    },
-    {
-        files: ['**/*.ts', '**/*.tsx', '**/*.cts', '**/*.mts', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
-        languageOptions: {
-            ecmaVersion: 5,
-            sourceType: 'script',
-
-            parserOptions: {
-                project: [
-                    // @TODO: this probably means the respective tsconfig
-                    // files for each project get disregarded?
-                    './tsconfig.base.json',
-                ],
-
-                createDefaultProgram: true,
-            },
-        },
-        rules: {
             '@typescript-eslint/no-empty-function': 'warn',
             '@typescript-eslint/no-explicit-any': 'error',
             '@typescript-eslint/no-unsafe-assignment': 'off',
@@ -71,6 +52,23 @@ export default defineConfig([
                 },
             ],
             '@typescript-eslint/no-inferrable-types': 'warn',
+        },
+    },
+    {
+        files: ['**/*.ts', '**/*.tsx', '**/*.cts', '**/*.mts'],
+        languageOptions: {
+            ecmaVersion: 5,
+            sourceType: 'script',
+
+            parserOptions: {
+                project: [
+                    // @TODO: this probably means the respective tsconfig
+                    // files for each project get disregarded?
+                    './tsconfig.base.json',
+                ],
+
+                createDefaultProgram: true,
+            },
         },
     },
     ...nx.configs['flat/angular'],

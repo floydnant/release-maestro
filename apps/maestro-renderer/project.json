@@ -70,7 +70,14 @@
             }
         },
         "lint": {
-            "executor": "@nx/eslint:lint"
+            "executor": "@nx/eslint:lint",
+            "options": {
+                "lintFilePatterns": [
+                    "apps/maestro-renderer/tailwind.config.js",
+                    "apps/maestro-renderer/src/**/*.ts",
+                    "apps/maestro-renderer/src/**/*.html"
+                ]
+            }
         },
         "test": {
             "executor": "@nx/jest:jest",
