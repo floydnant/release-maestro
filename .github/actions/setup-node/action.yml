@@ -1,0 +1,35 @@
+name: 'Setup Node Dependencies'
+description: 'Set up Node.js, cache npm downloads, and install project dependencies.'
+
+inputs:
+    node-version:
+        description: 'Node.js version to install.'
+        required: false
+        default: '22'
+    install-command:
+        description: 'Command used to install dependencies.'
+        required: false
+        default: 'npm i'
+
+runs:
+    using: 'composite'
+    steps:
+        - name: Cache node modules
+          uses: actions/cache@v4
+          env:
+              cache-name: cache-node-modules
+          with:
+              path: ~/.npm
+              key: ${{ runner.os }}-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+              restore-keys: |
+                  ${{ runner.os }}-${{ env.cache-name }}-
+                  ${{ runner.os }}-
+
+        - name: Setup node
+          uses: actions/setup-node@v5
+          with:
+              node-version: ${{ inputs.node-version }}
+
+        - name: Install Dependencies
+          shell: bash
+          run: ${{ inputs.install-command }}

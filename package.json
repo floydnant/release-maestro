@@ -22,7 +22,7 @@
         "e2e:show-report": "playwright show-report dist/.playwright/apps/maestro-renderer-e2e/playwright-report",
         "e2e:show-trace": "npm run e2e:show-report",
         "version": "conventional-changelog -i CHANGELOG.md -s -r 0 && git add CHANGELOG.md",
-        "lint": "nx lint",
+        "lint": "nx run-many -t lint",
         "format": "prettier --write \"./**/*.ts\" \"./**/*.html\" \"./**/*.css\" \"./**/*.json\"",
         "format:check": "prettier --check \"./**/*.ts\" \"./**/*.html\" \"./**/*.css\" \"./**/*.json\"",
         "nxe:build:frontend": "nx build maestro-renderer",

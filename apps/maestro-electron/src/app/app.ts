@@ -93,7 +93,7 @@ export default class App {
             show: false,
             webPreferences: {
                 nodeIntegration: true,
-                allowRunningInsecureContent: !App.isDevelopmentMode(),
+                allowRunningInsecureContent: false,
                 contextIsolation: false,
                 webSecurity: false, // Disabled to allow cross-origin audio/media from Bandcamp CDN
                 backgroundThrottling: false,
