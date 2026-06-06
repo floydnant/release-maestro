@@ -1,7 +1,26 @@
-Copyright 2020 - Maxime GRIS
+Copyright (c) 2026 Floyd Haremsa. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+This software and associated documentation files (the "Software") are the
+proprietary property of Floyd Haremsa. No part of the Software may be
+reproduced, distributed, modified, reverse-engineered, or used in any form
+without the prior written permission of the copyright holder.
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+Unauthorized copying, distribution, or use of the Software, in whole or in
+part, is strictly prohibited.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+Exclusions:
+
+The proprietary restrictions above do not apply to the following files, which
+are excluded pending rewrite and are instead covered by the third-party notice
+in THIRD_PARTY_NOTICES.txt:
+
+- apps/maestro-electron/src/app/events/squirrel.events.ts
+- apps/maestro-electron/src/main.ts
+- apps/maestro-electron/src/app/events/electron.events.ts
+- apps/maestro-electron/src/app/events/update.events.ts
+- apps/maestro-renderer/src/app/core/services/electron/electron.service.ts
+- apps/maestro-renderer/src/assets/i18n/en.json
+- apps/maestro-renderer/src/index.html
+
+All other original source files and project-specific assets in this repository
+remain proprietary and all rights are reserved by Floyd Haremsa.

@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { defineConfig } from 'drizzle-kit'
 
 const dbUrl = process.env.DATABASE_URL
@@ -6,7 +8,7 @@ if (!dbUrl) {
 }
 
 export default defineConfig({
-    schema: './app/database/drizzle.schema.ts',
+    schema: './apps/maestro-electron/src/app/database/drizzle.schema.ts',
     out: './drizzle',
     dialect: 'sqlite',
     verbose: true,

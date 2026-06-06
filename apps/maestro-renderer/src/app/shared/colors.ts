@@ -1,0 +1,20 @@
+import type tailwindColors from 'tailwindcss/colors'
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import colorsJson from '../../../../../colors.json'
+import { LeavesConcatenated } from '@release-maestro/core'
+
+export const colors = {
+    ...colorsJson,
+} satisfies Partial<Record<keyof typeof tailwindColors, unknown>> & typeof colorsJson
+
+export type ColorIdentifier = LeavesConcatenated<typeof colors, '-'>
+
+export const colorFrom = (identifier: ColorIdentifier): string => {
+    const [name, shade] = identifier.split('-')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const color = (colors as any)[name as any]
+    if (typeof color === 'string') return color
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return color[shade as any]
+}

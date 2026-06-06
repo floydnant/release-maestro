@@ -1,0 +1,62 @@
+name: 'Quality'
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    format:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - uses: ./.github/actions/setup-node
+
+            - name: Check formatting
+              run: npm run format:check
+
+    lint:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - uses: ./.github/actions/setup-node
+
+            - name: Check lint
+              run: npm run lint
+
+    test:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - uses: ./.github/actions/setup-node
+
+            - name: Run unit tests
+              run: npm run test
+
+    e2e:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - uses: ./.github/actions/setup-node
+
+            - name: Install Playwright browsers
+              run: npx playwright install --with-deps
+
+            - name: Run e2e tests
+              run: npm run e2e

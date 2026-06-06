@@ -4,23 +4,19 @@
         "output": "release/"
     },
     "files": [
-        "**/*",
-        "!**/*.ts",
-        "!**/*.map",
-        "!package-lock.json",
+        "package.json",
+        "node_modules/**/*",
+        "!node_modules/**/*.ts",
+        "!node_modules/**/*.map",
         {
-            "from": "../dist",
+            "from": "dist/apps/maestro-electron",
+            "to": ".",
+            "filter": ["**/*", "!**/*.map"]
+        },
+        {
+            "from": "dist/apps/maestro-renderer/browser",
+            "to": "maestro-renderer",
             "filter": ["**/*"]
-        },
-        {
-            "from": "../dist/out-tsc/app",
-            "to": ".",
-            "filter": ["**/*.js"]
-        },
-        {
-            "from": "../dist/out-tsc/src",
-            "to": ".",
-            "filter": ["**/*.js"]
         }
     ],
     "extraFiles": [
@@ -28,18 +24,41 @@
             "from": "drizzle",
             "to": "drizzle",
             "filter": ["**/*"]
+        },
+        {
+            "from": "LICENSE.md",
+            "to": "LICENSE.md"
+        },
+        {
+            "from": "THIRD_PARTY_NOTICES.txt",
+            "to": "THIRD_PARTY_NOTICES.txt"
         }
     ],
+    "publish": {
+        "provider": "github",
+        "owner": "floydnant",
+        "repo": "release-maestro"
+    },
     "win": {
         "icon": "dist/assets/icons",
-        "target": ["portable"]
+        "target": [
+            {
+                "target": "nsis",
+                "arch": ["x64"]
+            }
+        ]
     },
     "portable": {
         "splashImage": "dist/assets/icons/electron.bmp"
     },
     "mac": {
         "icon": "dist/assets/icons",
-        "target": ["dmg"],
+        "target": [
+            {
+                "target": "default",
+                "arch": ["universal"]
+            }
+        ],
         "extraFiles": [
             {
                 "from": "apple-scripts",

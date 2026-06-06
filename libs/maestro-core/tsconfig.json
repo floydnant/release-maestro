@@ -1,0 +1,28 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        // "module": "commonjs",
+        // "forceConsistentCasingInFileNames": true,
+        // "strict": true,
+        // "importHelpers": true,
+        // "noImplicitOverride": true,
+        // "noImplicitReturns": true,
+        // "noFallthroughCasesInSwitch": true,
+        // "noPropertyAccessFromIndexSignature": true
+        "moduleResolution": "bundler",
+        "ignoreDeprecations": "5.0",
+        "declaration": true,
+        "outDir": "../../dist/out-tsc/shared",
+        "rootDir": "."
+    },
+    "files": [],
+    "include": [],
+    "references": [
+        {
+            "path": "./tsconfig.lib.json"
+        },
+        {
+            "path": "./tsconfig.spec.json"
+        }
+    ]
+}

@@ -1,0 +1,101 @@
+{
+    "name": "maestro-renderer",
+    "$schema": "../../node_modules/nx/schemas/project-schema.json",
+    "projectType": "application",
+    "prefix": "app",
+    "sourceRoot": "apps/maestro-renderer/src",
+    "tags": [],
+    "targets": {
+        "build": {
+            "executor": "@angular/build:application",
+            "outputs": ["{options.outputPath}"],
+            "options": {
+                "outputPath": "dist/apps/maestro-renderer",
+                "browser": "apps/maestro-renderer/src/main.ts",
+                "polyfills": ["zone.js"],
+                "tsConfig": "apps/maestro-renderer/tsconfig.app.json",
+                "assets": [
+                    {
+                        "glob": "**/*",
+                        "input": "apps/maestro-renderer/src/assets"
+                    }
+                ],
+                "styles": ["apps/maestro-renderer/src/styles.css"]
+            },
+            "configurations": {
+                "production": {
+                    "baseHref": "./",
+                    "budgets": [
+                        {
+                            "type": "initial",
+                            "maximumWarning": "500kb",
+                            "maximumError": "1mb"
+                        },
+                        {
+                            "type": "anyComponentStyle",
+                            "maximumWarning": "4kb",
+                            "maximumError": "8kb"
+                        }
+                    ],
+                    "outputHashing": "all"
+                },
+                "development": {
+                    "optimization": false,
+                    "extractLicenses": false,
+                    "sourceMap": true
+                }
+            },
+            "defaultConfiguration": "production"
+        },
+        "serve": {
+            "continuous": true,
+            "executor": "@angular/build:dev-server",
+            "configurations": {
+                "production": {
+                    "buildTarget": "maestro-renderer:build:production"
+                },
+                "development": {
+                    "buildTarget": "maestro-renderer:build:development"
+                }
+            },
+            "defaultConfiguration": "development",
+            "options": {
+                "proxyConfig": "apps/maestro-renderer/proxy.conf.json"
+            }
+        },
+        "extract-i18n": {
+            "executor": "@angular/build:extract-i18n",
+            "options": {
+                "buildTarget": "maestro-renderer:build"
+            }
+        },
+        "lint": {
+            "executor": "@nx/eslint:lint",
+            "options": {
+                "lintFilePatterns": [
+                    "apps/maestro-renderer/tailwind.config.js",
+                    "apps/maestro-renderer/src/**/*.ts",
+                    "apps/maestro-renderer/src/**/*.html"
+                ]
+            }
+        },
+        "test": {
+            "executor": "@nx/jest:jest",
+            "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+            "options": {
+                "jestConfig": "apps/maestro-renderer/jest.config.ts",
+                "tsConfig": "apps/maestro-renderer/tsconfig.spec.json"
+            }
+        },
+        "serve-static": {
+            "continuous": true,
+            "executor": "@nx/web:file-server",
+            "options": {
+                "buildTarget": "maestro-renderer:build",
+                "port": 4200,
+                "staticFilePath": "dist/apps/maestro-renderer/browser",
+                "spa": true
+            }
+        }
+    }
+}
