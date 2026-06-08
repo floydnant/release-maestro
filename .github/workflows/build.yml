@@ -28,7 +28,7 @@ jobs:
               run: make package
 
             - name: Upload artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: linux-build
                   path: dist/executables/
@@ -45,7 +45,7 @@ jobs:
               run: make package
 
             - name: Upload artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: macos-build
                   path: dist/executables/*.dmg
@@ -60,7 +60,7 @@ jobs:
               run: make package
 
             - name: Upload artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: windows-build
                   path: dist/executables/
