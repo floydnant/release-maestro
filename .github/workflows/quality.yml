@@ -16,47 +16,38 @@ permissions:
 jobs:
     format:
         runs-on: ubuntu-latest
-
         steps:
             - uses: actions/checkout@v5
-
             - uses: ./.github/actions/setup-node
 
             - name: Check formatting
-              run: npm run format:check
+              run: make format-check
 
     lint:
         runs-on: ubuntu-latest
-
         steps:
             - uses: actions/checkout@v5
-
             - uses: ./.github/actions/setup-node
 
             - name: Check lint
-              run: npm run lint
+              run: make lint
 
     test:
         runs-on: ubuntu-latest
-
         steps:
             - uses: actions/checkout@v5
-
             - uses: ./.github/actions/setup-node
 
             - name: Run unit tests
-              run: npm run test
+              run: make test
 
     e2e:
         runs-on: ubuntu-latest
-
         steps:
             - uses: actions/checkout@v5
-
             - uses: ./.github/actions/setup-node
-
             - name: Install Playwright browsers
               run: npx playwright install --with-deps
 
             - name: Run e2e tests
-              run: npm run e2e
+              run: make e2e

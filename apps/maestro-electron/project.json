@@ -38,6 +38,7 @@
             "command": "wait-on tcp:4200 && nx serve-internal maestro-electron"
         },
         "package": {
+            "dependsOn": ["maestro-renderer:build", "build"],
             "executor": "nx-electron:package",
             "options": {
                 "name": "maestro-electron",
@@ -48,13 +49,15 @@
             }
         },
         "make": {
+            "dependsOn": ["maestro-renderer:build", "build"],
             "executor": "nx-electron:make",
             "options": {
                 "name": "maestro-electron",
                 "frontendProject": "maestro-renderer",
                 "sourcePath": "dist/apps",
                 "outputPath": "dist/executables"
-            }
+            },
+            "defaultConfiguration": "production"
         },
         "lint": {
             "command": "eslint apps/maestro-electron/**/*.ts"
