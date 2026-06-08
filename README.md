@@ -13,15 +13,15 @@ A desktop app for tracking and discovering music releases from Bandcamp. Import 
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Angular 20, Tailwind CSS, ng-primitives |
-| Backend | Electron 36, Node.js |
-| Database | SQLite (better-sqlite3), Drizzle ORM |
-| Validation | Zod |
-| Scraping | Cheerio, bandcamp-fetch |
-| Build | Nx 21 (monorepo), electron-builder |
-| Testing | Jest (unit), Playwright (E2E) |
+| Layer      | Technology                              |
+| ---------- | --------------------------------------- |
+| Frontend   | Angular 20, Tailwind CSS, ng-primitives |
+| Backend    | Electron 36, Node.js                    |
+| Database   | SQLite (better-sqlite3), Drizzle ORM    |
+| Validation | Zod                                     |
+| Scraping   | Cheerio, bandcamp-fetch                 |
+| Build      | Nx 21 (monorepo), electron-builder      |
+| Testing    | Jest (unit), Playwright (E2E)           |
 
 ## Prerequisites
 
@@ -54,17 +54,17 @@ drizzle/               Database migrations
 
 All commands are available via `make` or `npm run`:
 
-| Command | Make | npm |
-|---------|------|-----|
-| Dev server | `make dev` | `npm run dev` |
-| Production build | `make build-prod` | `npm run build:prod` |
-| Package distributable | `make package` | `npm run electron:build` |
-| Run tests | `make test` | `npm run test` |
-| Run tests (watch) | `make test-watch` | `npm run test:watch` |
-| Lint | `make lint` | `npm run lint` |
-| Format | `make format` | `npm run format` |
-| E2E tests | `make e2e` | `npm run e2e` |
-| Clean build outputs | `make clean` | — |
+| Command               | Make              | npm                      |
+| --------------------- | ----------------- | ------------------------ |
+| Dev server            | `make dev`        | `npm run dev`            |
+| Production build      | `make build-prod` | `npm run build:prod`     |
+| Package distributable | `make package`    | `npm run electron:build` |
+| Run tests             | `make test`       | `npm run test`           |
+| Run tests (watch)     | `make test-watch` | `npm run test:watch`     |
+| Lint                  | `make lint`       | `npm run lint`           |
+| Format                | `make format`     | `npm run format`         |
+| E2E tests             | `make e2e`        | `npm run e2e`            |
+| Clean build outputs   | `make clean`      | —                        |
 
 Run `make help` for the full list.
 
@@ -76,11 +76,11 @@ npm run electron:build
 
 Produces platform-specific distributables in `release/`:
 
-| Platform | Format |
-|----------|--------|
-| macOS | DMG (universal) |
-| Windows | NSIS installer (x64) |
-| Linux | AppImage |
+| Platform | Format               |
+| -------- | -------------------- |
+| macOS    | DMG (universal)      |
+| Windows  | NSIS installer (x64) |
+| Linux    | AppImage             |
 
 ## Database
 
