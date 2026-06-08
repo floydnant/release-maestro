@@ -16,58 +16,51 @@ permissions:
 jobs:
     build-linux:
         runs-on: ubuntu-latest
-
         steps:
             - uses: actions/checkout@v5
-
             - uses: ./.github/actions/setup-node
-
             - name: Install linux dependencies
               run: |
                   sudo apt-get update
                   sudo apt-get install -y libgtk-3-dev webkit2gtk-4.0 libappindicator3-dev librsvg2-dev patchelf
 
             - name: Build the app
-              run: npm run electron:build
+              run: make package
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
                   name: linux-build
-                  path: release/
+                  path: dist/executables/
 
     build-macos:
         runs-on: macos-latest
-
         steps:
             - uses: actions/checkout@v5
-
             - uses: ./.github/actions/setup-node
               with:
                   install-command: npm i && npm i -D cli-truncate iconv-corefoundation
 
             - name: Build the app
-              run: npm run electron:build
+              run: make package
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
                   name: macos-build
-                  path: release/*.dmg
+                  path: dist/executables/*.dmg
 
     build-windows:
         runs-on: windows-latest
-
         steps:
             - uses: actions/checkout@v5
-
             - uses: ./.github/actions/setup-node
 
             - name: Build the app
-              run: npm run electron:build
+              run: make package
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
                   name: windows-build
-                  path: release/
+                  path: dist/executables/
