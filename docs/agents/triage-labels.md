@@ -1,6 +1,15 @@
-# Triage Labels
+# Triage Roles
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
+The skills speak in terms of canonical triage roles. This file maps those roles to the actual values used in this repo's issue tracker.
+
+## Category roles
+
+| Role in skills | Value in our tracker | Meaning                    |
+| -------------- | -------------------- | -------------------------- |
+| `bug`          | `bug`                | Something is broken        |
+| `enhancement`  | `enhancement`        | New feature or improvement |
+
+## State roles
 
 | Label in mattpocock/skills | Label in our tracker | Meaning                                  |
 | -------------------------- | -------------------- | ---------------------------------------- |
@@ -10,4 +19,4 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 | `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
 | `wontfix`                  | `wontfix`            | Will not be actioned                     |
 
-When a skill mentions a role, use the corresponding label string from this table.
+When a skill mentions a role, use the corresponding tracker value from these tables. In Notion, these may be select/status values rather than labels.

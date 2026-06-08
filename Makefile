@@ -1,4 +1,4 @@
-.PHONY: dev build build-dev build-prod package test test-watch test-core test-electron test-renderer lint format format-check e2e clean
+.PHONY: dev serve-renderer build build-prod package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer e2e e2e-show-report lint format f format-check sure affected db-generate db-push db-studio clean install version help
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
@@ -8,9 +8,7 @@ serve-renderer: ## Start only the renderer dev server
 	npx nx serve maestro-renderer
 
 # Build
-build: ## Build all projects (default config)
-	npx nx run-many -t build
-build-dev: ## Build all projects (development config)
+build: ## Build all projects (development config)
 	npx nx run-many -t build -c development
 build-prod: ## Build all projects (production config)
 	npx nx run-many -t build -p maestro-renderer maestro-electron -c production
@@ -55,8 +53,11 @@ format: ## Format all files
 f: format
 format-check: ## Check formatting
 	npx prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"
-sure: format
+
+sure: format ## Run all checks (format, lint, test, build)
 	npx nx run-many -t lint,build,test -c development
+affected: ## Run checks only on affected projects based on git changes
+	npx nx affected -t build,lint,test,e2e
 
 # Database
 db-generate: ## Generate a new drizzle migration

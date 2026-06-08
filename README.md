@@ -13,15 +13,15 @@ A desktop app for tracking and discovering music releases from Bandcamp. Import 
 
 ## Tech Stack
 
-| Layer      | Technology                              |
-| ---------- | --------------------------------------- |
-| Frontend   | Angular 20, Tailwind CSS, ng-primitives |
-| Backend    | Electron 36, Node.js                    |
-| Database   | SQLite (better-sqlite3), Drizzle ORM    |
-| Validation | Zod                                     |
-| Scraping   | Cheerio, bandcamp-fetch                 |
-| Build      | Nx 21 (monorepo), electron-builder      |
-| Testing    | Jest (unit), Playwright (E2E)           |
+| Layer      | Technology                           |
+| ---------- | ------------------------------------ |
+| Frontend   | Angular, Tailwind CSS, ng-primitives |
+| Backend    | Electron, Node.js                    |
+| Database   | SQLite (better-sqlite3), Drizzle ORM |
+| Validation | Zod                                  |
+| Scraping   | Cheerio, bandcamp-fetch              |
+| Build      | Nx (monorepo), electron-builder      |
+| Testing    | Jest (unit), Playwright (E2E)        |
 
 ## Prerequisites
 
@@ -34,9 +34,20 @@ A desktop app for tracking and discovering music releases from Bandcamp. Import 
 ```bash
 npm i
 make dev
+
+# Verifications
+make format
+make lint
+make test
+make build
+make e2e
 ```
 
 This starts the Angular dev server and the Electron main process with hot reload.
+
+## Commands
+
+Run `make help` for a list of commands to run.
 
 ## Project Structure
 
@@ -44,37 +55,20 @@ This starts the Angular dev server and the Electron main process with hot reload
 apps/
   maestro-electron/    Electron main process (backend services, IPC API, database)
   maestro-renderer/    Angular frontend (feed UI, audio player, settings)
+  maestro-renderer-e2e/ E2E tests against the angular frontend
 libs/
   maestro-core/        Shared library (Zod schemas, types, utilities)
 apple-scripts/         AppleScript for exporting emails from Apple Mail
 drizzle/               Database migrations
 ```
 
-## Commands
-
-All commands are available via `make` or `npm run`:
-
-| Command               | Make              | npm                      |
-| --------------------- | ----------------- | ------------------------ |
-| Dev server            | `make dev`        | `npm run dev`            |
-| Production build      | `make build-prod` | `npm run build:prod`     |
-| Package distributable | `make package`    | `npm run electron:build` |
-| Run tests             | `make test`       | `npm run test`           |
-| Run tests (watch)     | `make test-watch` | `npm run test:watch`     |
-| Lint                  | `make lint`       | `npm run lint`           |
-| Format                | `make format`     | `npm run format`         |
-| E2E tests             | `make e2e`        | `npm run e2e`            |
-| Clean build outputs   | `make clean`      | —                        |
-
-Run `make help` for the full list.
-
 ## Building for Distribution
 
 ```bash
-npm run electron:build
+make package
 ```
 
-Produces platform-specific distributables in `release/`:
+Produces platform-specific distributables in `dist/executables/`:
 
 | Platform | Format               |
 | -------- | -------------------- |

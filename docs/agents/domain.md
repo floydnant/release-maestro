@@ -11,31 +11,26 @@ How the engineering skills should consume this repo's domain documentation when 
 
 If a file or directory does not exist, proceed silently.
 
-## File structure
-
-This repo is multi-context.
-
-Expected layout:
-
-```
-/
-├── CONTEXT-MAP.md
-├── docs/adr/                          ← system-wide decisions
-└── apps/
-    ├── electron-main/
-    │   └── CONTEXT.md
-    ├── maestro-electron/
-    │   └── CONTEXT.md
-    ├── maestro-renderer/
-    │   └── CONTEXT.md
-    └── maestro-renderer-e2e/
-        └── CONTEXT.md
-└── libs/
-    └── maestro-core/
-        └── CONTEXT.md
-```
+This repo currently has a root `CONTEXT.md` seed glossary. Add context-specific glossaries lazily if a project area develops its own vocabulary that would make the root glossary noisy.
 
 If a context needs its own architectural decisions, keep them in that context's `docs/adr/` directory.
+
+## Repository structure
+
+This repo is an Nx monorepo. The active projects are:
+
+- `apps/maestro-electron/` for the Electron main process, IPC, and backend services
+- `apps/maestro-renderer/` for the Angular renderer UI
+- `apps/maestro-renderer-e2e/` for Playwright end-to-end tests
+- `libs/maestro-core/` for shared schemas, types, and utilities
+
+Supporting areas:
+
+- `drizzle/` for database migrations and metadata
+- `apple-scripts/` for Apple Mail export automation
+- `scripts/` for repo maintenance scripts
+
+When in doubt, treat `README.md` as the high-level overview and the per-project `project.json` files as the source of truth for project boundaries and targets.
 
 ## Use the glossary's vocabulary
 

@@ -1,11 +1,11 @@
 ---
 name: qa
-description: Interactive QA session where user reports bugs or issues conversationally, and the agent files GitHub issues. Explores the codebase in the background for context and domain language. Use when user wants to report bugs, do QA, file issues conversationally, or mentions "QA session".
+description: Interactive QA session where user reports bugs or issues conversationally, and the agent files issues in the project issue tracker. Explores the codebase in the background for context and domain language. Use when user wants to report bugs, do QA, file issues conversationally, or mentions "QA session".
 ---
 
 # QA Session
 
-Run an interactive QA session. The user describes problems they're encountering. You clarify, explore the codebase for context, and file GitHub issues that are durable, user-focused, and use the project's domain language.
+Run an interactive QA session. The user describes problems they're encountering. You clarify, explore the codebase for context, and file issues in the project issue tracker that are durable, user-focused, and use the project's domain language.
 
 ## For each issue the user raises
 
@@ -23,7 +23,7 @@ Do NOT over-interview. If the description is clear enough to file, move on.
 
 While talking to the user, kick off an Agent (subagent_type=Explore) in the background to understand the relevant area. The goal is NOT to find a fix — it's to:
 
-- Learn the domain language used in that area (check UBIQUITOUS_LANGUAGE.md)
+- Learn the domain language used in that area (check CONTEXT.md and any relevant context glossary)
 - Understand what the feature is supposed to do
 - Identify the user-facing behavior boundary
 
@@ -44,9 +44,9 @@ Keep as a single issue when:
 - It's one behavior that's wrong in one place
 - The symptoms are all caused by the same root behavior
 
-### 4. File the GitHub issue(s)
+### 4. File the issue(s)
 
-Create issues with `gh issue create`. Do NOT ask the user to review first — just file and share URLs.
+Create issues in the project issue tracker. Do NOT ask the user to review first — just file and share URLs.
 
 Issues must be **durable** — they should still make sense after major refactors. Write from the user's perspective.
 
@@ -118,7 +118,7 @@ When creating a breakdown:
 #### Rules for all issue bodies
 
 - **No file paths or line numbers** — these go stale
-- **Use the project's domain language** (check UBIQUITOUS_LANGUAGE.md if it exists)
+- **Use the project's domain language** (check CONTEXT.md and any relevant context glossary)
 - **Describe behaviors, not code** — "the sync service fails to apply the patch" not "applyPatch() throws on line 42"
 - **Reproduction steps are mandatory** — if you can't determine them, ask the user
 - **Keep it concise** — a developer should be able to read the issue in 30 seconds

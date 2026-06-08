@@ -59,13 +59,13 @@
             "source": "mattpocock/skills",
             "sourceType": "github",
             "skillPath": "skills/deprecated/qa/SKILL.md",
-            "computedHash": "20c63e29b268b1f0762cff524b5e321d5e1a773b4f61b90d84811b755948a66c"
+            "computedHash": "13898f35bc3e5a02155bce41a475d8bef46649c6403a8934dd2fe412f799fd1e"
         },
         "request-refactor-plan": {
             "source": "mattpocock/skills",
             "sourceType": "github",
             "skillPath": "skills/deprecated/request-refactor-plan/SKILL.md",
-            "computedHash": "176cf1d0c4dc4fc4d958c4bc4ed67f222f2656bda2f3f15e3a3e98b2e5edaf2f"
+            "computedHash": "658c4687896bc943d35c3d5d999eafe04d09eccb2acc6fe86fc4deadb4d42084"
         },
         "review": {
             "source": "mattpocock/skills",
