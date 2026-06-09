@@ -61,7 +61,7 @@
         },
         "prepare-icons": {
             "dependsOn": ["maestro-renderer:build"],
-            "command": "rm -rf dist/assets/icons && mkdir -p dist/assets && cp -R dist/apps/maestro-renderer/browser/icons dist/assets/icons"
+            "command": "node -e \"const fs = require('node:fs'); fs.rmSync('dist/assets/icons', { recursive: true, force: true }); fs.mkdirSync('dist/assets', { recursive: true }); fs.cpSync('dist/apps/maestro-renderer/browser/icons', 'dist/assets/icons', { recursive: true });\""
         },
         "lint": {
             "command": "eslint apps/maestro-electron/**/*.ts"
