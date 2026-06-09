@@ -1,4 +1,9 @@
+<div align=center>
+<img src="./apps/maestro-renderer/src/assets/icons/app-icon.png" height="200px">
+
 # Release Maestro
+
+</div>
 
 A desktop app for tracking and discovering music releases from Bandcamp. Import release notifications from your inbox, browse a rich feed with cover art and metadata, and preview tracks — all without leaving the app.
 

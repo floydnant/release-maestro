@@ -40,7 +40,7 @@
         "repo": "release-maestro"
     },
     "win": {
-        "icon": "dist/assets/icons",
+        "icon": "dist/assets/icons/favicon.ico",
         "target": [
             {
                 "target": "nsis",
@@ -52,7 +52,7 @@
         "splashImage": "dist/assets/icons/electron.bmp"
     },
     "mac": {
-        "icon": "dist/assets/icons",
+        "icon": "dist/assets/icons/favicon.icns",
         "target": [
             {
                 "target": "default",
@@ -68,7 +68,7 @@
         ]
     },
     "linux": {
-        "icon": "dist/assets/icons",
+        "icon": "dist/assets/icons/favicon.512x512.png",
         "target": ["AppImage"]
     }
 }

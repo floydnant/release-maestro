@@ -1,4 +1,7 @@
-.PHONY: dev serve-renderer build build-prod package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer e2e e2e-show-report lint format f format-check sure affected db-generate db-push db-studio clean install version help
+.PHONY: dev serve-renderer build build-prod generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer e2e e2e-show-report lint format f format-check sure affected db-generate db-push db-studio clean install version help
+
+ICON_DIR := apps/maestro-renderer/src/assets/icons
+ICON_SOURCE := $(ICON_DIR)/app-icon.png
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
@@ -14,6 +17,24 @@ build-prod: ## Build all projects (production config)
 	npx nx run-many -t build -p maestro-renderer maestro-electron -c production
 
 # Package & Release
+generate-icons: ## Generate app icon variants from app-icon.png
+	@test -f "$(ICON_SOURCE)" || (echo "Missing $(ICON_SOURCE)" && exit 1)
+	@command -v magick >/dev/null || (echo "Missing ImageMagick: install 'magick'" && exit 1)
+	@command -v iconutil >/dev/null || (echo "Missing iconutil: run this target on macOS" && exit 1)
+	@iconset_dir="$$(mktemp -d)/release-maestro.iconset"; \
+		mkdir -p "$$iconset_dir"; \
+		magick "$(ICON_SOURCE)" -resize 512x512 "$(ICON_DIR)/favicon.512x512.png"; \
+		magick "$(ICON_SOURCE)" -resize 256x256 "$(ICON_DIR)/favicon.256x256.png"; \
+		cp "$(ICON_DIR)/favicon.256x256.png" "$(ICON_DIR)/favicon.png"; \
+		magick "$(ICON_SOURCE)" -define icon:auto-resize=256,128,64,48,32,16 "$(ICON_DIR)/favicon.ico"; \
+		for size in 16 32 128 256 512; do \
+			magick "$(ICON_SOURCE)" -resize "$${size}x$${size}" "$$iconset_dir/icon_$${size}x$${size}.png"; \
+			doubled=$$((size * 2)); \
+			magick "$(ICON_SOURCE)" -resize "$${doubled}x$${doubled}" "$$iconset_dir/icon_$${size}x$${size}@2x.png"; \
+		done; \
+		iconutil -c icns "$$iconset_dir" -o "$(ICON_DIR)/favicon.icns"; \
+		rm -rf "$$(dirname "$$iconset_dir")"
+
 package: ## Build and package as distributable (DMG/zip)
 	npx nx make maestro-electron
 package-dir: ## Build and package (directory only, no installer)
