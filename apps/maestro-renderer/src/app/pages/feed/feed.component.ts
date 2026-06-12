@@ -90,8 +90,8 @@ export class FeedComponent {
         ),
     )
 
-    @HostListener('document:keydown.ArrowUp', ['$event'])
-    @HostListener('document:keydown.K', ['$event'])
+    @HostListener('document:keydown.Shift.ArrowUp', ['$event'])
+    @HostListener('document:keydown.Shift.K', ['$event'])
     scrollUp(event?: Event) {
         event?.preventDefault()
 
@@ -105,8 +105,8 @@ export class FeedComponent {
         }
     }
 
-    @HostListener('document:keydown.ArrowDown', ['$event'])
-    @HostListener('document:keydown.J', ['$event'])
+    @HostListener('document:keydown.Shift.ArrowDown', ['$event'])
+    @HostListener('document:keydown.Shift.J', ['$event'])
     scrollDown(event?: Event) {
         event?.preventDefault()
 
@@ -198,8 +198,8 @@ export class FeedComponent {
         }
     }
 
-    @HostListener('document:keydown.Shift.ArrowDown', ['$event'])
-    @HostListener('document:keydown.Shift.J', ['$event'])
+    @HostListener('document:keydown.ArrowDown', ['$event'])
+    @HostListener('document:keydown.J', ['$event'])
     nextTrack(event?: Event) {
         event?.preventDefault()
 
@@ -236,8 +236,8 @@ export class FeedComponent {
         this.nextTrack()
     })
 
-    @HostListener('document:keydown.Shift.ArrowUp', ['$event'])
-    @HostListener('document:keydown.Shift.K', ['$event'])
+    @HostListener('document:keydown.ArrowUp', ['$event'])
+    @HostListener('document:keydown.K', ['$event'])
     prevTrack(event?: Event) {
         event?.preventDefault()
 
