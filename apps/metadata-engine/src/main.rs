@@ -7,8 +7,8 @@
 //! - stderr: human/diagnostic logs ONLY
 //!
 //! Runtime model (v1): one active operation at a time. A second operation while
-//! one is running is rejected with a structured `BUSY` error. `cancel` is the
-//! only request honoured while an operation is active. Request ids are always
+//! one is running is rejected with a structured `BUSY` error. While active,
+//! `ping` and `cancel` are still honoured. Request ids are always
 //! required so events can be correlated and operations cancelled.
 
 mod constants;

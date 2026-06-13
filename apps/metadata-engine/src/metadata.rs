@@ -859,10 +859,10 @@ pub fn read_song_metadata_v2(
                             })
                         })
                         .or_else(|| {
-                            let folder = path.replace(file_name.as_str(), "");
-                            let folder = folder.trim_end_matches(separator());
-
-                            get_first_image_in_folder(&folder)
+                            Path::new(&path)
+                                .parent()
+                                .and_then(|folder| folder.to_str())
+                                .and_then(get_first_image_in_folder)
                         });
 
                     return Some(SongMetadata {

@@ -38,7 +38,8 @@ impl ImageFormat {
             .extension()
             .and_then(|ext| ext.to_str())
         {
-            return match ext {
+            let ext = ext.to_ascii_lowercase();
+            return match ext.as_str() {
                 "jpg" | "jpeg" => Some(ImageFormat::Jpeg),
                 "png" => Some(ImageFormat::Png),
                 "bmp" => Some(ImageFormat::Bmp),
