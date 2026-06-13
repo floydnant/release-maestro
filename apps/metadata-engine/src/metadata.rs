@@ -6,6 +6,7 @@ use lofty::{
     tag::{Accessor, ItemKey, ItemValue, Tag, TagItem, TagType},
 };
 use serde::{Deserialize, Deserializer, Serialize};
+use sha2::{Digest, Sha256};
 use std::{fs, path::Path, time::SystemTime};
 
 type NullableField<T> = Option<Option<T>>;
@@ -226,6 +227,16 @@ fn format_item_key(key: &ItemKey) -> String {
         ItemKey::Unknown(ref_key) => format!("Custom: {ref_key}"),
         _ => format!("{:?}", key),
     }
+}
+
+/// Lowercase hex SHA-256 of the given bytes, used to content-address cached cover art.
+fn hex_digest(bytes: &[u8]) -> String {
+    let hash = Sha256::digest(bytes);
+    let mut out = String::with_capacity(hash.len() * 2);
+    for byte in hash {
+        out.push_str(&format!("{:02x}", byte));
+    }
+    out
 }
 
 fn get_first_image_in_folder(folder_path: &str) -> Option<String> {
@@ -793,13 +804,24 @@ pub fn read_song_metadata_v2(
                                     .or(Some("unknown"))
                                     .unwrap();
 
+                                // Content-addressed filename: derived from the image bytes
+                                // rather than the song's file name. This avoids collisions
+                                // between same-named files in different folders and lets
+                                // identical artwork dedupe to a single cache entry.
+                                let digest = hex_digest(cover.data());
                                 let cover_path = format!(
                                     "{}{}{}.{}",
                                     cover_art_cache_dir,
                                     separator(),
-                                    file_name,
+                                    digest,
                                     file_ext
                                 );
+
+                                // Identical bytes always hash to the same path, so an
+                                // existing file is guaranteed to hold the same artwork.
+                                if Path::new(&cover_path).exists() {
+                                    return Some(cover_path);
+                                }
 
                                 match fs::write(cover_path.clone(), cover.data()) {
                                     Ok(_) => Some(cover_path),
