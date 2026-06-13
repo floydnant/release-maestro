@@ -815,16 +815,17 @@ pub fn read_song_metadata_v2(
                         .primary_tag()
                         .and_then(|tag| {
                             tag.pictures().first().and_then(|cover| {
-                                let file_ext: &'static str = cover
-                                    .mime_type()
-                                    .and_then(|mime| {
-                                        Some(
-                                            ImageFormat::from_lofty_mimetype(mime.clone())
-                                                .extension(),
-                                        )
-                                    })
-                                    .or(Some("unknown"))
-                                    .unwrap();
+                                let file_ext: Option<&str> = cover.mime_type().and_then(|mime| {
+                                    ImageFormat::from_lofty_mimetype(mime.clone())
+                                        .map(|format| format.extension())
+                                });
+                                if file_ext.is_none() {
+                                    eprintln!(
+                                        "Unsupported or missing MIME type for cover art in {}: {:?}",
+                                        path, cover.mime_type()
+                                    );
+                                    return None;
+                                }
 
                                 // Content-addressed filename: derived from the image bytes
                                 // rather than the song's file name. This avoids collisions
@@ -836,7 +837,7 @@ pub fn read_song_metadata_v2(
                                     cover_art_cache_dir,
                                     separator(),
                                     digest,
-                                    file_ext
+                                    file_ext.unwrap()
                                 );
 
                                 // Identical bytes always hash to the same path, so an
@@ -865,7 +866,6 @@ pub fn read_song_metadata_v2(
                         });
 
                     return Some(SongMetadata {
-                        // id,
                         path,
                         file_name: file_name.clone(),
                         title: title.unwrap_or(file_name),

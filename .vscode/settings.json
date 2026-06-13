@@ -1,5 +1,12 @@
 {
     "css.customData": [".vscode/tailwind.json"],
     "window.title": "${activeEditorShort}${separator}${rootName}${separator}${activeRepositoryBranchName}",
-    "js/ts.tsdk.path": "node_modules/typescript/lib"
+    "js/ts.tsdk.path": "node_modules/typescript/lib",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.prettier": "always",
+        "source.organizeImports": "always"
+    },
+    "rust-analyzer.linkedProjects": [
+        "apps/metadata-engine/Cargo.toml"
+    ]
 }

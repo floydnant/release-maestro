@@ -22,15 +22,15 @@ impl ImageFormat {
         }
     }
 
-    pub fn from_lofty_mimetype(mime_type: lofty::picture::MimeType) -> ImageFormat {
+    pub fn from_lofty_mimetype(mime_type: lofty::picture::MimeType) -> Option<ImageFormat> {
         return match mime_type {
-            lofty::picture::MimeType::Jpeg => ImageFormat::Jpeg,
-            lofty::picture::MimeType::Png => ImageFormat::Png,
-            lofty::picture::MimeType::Bmp => ImageFormat::Bmp,
-            lofty::picture::MimeType::Gif => ImageFormat::Gif,
-            lofty::picture::MimeType::Tiff => ImageFormat::Tiff,
-            _ => ImageFormat::Gif, // @TODO: this should be handled better
-        };
+            lofty::picture::MimeType::Jpeg => Some(ImageFormat::Jpeg),
+            lofty::picture::MimeType::Png => Some(ImageFormat::Png),
+            lofty::picture::MimeType::Bmp => Some(ImageFormat::Bmp),
+            lofty::picture::MimeType::Gif => Some(ImageFormat::Gif),
+            lofty::picture::MimeType::Tiff => Some(ImageFormat::Tiff),
+            _ => None,
+        }
     }
 
     pub fn from_file_name(file_name: &str) -> Option<ImageFormat> {
