@@ -26,8 +26,9 @@
             "filter": ["**/*"]
         },
         {
-            "from": "apps/metadata-engine/target/release/metadata-engine",
-            "to": "metadata-engine/metadata-engine"
+            "from": "apps/metadata-engine/target/release",
+            "to": "metadata-engine",
+            "filter": ["metadata-engine", "metadata-engine.exe"]
         },
         {
             "from": "LICENSE.md",

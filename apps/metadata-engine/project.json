@@ -6,7 +6,7 @@
     "targets": {
         "build": {
             "executor": "nx:run-commands",
-            "outputs": ["{projectRoot}/target/release/metadata-engine"],
+            "outputs": ["{projectRoot}/target/release"],
             "options": {
                 "command": "node scripts/build.mjs",
                 "cwd": "apps/metadata-engine"
@@ -14,7 +14,7 @@
         },
         "build-debug": {
             "executor": "nx:run-commands",
-            "outputs": ["{projectRoot}/target/debug/metadata-engine"],
+            "outputs": ["{projectRoot}/target/debug"],
             "options": {
                 "command": "cargo build",
                 "cwd": "apps/metadata-engine"
