@@ -1,0 +1,20 @@
+[package]
+name = "metadata-engine"
+version = "0.1.0"
+description = "JSONL-over-stdio music metadata read/write/scan engine for Release Maestro"
+edition = "2021"
+default-run = "metadata-engine"
+
+[[bin]]
+name = "metadata-engine"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+lofty = "0.21.1"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true

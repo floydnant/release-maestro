@@ -7,6 +7,7 @@
         "build": {
             "executor": "nx-electron:build",
             "outputs": ["{options.outputPath}"],
+            "dependsOn": ["^build", "metadata-engine:build"],
             "options": {
                 "outputPath": "dist/apps/maestro-electron",
                 "main": "apps/maestro-electron/src/main.ts",
@@ -34,7 +35,7 @@
             }
         },
         "serve": {
-            "dependsOn": ["maestro-renderer:serve"],
+            "dependsOn": ["maestro-renderer:serve", "metadata-engine:build"],
             "command": "wait-on tcp:4200 && nx serve-internal maestro-electron"
         },
         "package": {

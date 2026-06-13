@@ -35,6 +35,7 @@ testem.log
 .nx
 .env
 .app-data*
+nice-explorer-reference
 
 # e2e
 /apps/release-maestro-e2e/*.js
