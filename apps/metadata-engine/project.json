@@ -8,7 +8,7 @@
             "executor": "nx:run-commands",
             "outputs": ["{projectRoot}/target/release/metadata-engine"],
             "options": {
-                "command": "cargo build --release",
+                "command": "node scripts/build.mjs",
                 "cwd": "apps/metadata-engine"
             }
         },

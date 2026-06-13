@@ -57,6 +57,7 @@
     },
     "mac": {
         "icon": "dist/assets/icons/favicon.icns",
+        "x64ArchFiles": "**/metadata-engine",
         "target": [
             {
                 "target": "default",
