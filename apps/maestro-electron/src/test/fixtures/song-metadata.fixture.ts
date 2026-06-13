@@ -1,0 +1,26 @@
+import { SongMetadata } from '@release-maestro/core'
+
+export const newSongFixture = (overrides: Partial<SongMetadata> = {}): SongMetadata => ({
+    title: 'Song',
+    artist: null,
+    albumTitle: null,
+    albumArtist: null,
+    coverPath: null,
+    year: null,
+    track: null,
+    genre: 'Psytrance',
+    label: null,
+    catalogNumber: null,
+    duration: null,
+    comment: null,
+    key: null,
+    bpm: null,
+    energy: null,
+    lyrics: null,
+    date: null,
+    extraMetadata: [],
+    fileInfo: null,
+    fileName: 'song.flac',
+    path: '/music/song.flac',
+    ...overrides,
+})

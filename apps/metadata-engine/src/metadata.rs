@@ -139,7 +139,8 @@ pub struct SongMetadataUpdateable {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_energy_update, apply_item_key_update_with_alias_removal, SongMetadataUpdateable,
+        apply_energy_update, apply_item_key_update_with_alias_removal, hex_digest,
+        SongMetadataUpdateable,
     };
     use lofty::tag::{ItemKey, Tag, TagType};
 
@@ -219,6 +220,27 @@ mod tests {
             tag.get_string(&ItemKey::Unknown("ENERGYLEVEL".to_string())),
             None
         );
+    }
+
+    #[test]
+    fn hex_digest_is_deterministic_and_content_addressed() {
+        // Known SHA-256 of the empty input, pinned so the cache layout is stable.
+        assert_eq!(
+            hex_digest(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+
+        // Same bytes always hash to the same name (enables dedupe + skip-write);
+        // different bytes must not collide.
+        assert_eq!(hex_digest(b"cover-bytes"), hex_digest(b"cover-bytes"));
+        assert_ne!(hex_digest(b"cover-a"), hex_digest(b"cover-b"));
+
+        // Always lowercase hex of a 32-byte digest.
+        let digest = hex_digest(b"anything");
+        assert_eq!(digest.len(), 64);
+        assert!(digest
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
     }
 }
 
