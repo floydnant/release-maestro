@@ -6,7 +6,5 @@
         "source.fixAll.prettier": "always",
         "source.organizeImports": "always"
     },
-    "rust-analyzer.linkedProjects": [
-        "apps/metadata-engine/Cargo.toml"
-    ]
+    "rust-analyzer.linkedProjects": ["apps/metadata-engine/Cargo.toml"]
 }
