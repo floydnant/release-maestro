@@ -44,7 +44,7 @@ export interface SongMetadata {
     catalogNumber: string | null
     duration: number | null
     comment: string | null
-    key: string | null
+    musicalKey: string | null
     bpm: number | null
     energy: string | null
     lyrics: string | null
@@ -86,7 +86,7 @@ export interface SongMetadataUpdate {
     date?: string | null
     label?: string | null
     catalogNumber?: string | null
-    key?: string | null
+    musicalKey?: string | null
     bpm?: number | null
     energy?: string | null
     lyrics?: string | null

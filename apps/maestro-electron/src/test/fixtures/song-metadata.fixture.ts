@@ -13,7 +13,7 @@ export const newSongFixture = (overrides: Partial<SongMetadata> = {}): SongMetad
     catalogNumber: null,
     duration: null,
     comment: null,
-    key: null,
+    musicalKey: null,
     bpm: null,
     energy: null,
     lyrics: null,

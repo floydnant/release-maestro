@@ -88,7 +88,7 @@ pub struct SongMetadata {
     pub catalog_number: Option<String>,
     pub duration: Option<f64>,
     pub comment: Option<String>,
-    pub key: Option<String>,
+    pub musical_key: Option<String>,
     pub bpm: Option<f64>,
     pub energy: Option<String>,
     pub lyrics: Option<String>,
@@ -126,7 +126,7 @@ pub struct SongMetadataUpdateable {
     #[serde(default, deserialize_with = "deserialize_nullable_field")]
     pub catalog_number: NullableField<String>,
     #[serde(default, deserialize_with = "deserialize_nullable_field")]
-    pub key: NullableField<String>,
+    pub musical_key: NullableField<String>,
     #[serde(default, deserialize_with = "deserialize_nullable_field")]
     pub bpm: NullableField<f64>,
     #[serde(default, deserialize_with = "deserialize_nullable_field")]
@@ -139,8 +139,8 @@ pub struct SongMetadataUpdateable {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_energy_update, apply_item_key_update_with_alias_removal, hex_digest,
-        SongMetadataUpdateable,
+        apply_energy_update, apply_item_key_update_with_alias_removal, hex_digest, FileInfo,
+        SongMetadata, SongMetadataUpdateable,
     };
     use lofty::tag::{ItemKey, Tag, TagType};
 
@@ -161,6 +161,51 @@ mod tests {
 
         assert_eq!(set_value.artist, Some(Some("A".to_string())));
         assert_eq!(set_value.bpm, Some(Some(128.0)));
+    }
+
+    #[test]
+    fn serializes_and_deserializes_musical_key_wire_name() {
+        let metadata = SongMetadata {
+            title: "Song".to_string(),
+            artist: None,
+            album_title: None,
+            album_artist: None,
+            cover_path: None,
+            year: None,
+            track: None,
+            genre: None,
+            label: None,
+            catalog_number: None,
+            duration: None,
+            comment: None,
+            musical_key: Some("Am".to_string()),
+            bpm: None,
+            energy: None,
+            lyrics: None,
+            date: None,
+            extra_metadata: vec![],
+            file_info: Some(FileInfo {
+                duration: 123.0,
+                overall_bitrate: None,
+                audio_bitrate: None,
+                sample_rate: None,
+                bit_depth: None,
+                channels: None,
+                tag_type: None,
+                codec: "FLAC".to_string(),
+            }),
+            file_name: "song.flac".to_string(),
+            path: "/music/song.flac".to_string(),
+            created_at: None,
+        };
+
+        let serialized = serde_json::to_value(metadata).expect("should serialize metadata");
+        assert_eq!(serialized["musicalKey"], "Am");
+        assert!(serialized.get("key").is_none());
+
+        let update: SongMetadataUpdateable =
+            serde_json::from_str(r#"{"musicalKey":"Gm"}"#).expect("should deserialize update");
+        assert_eq!(update.musical_key, Some(Some("Gm".to_string())));
     }
 
     #[test]
@@ -562,7 +607,7 @@ pub fn update_song_metadata(
 
     has_changes |= apply_item_key_update(tag, ItemKey::Label, song.label);
     has_changes |= apply_item_key_update(tag, ItemKey::CatalogNumber, song.catalog_number);
-    has_changes |= apply_item_key_update(tag, ItemKey::InitialKey, song.key);
+    has_changes |= apply_item_key_update(tag, ItemKey::InitialKey, song.musical_key);
     has_changes |=
         apply_item_key_update_with_alias_removal(tag, ItemKey::Lyrics, &["LYRICS"], song.lyrics);
     has_changes |= apply_bpm_update(tag, song.bpm)?;
@@ -881,7 +926,7 @@ pub fn read_song_metadata_v2(
                         file_info: Some(file_info),
                         cover_path,
                         comment: comment,
-                        key: key,
+                        musical_key: key,
                         bpm: bpm,
                         lyrics: lyrics,
                         energy: energy,
