@@ -26,6 +26,11 @@
             "filter": ["**/*"]
         },
         {
+            "from": "apps/metadata-engine/target/release",
+            "to": "metadata-engine",
+            "filter": ["metadata-engine", "metadata-engine.exe"]
+        },
+        {
             "from": "LICENSE.md",
             "to": "LICENSE.md"
         },
@@ -53,6 +58,7 @@
     },
     "mac": {
         "icon": "dist/assets/icons/favicon.icns",
+        "x64ArchFiles": "**/metadata-engine",
         "target": [
             {
                 "target": "default",

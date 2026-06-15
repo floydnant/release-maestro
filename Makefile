@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer e2e e2e-show-report lint format f format-check sure affected db-generate db-push db-studio clean install version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine e2e e2e-show-report lint format f format-check sure affected db-generate db-push db-studio clean install version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -15,6 +15,8 @@ build: ## Build all projects (development config)
 	npx nx run-many -t build -c development
 build-prod: ## Build all projects (production config)
 	npx nx run-many -t build -p maestro-renderer maestro-electron -c production
+build-engine: ## Build the Rust metadata-engine worker binary (release)
+	npx nx build metadata-engine
 
 # Package & Release
 generate-icons: ## Generate app icon variants from app-icon.png
@@ -41,7 +43,10 @@ package-dir: ## Build and package (directory only, no installer)
 	npx nx make maestro-electron --prepackageOnly
 run-packaged: package-dir ## Run the packaged app (macOS) and keep terminal attached for logs
 	dist/packages/mac-arm64/Release\ Maestro.app/Contents/MacOS/Release\ Maestro
-install-packaged: package ## Install the packaged app (macOS) using the DMG
+open-dmg: ## Open the generated DMG file (macOS)
+	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
+	open "$$dmgPath"
+install-dmg: package ## Install the packaged app (macOS) using the DMG
 	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
 	hdiutil attach "$$dmgPath" && \
 	volumeName="$$(find /Volumes -d -name "Release Maestro *-universal" -print -quit | tr -d '\n')" && \
@@ -60,6 +65,8 @@ test-electron: ## Run electron backend tests
 	npx nx test maestro-electron
 test-renderer: ## Run renderer tests
 	npx nx test maestro-renderer
+test-engine: ## Run metadata-engine (Rust) tests
+	npx nx test metadata-engine
 
 e2e: ## Run end-to-end tests
 	npx playwright test -c apps/maestro-renderer-e2e/playwright.config.ts

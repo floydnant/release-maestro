@@ -22,6 +22,7 @@ This repo is an Nx monorepo. The active projects are:
 - `apps/maestro-electron/` for the Electron main process, IPC, and backend services
 - `apps/maestro-renderer/` for the Angular renderer UI
 - `apps/maestro-renderer-e2e/` for Playwright end-to-end tests
+- `apps/metadata-engine/` for reading/writing audio file tags
 - `libs/maestro-core/` for shared schemas, types, and utilities
 
 Supporting areas:

@@ -1,0 +1,38 @@
+{
+    "name": "metadata-engine",
+    "$schema": "../../node_modules/nx/schemas/project-schema.json",
+    "sourceRoot": "apps/metadata-engine/src",
+    "projectType": "application",
+    "targets": {
+        "build": {
+            "executor": "nx:run-commands",
+            "outputs": ["{projectRoot}/target/release"],
+            "options": {
+                "command": "node scripts/build.mjs",
+                "cwd": "apps/metadata-engine"
+            }
+        },
+        "build-debug": {
+            "executor": "nx:run-commands",
+            "outputs": ["{projectRoot}/target/debug"],
+            "options": {
+                "command": "cargo build",
+                "cwd": "apps/metadata-engine"
+            }
+        },
+        "test": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "cargo test",
+                "cwd": "apps/metadata-engine"
+            }
+        },
+        "lint": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "cargo clippy --all-targets",
+                "cwd": "apps/metadata-engine"
+            }
+        }
+    }
+}

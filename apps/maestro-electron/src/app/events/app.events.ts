@@ -7,6 +7,14 @@ import { ipcMain, shell } from 'electron'
 import { diContainer } from '../di'
 // import { DatabaseClient } from '../database/database.client' // TODO: Use when needed
 import { SettingsBackendService } from '../services/settings.backend.service'
+import {
+    METADATA_IPC_CHANNELS,
+    ReadMetadataRequest,
+    ScanMetadataRequest,
+    ScanResult,
+    WriteMetadataRequest,
+} from '@release-maestro/core'
+import { MetadataBackendService } from '../services/metadata/metadata.backend.service'
 
 export default class AppEvents {
     static bootstrapAppEvents(): Electron.IpcMain {
@@ -98,3 +106,51 @@ ipcMain.handle(
         return await feedService.markFeedItemAsViewed(id, feedItemType as any, isSnoozed)
     },
 )
+
+// ---------------------------------------------------------------------------
+// Music-metadata engine (Rust JSONL worker) IPC
+// ---------------------------------------------------------------------------
+
+ipcMain.handle(METADATA_IPC_CHANNELS.ping, async () => {
+    const metadataService = await diContainer.get(MetadataBackendService)
+    return metadataService.ping()
+})
+
+ipcMain.handle(METADATA_IPC_CHANNELS.read, async (_event, request: ReadMetadataRequest) => {
+    const metadataService = await diContainer.get(MetadataBackendService)
+    return metadataService.readFile(request.path)
+})
+
+ipcMain.handle(METADATA_IPC_CHANNELS.write, async (_event, request: WriteMetadataRequest) => {
+    const metadataService = await diContainer.get(MetadataBackendService)
+    return metadataService.writeTags(request.path, request.update)
+})
+
+// Scan streams per-file results/progress over `scan-progress` and resolves with a
+// summary when finished. Cancellation arrives on the fire-and-forget `scan-abort`.
+ipcMain.handle(METADATA_IPC_CHANNELS.scan, async (event, request: ScanMetadataRequest) => {
+    const abortController = new AbortController()
+    const abortHandler = () => abortController.abort()
+    ipcMain.once(METADATA_IPC_CHANNELS.scanAbort, abortHandler)
+
+    const metadataService = await diContainer.get(MetadataBackendService)
+    const update$ = metadataService.scan(request.paths, abortController.signal)
+
+    return new Promise<ScanResult | undefined>((resolve, reject) => {
+        let summary: ScanResult | undefined
+        update$.subscribe({
+            next: update => {
+                event.sender.send(METADATA_IPC_CHANNELS.scanProgress, update)
+                if (update.phase == 'completed') summary = { count: update.count, total: update.total }
+            },
+            error: err => {
+                ipcMain.removeListener(METADATA_IPC_CHANNELS.scanAbort, abortHandler)
+                reject(err)
+            },
+            complete: () => {
+                ipcMain.removeListener(METADATA_IPC_CHANNELS.scanAbort, abortHandler)
+                resolve(summary)
+            },
+        })
+    })
+})

@@ -5,6 +5,9 @@ import { FeedBackendRepository } from './services/feed/feed.backend.repository'
 import { FeedBackendService } from './services/feed/feed.backend.service'
 import { BandcampApiBackendService } from './services/bandcamp/bandcamp-api.backend.service'
 import { WebScrapingService } from './services/web-scraping/web-scraping.service'
+import { MetadataBackendService } from './services/metadata/metadata.backend.service'
+import { SidecarProcessService } from './services/metadata/sidecar-process.service'
+import { coverArtCacheDir, resolveMetadataEngineBinaryPath } from './app-env'
 import { DiContainer } from './utils/dependency-injection.util'
 
 export const diContainer = new DiContainer({
@@ -42,6 +45,15 @@ export const diContainer = new DiContainer({
                     await di.get(WebScrapingService),
                     await di.get(FeedBackendRepository),
                 ),
+        },
+        {
+            provide: SidecarProcessService,
+            useFactory: async () => new SidecarProcessService(await resolveMetadataEngineBinaryPath()),
+        },
+        {
+            provide: MetadataBackendService,
+            useFactory: async di =>
+                new MetadataBackendService(await di.get(SidecarProcessService), coverArtCacheDir()),
         },
     ],
 })
