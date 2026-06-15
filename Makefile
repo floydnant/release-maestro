@@ -43,7 +43,10 @@ package-dir: ## Build and package (directory only, no installer)
 	npx nx make maestro-electron --prepackageOnly
 run-packaged: package-dir ## Run the packaged app (macOS) and keep terminal attached for logs
 	dist/packages/mac-arm64/Release\ Maestro.app/Contents/MacOS/Release\ Maestro
-install-packaged: package ## Install the packaged app (macOS) using the DMG
+open-dmg: ## Open the generated DMG file (macOS)
+	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
+	open "$$dmgPath"
+install-dmg: package ## Install the packaged app (macOS) using the DMG
 	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
 	hdiutil attach "$$dmgPath" && \
 	volumeName="$$(find /Volumes -d -name "Release Maestro *-universal" -print -quit | tr -d '\n')" && \
