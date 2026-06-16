@@ -35,6 +35,7 @@ testem.log
 .nx
 .env
 .app-data*
+.native-home
 nice-explorer-reference
 
 # e2e

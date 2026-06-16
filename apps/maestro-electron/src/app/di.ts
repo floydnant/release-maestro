@@ -9,6 +9,8 @@ import { MetadataBackendService } from './services/metadata/metadata.backend.ser
 import { SidecarProcessService } from './services/metadata/sidecar-process.service'
 import { coverArtCacheDir, resolveMetadataEngineBinaryPath } from './app-env'
 import { DiContainer } from './utils/dependency-injection.util'
+import { LibraryBackendRepository } from './services/library/library.backend.repository'
+import { LibraryBackendService } from './services/library/library.backend.service'
 
 export const diContainer = new DiContainer({
     providers: [
@@ -54,6 +56,18 @@ export const diContainer = new DiContainer({
             provide: MetadataBackendService,
             useFactory: async di =>
                 new MetadataBackendService(await di.get(SidecarProcessService), coverArtCacheDir()),
+        },
+        {
+            provide: LibraryBackendRepository,
+            useFactory: async di => new LibraryBackendRepository(await di.get(DatabaseClient)),
+        },
+        {
+            provide: LibraryBackendService,
+            useFactory: async di =>
+                new LibraryBackendService(
+                    await di.get(LibraryBackendRepository),
+                    await di.get(MetadataBackendService),
+                ),
         },
     ],
 })

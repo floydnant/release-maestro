@@ -4,7 +4,7 @@
 //! from stdout. Cargo builds the binary automatically and exposes its path via
 //! `CARGO_BIN_EXE_metadata-engine`.
 
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
 use serde_json::Value;
@@ -45,6 +45,52 @@ fn find_by_id<'a>(responses: &'a [Value], id: &str) -> &'a Value {
         .iter()
         .find(|response| response["id"] == id)
         .unwrap_or_else(|| panic!("no response with id {id:?} in {responses:?}"))
+}
+
+fn run_streaming_request(request: &str, id: &str) -> Vec<Value> {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_metadata-engine"))
+        .arg("--jsonl")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("failed to spawn metadata-engine");
+    let mut stdin = child.stdin.take().expect("stdin");
+    let stdout = child.stdout.take().expect("stdout");
+    let mut reader = BufReader::new(stdout);
+    let mut messages = Vec::new();
+
+    writeln!(stdin, "{request}").expect("write request");
+    stdin.flush().expect("flush request");
+
+    loop {
+        let mut line = String::new();
+        reader.read_line(&mut line).expect("read protocol line");
+        let message: Value = serde_json::from_str(line.trim()).expect("valid JSONL message");
+        let is_terminal = message["type"] == "response" && message["id"] == id;
+        messages.push(message);
+        if is_terminal {
+            break;
+        }
+    }
+
+    drop(stdin);
+    child.wait().expect("worker exit");
+    messages
+}
+
+fn read_until_response(reader: &mut impl BufRead, id: &str) -> Vec<Value> {
+    let mut messages = Vec::new();
+    loop {
+        let mut line = String::new();
+        reader.read_line(&mut line).expect("read protocol line");
+        let message: Value = serde_json::from_str(line.trim()).expect("valid JSONL message");
+        let is_terminal = message["type"] == "response" && message["id"] == id;
+        messages.push(message);
+        if is_terminal {
+            return messages;
+        }
+    }
 }
 
 #[test]
@@ -124,4 +170,113 @@ fn processes_multiple_requests_in_order_on_one_connection() {
 
     assert_eq!(find_by_id(&responses, "a")["ok"], true);
     assert_eq!(find_by_id(&responses, "b")["ok"], true);
+}
+
+#[test]
+fn prescan_streams_supported_file_facts_in_requested_batches() {
+    let root = std::env::temp_dir().join(format!("me-prescan-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("create root");
+    std::fs::write(root.join("one.flac"), b"one").expect("write audio candidate");
+    std::fs::write(root.join("ignored.txt"), b"text").expect("write ignored file");
+
+    let request = format!(
+        r#"{{"type":"request","id":"s1","method":"prescan","params":{{"paths":[{root}],"batchSize":1}}}}"#,
+        root = Value::from(root.to_string_lossy().to_string()),
+    );
+    let messages = run_streaming_request(&request, "s1");
+    let batches: Vec<&Value> = messages
+        .iter()
+        .filter(|message| message["event"] == "batch")
+        .collect();
+    let response = messages.last().expect("terminal response");
+
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0]["data"]["items"][0]["fileName"], "one.flac");
+    assert_eq!(batches[0]["data"]["items"][0]["size"], 3);
+    assert!(batches[0]["data"]["items"][0]["modifiedAt"].is_number());
+    assert_eq!(response["result"]["count"], 1);
+    assert_eq!(response["result"]["errors"], 0);
+
+    std::fs::remove_dir_all(root).expect("remove root");
+}
+
+#[test]
+fn prescan_reports_unreadable_roots_instead_of_silently_succeeding() {
+    let missing = std::env::temp_dir().join(format!("me-prescan-missing-{}", std::process::id()));
+    let request = format!(
+        r#"{{"type":"request","id":"s2","method":"prescan","params":{{"paths":[{root}]}}}}"#,
+        root = Value::from(missing.to_string_lossy().to_string()),
+    );
+    let messages = run_streaming_request(&request, "s2");
+    let item_error = messages
+        .iter()
+        .find(|message| message["event"] == "item_error")
+        .expect("item error event");
+    let response = messages.last().expect("terminal response");
+
+    assert_eq!(
+        item_error["data"]["path"],
+        missing.to_string_lossy().as_ref()
+    );
+    assert_eq!(response["result"]["count"], 0);
+    assert_eq!(response["result"]["errors"], 1);
+}
+
+#[test]
+fn read_files_streams_item_errors_and_completes_the_batch() {
+    let missing = std::env::temp_dir().join(format!("me-missing-{}.flac", std::process::id()));
+    let cache = std::env::temp_dir().join(format!("me-read-cache-{}", std::process::id()));
+    let request = format!(
+        r#"{{"type":"request","id":"r2","method":"read_files","params":{{"paths":[{path}],"coverArtCacheDir":{cache}}}}}"#,
+        path = Value::from(missing.to_string_lossy().to_string()),
+        cache = Value::from(cache.to_string_lossy().to_string()),
+    );
+    let messages = run_streaming_request(&request, "r2");
+    let item_error = messages
+        .iter()
+        .find(|message| message["event"] == "item_error")
+        .expect("item error event");
+    let response = messages.last().expect("terminal response");
+
+    assert_eq!(
+        item_error["data"]["path"],
+        missing.to_string_lossy().as_ref()
+    );
+    assert_eq!(response["result"]["count"], 0);
+    assert_eq!(response["result"]["total"], 1);
+
+    let _ = std::fs::remove_dir_all(cache);
+}
+
+#[test]
+fn accepts_the_next_batch_immediately_after_a_terminal_response() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_metadata-engine"))
+        .arg("--jsonl")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("failed to spawn metadata-engine");
+    let mut stdin = child.stdin.take().expect("stdin");
+    let stdout = child.stdout.take().expect("stdout");
+    let mut reader = BufReader::new(stdout);
+    let cache = std::env::temp_dir().join(format!("me-sequential-cache-{}", std::process::id()));
+    let missing = std::env::temp_dir().join(format!("me-sequential-{}.flac", std::process::id()));
+
+    for id in ["batch-1", "batch-2"] {
+        let request = format!(
+            r#"{{"type":"request","id":"{id}","method":"read_files","params":{{"paths":[{path}],"coverArtCacheDir":{cache}}}}}"#,
+            path = Value::from(missing.to_string_lossy().to_string()),
+            cache = Value::from(cache.to_string_lossy().to_string()),
+        );
+        writeln!(stdin, "{request}").expect("write request");
+        stdin.flush().expect("flush request");
+        let messages = read_until_response(&mut reader, id);
+        let response = messages.last().expect("terminal response");
+        assert_eq!(response["ok"], true, "{response:?}");
+    }
+
+    drop(stdin);
+    child.wait().expect("worker exit");
+    let _ = std::fs::remove_dir_all(cache);
 }

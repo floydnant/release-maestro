@@ -6,8 +6,7 @@
     "private": true,
     "scripts": {
         "postinstall": "electron-builder install-app-deps",
-        "list-project-dev-scripts": "echo 'USE MAKEFILE SCRIPTS' && make help",
-        "rebuild": "electron-rebuild",
+        "list-project-dev-scripts": "echo 'ALWAYS USE MAKEFILE SCRIPTS' && make help",
         "dev": "make dev",
         "test": "make test"
     },

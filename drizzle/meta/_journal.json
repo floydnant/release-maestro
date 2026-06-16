@@ -8,6 +8,13 @@
       "when": 1753459263134,
       "tag": "0000_initial-migration",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1781647120363,
+      "tag": "0001_library-song-scan-model",
+      "breakpoints": true
     }
   ]
 }

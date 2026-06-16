@@ -18,5 +18,7 @@ ALWAYS run verifications after making changes to code. Use the Makefile targets 
 
 ### Rules
 
+- ALWAYS use make commands, never npm scripts
+- When generating migrations, always specify a name `make db-generate NAME=cool_migration`
 - Commit messages use Conventional Commits with a mandatory type: prefix on the subject line
 - Tests: prefer shared fixture files for reusable fixtures; only keep fixtures inline in a spec when the fixture is clearly one-off to that spec.
