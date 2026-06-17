@@ -23,7 +23,7 @@ impl ImageFormat {
     }
 
     pub fn from_lofty_mimetype(mime_type: lofty::picture::MimeType) -> Option<ImageFormat> {
-        return match mime_type {
+        match mime_type {
             lofty::picture::MimeType::Jpeg => Some(ImageFormat::Jpeg),
             lofty::picture::MimeType::Png => Some(ImageFormat::Png),
             lofty::picture::MimeType::Bmp => Some(ImageFormat::Bmp),

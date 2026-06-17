@@ -1,18 +1,18 @@
 import { CommonModule } from '@angular/common'
 import { Component, ElementRef, HostListener, inject, signal, viewChildren } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
+import { RouterModule } from '@angular/router'
 import { TranslateModule } from '@ngx-translate/core'
+import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
 import { combineLatestWith, fromEvent, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { FeedService } from '../../core/services/feed.service'
-import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
-import { RouterModule } from '@angular/router'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
 import { IntersectionDirective } from '../../shared/directives/intersection.directive'
 import { SafePipe } from '../../shared/pipes/safe.pipe'
-import { formatDuration, formatDateRelative } from '../../shared/utils/formatting.utils'
+import { formatDateRelative, formatDuration } from '../../shared/utils/formatting.utils'
 
 const getErrorMessage = (error: unknown) => {
     if (typeof error == 'string') return error

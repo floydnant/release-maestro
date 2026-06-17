@@ -24,9 +24,7 @@ describe('HomeComponent', () => {
     })
 
     it('should render title in a h1 tag', waitForAsync(() => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const compiled = fixture.debugElement.nativeElement
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         expect(compiled.querySelector('h1').textContent).toContain('PAGES.HOME.TITLE')
     }))
 })

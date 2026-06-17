@@ -2,6 +2,7 @@
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
+SKIP_NX_CACHE := false
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
@@ -56,7 +57,7 @@ install-dmg: package ## Install the packaged app (macOS) using the DMG
 
 # Test
 test: ## Run all tests
-	npx nx run-many -t test
+	npx nx run-many -t test --skipNxCache=$(SKIP_NX_CACHE)
 test-watch: ## Run all tests in watch mode
 	npx nx run-many -t test -- --watch
 test-core: ## Run core library tests
@@ -75,7 +76,7 @@ e2e-show-report: ## Show the latest e2e test report
 
 # Code Quality
 lint: ## Lint all projects
-	npx nx run-many -t lint
+	npx nx run-many -t lint --output-style=stream --skipNxCache=$(SKIP_NX_CACHE)
 format: ## Format all files
 	npx prettier --write "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"
 f: format
@@ -83,9 +84,9 @@ format-check: ## Check formatting
 	npx prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"
 
 sure: format ## Run all checks (format, lint, test, build)
-	npx nx run-many -t lint,build,test -c development
+	npx nx run-many -t lint,build,test -c development --skipNxCache=$(SKIP_NX_CACHE)
 affected: ## Run checks only on affected projects based on git changes
-	npx nx affected -t build,lint,test,e2e
+	npx nx affected -t build,lint,test,e2e --skipNxCache=$(SKIP_NX_CACHE)
 
 # Database
 drizzleCommand = mkdir -p .app-data.dev/data && DATABASE_URL=file:./.app-data.dev/data/mailbox-tool.db ELECTRON_RUN_AS_NODE=1 npx electron ./node_modules/drizzle-kit/bin.cjs
