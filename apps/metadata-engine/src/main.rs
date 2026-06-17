@@ -16,7 +16,10 @@ mod image_format;
 mod metadata;
 mod protocol;
 
-use metadata::{read_song_metadata_v2, update_song_metadata, SongMetadataUpdateable};
+use metadata::{
+    is_supported_audio_file_extension, read_song_metadata_v2, update_song_metadata,
+    ReadSongMetadataError, SongMetadataUpdateable,
+};
 use protocol::{classify_engine_error, ErrorCode, Event, Request, Response, PROTOCOL_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -289,17 +292,18 @@ fn handle_read_file(emitter: &Emitter, request: Request) {
     };
     ensure_cache_dir(&params.cover_art_cache_dir);
 
-    // `None` preserves the Tauri `get_song_metadata` contract: a non-audio,
-    // unsupported, or unreadable file resolves to `null` rather than an error.
     match read_song_metadata_v2(Path::new(&params.path), params.cover_art_cache_dir) {
-        Some(song) => match serde_json::to_value(&song) {
+        Ok(song) => match serde_json::to_value(&song) {
             Ok(value) => emitter.response(Response::ok(request.id, value)),
             Err(error) => emitter.response(Response::err(
                 request.id,
                 ErrorCode::Internal.error(format!("Failed to serialize metadata: {error}")),
             )),
         },
-        None => emitter.response(Response::ok(request.id, Value::Null)),
+        Err(error) => emitter.response(Response::err(
+            request.id,
+            classify_read_song_metadata_error(&error),
+        )),
     }
 }
 
@@ -419,7 +423,9 @@ fn run_prescan(
             continue;
         }
 
-        if !is_supported_audio_file(&path) {
+        if !is_supported_audio_file_extension(
+            path.extension().and_then(|extension| extension.to_str()),
+        ) {
             continue;
         }
 
@@ -510,7 +516,7 @@ fn run_read_files(
         }
 
         match read_song_metadata_v2(Path::new(&path), params.cover_art_cache_dir.clone()) {
-            Some(song) => match serde_json::to_value(&song) {
+            Ok(song) => match serde_json::to_value(&song) {
                 Ok(value) => {
                     count += 1;
                     emitter.event(&id, "item", json!({ "metadata": value }));
@@ -521,10 +527,14 @@ fn run_read_files(
                     json!({ "path": path, "error": error.to_string() }),
                 ),
             },
-            None => emitter.event(
+            Err(error) => emitter.event(
                 &id,
                 "item_error",
-                json!({ "path": path, "error": "File could not be parsed as supported audio" }),
+                json!({
+                    "path": path,
+                    "code": read_song_metadata_error_code(&error).as_str(),
+                    "error": error.to_string()
+                }),
             ),
         }
         emitter.event(
@@ -597,7 +607,7 @@ fn run_scan(
 
         done += 1;
         match read_song_metadata_v2(&file, params.cover_art_cache_dir.clone()) {
-            Some(song) => match serde_json::to_value(&song) {
+            Ok(song) => match serde_json::to_value(&song) {
                 Ok(value) => {
                     count += 1;
                     emitter.event(&id, "item", json!({ "metadata": value }));
@@ -608,11 +618,18 @@ fn run_scan(
                     json!({ "path": file.to_string_lossy(), "error": error.to_string() }),
                 ),
             },
-            None => {
-                // @TODO: distinguish between "not an audio file" and "file exists but metadata couldn't be read"
-                // Non-audio / unreadable files are skipped, matching the Tauri
-                // `get_songs` behaviour which silently drops `None` results.
+            Err(ReadSongMetadataError::UnsupportedFormat { .. }) => {
+                // Non-audio files are simply ignored, not treated as errors, not to clutter logs with irrelevant failures.
             }
+            Err(error) => emitter.event(
+                &id,
+                "item_error",
+                json!({
+                    "path": file.to_string_lossy(),
+                    "code": read_song_metadata_error_code(&error).as_str(),
+                    "error": error.to_string()
+                }),
+            ),
         }
         emitter.event(&id, "progress", json!({ "done": done, "total": total }));
     }
@@ -639,15 +656,19 @@ fn collect_files(path: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-fn is_supported_audio_file(path: &Path) -> bool {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| {
-            matches!(
-                extension.to_ascii_lowercase().as_str(),
-                "mp3" | "flac" | "wav" | "aiff" | "aif" | "ape" | "ogg"
-            )
-        })
+fn read_song_metadata_error_code(error: &ReadSongMetadataError) -> ErrorCode {
+    match error {
+        ReadSongMetadataError::FileNotFound { .. } => ErrorCode::FileNotFound,
+        ReadSongMetadataError::UnsupportedFormat { .. } => ErrorCode::UnsupportedFormat,
+        ReadSongMetadataError::NotAnAudioFile { .. } => ErrorCode::NotAnAudioFile,
+        ReadSongMetadataError::MetadataParseFailed { .. } => ErrorCode::ParseFailed,
+        ReadSongMetadataError::FileMetadataReadFailed { .. }
+        | ReadSongMetadataError::FileNameMissing { .. } => ErrorCode::Internal,
+    }
+}
+
+fn classify_read_song_metadata_error(error: &ReadSongMetadataError) -> protocol::ProtocolError {
+    read_song_metadata_error_code(error).error(error.to_string())
 }
 
 fn epoch_millis(time: SystemTime) -> Option<u128> {

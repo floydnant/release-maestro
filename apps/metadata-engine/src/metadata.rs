@@ -7,9 +7,23 @@ use lofty::{
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
-use std::{fs, path::Path, time::SystemTime};
+use std::{fmt, fs, io, path::Path, time::SystemTime};
 
 type NullableField<T> = Option<Option<T>>;
+
+const LOFTY_SUPPORTED_AUDIO_EXTENSIONS: &[&str] = &[
+    "3gp", "aac", "afc", "aif", "aifc", "aiff", "ape", "flac", "m4a", "m4b", "m4p", "m4r", "m4v",
+    "mp+", "mp1", "mp2", "mp3", "mp4", "mpc", "mpp", "ogg", "opus", "spx", "wav", "wave", "wv",
+];
+
+const AUDIO_FILE_EXTENSIONS: &[&str] = &[
+    "3ga", "3gp", "4mp", "669", "8svx", "aa", "aac", "aax", "ac3", "act", "adp", "adt", "adts",
+    "afc", "aif", "aifc", "aiff", "alac", "amr", "ape", "apl", "au", "awb", "caf", "cda", "dff",
+    "dsf", "dts", "dtshd", "eac3", "flac", "gsm", "it", "kar", "la", "m4a", "m4b", "m4p", "m4r",
+    "m4v", "mid", "midi", "mka", "mlp", "mod", "mogg", "mp+", "mp1", "mp2", "mp3", "mp4", "mpa",
+    "mpc", "mpp", "msv", "oga", "ogg", "oma", "opus", "ra", "ram", "rf64", "s3m", "sid", "snd",
+    "spx", "tak", "tta", "voc", "vox", "vqf", "wav", "wave", "wma", "wv", "xm",
+];
 
 fn deserialize_nullable_field<'de, D, T>(deserializer: D) -> Result<NullableField<T>, D::Error>
 where
@@ -136,6 +150,73 @@ pub struct SongMetadataUpdateable {
     pub file_name: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReadSongMetadataError {
+    FileNotFound {
+        path: String,
+    },
+    FileMetadataReadFailed {
+        path: String,
+        message: String,
+    },
+    UnsupportedFormat {
+        path: String,
+        extension: Option<String>,
+    },
+    NotAnAudioFile {
+        path: String,
+        extension: Option<String>,
+    },
+    MetadataParseFailed {
+        path: String,
+        message: String,
+    },
+    FileNameMissing {
+        path: String,
+    },
+}
+
+impl fmt::Display for ReadSongMetadataError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReadSongMetadataError::FileNotFound { path } => {
+                write!(formatter, "File not found: {path}")
+            }
+            ReadSongMetadataError::FileMetadataReadFailed { path, message } => {
+                write!(
+                    formatter,
+                    "Failed to read file metadata for {path}: {message}"
+                )
+            }
+            ReadSongMetadataError::UnsupportedFormat { path, extension } => {
+                let extension = extension.as_deref().unwrap_or("none");
+                write!(
+                    formatter,
+                    "Unsupported audio format for {path}: {extension}"
+                )
+            }
+            ReadSongMetadataError::MetadataParseFailed { path, message } => {
+                write!(
+                    formatter,
+                    "Failed to read file metadata from {path}: {message}"
+                )
+            }
+            ReadSongMetadataError::FileNameMissing { path } => {
+                write!(formatter, "Failed to read file name for {path}")
+            }
+            ReadSongMetadataError::NotAnAudioFile { path, extension } => {
+                let extension = extension.as_deref().unwrap_or("none");
+                write!(
+                    formatter,
+                    "Not an audio file: {path} (extension: {extension})"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for ReadSongMetadataError {}
+
 fn format_item_key(key: &ItemKey) -> String {
     match key {
         ItemKey::Unknown(ref_key) => format!("Custom: {ref_key}"),
@@ -180,6 +261,21 @@ fn get_first_image_in_folder(folder_path: &str) -> Option<String> {
     };
 
     file_path
+}
+
+pub(crate) fn is_audio_file_extension(extension: Option<&str>) -> bool {
+    extension_matches(extension, AUDIO_FILE_EXTENSIONS)
+}
+
+pub(crate) fn is_supported_audio_file_extension(extension: Option<&str>) -> bool {
+    extension_matches(extension, LOFTY_SUPPORTED_AUDIO_EXTENSIONS)
+}
+
+fn extension_matches(extension: Option<&str>, supported_extensions: &[&str]) -> bool {
+    extension.is_some_and(|extension| {
+        let extension = extension.to_ascii_lowercase();
+        supported_extensions.contains(&extension.as_str())
+    })
 }
 
 fn get_or_create_primary_tag(tagged_file: &mut TaggedFile) -> Result<&mut Tag, String> {
@@ -376,6 +472,7 @@ fn rename_file(path: &str, new_file_name: &str) -> Result<String, String> {
     Ok(new_path.to_string_lossy().into_owned())
 }
 
+// @TODO: report proper errors instead of using string messages
 pub fn update_song_metadata(
     path: &str,
     song: SongMetadataUpdateable,
@@ -473,323 +570,329 @@ pub fn update_song_metadata(
     };
 
     read_song_metadata_v2(Path::new(&final_path), cover_art_cache_dir)
-        .ok_or_else(|| format!("Failed to reload updated metadata from {final_path}"))
+        .map_err(|error| format!("Failed to reload updated metadata from {final_path}: {error}"))
 }
 
-// @TODO: report errors instead of silently returning None, and handle them properly in the UI.
 pub fn read_song_metadata_v2(
     file_path: &Path,
     cover_art_cache_dir: String,
-) -> Option<SongMetadata> {
-    // Its fair to assume that if the metadata cannot be read,
-    // the file does not exist or cannot be accessed anyway
-    let metadata = fs::metadata(file_path).ok()?;
+) -> Result<SongMetadata, ReadSongMetadataError> {
+    let path = file_path.to_string_lossy().into_owned();
+    let metadata = fs::metadata(file_path).map_err(|error| match error.kind() {
+        io::ErrorKind::NotFound => ReadSongMetadataError::FileNotFound { path: path.clone() },
+        _ => ReadSongMetadataError::FileMetadataReadFailed {
+            path: path.clone(),
+            message: error.to_string(),
+        },
+    })?;
     let created_at = metadata.created().ok().and_then(|time| {
         time.duration_since(SystemTime::UNIX_EPOCH)
             .ok()
             .map(|d| d.as_millis())
     });
 
-    if let Some(extension) = file_path.extension() {
-        if let Some(ext_str) = extension.to_str() {
-            // @TODO: does this check for formats need to be extended?
-            if ext_str.eq_ignore_ascii_case("mp3")
-                || ext_str.eq_ignore_ascii_case("flac")
-                || ext_str.eq_ignore_ascii_case("wav")
-                || ext_str.eq_ignore_ascii_case("aiff")
-                || ext_str.eq_ignore_ascii_case("aif")
-                || ext_str.eq_ignore_ascii_case("ape")
-                || ext_str.eq_ignore_ascii_case("ogg")
-            // || ext_str.eq_ignore_ascii_case("opus")
-            {
-                if let Ok(tagged_file) = read_from_path(file_path) {
-                    // let id = MD5::hash(file_path.to_str().unwrap().as_bytes()).to_hex_lowercase();
-                    let path = file_path.to_string_lossy().into_owned();
-                    let file_name = file_path.file_name()?.to_string_lossy().into_owned();
-
-                    let file_info = FileInfo {
-                        duration: tagged_file.properties().duration().as_secs_f64(),
-                        channels: tagged_file.properties().channels(),
-                        bit_depth: tagged_file.properties().bit_depth().or(Some(16)),
-                        sample_rate: tagged_file.properties().sample_rate(),
-                        audio_bitrate: tagged_file.properties().audio_bitrate(),
-                        overall_bitrate: tagged_file.properties().overall_bitrate(),
-                        tag_type: if let Some(tag) = tagged_file.primary_tag() {
-                            Some(tag.tag_type().to_formatted())
-                        } else {
-                            match tagged_file.file_type() {
-                                FileType::Flac | FileType::Wav | FileType::Vorbis => {
-                                    Some("Vorbis".to_string())
-                                }
-                                FileType::Mpeg => Some("ID3v2".to_string()),
-                                FileType::Ape | FileType::Opus | FileType::Speex => None,
-                                _ => None,
-                            }
-                        },
-                        codec: tagged_file.file_type().to_formatted(),
-                    };
-
-                    let mut title = None;
-                    let mut artist = None;
-                    let mut album_title = None;
-                    let mut album_artist = None;
-                    let mut track_number = None;
-                    let mut comment = None;
-                    let mut year = None;
-                    let mut date = None;
-                    let mut genre = None;
-                    let mut label = None;
-                    let mut catalog_number = None;
-                    let mut key = None;
-                    let mut bpm = None;
-                    let mut energy = None;
-                    let mut lyrics = None;
-                    let mut extra_metadata_tags: Vec<(String, String)> = Vec::new();
-                    let primary_tag = tagged_file.primary_tag();
-                    let has_primary_tag = primary_tag.is_some();
-
-                    let mut apply_tag = |tag: &Tag, allow_overwrite: bool| {
-                        tag.items().for_each(|item| match item.key() {
-                            ItemKey::TrackTitle => {
-                                if allow_overwrite || (!has_primary_tag && title.is_none()) {
-                                    title = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::TrackArtist => {
-                                if allow_overwrite || (!has_primary_tag && artist.is_none()) {
-                                    artist = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::AlbumTitle => {
-                                if allow_overwrite || (!has_primary_tag && album_title.is_none()) {
-                                    album_title = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::AlbumArtist => {
-                                if allow_overwrite || (!has_primary_tag && album_artist.is_none()) {
-                                    album_artist = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::Genre => {
-                                if allow_overwrite || (!has_primary_tag && genre.is_none()) {
-                                    genre = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::Comment => {
-                                if allow_overwrite || (!has_primary_tag && comment.is_none()) {
-                                    comment = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::Lyrics => {
-                                if allow_overwrite || (!has_primary_tag && lyrics.is_none()) {
-                                    lyrics = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::Year => {
-                                if allow_overwrite || (!has_primary_tag && year.is_none()) {
-                                    year = item
-                                        .value()
-                                        .to_owned()
-                                        .into_string()
-                                        .and_then(|s| s.parse::<i32>().ok());
-                                }
-                            }
-                            ItemKey::ReleaseDate | ItemKey::RecordingDate => {
-                                if allow_overwrite || (!has_primary_tag && date.is_none()) {
-                                    date = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::TrackNumber => {
-                                if allow_overwrite || (!has_primary_tag && track_number.is_none()) {
-                                    track_number = item
-                                        .value()
-                                        .to_owned()
-                                        .into_string()
-                                        .and_then(|s| s.parse::<u16>().ok());
-                                }
-                            }
-                            ItemKey::CatalogNumber => {
-                                if allow_overwrite || (!has_primary_tag && catalog_number.is_none())
-                                {
-                                    catalog_number = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::Label => {
-                                if allow_overwrite || (!has_primary_tag && label.is_none()) {
-                                    label = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::InitialKey => {
-                                if allow_overwrite || (!has_primary_tag && key.is_none()) {
-                                    key = item.value().to_owned().into_string();
-                                }
-                            }
-                            ItemKey::Bpm | ItemKey::IntegerBpm => {
-                                if allow_overwrite || (!has_primary_tag && bpm.is_none()) {
-                                    bpm = item
-                                        .value()
-                                        .to_owned()
-                                        .into_string()
-                                        .and_then(|value| parse_bpm_value(&value));
-                                }
-                            }
-                            ItemKey::Unknown(field_name) => match field_name.as_str() {
-                                "ENERGY" | "ENERGYLEVEL" | "Energylevel" | "EnergyLevel" => {
-                                    if energy.is_none() {
-                                        energy = item.value().to_owned().into_string();
-                                    }
-                                }
-                                "BPM" | "TBPM" | "Bpm" | "bpm" => {
-                                    if bpm.is_none() {
-                                        bpm = item
-                                            .value()
-                                            .to_owned()
-                                            .into_string()
-                                            .and_then(|value| parse_bpm_value(&value));
-                                    }
-                                }
-                                "KEY" | "TKEY" | "INITIALKEY" | "INITIAL KEY" | "Initial key" => {
-                                    if key.is_none() {
-                                        key = item.value().to_owned().into_string();
-                                    }
-                                }
-                                "COMMENT" | "Comment" | "comment" => {
-                                    if comment.is_none() {
-                                        comment = item.value().to_owned().into_string();
-                                    }
-                                }
-                                "CATALOGUENUMBER" | "CATALOGID" | "CATALOG" | "Catalog"
-                                | "CATALOG NUMBER" | "Catalog ID" | "CATALOG #" | "Catalog #"
-                                | "CAT#" => {
-                                    if catalog_number.is_none() {
-                                        catalog_number = item.value().to_owned().into_string();
-                                    }
-                                }
-                                "LYRICS" => {
-                                    if lyrics.is_none() {
-                                        lyrics = item.value().to_owned().into_string();
-                                    }
-                                }
-                                unknown_field_name => {
-                                    extra_metadata_tags.push((
-                                        format_item_key(&ItemKey::Unknown(
-                                            unknown_field_name.to_string(),
-                                        )),
-                                        item.value().to_owned().into_string().unwrap_or_default(),
-                                    ));
-                                }
-                            },
-                            item_key => {
-                                extra_metadata_tags.push((
-                                    format_item_key(item_key),
-                                    item.value().to_owned().into_string().unwrap_or_default(),
-                                ));
-                            }
-                        });
-                    };
-
-                    if let Some(primary_tag) = primary_tag {
-                        apply_tag(primary_tag, true);
+    let tagged_file = read_from_path(file_path).map_err(|error| {
+        let extension = file_path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.to_string());
+        if !is_audio_file_extension(extension.as_deref()) {
+            ReadSongMetadataError::NotAnAudioFile {
+                path: path.clone(),
+                extension,
+            }
+        } else {
+            match error.kind() {
+                lofty::error::ErrorKind::UnsupportedTag
+                | lofty::error::ErrorKind::UnknownFormat => {
+                    ReadSongMetadataError::UnsupportedFormat {
+                        path: path.clone(),
+                        extension,
                     }
-
-                    tagged_file.tags().iter().for_each(|tag| {
-                        if primary_tag.is_some_and(|primary_tag| std::ptr::eq(primary_tag, tag)) {
-                            return;
-                        }
-
-                        apply_tag(tag, false);
-                    });
-
-                    let cover_path = tagged_file
-                        .primary_tag()
-                        .and_then(|tag| {
-                            tag.pictures().first().and_then(|cover| {
-                                let file_ext: Option<&str> = cover.mime_type().and_then(|mime| {
-                                    ImageFormat::from_lofty_mimetype(mime.clone())
-                                        .map(|format| format.extension())
-                                });
-                                if file_ext.is_none() {
-                                    eprintln!(
-                                        "Unsupported or missing MIME type for cover art in {}: {:?}",
-                                        path, cover.mime_type()
-                                    );
-                                    return None;
-                                }
-
-                                // Content-addressed filename: derived from the image bytes
-                                // rather than the song's file name. This avoids collisions
-                                // between same-named files in different folders and lets
-                                // identical artwork dedupe to a single cache entry.
-                                let digest = hex_digest(cover.data());
-                                let cover_path = format!(
-                                    "{}{}{}.{}",
-                                    cover_art_cache_dir,
-                                    separator(),
-                                    digest,
-                                    file_ext.unwrap()
-                                );
-
-                                // Identical bytes always hash to the same path, so an
-                                // existing file is guaranteed to hold the same artwork.
-                                if Path::new(&cover_path).exists() {
-                                    return Some(cover_path);
-                                }
-
-                                match fs::write(cover_path.clone(), cover.data()) {
-                                    Ok(_) => Some(cover_path),
-                                    Err(err) => {
-                                        eprintln!(
-                                            "Failed to write cover art to {}: {:?}",
-                                            cover_path, err
-                                        );
-                                        None
-                                    }
-                                }
-                            })
-                        })
-                        .or_else(|| {
-                            Path::new(&path)
-                                .parent()
-                                .and_then(|folder| folder.to_str())
-                                .and_then(get_first_image_in_folder)
-                        });
-
-                    return Some(SongMetadata {
-                        path,
-                        file_name: file_name.clone(),
-                        title: title.unwrap_or(file_name),
-                        artist,
-                        album_title,
-                        album_artist,
-                        year,
-                        genre,
-                        label,
-                        catalog_number,
-                        track: track_number,
-                        duration: Some(file_info.duration),
-                        file_info: Some(file_info),
-                        cover_path,
-                        comment,
-                        musical_key: key,
-                        bpm,
-                        lyrics,
-                        energy,
-                        date,
-                        extra_metadata: extra_metadata_tags,
-                        created_at,
-                    });
                 }
+                _ => ReadSongMetadataError::MetadataParseFailed {
+                    path: path.clone(),
+                    message: error.to_string(),
+                },
             }
         }
+    })?;
+    let file_name = file_path
+        .file_name()
+        .ok_or_else(|| ReadSongMetadataError::FileNameMissing { path: path.clone() })?
+        .to_string_lossy()
+        .into_owned();
+
+    let file_info = FileInfo {
+        duration: tagged_file.properties().duration().as_secs_f64(),
+        channels: tagged_file.properties().channels(),
+        bit_depth: tagged_file.properties().bit_depth().or(Some(16)),
+        sample_rate: tagged_file.properties().sample_rate(),
+        audio_bitrate: tagged_file.properties().audio_bitrate(),
+        overall_bitrate: tagged_file.properties().overall_bitrate(),
+        tag_type: if let Some(tag) = tagged_file.primary_tag() {
+            Some(tag.tag_type().to_formatted())
+        } else {
+            match tagged_file.file_type() {
+                FileType::Flac | FileType::Wav | FileType::Vorbis => Some("Vorbis".to_string()),
+                FileType::Mpeg => Some("ID3v2".to_string()),
+                FileType::Ape | FileType::Opus | FileType::Speex => None,
+                _ => None,
+            }
+        },
+        codec: tagged_file.file_type().to_formatted(),
+    };
+
+    let mut title = None;
+    let mut artist = None;
+    let mut album_title = None;
+    let mut album_artist = None;
+    let mut track_number = None;
+    let mut comment = None;
+    let mut year = None;
+    let mut date = None;
+    let mut genre = None;
+    let mut label = None;
+    let mut catalog_number = None;
+    let mut key = None;
+    let mut bpm = None;
+    let mut energy = None;
+    let mut lyrics = None;
+    let mut extra_metadata_tags: Vec<(String, String)> = Vec::new();
+    let primary_tag = tagged_file.primary_tag();
+    let has_primary_tag = primary_tag.is_some();
+
+    let mut apply_tag = |tag: &Tag, allow_overwrite: bool| {
+        tag.items().for_each(|item| match item.key() {
+            ItemKey::TrackTitle => {
+                if allow_overwrite || (!has_primary_tag && title.is_none()) {
+                    title = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::TrackArtist => {
+                if allow_overwrite || (!has_primary_tag && artist.is_none()) {
+                    artist = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::AlbumTitle => {
+                if allow_overwrite || (!has_primary_tag && album_title.is_none()) {
+                    album_title = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::AlbumArtist => {
+                if allow_overwrite || (!has_primary_tag && album_artist.is_none()) {
+                    album_artist = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::Genre => {
+                if allow_overwrite || (!has_primary_tag && genre.is_none()) {
+                    genre = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::Comment => {
+                if allow_overwrite || (!has_primary_tag && comment.is_none()) {
+                    comment = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::Lyrics => {
+                if allow_overwrite || (!has_primary_tag && lyrics.is_none()) {
+                    lyrics = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::Year => {
+                if allow_overwrite || (!has_primary_tag && year.is_none()) {
+                    year = item
+                        .value()
+                        .to_owned()
+                        .into_string()
+                        .and_then(|s| s.parse::<i32>().ok());
+                }
+            }
+            ItemKey::ReleaseDate | ItemKey::RecordingDate => {
+                if allow_overwrite || (!has_primary_tag && date.is_none()) {
+                    date = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::TrackNumber => {
+                if allow_overwrite || (!has_primary_tag && track_number.is_none()) {
+                    track_number = item
+                        .value()
+                        .to_owned()
+                        .into_string()
+                        .and_then(|s| s.parse::<u16>().ok());
+                }
+            }
+            ItemKey::CatalogNumber => {
+                if allow_overwrite || (!has_primary_tag && catalog_number.is_none()) {
+                    catalog_number = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::Label => {
+                if allow_overwrite || (!has_primary_tag && label.is_none()) {
+                    label = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::InitialKey => {
+                if allow_overwrite || (!has_primary_tag && key.is_none()) {
+                    key = item.value().to_owned().into_string();
+                }
+            }
+            ItemKey::Bpm | ItemKey::IntegerBpm => {
+                if allow_overwrite || (!has_primary_tag && bpm.is_none()) {
+                    bpm = item
+                        .value()
+                        .to_owned()
+                        .into_string()
+                        .and_then(|value| parse_bpm_value(&value));
+                }
+            }
+            ItemKey::Unknown(field_name) => match field_name.as_str() {
+                "ENERGY" | "ENERGYLEVEL" | "Energylevel" | "EnergyLevel" => {
+                    if energy.is_none() {
+                        energy = item.value().to_owned().into_string();
+                    }
+                }
+                "BPM" | "TBPM" | "Bpm" | "bpm" => {
+                    if bpm.is_none() {
+                        bpm = item
+                            .value()
+                            .to_owned()
+                            .into_string()
+                            .and_then(|value| parse_bpm_value(&value));
+                    }
+                }
+                "KEY" | "TKEY" | "INITIALKEY" | "INITIAL KEY" | "Initial key" => {
+                    if key.is_none() {
+                        key = item.value().to_owned().into_string();
+                    }
+                }
+                "COMMENT" | "Comment" | "comment" => {
+                    if comment.is_none() {
+                        comment = item.value().to_owned().into_string();
+                    }
+                }
+                "CATALOGUENUMBER" | "CATALOGID" | "CATALOG" | "Catalog" | "CATALOG NUMBER"
+                | "Catalog ID" | "CATALOG #" | "Catalog #" | "CAT#" => {
+                    if catalog_number.is_none() {
+                        catalog_number = item.value().to_owned().into_string();
+                    }
+                }
+                "LYRICS" => {
+                    if lyrics.is_none() {
+                        lyrics = item.value().to_owned().into_string();
+                    }
+                }
+                unknown_field_name => {
+                    extra_metadata_tags.push((
+                        format_item_key(&ItemKey::Unknown(unknown_field_name.to_string())),
+                        item.value().to_owned().into_string().unwrap_or_default(),
+                    ));
+                }
+            },
+            item_key => {
+                extra_metadata_tags.push((
+                    format_item_key(item_key),
+                    item.value().to_owned().into_string().unwrap_or_default(),
+                ));
+            }
+        });
+    };
+
+    if let Some(primary_tag) = primary_tag {
+        apply_tag(primary_tag, true);
     }
-    None
+
+    tagged_file.tags().iter().for_each(|tag| {
+        if primary_tag.is_some_and(|primary_tag| std::ptr::eq(primary_tag, tag)) {
+            return;
+        }
+
+        apply_tag(tag, false);
+    });
+
+    let cover_path = tagged_file
+        .primary_tag()
+        .and_then(|tag| {
+            tag.pictures().first().and_then(|cover| {
+                let file_ext: Option<&str> = cover.mime_type().and_then(|mime| {
+                    ImageFormat::from_lofty_mimetype(mime.clone()).map(|format| format.extension())
+                });
+                if file_ext.is_none() {
+                    eprintln!(
+                        "Unsupported or missing MIME type for cover art in {}: {:?}",
+                        path,
+                        cover.mime_type()
+                    );
+                    return None;
+                }
+
+                // Content-addressed filename: derived from the image bytes
+                // rather than the song's file name. This avoids collisions
+                // between same-named files in different folders and lets
+                // identical artwork dedupe to a single cache entry.
+                let digest = hex_digest(cover.data());
+                let cover_path = format!(
+                    "{}{}{}.{}",
+                    cover_art_cache_dir,
+                    separator(),
+                    digest,
+                    file_ext.unwrap()
+                );
+
+                // Identical bytes always hash to the same path, so an
+                // existing file is guaranteed to hold the same artwork.
+                if Path::new(&cover_path).exists() {
+                    return Some(cover_path);
+                }
+
+                match fs::write(cover_path.clone(), cover.data()) {
+                    Ok(_) => Some(cover_path),
+                    Err(err) => {
+                        eprintln!("Failed to write cover art to {}: {:?}", cover_path, err);
+                        None
+                    }
+                }
+            })
+        })
+        .or_else(|| {
+            Path::new(&path)
+                .parent()
+                .and_then(|folder| folder.to_str())
+                .and_then(get_first_image_in_folder)
+        });
+
+    Ok(SongMetadata {
+        path,
+        file_name: file_name.clone(),
+        title: title.unwrap_or(file_name),
+        artist,
+        album_title,
+        album_artist,
+        year,
+        genre,
+        label,
+        catalog_number,
+        track: track_number,
+        duration: Some(file_info.duration),
+        file_info: Some(file_info),
+        cover_path,
+        comment,
+        musical_key: key,
+        bpm,
+        lyrics,
+        energy,
+        date,
+        extra_metadata: extra_metadata_tags,
+        created_at,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_energy_update, apply_item_key_update_with_alias_removal, hex_digest, FileInfo,
-        SongMetadata, SongMetadataUpdateable,
+        apply_energy_update, apply_item_key_update_with_alias_removal, hex_digest,
+        is_audio_file_extension, is_supported_audio_file_extension, read_song_metadata_v2,
+        FileInfo, ReadSongMetadataError, SongMetadata, SongMetadataUpdateable,
     };
     use lofty::tag::{ItemKey, Tag, TagType};
 
@@ -810,6 +913,98 @@ mod tests {
 
         assert_eq!(set_value.artist, Some(Some("A".to_string())));
         assert_eq!(set_value.bpm, Some(Some(128.0)));
+    }
+
+    #[test]
+    fn read_song_metadata_reports_missing_file() {
+        let path = std::env::temp_dir().join(format!("missing-{}.flac", std::process::id()));
+        let cache_dir = std::env::temp_dir().join(format!("cache-{}", std::process::id()));
+
+        let error = read_song_metadata_v2(&path, cache_dir.to_string_lossy().into_owned())
+            .expect_err("missing file should return an error");
+
+        assert_eq!(
+            error,
+            ReadSongMetadataError::FileNotFound {
+                path: path.to_string_lossy().into_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn read_song_metadata_reports_not_audio_file() {
+        let root = std::env::temp_dir().join(format!("not-audio-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("create temp dir");
+        let path = root.join("notes.txt");
+        std::fs::write(&path, b"not audio").expect("write text file");
+
+        let error = read_song_metadata_v2(&path, root.to_string_lossy().into_owned())
+            .expect_err("text file should return an error");
+
+        assert_eq!(
+            error,
+            ReadSongMetadataError::NotAnAudioFile {
+                path: path.to_string_lossy().into_owned(),
+                extension: Some("txt".to_string())
+            }
+        );
+
+        std::fs::remove_dir_all(root).expect("remove temp dir");
+    }
+
+    #[test]
+    fn read_song_metadata_reports_unsupported_audio_format() {
+        let root = std::env::temp_dir().join(format!("unsupported-audio-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("create temp dir");
+        let path = root.join("song.wma");
+        std::fs::write(&path, b"not a valid wma, but wma is an audio extension")
+            .expect("write unsupported audio file");
+
+        let error = read_song_metadata_v2(&path, root.to_string_lossy().into_owned())
+            .expect_err("unsupported audio file should return an error");
+
+        assert_eq!(
+            error,
+            ReadSongMetadataError::UnsupportedFormat {
+                path: path.to_string_lossy().into_owned(),
+                extension: Some("wma".to_string())
+            }
+        );
+
+        std::fs::remove_dir_all(root).expect("remove temp dir");
+    }
+
+    #[test]
+    fn recognizes_lofty_supported_audio_extensions() {
+        for extension in [
+            "3gp", "aac", "afc", "aif", "aifc", "aiff", "ape", "flac", "m4a", "m4b", "m4p", "m4r",
+            "m4v", "mp+", "mp1", "mp2", "mp3", "mp4", "mpc", "mpp", "ogg", "opus", "spx", "wav",
+            "wave", "wv",
+        ] {
+            assert!(
+                is_supported_audio_file_extension(Some(extension)),
+                "{extension} should be recognized"
+            );
+        }
+
+        assert!(is_supported_audio_file_extension(Some("FLAC")));
+        assert!(!is_supported_audio_file_extension(Some("wma")));
+        assert!(!is_supported_audio_file_extension(Some("txt")));
+        assert!(!is_supported_audio_file_extension(None));
+    }
+
+    #[test]
+    fn recognizes_known_audio_extensions_for_error_classification() {
+        for extension in ["flac", "wma", "mka", "ra", "mid", "tta", "voc", "oga"] {
+            assert!(
+                is_audio_file_extension(Some(extension)),
+                "{extension} should be recognized as an audio extension"
+            );
+        }
+
+        assert!(is_audio_file_extension(Some("WMA")));
+        assert!(!is_audio_file_extension(Some("txt")));
+        assert!(!is_audio_file_extension(None));
     }
 
     #[test]

@@ -127,7 +127,7 @@ fn malformed_json_yields_invalid_request() {
 }
 
 #[test]
-fn read_file_on_missing_path_resolves_to_null() {
+fn read_file_on_missing_path_reports_file_not_found() {
     let cache_dir = std::env::temp_dir().join(format!("me-test-cache-{}", std::process::id()));
     std::fs::create_dir_all(&cache_dir).expect("create cache dir");
     let missing = cache_dir.join("does-not-exist.flac");
@@ -139,13 +139,30 @@ fn read_file_on_missing_path_resolves_to_null() {
     );
     let responses = run_engine(&[&request]);
 
-    // Contract: an unreadable / unsupported file is `null`, not an error.
     let response = find_by_id(&responses, "r1");
-    assert_eq!(response["ok"], true);
-    assert!(
-        response["result"].is_null(),
-        "expected null result, got {response:?}"
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], "FILE_NOT_FOUND");
+
+    let _ = std::fs::remove_dir_all(&cache_dir);
+}
+
+#[test]
+fn read_file_on_non_audio_path_reports_not_audio_file() {
+    let cache_dir = std::env::temp_dir().join(format!("me-test-cache-{}", std::process::id()));
+    std::fs::create_dir_all(&cache_dir).expect("create cache dir");
+    let text_file = cache_dir.join("notes.txt");
+    std::fs::write(&text_file, b"not audio").expect("write text file");
+
+    let request = format!(
+        r#"{{"type":"request","id":"r1","method":"read_file","params":{{"path":{path},"coverArtCacheDir":{cache}}}}}"#,
+        path = Value::from(text_file.to_string_lossy().to_string()),
+        cache = Value::from(cache_dir.to_string_lossy().to_string()),
     );
+    let responses = run_engine(&[&request]);
+
+    let response = find_by_id(&responses, "r1");
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], "NOT_AN_AUDIO_FILE");
 
     let _ = std::fs::remove_dir_all(&cache_dir);
 }
@@ -242,6 +259,7 @@ fn read_files_streams_item_errors_and_completes_the_batch() {
         item_error["data"]["path"],
         missing.to_string_lossy().as_ref()
     );
+    assert_eq!(item_error["data"]["code"], "FILE_NOT_FOUND");
     assert_eq!(response["result"]["count"], 0);
     assert_eq!(response["result"]["total"], 1);
 
