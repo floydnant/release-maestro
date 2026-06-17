@@ -560,7 +560,7 @@ export class LibraryBackendRepository {
                             value: issue.value,
                             lastSeenAt: scannedAt,
                             status: existingIssue.status == 'DISMISSED' ? 'DISMISSED' : 'OPEN',
-                            closedAt: null,
+                            closedAt: existingIssue.status == 'DISMISSED' ? existingIssue.closedAt : null,
                             detectorVersion: NORMALIZATION_ISSUE_DETECTOR_VERSION,
                         })
                         .where(eq(normalizationIssuesTable.id, existingIssue.id))

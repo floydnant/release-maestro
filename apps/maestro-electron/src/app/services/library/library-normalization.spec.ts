@@ -1,5 +1,5 @@
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
-import { ExternalRefs } from '../../database/drizzle.schema'
+import { ExternalRefs, NormalizationIssueType } from '../../database/drizzle.schema'
 import {
     detectNormalizationIssues,
     extractExternalRefs,
@@ -81,9 +81,9 @@ describe('library normalization', () => {
         )
 
         expect(issues.map(issue => issue.type)).toEqual([
-            'album_artist_missing',
-            'artist_looks_multi_value',
-            'artist_equals_label',
+            NormalizationIssueType.AlbumArtistMissing,
+            NormalizationIssueType.ArtistLooksMultiValue,
+            NormalizationIssueType.ArtistEqualsLabel,
         ])
     })
 })

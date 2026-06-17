@@ -14,6 +14,10 @@ import {
     genreRawNameGenresTable,
     genreRawNamesTable,
     genresTable,
+    NormalizationIssueEntityType,
+    NormalizationIssueField,
+    NormalizationIssueStatus,
+    NormalizationIssueType,
     normalizationIssuesTable,
     songArtistsTable,
     songGenresTable,
@@ -126,11 +130,11 @@ describe('LibraryBackendRepository', () => {
         ).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
-                    entityType: 'song',
-                    issueType: 'artist_looks_multi_value',
-                    field: 'artist',
+                    entityType: NormalizationIssueEntityType.Song,
+                    issueType: NormalizationIssueType.ArtistLooksMultiValue,
+                    field: NormalizationIssueField.Artist,
                     value: 'Alpha & Beta',
-                    status: 'open',
+                    status: NormalizationIssueStatus.Open,
                 }),
             ]),
         )
@@ -278,13 +282,13 @@ describe('LibraryBackendRepository', () => {
         const issue = db
             .select()
             .from(normalizationIssuesTable)
-            .where(eq(normalizationIssuesTable.issueType, 'artist_looks_multi_value'))
+            .where(eq(normalizationIssuesTable.issueType, NormalizationIssueType.ArtistLooksMultiValue))
             .get()
         if (!issue) throw new Error('expected normalization issue')
 
-        const dismissedAt = new Date('2026-06-15T10:10:00Z')
+        const closedAt = new Date('2026-06-15T10:10:00Z')
         db.update(normalizationIssuesTable)
-            .set({ status: 'dismissed', dismissedAt })
+            .set({ status: 'DISMISSED', closedAt })
             .where(eq(normalizationIssuesTable.id, issue.id))
             .run()
 
@@ -293,8 +297,8 @@ describe('LibraryBackendRepository', () => {
         expect(
             db.select().from(normalizationIssuesTable).where(eq(normalizationIssuesTable.id, issue.id)).get(),
         ).toMatchObject({
-            status: 'dismissed',
-            dismissedAt,
+            status: NormalizationIssueStatus.Dismissed,
+            closedAt,
         })
     })
 
@@ -306,7 +310,7 @@ describe('LibraryBackendRepository', () => {
         const issue = db
             .select()
             .from(normalizationIssuesTable)
-            .where(eq(normalizationIssuesTable.issueType, 'artist_looks_multi_value'))
+            .where(eq(normalizationIssuesTable.issueType, NormalizationIssueType.ArtistLooksMultiValue))
             .get()
         if (!issue) throw new Error('expected normalization issue')
 
@@ -316,8 +320,8 @@ describe('LibraryBackendRepository', () => {
         expect(
             db.select().from(normalizationIssuesTable).where(eq(normalizationIssuesTable.id, issue.id)).get(),
         ).toMatchObject({
-            status: 'disappeared',
-            disappearedAt: rescannedAt,
+            status: NormalizationIssueStatus.Disappeared,
+            closedAt: rescannedAt,
         })
     })
 })

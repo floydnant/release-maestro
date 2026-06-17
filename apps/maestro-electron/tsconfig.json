@@ -4,5 +4,14 @@
         "moduleResolution": "bundler",
         "types": ["node"]
     },
-    "include": ["**/*.ts"]
+    "files": [],
+    "include": [],
+    "references": [
+        {
+            "path": "./tsconfig.spec.json"
+        },
+        {
+            "path": "./tsconfig.app.json"
+        }
+    ]
 }

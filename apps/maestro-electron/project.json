@@ -66,6 +66,9 @@
         },
         "lint": {
             "command": "eslint apps/maestro-electron/**/*.ts"
+        },
+        "test": {
+            "command": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron ./node_modules/jest/bin/jest.js --config apps/maestro-electron/jest.config.ts"
         }
     }
 }
