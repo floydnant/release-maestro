@@ -1,5 +1,12 @@
 import nx from '@nx/eslint-plugin'
+import tailwind from 'eslint-plugin-tailwindcss'
 import { defineConfig } from 'eslint/config'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const workspaceRoot = dirname(fileURLToPath(import.meta.url))
+const tailwindConfig = join(workspaceRoot, 'apps/maestro-renderer/tailwind.config.js')
+const tailwindRules = tailwind.configs['flat/recommended'].find(config => config.rules)?.rules ?? {}
 
 export default defineConfig([
     ...nx.configs['flat/base'],
@@ -98,6 +105,20 @@ export default defineConfig([
         files: ['**/*.html'],
         rules: {
             '@angular-eslint/template/eqeqeq': 'off',
+        },
+    },
+    {
+        files: ['**/*.html', '**/*.ts'],
+        plugins: { tailwindcss: tailwind },
+        settings: {
+            tailwindcss: {
+                config: tailwindConfig,
+            },
+        },
+        rules: {
+            ...tailwindRules,
+            // Class ordering is owned by prettier-plugin-tailwindcss to avoid conflicts
+            'tailwindcss/classnames-order': 'off',
         },
     },
 ])

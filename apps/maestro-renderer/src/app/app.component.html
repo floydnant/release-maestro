@@ -1,5 +1,5 @@
-<div class="flex overflow-hidden h-screen">
-    <div class="sidebar | flex flex-col shrink-0 bg-tinted-750 w-52 px-4 py-4">
+<div class="flex h-screen overflow-hidden">
+    <div class="sidebar | flex w-52 shrink-0 flex-col bg-tinted-750 px-4 py-4">
         <nav>
             <ul class="flex flex-col gap-px">
                 <li>
@@ -29,10 +29,10 @@
             } @else if (importStatus.phase == 'processing') {
                 <app-progress-bar class="mt-4" [segments]="progressBarSegments() || []"></app-progress-bar>
 
-                <p class="mt-3 text-sm h-24 align-top overflow-y-hidden relative">
+                <p class="relative mt-3 h-24 overflow-y-hidden align-top text-sm">
                     {{ importStatus.message }}
                     <span
-                        class="absolute top-10 inset-0 bg-gradient-to-b from-transparent to-tinted-750"
+                        class="absolute inset-0 top-10 bg-gradient-to-b from-transparent to-tinted-750"
                     ></span>
                 </p>
                 <button class="btn-nkd-neutral mt-2" (click)="cancelEmailImport()">Cancel</button>
@@ -42,7 +42,7 @@
                     <app-icon
                         name="octCheckCircleFill"
                         color="submit-400"
-                        class="align-middle translate-y-px"
+                        class="translate-y-px align-middle"
                     ></app-icon>
                     Done! Processed {{ importStatus.totalProcessed }} emails, imported
                     {{ importStatus.newlyImported }} new ones.
@@ -56,7 +56,7 @@
                     <app-icon
                         name="octXCircleFill"
                         color="danger-400"
-                        class="align-middle translate-y-px"
+                        class="translate-y-px align-middle"
                     ></app-icon>
                     {{ importStatus.errorMessage }}
                 </p>
@@ -67,7 +67,7 @@
         <div class="flex h-full items-center justify-center">
             <div class="flex flex-col gap-3">
                 <button
-                    class="bg-tinted-500 p-2 rounded-md"
+                    class="rounded-md bg-tinted-500 p-2"
                     (click)="audioPlayer.isPlaying() ? audioPlayer.pause() : audioPlayer.play()"
                 >
                     {{ audioPlayer.isPlaying() ? 'PAUSE' : 'PLAY' }}

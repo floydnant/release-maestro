@@ -1,22 +1,22 @@
-<div class="snap-y snap-mandatory snap-always overflow-y-auto h-screen w-full px-3 relative">
+<div class="relative h-screen w-full snap-y snap-mandatory snap-always overflow-y-auto px-3">
     <div
         class="mx-auto max-w-[65rem]"
         style="--max-feed-item-height: min(100vh, 800px); --feed-item-padding-y: 1.5rem"
     >
         @if (!feed() && !feedError()) {
-            <div class="absolute inset-0 flex flex-col items-center justify-center -translate-y-22">
+            <div class="-translate-y-22 absolute inset-0 flex flex-col items-center justify-center">
                 <app-progress-ring [diameter]="150" [strokeWidth]="8" mode="spinning"></app-progress-ring>
-                <p class="text-tinted-300 font-bold">Loading...</p>
+                <p class="font-bold text-tinted-300">Loading...</p>
             </div>
         }
         @if (feedError()) {
             <div
-                class="max-w-64 mx-auto absolute inset-0 flex flex-col items-center justify-center -translate-y-22"
+                class="-translate-y-22 absolute inset-0 mx-auto flex max-w-64 flex-col items-center justify-center"
             >
-                <p class="text-tinted-300 font-bold">
+                <p class="font-bold text-tinted-300">
                     <app-icon name="octXCircleFill" color="danger-400" size="3rem"></app-icon>
                 </p>
-                <p class="mt-2 text-center text-danger-400 font-bold">
+                <p class="mt-2 text-center font-bold text-danger-400">
                     {{ feedError() }}
                 </p>
 
@@ -27,15 +27,15 @@
         @if (!feedError() && feed()) {
             @if (feed()?.length == 0) {
                 <div
-                    class="max-w-64 mx-auto absolute inset-0 flex flex-col items-center justify-center -translate-y-22 px-3 text-center"
+                    class="-translate-y-22 absolute inset-0 mx-auto flex max-w-64 flex-col items-center justify-center px-3 text-center"
                 >
-                    <p class="text-tinted-300 font-bold">No new releases</p>
+                    <p class="font-bold text-tinted-300">No new releases</p>
                     @if (this.feedService.hasFeed() | async) {
-                        <p class="text-tinted-400 mt-2">
+                        <p class="mt-2 text-tinted-400">
                             You're all caught up! Check back later for new releases.
                         </p>
                     } @else {
-                        <p class="text-tinted-400 mt-2">
+                        <p class="mt-2 text-tinted-400">
                             It looks like you haven't set up your feed yet. Go to
                             <a class="" routerLink="/settings">settings</a>
                             to get started.
@@ -46,7 +46,7 @@
 
             @for (feedItem of feed(); track feedItem.id) {
                 <div
-                    class="feed-entry | snap-center my-32 py-[calc(var(--feed-item-padding-y)/2)] min-h-[45vh] max-h-[var(--max-feed-item-height)] flex items-center transition-all duration-500"
+                    class="feed-entry | my-32 flex max-h-[var(--max-feed-item-height)] min-h-[45vh] snap-center items-center py-[calc(var(--feed-item-padding-y)/2)] transition-all duration-500"
                     [ngClass]="{ 'opacity-30 blur-sm': currentFeedIndex() != $index }"
                     #feedEntry
                     (intersectionChange)="onIntersectionChange($event, feedItem, $index)"
@@ -54,8 +54,8 @@
                     #emailEntryIntersection="appIntersection"
                 >
                     <!-- @TODO: handle all feed item types -->
-                    <div class="inner-container | grid gap-4 w-full grid-cols-[300px_1fr_120px] h-full">
-                        <div class="artwork-column | h-full grid grid-rows-[300px_1fr]">
+                    <div class="inner-container | grid h-full w-full grid-cols-[300px_1fr_120px] gap-4">
+                        <div class="artwork-column | grid h-full grid-rows-[300px_1fr]">
                             <img
                                 class="album-cover | aspect-square shrink-0 rounded-md"
                                 width="300px"
@@ -66,15 +66,15 @@
                             <!-- @TODO: the height on this is very fragile, keep it up to date and come up with a better approach -->
                             <!-- @TODO: we need to add the same kind of shadow effect on the scrolling list here as on the text-column -->
                             <ul
-                                class="tracks | mt-3 overflow-y-auto max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)]"
+                                class="tracks | mt-3 max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] overflow-y-auto"
                             >
                                 @for (track of feedItem.data.tracks; track $index) {
                                     <li
-                                        class="track | text-sm flex justify-between gap-2"
+                                        class="track | flex justify-between gap-2 text-sm"
                                         [attr.data-track-index]="$index"
                                         [ngClass]="{
                                             'text-tinted-400': !track.streamUrl,
-                                            'text-blue-300 font-bold':
+                                            'font-bold text-blue-300':
                                                 track.streamUrl == audioPlayer.currentUrl(),
                                             'mt-2': !$first,
                                         }"
@@ -95,12 +95,12 @@
                         </div>
 
                         <div
-                            class="text-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto flex flex-col justify-between relative"
+                            class="text-column | relative flex max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] flex-col justify-between overflow-y-auto"
                         >
                             <div class="">
                                 @if (feedItem.error; as error) {
-                                    <div class="error | flex gap-2 items-center mb-1.5">
-                                        <p class="text-tinted-300 font-bold">
+                                    <div class="error | mb-1.5 flex items-center gap-2">
+                                        <p class="font-bold text-tinted-300">
                                             <app-icon
                                                 name="octXCircleFill"
                                                 color="danger-400"
@@ -108,7 +108,7 @@
                                                 class="translate-y-[3px]"
                                             ></app-icon>
                                         </p>
-                                        <p class="text-danger-400 font-semibold">
+                                        <p class="font-semibold text-danger-400">
                                             {{ error.message || 'Error loading feed item' }}
                                         </p>
                                     </div>
@@ -127,10 +127,10 @@
                                 @if (feedItem.data.artist) {
                                     <h2 class="artist | text-sm">by {{ feedItem.data.artist }}</h2>
                                 }
-                                <div class="dates | mt-3 flex gap-2 items-center">
+                                <div class="dates | mt-3 flex items-center gap-2">
                                     @if (feedItem.data.releaseDate) {
                                         <span
-                                            class="text-xs bg-tinted-700 border border-tinted-500 rounded-full px-1.5 py-px"
+                                            class="rounded-full border border-tinted-500 bg-tinted-700 px-1.5 py-px text-xs"
                                             [title]="
                                                 isInThePast(feedItem.data.releaseDate)
                                                     ? 'released ' +
@@ -166,14 +166,14 @@
                                 ></p>
 
                                 <!-- @TODO: abstract this into a <link-meta-previews /> -->
-                                <ul class="links | text-sm mt-6 flex flex-wrap gap-1">
+                                <ul class="links | mt-6 flex flex-wrap gap-1 text-sm">
                                     @for (link of feedItem.data.links; track $index) {
-                                        <li class="w-full flex">
+                                        <li class="flex w-full">
                                             <a
                                                 [href]="link.url"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                class="flex items-center gap-1.5 bg-tinted-750 not-hover:text-tinted-400 rounded-md py-1 px-2 max-w-full truncate"
+                                                class="flex max-w-full items-center gap-1.5 truncate rounded-md bg-tinted-750 px-2 py-1 not-hover:text-tinted-400"
                                                 [title]="link.url"
                                             >
                                                 <img
@@ -191,16 +191,16 @@
                                 </ul>
                             </div>
 
-                            <div class="feed-controls | mt-4 sticky bottom-0 flex justify-end">
+                            <div class="feed-controls | sticky bottom-0 mt-4 flex justify-end">
                                 <div
-                                    class="shadow-overlay | h-full w-full z-0 bg-gradient-to-b from-transparent to-tinted-800"
+                                    class="shadow-overlay | z-0 h-full w-full bg-gradient-to-b from-transparent to-tinted-800"
                                 ></div>
 
                                 <div
-                                    class="text-xl text-tinted-400 flex bg-tinted-800 rounded-tl-xl p-2 pr-4"
+                                    class="flex rounded-tl-xl bg-tinted-800 p-2 pr-4 text-xl text-tinted-400"
                                 >
                                     <button
-                                        class="flex gap-2 items-center hover:underline"
+                                        class="flex items-center gap-2 hover:underline"
                                         (click)="toggleCurrentFeedItemSnoozedState()"
                                         [title]="
                                             snoozedFeedItems.has(feedItem.id)
@@ -232,14 +232,14 @@
                                         alt="Label image for {{ feedItem.data.band.name }}"
                                     />
                                 }
-                                <p class="text-sm font-bold mt-2">{{ feedItem.data.band.name }}</p>
+                                <p class="mt-2 text-sm font-bold">{{ feedItem.data.band.name }}</p>
                                 <p class="text-xs text-tinted-300">{{ feedItem.data.band.location }}</p>
                                 @if (feedItem.data.unsubscribeUrl) {
                                     <a
                                         [href]="feedItem.data.unsubscribeUrl"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="block mt-2.5 rounded-md py-1 px-2 text-center text-sm bg-tinted-750 not-hover:text-tinted-400 not-hover:no-underline [&_.unfollow]:not-hover:hidden [&_.following]:hover:hidden relative"
+                                        class="relative mt-2.5 block rounded-md bg-tinted-750 px-2 py-1 text-center text-sm not-hover:text-tinted-400 not-hover:no-underline [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
                                         [title]="feedItem.data.unsubscribeText"
                                     >
                                         <span class="opacity-0">Text</span>
@@ -247,11 +247,11 @@
                                         <span class="unfollow | absolute inset-0 py-1">Unfollow</span>
                                     </a>
                                 }
-                                <p class="text-xs mt-2.5">{{ feedItem.data.band.bio }}</p>
+                                <p class="mt-2.5 text-xs">{{ feedItem.data.band.bio }}</p>
 
-                                <ul class="label-links | text-xs mt-2.5">
+                                <ul class="label-links | mt-2.5 text-xs">
                                     @for (link of feedItem.data.band.links; track $index) {
-                                        <li class="leading-5 truncate">
+                                        <li class="truncate leading-5">
                                             <a
                                                 [href]="link.url"
                                                 target="_blank"
