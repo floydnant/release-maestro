@@ -15,6 +15,7 @@ import {
     WriteMetadataRequest,
 } from '@release-maestro/core'
 import { MetadataBackendService } from '../services/metadata/metadata.backend.service'
+import { LibraryBackendService } from '../services/library/library.backend.service'
 
 export default class AppEvents {
     static bootstrapAppEvents(): Electron.IpcMain {
@@ -133,15 +134,25 @@ ipcMain.handle(METADATA_IPC_CHANNELS.scan, async (event, request: ScanMetadataRe
     const abortHandler = () => abortController.abort()
     ipcMain.once(METADATA_IPC_CHANNELS.scanAbort, abortHandler)
 
-    const metadataService = await diContainer.get(MetadataBackendService)
-    const update$ = metadataService.scan(request.paths, abortController.signal)
+    const libraryService = await diContainer.get(LibraryBackendService)
+    const update$ = libraryService.scan(request.paths, abortController.signal)
 
     return new Promise<ScanResult | undefined>((resolve, reject) => {
         let summary: ScanResult | undefined
         update$.subscribe({
             next: update => {
                 event.sender.send(METADATA_IPC_CHANNELS.scanProgress, update)
-                if (update.phase == 'completed') summary = { count: update.count, total: update.total }
+                if (update.phase == 'completed') {
+                    summary = {
+                        count: update.count,
+                        total: update.total,
+                        unchanged: update.unchanged,
+                        changed: update.changed,
+                        new: update.new,
+                        missing: update.missing,
+                        errors: update.errors,
+                    }
+                }
             },
             error: err => {
                 ipcMain.removeListener(METADATA_IPC_CHANNELS.scanAbort, abortHandler)

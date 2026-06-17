@@ -1,9 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { signal } from '@angular/core'
-import { NEVER, Subject } from 'rxjs'
 import { Prettify } from '@release-maestro/core'
+import { NEVER, Subject } from 'rxjs'
 import { WebAudioPlayer } from '../app/core/services/audio-player.service'
 
 export const provideWebAudioPlayerMock = () => ({

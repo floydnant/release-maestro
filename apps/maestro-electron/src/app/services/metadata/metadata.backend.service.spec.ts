@@ -216,4 +216,85 @@ describe('MetadataBackendService', () => {
             })
         })
     })
+
+    describe('prescan', () => {
+        it('streams filesystem fact batches without injecting the artwork cache', async () => {
+            const collected = firstValueFrom(service.prescan(['/music'], undefined, 150).pipe(toArray()))
+
+            sidecar.emit({ type: 'event', requestId: 'scan-1', event: 'started', data: { total: 0 } })
+            sidecar.emit({
+                type: 'event',
+                requestId: 'scan-1',
+                event: 'batch',
+                data: {
+                    items: [
+                        {
+                            path: '/music/song.flac',
+                            fileName: 'song.flac',
+                            size: 10,
+                            modifiedAt: 1000,
+                        },
+                    ],
+                },
+            })
+            sidecar.finishScan({
+                type: 'response',
+                id: 'scan-1',
+                ok: true,
+                result: { count: 1, errors: 0 },
+            })
+
+            await expect(collected).resolves.toEqual([
+                { phase: 'started' },
+                {
+                    phase: 'batch',
+                    items: [
+                        {
+                            path: '/music/song.flac',
+                            fileName: 'song.flac',
+                            size: 10,
+                            modifiedAt: 1000,
+                        },
+                    ],
+                },
+                { phase: 'completed', count: 1, errors: 0 },
+            ])
+            expect(sidecar.startRequestCalls[0]).toEqual({
+                method: 'prescan',
+                params: { paths: ['/music'], batchSize: 150 },
+            })
+        })
+    })
+
+    describe('readFiles', () => {
+        it('streams deep metadata reads for an explicit path batch', async () => {
+            const collected = firstValueFrom(service.readFiles(['/music/song.flac']).pipe(toArray()))
+            const metadata = newSongFixture()
+
+            sidecar.emit({
+                type: 'event',
+                requestId: 'scan-1',
+                event: 'item',
+                data: { metadata },
+            })
+            sidecar.finishScan({
+                type: 'response',
+                id: 'scan-1',
+                ok: true,
+                result: { count: 1, total: 1 },
+            })
+
+            await expect(collected).resolves.toEqual([
+                { phase: 'item', metadata },
+                { phase: 'completed', count: 1, total: 1 },
+            ])
+            expect(sidecar.startRequestCalls[0]).toEqual({
+                method: 'read_files',
+                params: {
+                    paths: ['/music/song.flac'],
+                    coverArtCacheDir: CACHE_DIR,
+                },
+            })
+        })
+    })
 })

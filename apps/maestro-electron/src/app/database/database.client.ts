@@ -49,6 +49,7 @@ export class DatabaseClient {
         console.log(`Initializing database at: ${dbPath}`)
 
         this._sqlite = new Database(dbPath)
+        this._sqlite.pragma('foreign_keys = ON')
         this._db = drizzle(this._sqlite, { schema })
 
         await this.runMigrations()

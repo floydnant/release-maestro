@@ -58,6 +58,15 @@ export interface SongMetadata {
     createdAt?: number
 }
 
+/** Cheap filesystem facts emitted by the engine before any metadata parsing. */
+export interface PrescanFileFact {
+    path: string
+    fileName: string
+    size: number
+    modifiedAt: number
+    createdAt?: number
+}
+
 /**
  * Tri-state metadata write payload (mirror of the Rust `SongMetadataUpdateable`).
  *
@@ -118,7 +127,14 @@ export interface MetadataProtocolError {
     details?: unknown
 }
 
-export type MetadataMethod = 'ping' | 'read_file' | 'scan' | 'write_tags' | 'cancel'
+export type MetadataMethod =
+    | 'ping'
+    | 'read_file'
+    | 'read_files'
+    | 'prescan'
+    | 'scan'
+    | 'write_tags'
+    | 'cancel'
 
 export interface MetadataRequest<TParams = unknown> {
     type: 'request'
@@ -135,7 +151,7 @@ export interface MetadataResponse<TResult = unknown> {
     error?: MetadataProtocolError
 }
 
-export type MetadataEventName = 'started' | 'progress' | 'item' | 'item_error'
+export type MetadataEventName = 'started' | 'progress' | 'batch' | 'item' | 'item_error'
 
 export interface MetadataEvent<TData = unknown> {
     type: 'event'
@@ -164,6 +180,16 @@ export interface ScanParams {
     coverArtCacheDir: string
 }
 
+export interface PrescanParams {
+    paths: string[]
+    batchSize?: number
+}
+
+export interface ReadFilesParams {
+    paths: string[]
+    coverArtCacheDir: string
+}
+
 export interface WriteTagsParams {
     path: string
     update: SongMetadataUpdate
@@ -177,6 +203,16 @@ export interface CancelParams {
 export interface ScanResult {
     count: number
     total: number
+    unchanged?: number
+    changed?: number
+    new?: number
+    missing?: number
+    errors?: number
+}
+
+export interface PrescanResult {
+    count: number
+    errors: number
 }
 
 export interface CancelResult {
@@ -187,6 +223,10 @@ export interface CancelResult {
 
 export interface ScanStartedData {
     total: number
+}
+
+export interface PrescanBatchData {
+    items: PrescanFileFact[]
 }
 
 export interface ScanProgressData {
@@ -212,7 +252,23 @@ export type MetadataScanUpdate =
     | { phase: 'progress'; done: number; total: number }
     | { phase: 'item'; metadata: SongMetadata }
     | { phase: 'itemError'; path: string; error: string }
-    | { phase: 'completed'; count: number; total: number }
+    | {
+          phase: 'completed'
+          count: number
+          total: number
+          unchanged?: number
+          changed?: number
+          new?: number
+          missing?: number
+          errors?: number
+      }
+    | { phase: 'error'; error: MetadataProtocolError }
+
+export type MetadataPrescanUpdate =
+    | { phase: 'started' }
+    | { phase: 'batch'; items: PrescanFileFact[] }
+    | { phase: 'itemError'; path: string; error: string }
+    | { phase: 'completed'; count: number; errors: number }
     | { phase: 'error'; error: MetadataProtocolError }
 
 // ---------------------------------------------------------------------------

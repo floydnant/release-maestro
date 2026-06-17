@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine e2e e2e-show-report lint format f format-check sure affected db-generate db-push db-studio clean install version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine e2e e2e-show-report lint format f format-check sure affected db-generate db-studio db-check clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -88,12 +88,14 @@ affected: ## Run checks only on affected projects based on git changes
 	npx nx affected -t build,lint,test,e2e
 
 # Database
-db-generate: ## Generate a new drizzle migration
-	npx drizzle-kit generate
-db-push: ## Push schema changes directly (no migration)
-	npx drizzle-kit push
+drizzleCommand = mkdir -p .app-data.dev/data && DATABASE_URL=file:./.app-data.dev/data/mailbox-tool.db ELECTRON_RUN_AS_NODE=1 npx electron ./node_modules/drizzle-kit/bin.cjs
+db-generate: ## Generate a new migration with the given NAME (e.g. make db-generate NAME=add_users_table)
+	@test -n "$(NAME)" || (echo "Usage: make db-generate NAME=migration_name" && exit 1)
+	$(drizzleCommand) generate --name=$(NAME)
 db-studio: ## Open drizzle studio
-	npx drizzle-kit studio
+	$(drizzleCommand) studio 
+db-check: ## Check the database
+	$(drizzleCommand) check
 
 # Maintenance
 clean: ## Clean build outputs and caches
@@ -101,6 +103,10 @@ clean: ## Clean build outputs and caches
 	npx nx reset
 install: ## Install dependencies
 	npm install
+rebuild-electron: ## Rebuild native dependencies (e.g. after Electron version change)
+	electron-rebuild -f -w better-sqlite3
+rebuild-node: ## Rebuild native dependencies for Node.js (e.g. after Node version change)
+	npm rebuild better-sqlite3
 
 version: ## Generate changelog and update version
 	npx conventional-changelog -i CHANGELOG.md -s -r 0 && npx prettier --write CHANGELOG.md && git add CHANGELOG.md

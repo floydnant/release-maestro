@@ -88,5 +88,8 @@
             "unitTestRunner": "jest"
         }
     },
+    "tui": {
+        "enabled": false
+    },
     "defaultProject": "maestro-electron"
 }

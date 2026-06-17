@@ -1,10 +1,13 @@
 import { Observable } from 'rxjs'
 import {
     MetadataEvent,
+    MetadataPrescanUpdate,
     MetadataProtocolError,
     MetadataResponse,
     MetadataScanUpdate,
     PingResult,
+    PrescanBatchData,
+    PrescanResult,
     ScanItemData,
     ScanItemErrorData,
     ScanProgressData,
@@ -47,6 +50,8 @@ const translateScanEvent = (event: MetadataEvent): MetadataScanUpdate => {
             const { path, error } = event.data as ScanItemErrorData
             return { phase: 'itemError', path, error }
         }
+        case 'batch':
+            throw new Error('Unexpected batch event during metadata read')
     }
 }
 
@@ -80,6 +85,94 @@ export class MetadataBackendService {
             coverArtCacheDir: this.coverArtCacheDir,
         })
         return unwrap(response)
+    }
+
+    prescan(paths: string[], abortSignal?: AbortSignal, batchSize = 200): Observable<MetadataPrescanUpdate> {
+        return new Observable<MetadataPrescanUpdate>(subscriber => {
+            const { id, done } = this.sidecar.startRequest<PrescanResult>(
+                'prescan',
+                { paths, batchSize },
+                event => {
+                    switch (event.event) {
+                        case 'started':
+                            subscriber.next({ phase: 'started' })
+                            break
+                        case 'batch':
+                            subscriber.next({
+                                phase: 'batch',
+                                items: (event.data as PrescanBatchData).items,
+                            })
+                            break
+                        case 'item_error': {
+                            const { path, error } = event.data as ScanItemErrorData
+                            subscriber.next({ phase: 'itemError', path, error })
+                            break
+                        }
+                    }
+                },
+            )
+
+            const onAbort = () => void this.sidecar.send('cancel', { requestId: id })
+            abortSignal?.addEventListener('abort', onAbort, { once: true })
+
+            done.then(
+                response => {
+                    if (response.ok) {
+                        subscriber.next({
+                            phase: 'completed',
+                            count: (response.result as PrescanResult).count,
+                            errors: (response.result as PrescanResult).errors,
+                        })
+                    } else {
+                        subscriber.next({
+                            phase: 'error',
+                            error: response.error ?? {
+                                code: 'INTERNAL_ERROR',
+                                message: 'Unknown engine error',
+                            },
+                        })
+                    }
+                    subscriber.complete()
+                },
+                error => subscriber.error(error),
+            )
+
+            return () => abortSignal?.removeEventListener('abort', onAbort)
+        })
+    }
+
+    readFiles(paths: string[], abortSignal?: AbortSignal): Observable<MetadataScanUpdate> {
+        return new Observable<MetadataScanUpdate>(subscriber => {
+            const { id, done } = this.sidecar.startRequest<ScanResult>(
+                'read_files',
+                { paths, coverArtCacheDir: this.coverArtCacheDir },
+                event => subscriber.next(translateScanEvent(event)),
+            )
+
+            const onAbort = () => void this.sidecar.send('cancel', { requestId: id })
+            abortSignal?.addEventListener('abort', onAbort, { once: true })
+
+            done.then(
+                response => {
+                    if (response.ok) {
+                        const { count, total } = response.result as ScanResult
+                        subscriber.next({ phase: 'completed', count, total })
+                    } else {
+                        subscriber.next({
+                            phase: 'error',
+                            error: response.error ?? {
+                                code: 'INTERNAL_ERROR',
+                                message: 'Unknown engine error',
+                            },
+                        })
+                    }
+                    subscriber.complete()
+                },
+                error => subscriber.error(error),
+            )
+
+            return () => abortSignal?.removeEventListener('abort', onAbort)
+        })
     }
 
     /**
