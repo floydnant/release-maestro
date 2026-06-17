@@ -5,9 +5,18 @@
 //! `CARGO_BIN_EXE_metadata-engine`.
 
 use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde_json::Value;
+
+static TEMP_PATH_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn unique_temp_path(prefix: &str) -> PathBuf {
+    let sequence = TEMP_PATH_COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("{prefix}-{}-{sequence}", std::process::id()))
+}
 
 /// Spawns the engine, feeds it `requests` (one per line), closes stdin so the
 /// worker drains and exits, and returns every parsed `response` line keyed by id.
@@ -128,7 +137,7 @@ fn malformed_json_yields_invalid_request() {
 
 #[test]
 fn read_file_on_missing_path_reports_file_not_found() {
-    let cache_dir = std::env::temp_dir().join(format!("me-test-cache-{}", std::process::id()));
+    let cache_dir = unique_temp_path("me-test-cache");
     std::fs::create_dir_all(&cache_dir).expect("create cache dir");
     let missing = cache_dir.join("does-not-exist.flac");
 
@@ -148,7 +157,7 @@ fn read_file_on_missing_path_reports_file_not_found() {
 
 #[test]
 fn read_file_on_non_audio_path_reports_not_audio_file() {
-    let cache_dir = std::env::temp_dir().join(format!("me-test-cache-{}", std::process::id()));
+    let cache_dir = unique_temp_path("me-test-cache");
     std::fs::create_dir_all(&cache_dir).expect("create cache dir");
     let text_file = cache_dir.join("notes.txt");
     std::fs::write(&text_file, b"not audio").expect("write text file");
@@ -191,7 +200,7 @@ fn processes_multiple_requests_in_order_on_one_connection() {
 
 #[test]
 fn prescan_streams_supported_file_facts_in_requested_batches() {
-    let root = std::env::temp_dir().join(format!("me-prescan-{}", std::process::id()));
+    let root = unique_temp_path("me-prescan");
     std::fs::create_dir_all(&root).expect("create root");
     std::fs::write(root.join("one.flac"), b"one").expect("write audio candidate");
     std::fs::write(root.join("ignored.txt"), b"text").expect("write ignored file");
@@ -219,7 +228,7 @@ fn prescan_streams_supported_file_facts_in_requested_batches() {
 
 #[test]
 fn prescan_reports_unreadable_roots_instead_of_silently_succeeding() {
-    let missing = std::env::temp_dir().join(format!("me-prescan-missing-{}", std::process::id()));
+    let missing = unique_temp_path("me-prescan-missing");
     let request = format!(
         r#"{{"type":"request","id":"s2","method":"prescan","params":{{"paths":[{root}]}}}}"#,
         root = Value::from(missing.to_string_lossy().to_string()),
@@ -241,8 +250,8 @@ fn prescan_reports_unreadable_roots_instead_of_silently_succeeding() {
 
 #[test]
 fn read_files_streams_item_errors_and_completes_the_batch() {
-    let missing = std::env::temp_dir().join(format!("me-missing-{}.flac", std::process::id()));
-    let cache = std::env::temp_dir().join(format!("me-read-cache-{}", std::process::id()));
+    let missing = unique_temp_path("me-missing").with_extension("flac");
+    let cache = unique_temp_path("me-read-cache");
     let request = format!(
         r#"{{"type":"request","id":"r2","method":"read_files","params":{{"paths":[{path}],"coverArtCacheDir":{cache}}}}}"#,
         path = Value::from(missing.to_string_lossy().to_string()),
@@ -278,8 +287,8 @@ fn accepts_the_next_batch_immediately_after_a_terminal_response() {
     let mut stdin = child.stdin.take().expect("stdin");
     let stdout = child.stdout.take().expect("stdout");
     let mut reader = BufReader::new(stdout);
-    let cache = std::env::temp_dir().join(format!("me-sequential-cache-{}", std::process::id()));
-    let missing = std::env::temp_dir().join(format!("me-sequential-{}.flac", std::process::id()));
+    let cache = unique_temp_path("me-sequential-cache");
+    let missing = unique_temp_path("me-sequential").with_extension("flac");
 
     for id in ["batch-1", "batch-2"] {
         let request = format!(
