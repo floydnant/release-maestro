@@ -25,20 +25,20 @@ export class WebAudioPlayer {
             this.ended$.next()
         })
         this.audioElem.addEventListener('error', e => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             switch ((e.target as any)?.error.code) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 case (e.target as any)?.error.MEDIA_ERR_ABORTED:
                     break
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 case (e.target as any)?.error.MEDIA_ERR_NETWORK:
                     this.logError('A network error caused the audio download to fail.')
                     break
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 case (e.target as any)?.error.MEDIA_ERR_DECODE:
                     this.logError('The audio playback was aborted due to a decoding issue.')
                     break
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 case (e.target as any)?.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
                     this.logError(
                         'The audio could not be loaded, either because network failed or due to an issue with the format.',

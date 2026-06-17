@@ -119,6 +119,7 @@ export default defineConfig([
             ...tailwindRules,
             // Class ordering is owned by prettier-plugin-tailwindcss to avoid conflicts
             'tailwindcss/classnames-order': 'off',
+            'tailwindcss/no-custom-classname': 'off',
         },
     },
 ])

@@ -1,8 +1,8 @@
 import { inject, Injectable } from '@angular/core'
-import { fromEventPattern, map, share } from 'rxjs'
 import { EmailImportProgressUpdate, HydratedFeedItem } from '@release-maestro/core'
-import { ElectronService } from './electron/electron.service'
+import { fromEventPattern, map, share } from 'rxjs'
 import { UiSideException } from '../../shared/ui-facing.exceptions'
+import { ElectronService } from './electron/electron.service'
 
 @Injectable({
     providedIn: 'root',
@@ -26,31 +26,21 @@ export class FeedService {
     }
 
     async loadFeed(index: number, count: number): Promise<HydratedFeedItem[]> {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const result = await this.electronService.ipcRenderer.invoke('load-feed', index, count)
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (result.isError) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
             throw new UiSideException(result.message, result.userFacingMessage)
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return result
     }
 
     async hasFeed(): Promise<boolean> {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const hasFeed = await this.electronService.ipcRenderer.invoke('has-feed')
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return hasFeed
     }
 
-    markFeedItemViewed(
-        id: string,
-        feedItemType: HydratedFeedItem['type'],
-        isSnoozed: boolean = false,
-    ): Promise<void> {
+    markFeedItemViewed(id: string, feedItemType: HydratedFeedItem['type'], isSnoozed = false): Promise<void> {
         return this.electronService.ipcRenderer.invoke('mark-feed-item-viewed', id, feedItemType, isSnoozed)
     }
 }

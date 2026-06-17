@@ -75,7 +75,7 @@ e2e-show-report: ## Show the latest e2e test report
 
 # Code Quality
 lint: ## Lint all projects
-	npx nx run-many -t lint
+	npx nx run-many -t lint --output-style=stream
 format: ## Format all files
 	npx prettier --write "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"
 f: format
