@@ -136,159 +136,6 @@ pub struct SongMetadataUpdateable {
     pub file_name: Option<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{
-        apply_energy_update, apply_item_key_update_with_alias_removal, hex_digest, FileInfo,
-        SongMetadata, SongMetadataUpdateable,
-    };
-    use lofty::tag::{ItemKey, Tag, TagType};
-
-    #[test]
-    fn deserializes_missing_and_null_fields_differently() {
-        let cleared: SongMetadataUpdateable = serde_json::from_str(r#"{"artist":null,"bpm":null}"#)
-            .expect("should deserialize nulls");
-        let omitted: SongMetadataUpdateable =
-            serde_json::from_str(r#"{}"#).expect("should deserialize empty payload");
-        let set_value: SongMetadataUpdateable =
-            serde_json::from_str(r#"{"artist":"A","bpm":128}"#).expect("should deserialize values");
-
-        assert_eq!(cleared.artist, Some(None));
-        assert_eq!(cleared.bpm, Some(None));
-
-        assert_eq!(omitted.artist, None);
-        assert_eq!(omitted.bpm, None);
-
-        assert_eq!(set_value.artist, Some(Some("A".to_string())));
-        assert_eq!(set_value.bpm, Some(Some(128.0)));
-    }
-
-    #[test]
-    fn serializes_and_deserializes_musical_key_wire_name() {
-        let metadata = SongMetadata {
-            title: "Song".to_string(),
-            artist: None,
-            album_title: None,
-            album_artist: None,
-            cover_path: None,
-            year: None,
-            track: None,
-            genre: None,
-            label: None,
-            catalog_number: None,
-            duration: None,
-            comment: None,
-            musical_key: Some("Am".to_string()),
-            bpm: None,
-            energy: None,
-            lyrics: None,
-            date: None,
-            extra_metadata: vec![],
-            file_info: Some(FileInfo {
-                duration: 123.0,
-                overall_bitrate: None,
-                audio_bitrate: None,
-                sample_rate: None,
-                bit_depth: None,
-                channels: None,
-                tag_type: None,
-                codec: "FLAC".to_string(),
-            }),
-            file_name: "song.flac".to_string(),
-            path: "/music/song.flac".to_string(),
-            created_at: None,
-        };
-
-        let serialized = serde_json::to_value(metadata).expect("should serialize metadata");
-        assert_eq!(serialized["musicalKey"], "Am");
-        assert!(serialized.get("key").is_none());
-
-        let update: SongMetadataUpdateable =
-            serde_json::from_str(r#"{"musicalKey":"Gm"}"#).expect("should deserialize update");
-        assert_eq!(update.musical_key, Some(Some("Gm".to_string())));
-    }
-
-    #[test]
-    fn comment_and_lyrics_updates_remove_legacy_alias_items() {
-        let mut tag = Tag::new(TagType::Id3v2);
-        tag.insert_text(
-            ItemKey::Unknown("COMMENT".to_string()),
-            "legacy comment".to_string(),
-        );
-        tag.insert_text(
-            ItemKey::Unknown("LYRICS".to_string()),
-            "legacy lyrics".to_string(),
-        );
-
-        assert!(apply_item_key_update_with_alias_removal(
-            &mut tag,
-            ItemKey::Comment,
-            &["COMMENT"],
-            Some(Some("fresh comment".to_string())),
-        ));
-        assert!(apply_item_key_update_with_alias_removal(
-            &mut tag,
-            ItemKey::Lyrics,
-            &["LYRICS"],
-            Some(None),
-        ));
-
-        assert_eq!(tag.get_string(&ItemKey::Comment), Some("fresh comment"));
-        assert_eq!(tag.get_string(&ItemKey::Lyrics), None);
-        assert_eq!(
-            tag.get_string(&ItemKey::Unknown("COMMENT".to_string())),
-            None
-        );
-        assert_eq!(
-            tag.get_string(&ItemKey::Unknown("LYRICS".to_string())),
-            None
-        );
-    }
-
-    #[test]
-    fn energy_update_replaces_legacy_aliases() {
-        let mut tag = Tag::new(TagType::Id3v2);
-        tag.insert_text(ItemKey::Unknown("EnergyLevel".to_string()), "3".to_string());
-        tag.insert_text(ItemKey::Unknown("ENERGYLEVEL".to_string()), "5".to_string());
-
-        assert!(apply_energy_update(&mut tag, Some(Some("8".to_string()))));
-
-        assert_eq!(
-            tag.get_string(&ItemKey::Unknown("ENERGY".to_string())),
-            Some("8")
-        );
-        assert_eq!(
-            tag.get_string(&ItemKey::Unknown("EnergyLevel".to_string())),
-            None
-        );
-        assert_eq!(
-            tag.get_string(&ItemKey::Unknown("ENERGYLEVEL".to_string())),
-            None
-        );
-    }
-
-    #[test]
-    fn hex_digest_is_deterministic_and_content_addressed() {
-        // Known SHA-256 of the empty input, pinned so the cache layout is stable.
-        assert_eq!(
-            hex_digest(b""),
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        );
-
-        // Same bytes always hash to the same name (enables dedupe + skip-write);
-        // different bytes must not collide.
-        assert_eq!(hex_digest(b"cover-bytes"), hex_digest(b"cover-bytes"));
-        assert_ne!(hex_digest(b"cover-a"), hex_digest(b"cover-b"));
-
-        // Always lowercase hex of a 32-byte digest.
-        let digest = hex_digest(b"anything");
-        assert_eq!(digest.len(), 64);
-        assert!(digest
-            .chars()
-            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
-    }
-}
-
 fn format_item_key(key: &ItemKey) -> String {
     match key {
         ItemKey::Unknown(ref_key) => format!("Custom: {ref_key}"),
@@ -634,12 +481,9 @@ pub fn read_song_metadata_v2(
     file_path: &Path,
     cover_art_cache_dir: String,
 ) -> Option<SongMetadata> {
-    let metadata = match fs::metadata(file_path).ok() {
-        Some(metadata) => metadata,
-        // Its fair to assume that if the metadata cannot be read,
-        // the file does not exist or cannot be accessed anyway
-        None => return None,
-    };
+    // Its fair to assume that if the metadata cannot be read,
+    // the file does not exist or cannot be accessed anyway
+    let metadata = fs::metadata(file_path).ok()?;
     let created_at = metadata.created().ok().and_then(|time| {
         time.duration_since(SystemTime::UNIX_EPOCH)
             .ok()
@@ -658,7 +502,7 @@ pub fn read_song_metadata_v2(
                 || ext_str.eq_ignore_ascii_case("ogg")
             // || ext_str.eq_ignore_ascii_case("opus")
             {
-                if let Ok(tagged_file) = read_from_path(&file_path) {
+                if let Ok(tagged_file) = read_from_path(file_path) {
                     // let id = MD5::hash(file_path.to_str().unwrap().as_bytes()).to_hex_lowercase();
                     let path = file_path.to_string_lossy().into_owned();
                     let file_name = file_path.file_name()?.to_string_lossy().into_owned();
@@ -914,29 +758,182 @@ pub fn read_song_metadata_v2(
                         path,
                         file_name: file_name.clone(),
                         title: title.unwrap_or(file_name),
-                        artist: artist,
-                        album_title: album_title,
-                        album_artist: album_artist,
-                        year: year,
-                        genre: genre,
-                        label: label,
-                        catalog_number: catalog_number,
+                        artist,
+                        album_title,
+                        album_artist,
+                        year,
+                        genre,
+                        label,
+                        catalog_number,
                         track: track_number,
                         duration: Some(file_info.duration),
                         file_info: Some(file_info),
                         cover_path,
-                        comment: comment,
+                        comment,
                         musical_key: key,
-                        bpm: bpm,
-                        lyrics: lyrics,
-                        energy: energy,
-                        date: date,
+                        bpm,
+                        lyrics,
+                        energy,
+                        date,
                         extra_metadata: extra_metadata_tags,
-                        created_at: created_at,
+                        created_at,
                     });
                 }
             }
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        apply_energy_update, apply_item_key_update_with_alias_removal, hex_digest, FileInfo,
+        SongMetadata, SongMetadataUpdateable,
+    };
+    use lofty::tag::{ItemKey, Tag, TagType};
+
+    #[test]
+    fn deserializes_missing_and_null_fields_differently() {
+        let cleared: SongMetadataUpdateable = serde_json::from_str(r#"{"artist":null,"bpm":null}"#)
+            .expect("should deserialize nulls");
+        let omitted: SongMetadataUpdateable =
+            serde_json::from_str(r#"{}"#).expect("should deserialize empty payload");
+        let set_value: SongMetadataUpdateable =
+            serde_json::from_str(r#"{"artist":"A","bpm":128}"#).expect("should deserialize values");
+
+        assert_eq!(cleared.artist, Some(None));
+        assert_eq!(cleared.bpm, Some(None));
+
+        assert_eq!(omitted.artist, None);
+        assert_eq!(omitted.bpm, None);
+
+        assert_eq!(set_value.artist, Some(Some("A".to_string())));
+        assert_eq!(set_value.bpm, Some(Some(128.0)));
+    }
+
+    #[test]
+    fn serializes_and_deserializes_musical_key_wire_name() {
+        let metadata = SongMetadata {
+            title: "Song".to_string(),
+            artist: None,
+            album_title: None,
+            album_artist: None,
+            cover_path: None,
+            year: None,
+            track: None,
+            genre: None,
+            label: None,
+            catalog_number: None,
+            duration: None,
+            comment: None,
+            musical_key: Some("Am".to_string()),
+            bpm: None,
+            energy: None,
+            lyrics: None,
+            date: None,
+            extra_metadata: vec![],
+            file_info: Some(FileInfo {
+                duration: 123.0,
+                overall_bitrate: None,
+                audio_bitrate: None,
+                sample_rate: None,
+                bit_depth: None,
+                channels: None,
+                tag_type: None,
+                codec: "FLAC".to_string(),
+            }),
+            file_name: "song.flac".to_string(),
+            path: "/music/song.flac".to_string(),
+            created_at: None,
+        };
+
+        let serialized = serde_json::to_value(metadata).expect("should serialize metadata");
+        assert_eq!(serialized["musicalKey"], "Am");
+        assert!(serialized.get("key").is_none());
+
+        let update: SongMetadataUpdateable =
+            serde_json::from_str(r#"{"musicalKey":"Gm"}"#).expect("should deserialize update");
+        assert_eq!(update.musical_key, Some(Some("Gm".to_string())));
+    }
+
+    #[test]
+    fn comment_and_lyrics_updates_remove_legacy_alias_items() {
+        let mut tag = Tag::new(TagType::Id3v2);
+        tag.insert_text(
+            ItemKey::Unknown("COMMENT".to_string()),
+            "legacy comment".to_string(),
+        );
+        tag.insert_text(
+            ItemKey::Unknown("LYRICS".to_string()),
+            "legacy lyrics".to_string(),
+        );
+
+        assert!(apply_item_key_update_with_alias_removal(
+            &mut tag,
+            ItemKey::Comment,
+            &["COMMENT"],
+            Some(Some("fresh comment".to_string())),
+        ));
+        assert!(apply_item_key_update_with_alias_removal(
+            &mut tag,
+            ItemKey::Lyrics,
+            &["LYRICS"],
+            Some(None),
+        ));
+
+        assert_eq!(tag.get_string(&ItemKey::Comment), Some("fresh comment"));
+        assert_eq!(tag.get_string(&ItemKey::Lyrics), None);
+        assert_eq!(
+            tag.get_string(&ItemKey::Unknown("COMMENT".to_string())),
+            None
+        );
+        assert_eq!(
+            tag.get_string(&ItemKey::Unknown("LYRICS".to_string())),
+            None
+        );
+    }
+
+    #[test]
+    fn energy_update_replaces_legacy_aliases() {
+        let mut tag = Tag::new(TagType::Id3v2);
+        tag.insert_text(ItemKey::Unknown("EnergyLevel".to_string()), "3".to_string());
+        tag.insert_text(ItemKey::Unknown("ENERGYLEVEL".to_string()), "5".to_string());
+
+        assert!(apply_energy_update(&mut tag, Some(Some("8".to_string()))));
+
+        assert_eq!(
+            tag.get_string(&ItemKey::Unknown("ENERGY".to_string())),
+            Some("8")
+        );
+        assert_eq!(
+            tag.get_string(&ItemKey::Unknown("EnergyLevel".to_string())),
+            None
+        );
+        assert_eq!(
+            tag.get_string(&ItemKey::Unknown("ENERGYLEVEL".to_string())),
+            None
+        );
+    }
+
+    #[test]
+    fn hex_digest_is_deterministic_and_content_addressed() {
+        // Known SHA-256 of the empty input, pinned so the cache layout is stable.
+        assert_eq!(
+            hex_digest(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+
+        // Same bytes always hash to the same name (enables dedupe + skip-write);
+        // different bytes must not collide.
+        assert_eq!(hex_digest(b"cover-bytes"), hex_digest(b"cover-bytes"));
+        assert_ne!(hex_digest(b"cover-a"), hex_digest(b"cover-b"));
+
+        // Always lowercase hex of a 32-byte digest.
+        let digest = hex_digest(b"anything");
+        assert_eq!(digest.len(), 64);
+        assert!(digest
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    }
 }

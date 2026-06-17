@@ -608,9 +608,11 @@ fn run_scan(
                     json!({ "path": file.to_string_lossy(), "error": error.to_string() }),
                 ),
             },
-            // Non-audio / unreadable files are skipped, matching the Tauri
-            // `get_songs` behaviour which silently drops `None` results.
-            None => {}
+            None => {
+                // @TODO: distinguish between "not an audio file" and "file exists but metadata couldn't be read"
+                // Non-audio / unreadable files are skipped, matching the Tauri
+                // `get_songs` behaviour which silently drops `None` results.
+            }
         }
         emitter.event(&id, "progress", json!({ "done": done, "total": total }));
     }
