@@ -1,7 +1,7 @@
 const { createGlobPatternsForDependencies } = require('@nx/angular/tailwind')
 const { join } = require('path')
 const plugin = require('tailwindcss/plugin')
-const colors = require('../../colors.json')
+const designTokens = require('./design-tokens/tailwind.generated.json')
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -10,9 +10,15 @@ module.exports = {
         ...createGlobPatternsForDependencies(__dirname),
     ],
     theme: {
+        spacing: designTokens.spacing,
+        borderRadius: designTokens.borderRadius,
+        opacity: designTokens.opacity,
+        boxShadow: designTokens.boxShadow,
         extend: {
-            colors,
-            fontSize: { md: '0.95rem' },
+            colors: designTokens.colors,
+            fontSize: designTokens.fontSize,
+            transitionDuration: designTokens.transitionDuration,
+            transitionTimingFunction: designTokens.transitionTimingFunction,
         },
     },
     plugins: [
@@ -43,9 +49,9 @@ module.exports = {
                         'box-shadow':
                             'var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)',
 
-                        // !ring-primary-400
+                        // !ring-border-focus
                         '--tw-ring-opacity': '1 !important',
-                        '--tw-ring-color': `${colors.primary[400]} !important`,
+                        '--tw-ring-color': 'var(--color-border-focus) !important',
                     },
                 },
 

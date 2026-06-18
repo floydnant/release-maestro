@@ -1,0 +1,160 @@
+<div class="specimen | w-full overflow-y-auto p-8">
+    <header class="mx-auto max-w-[65rem]">
+        <p class="type-label-sm uppercase text-content-success">Development specimen</p>
+        <h1 class="type-hero-title mt-2">Release Maestro design system</h1>
+        <p class="type-body-md mt-4 max-w-[40rem] text-content-secondary">
+            Foundations supply values. Semantic tokens describe intent. Components consume the semantic layer.
+        </p>
+    </header>
+
+    <div class="mx-auto mt-8 grid max-w-[65rem] gap-8">
+        <section class="panel p-6">
+            <h2 class="type-section-title">Foundation colors</h2>
+            <div class="foundation-color-grid mt-4">
+                @for (column of foundationColorColumns; track column.family) {
+                    <div class="foundation-color-column">
+                        <h3 class="type-label-sm uppercase text-content-muted">{{ column.family }}</h3>
+                        <div class="mt-3 grid gap-2">
+                            @for (token of column.tokens; track token) {
+                                <div class="swatch">
+                                    <div
+                                        class="swatch__color"
+                                        [style.background]="foundationToken(token)"
+                                    ></div>
+                                    <code class="type-code-sm text-content-secondary">{{ token }}</code>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="panel p-6">
+            <h2 class="type-section-title">Semantic colors</h2>
+            <p class="type-body-sm mt-2 text-content-muted">
+                These are the color names application code should use.
+            </p>
+            <div class="swatch-grid mt-4">
+                @for (token of semanticColors; track token) {
+                    <div class="semantic-swatch" [style.background]="semanticColor(token)">
+                        <code class="type-code-sm">{{ token }}</code>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="panel p-6">
+            <h2 class="type-section-title">Contrast pairs</h2>
+            <p class="type-body-sm mt-2 text-content-muted">
+                These foreground/background pairs are validated against WCAG AA by the token generator.
+            </p>
+            <div class="contrast-pair-grid mt-4">
+                @for (pair of contrastPairs; track pair.foreground + pair.background) {
+                    <div
+                        class="contrast-pair-swatch"
+                        [style.background]="semanticColorFromIdentifier(pair.background)"
+                        [style.color]="semanticColorFromIdentifier(pair.foreground)"
+                    >
+                        <span class="type-label-sm">Aa</span>
+                        <code class="type-code-sm">{{ pair.foreground }}</code>
+                        <code class="type-code-sm text-current">on {{ pair.background }}</code>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="panel p-6">
+            <h2 class="type-section-title">Typography</h2>
+            <div class="mt-4 grid gap-4">
+                @for (token of typographyVariants; track token) {
+                    <div class="border-b border-border-subtle pb-4">
+                        <code class="type-code-sm text-content-muted">type-{{ token }}</code>
+                        <p class="mt-2" [ngClass]="'type-' + token">Music discovery for working collectors</p>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="panel p-6">
+            <h2 class="type-section-title">Spacing and size</h2>
+            <div class="token-list mt-4">
+                @for (token of spacingTokens; track token) {
+                    <div class="token-row">
+                        <code class="type-code-sm text-content-muted">{{ token }}</code>
+                        <span class="spacing-sample" [style.width]="foundationToken(token)"></span>
+                    </div>
+                }
+            </div>
+            <div class="token-list mt-6">
+                @for (token of sizeTokens; track token) {
+                    <div class="token-row">
+                        <code class="type-code-sm text-content-muted">{{ token }}</code>
+                        <span
+                            class="size-sample"
+                            [style.width]="foundationToken(token)"
+                            [style.height]="foundationToken(token)"
+                        ></span>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="panel p-6">
+            <h2 class="type-section-title">Radii, shadows, and opacity</h2>
+            <div class="sample-grid mt-4">
+                @for (token of radiusTokens; track token) {
+                    <div class="visual-sample" [style.border-radius]="foundationToken(token)">
+                        <code class="type-code-sm">{{ token }}</code>
+                    </div>
+                }
+                @for (token of shadowTokens; track token) {
+                    <div class="visual-sample" [style.box-shadow]="foundationToken(token)">
+                        <code class="type-code-sm">{{ token }}</code>
+                    </div>
+                }
+                @for (token of opacityTokens; track token) {
+                    <div class="visual-sample" [style.opacity]="foundationToken(token)">
+                        <code class="type-code-sm">{{ token }}</code>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="panel p-6">
+            <h2 class="type-section-title">Components and interaction states</h2>
+            <div class="mt-4 flex flex-wrap gap-3">
+                <button class="btn-primary">Primary action</button>
+                <button class="btn-neutral">Secondary action</button>
+                <button class="btn-nkd-neutral">Quiet action</button>
+                <button class="btn-danger">Danger action</button>
+                <button class="btn-muted">Muted action</button>
+                <button class="btn-primary" disabled>Disabled</button>
+            </div>
+            <div class="mt-6 grid max-w-xs gap-3">
+                <label class="type-label-md" for="specimen-input">Release filter</label>
+                <input
+                    id="specimen-input"
+                    class="input"
+                    placeholder="Artist, label, or release"
+                    value="Bandcamp"
+                />
+                <div class="flex gap-2">
+                    <span class="badge">Announced today</span>
+                    <span class="badge text-content-success">Hydrated</span>
+                </div>
+            </div>
+            <div class="mt-6 grid grid-cols-3 gap-4">
+                <div class="rounded-lg border border-border-subtle bg-background-canvas p-4">
+                    <code class="type-code-sm">canvas</code>
+                </div>
+                <div class="rounded-lg border border-border-subtle bg-background-surface p-4">
+                    <code class="type-code-sm">surface</code>
+                </div>
+                <div class="rounded-lg border border-border-default bg-background-elevated p-4">
+                    <code class="type-code-sm">elevated</code>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>

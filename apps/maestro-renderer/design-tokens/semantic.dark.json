@@ -1,0 +1,109 @@
+{
+    "color": {
+        "background": {
+            "canvas": "{color.neutral.900}",
+            "surface": "{color.neutral.800}",
+            "elevated": "{color.neutral.700}",
+            "overlay": "rgb(25 21 31 / 0.82)"
+        },
+        "content": {
+            "primary": "{color.neutral.100}",
+            "secondary": "{color.neutral.300}",
+            "muted": "{color.neutral.400}",
+            "inverse": "{color.neutral.900}",
+            "action": "{color.purple.200}",
+            "success": "{color.green.400}",
+            "warning": "{color.warning.300}",
+            "danger": "{color.danger.300}",
+            "info": "{color.purple.300}"
+        },
+        "border": {
+            "subtle": "{color.neutral.700}",
+            "default": "{color.neutral.600}",
+            "strong": "{color.neutral.400}",
+            "focus": "{color.purple.300}"
+        },
+        "action": {
+            "primary": "{color.purple.500}",
+            "primary-hover": "{color.purple.400}",
+            "primary-pressed": "{color.purple.600}",
+            "primary-disabled": "{color.neutral.700}",
+            "primary-content": "{color.neutral.100}",
+            "secondary": "{color.neutral.700}",
+            "secondary-hover": "{color.neutral.600}",
+            "secondary-pressed": "{color.neutral.800}",
+            "secondary-content": "{color.neutral.100}",
+            "quiet-hover": "{color.neutral.700}",
+            "quiet-pressed": "{color.neutral.800}"
+        },
+        "status": {
+            "success-background": "{color.green.900}",
+            "success-hover": "{color.green.800}",
+            "success-content": "{color.green.200}",
+            "success-border": "{color.green.600}",
+            "warning-background": "{color.warning.900}",
+            "warning-hover": "{color.warning.800}",
+            "warning-content": "{color.warning.200}",
+            "warning-border": "{color.warning.600}",
+            "danger-background": "{color.danger.900}",
+            "danger-hover": "{color.danger.800}",
+            "danger-content": "{color.danger.200}",
+            "danger-border": "{color.danger.600}",
+            "info-background": "{color.purple.900}",
+            "info-hover": "{color.purple.800}",
+            "info-content": "{color.purple.200}",
+            "info-border": "{color.purple.600}"
+        }
+    },
+    "typography": {
+        "hero-title": {
+            "family": "{typography.family.sans}",
+            "size": "{typography.size.4xl}",
+            "weight": "{typography.weight.bold}",
+            "lineHeight": "{typography.lineHeight.tight}",
+            "letterSpacing": "{typography.letterSpacing.tight}"
+        },
+        "section-title": {
+            "family": "{typography.family.sans}",
+            "size": "{typography.size.xl}",
+            "weight": "{typography.weight.semibold}",
+            "lineHeight": "{typography.lineHeight.snug}",
+            "letterSpacing": "{typography.letterSpacing.tight}"
+        },
+        "body-md": {
+            "family": "{typography.family.sans}",
+            "size": "{typography.size.md}",
+            "weight": "{typography.weight.regular}",
+            "lineHeight": "{typography.lineHeight.normal}",
+            "letterSpacing": "{typography.letterSpacing.normal}"
+        },
+        "body-sm": {
+            "family": "{typography.family.sans}",
+            "size": "{typography.size.sm}",
+            "weight": "{typography.weight.regular}",
+            "lineHeight": "{typography.lineHeight.normal}",
+            "letterSpacing": "{typography.letterSpacing.normal}"
+        },
+        "label-md": {
+            "family": "{typography.family.sans}",
+            "size": "{typography.size.sm}",
+            "weight": "{typography.weight.semibold}",
+            "lineHeight": "{typography.lineHeight.snug}",
+            "letterSpacing": "{typography.letterSpacing.wide}"
+        },
+        "label-sm": {
+            "family": "{typography.family.sans}",
+            "size": "{typography.size.xs}",
+            "weight": "{typography.weight.semibold}",
+            "lineHeight": "{typography.lineHeight.snug}",
+            "letterSpacing": "{typography.letterSpacing.caps}"
+        },
+        "code-sm": {
+            "family": "{typography.family.mono}",
+            "size": "{typography.size.sm}",
+            "weight": "{typography.weight.regular}",
+            "lineHeight": "{typography.lineHeight.normal}",
+            "letterSpacing": "{typography.letterSpacing.normal}"
+        }
+    }
+}

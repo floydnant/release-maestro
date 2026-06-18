@@ -1,0 +1,112 @@
+:host {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+}
+
+.swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: var(--foundation-spacing-3);
+}
+
+.foundation-color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: var(--foundation-spacing-4);
+}
+
+.foundation-color-column {
+    min-width: 0;
+}
+
+.swatch,
+.semantic-swatch,
+.visual-sample {
+    overflow: hidden;
+    border-radius: var(--foundation-radius-lg);
+    background: var(--color-background-elevated);
+    box-shadow: var(--shadow-elevation-low);
+}
+
+.swatch__color {
+    height: 4rem;
+}
+
+.swatch code {
+    display: block;
+    padding: var(--foundation-spacing-2);
+}
+
+.semantic-swatch {
+    min-height: 5rem;
+    padding: var(--foundation-spacing-3);
+    color: var(--color-content-primary);
+}
+
+.contrast-pair-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: var(--foundation-spacing-3);
+}
+
+.contrast-pair-swatch {
+    display: grid;
+    min-height: 7rem;
+    align-content: end;
+    gap: var(--foundation-spacing-1);
+    overflow: hidden;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--foundation-radius-lg);
+    padding: var(--foundation-spacing-3);
+}
+
+.contrast-pair-swatch .type-label-sm {
+    font-size: var(--type-section-title-size);
+    line-height: var(--type-section-title-line-height);
+}
+
+.token-list {
+    display: grid;
+    gap: var(--foundation-spacing-2);
+}
+
+.token-row {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    align-items: center;
+    min-height: var(--foundation-size-control-sm);
+}
+
+.spacing-sample {
+    display: block;
+    height: var(--foundation-spacing-2);
+    max-width: 100%;
+    background: var(--color-action-primary);
+}
+
+.size-sample {
+    display: block;
+    border: 1px solid var(--color-border-focus);
+    background: var(--color-status-info-background);
+}
+
+.sample-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: var(--foundation-spacing-4);
+}
+
+.visual-sample {
+    display: grid;
+    min-height: 6rem;
+    place-items: center;
+    padding: var(--foundation-spacing-3);
+}
+
+button:disabled {
+    cursor: not-allowed;
+    background: var(--color-action-primary-disabled);
+    color: var(--color-content-muted);
+    box-shadow: none;
+}

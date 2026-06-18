@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core'
-import { colorFrom, ColorIdentifier } from '../../colors'
+import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 export type ProgressBarSegment = {
     percent: number
-    color: ColorIdentifier
+    color: SemanticColorIdentifier
 }
 
 @Component({
@@ -24,5 +24,5 @@ export class ProgressBarComponent {
 
     shouldGlow = input<boolean>(true)
 
-    colorFrom = colorFrom
+    semanticColor = semanticColor
 }

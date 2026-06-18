@@ -1,5 +1,5 @@
 import { Component, input, Input, ViewEncapsulation } from '@angular/core'
-import { colorFrom, ColorIdentifier } from '../../colors'
+import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 @Component({
     selector: 'app-progress-ring',
@@ -18,11 +18,11 @@ export class ProgressRingComponent {
     @Input() progress = 0
     @Input() mode: 'progress' | 'spinning' = 'progress'
 
-    color = input<string | undefined, ColorIdentifier | undefined>(colorFrom('tinted-100'), {
-        transform: v => v && colorFrom(v),
+    color = input<string | undefined, SemanticColorIdentifier | undefined>(semanticColor('content.action'), {
+        transform: value => value && semanticColor(value),
     })
-    bgColor = input<string | undefined, ColorIdentifier | undefined>(colorFrom('tinted-500'), {
-        transform: v => v && colorFrom(v),
+    bgColor = input<string | undefined, SemanticColorIdentifier | undefined>(semanticColor('border.subtle'), {
+        transform: value => value && semanticColor(value),
     })
 
     get position() {

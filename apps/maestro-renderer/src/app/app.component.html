@@ -1,7 +1,9 @@
-<div class="flex h-screen overflow-hidden">
-    <div class="sidebar | flex w-52 shrink-0 flex-col bg-tinted-750 p-4">
+<div class="flex h-screen overflow-hidden bg-background-canvas">
+    <aside
+        class="sidebar | flex w-52 shrink-0 flex-col border-r border-border-subtle bg-background-surface p-4 shadow-lg"
+    >
         <nav>
-            <ul class="flex flex-col gap-px">
+            <ul class="flex flex-col gap-1">
                 <li>
                     <a
                         class="btn-nkd-neutral"
@@ -19,30 +21,37 @@
                         >Settings</a
                     >
                 </li>
+                @if (showDesignSystem) {
+                    <li>
+                        <a class="btn-nkd-neutral" routerLink="/design-system" routerLinkActive="active-link"
+                            >System</a
+                        >
+                    </li>
+                }
             </ul>
         </nav>
 
         @if (importProgress(); as importStatus) {
             @if (importStatus.phase == 'idle') {
                 <hr />
-                <button class="btn-primary" (click)="triggerEmailImport()">Import</button>
+                <button class="btn-primary" (click)="triggerEmailImport()">Import Emails</button>
             } @else if (importStatus.phase == 'processing') {
                 <app-progress-bar class="mt-4" [segments]="progressBarSegments() || []"></app-progress-bar>
 
-                <p class="relative mt-3 h-24 overflow-y-hidden align-top text-sm">
+                <p class="type-body-sm relative mt-3 h-24 overflow-y-hidden align-top text-content-secondary">
                     {{ importStatus.message }}
                     <span
-                        class="absolute inset-0 top-10 bg-gradient-to-b from-transparent to-tinted-750"
+                        class="absolute inset-0 top-10 bg-gradient-to-b from-transparent to-background-surface"
                     ></span>
                 </p>
                 <button class="btn-nkd-neutral mt-2" (click)="cancelEmailImport()">Cancel</button>
             } @else if (importStatus.phase == 'completed') {
                 <hr />
-                <p class="text-sm">
+                <p class="type-body-sm text-content-secondary">
                     <app-icon
                         name="octCheckCircleFill"
-                        color="submit-400"
-                        class="translate-y-px align-middle"
+                        color="content.success"
+                        class="translate-y-px align-middle text-content-success"
                     ></app-icon>
                     Done! Processed {{ importStatus.totalProcessed }} emails, imported
                     {{ importStatus.newlyImported }} new ones.
@@ -52,10 +61,10 @@
                 </button>
             } @else if (importStatus.phase == 'error') {
                 <app-progress-bar class="mt-4" [segments]="progressBarSegments() || []"></app-progress-bar>
-                <p class="mt-3 text-sm">
+                <p class="type-body-sm mt-3 text-content-danger">
                     <app-icon
                         name="octXCircleFill"
-                        color="danger-400"
+                        color="content.danger"
                         class="translate-y-px align-middle"
                     ></app-icon>
                     {{ importStatus.errorMessage }}
@@ -67,14 +76,16 @@
         <div class="flex h-full items-center justify-center">
             <div class="flex flex-col gap-3">
                 <button
-                    class="rounded-md bg-tinted-500 p-2"
+                    class="btn-neutral w-full"
                     (click)="audioPlayer.isPlaying() ? audioPlayer.pause() : audioPlayer.play()"
                 >
                     {{ audioPlayer.isPlaying() ? 'PAUSE' : 'PLAY' }}
                 </button>
             </div>
         </div>
-    </div>
+    </aside>
 
-    <router-outlet></router-outlet>
+    <main class="flex min-w-0 grow bg-background-canvas">
+        <router-outlet></router-outlet>
+    </main>
 </div>

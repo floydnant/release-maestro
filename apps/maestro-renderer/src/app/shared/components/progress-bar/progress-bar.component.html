@@ -6,15 +6,15 @@
     [attr.aria-valuemin]="0"
     [attr.aria-valuemax]="100"
 >
-    <div class="progress-bar | flex h-1.5 grow rounded bg-tinted-600 transition-colors">
+    <div class="progress-bar | bg-border-subtle flex h-1.5 grow rounded-full transition-colors">
         @for (segment of segments(); track $index) {
             <div
                 class="progress-segment | h-full"
                 [class.rounded-l]="$first"
                 [class.rounded-r]="$last"
                 [style.width]="segment.percent + '%'"
-                [style.background]="colorFrom(segment.color)"
-                [style.--color]="colorFrom(segment.color)"
+                [style.background]="semanticColor(segment.color)"
+                [style.--color]="semanticColor(segment.color)"
             ></div>
         }
     </div>

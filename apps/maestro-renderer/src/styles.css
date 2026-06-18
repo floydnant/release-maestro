@@ -1,3 +1,5 @@
+@import './styles/design-tokens.generated.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,14 +9,17 @@ body {
     margin: 0;
     padding: 0;
     height: 100%;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: var(--type-body-md-family);
+    font-size: var(--type-body-md-size);
+    line-height: var(--type-body-md-line-height);
 
-    background: theme('colors.tinted.800');
-    color: theme('colors.tinted.100');
+    background: theme('colors.background.canvas');
+    color: theme('colors.content.primary');
 }
 
 * {
-    scrollbar-color: theme('colors.tinted.700') transparent;
+    box-sizing: border-box;
+    scrollbar-color: theme('colors.border.default') transparent;
     scrollbar-width: thin;
 }
 @supports not (scrollbar-color: auto) {
@@ -26,39 +31,49 @@ body {
         @apply bg-transparent;
     }
     ::-webkit-scrollbar-thumb {
-        @apply rounded-full bg-tinted-700 hover:bg-tinted-600;
+        @apply rounded-full bg-border-default hover:bg-border-strong;
     }
 }
 
 @layer components {
     a:not(:where([class*='btn'])) {
-        color: #0f91ff;
+        @apply text-content-action;
         text-decoration: underline;
+        text-underline-offset: 0.18em;
     }
 
     a.active-link {
-        @apply bg-tinted-600 text-tinted-100;
+        @apply bg-action-secondary text-action-primary-content shadow-sm hover:bg-action-secondary-hover;
     }
 
     .btn {
-        @apply block rounded-md px-2 py-0.5 transition-colors duration-75;
+        @apply inline-flex items-center justify-center rounded-lg px-3 py-1.5 transition-colors duration-fast ease-standard;
+        font-family: var(--type-label-md-family);
+        font-size: var(--type-label-md-size);
+        font-weight: var(--type-label-md-weight);
+        line-height: var(--type-label-md-line-height);
+        letter-spacing: var(--type-label-md-letter-spacing);
+        /* min-height: var(--foundation-size-control-md); */
     }
     .btn-neutral {
-        @apply btn btn-nkd-neutral bg-tinted-500;
+        @apply btn bg-action-secondary text-action-secondary-content active:bg-action-secondary-pressed hover:bg-action-secondary-hover;
     }
     .btn-nkd-neutral {
-        @apply btn hover:bg-tinted-600;
+        @apply btn text-content-secondary active:bg-action-quiet-pressed hover:bg-action-quiet-hover hover:text-content-primary;
+    }
+    .btn-muted {
+        @apply btn bg-background-surface text-content-muted hover:bg-background-elevated hover:text-content-secondary;
     }
 
     .btn-primary {
-        @apply btn bg-submit-600 text-tinted-100 hover:bg-submit-700;
+        @apply btn bg-action-primary text-action-primary-content shadow-sm active:bg-action-primary-pressed hover:bg-action-primary-hover;
     }
 
     .btn-danger {
-        @apply btn bg-danger-600 text-tinted-100 hover:bg-danger-700;
+        @apply btn hover:bg-status-danger-hover border border-status-danger-border bg-status-danger-background text-status-danger-content;
     }
     .btn-nkd-danger {
-        @apply btn text-danger-400 hover:bg-tinted-600;
+        @apply btn text-content-danger hover:bg-status-danger-background;
     }
 
     input,
@@ -67,14 +82,49 @@ body {
     [contenteditable],
     a[href],
     a[tabindex] {
-        @apply accent-tinted-300 outline-none ring-tinted-300 focus-visible:ring-2;
+        @apply accent-action-primary outline-none ring-border-focus focus-visible:ring-2;
+        transition: box-shadow var(--foundation-motion-duration-fast) var(--foundation-motion-easing-standard);
     }
 
     .input {
-        @apply rounded-md border border-tinted-500 bg-transparent px-2 py-0.5 text-tinted-100 placeholder-tinted-300;
+        @apply rounded-lg border border-border-default bg-background-canvas px-3 py-1.5 text-content-primary placeholder-content-muted;
+        font-family: var(--type-body-md-family);
+        font-size: var(--type-body-md-size);
+        font-weight: var(--type-body-md-weight);
+        line-height: var(--type-body-md-line-height);
+        letter-spacing: var(--type-body-md-letter-spacing);
+        min-height: var(--foundation-size-control-md);
     }
 
     hr {
-        @apply my-3 border-tinted-600;
+        @apply my-4 border-border-subtle;
+    }
+
+    .badge {
+        @apply inline-flex items-center rounded-full border border-border-default bg-background-elevated px-2 py-1 text-content-secondary;
+        font-family: var(--type-label-sm-family);
+        font-size: var(--type-label-sm-size);
+        font-weight: var(--type-label-sm-weight);
+        line-height: var(--type-label-sm-line-height);
+        letter-spacing: var(--type-label-sm-letter-spacing);
+    }
+
+    .panel {
+        @apply rounded-lg border border-border-subtle bg-background-surface shadow-md;
+    }
+
+    .surface-elevated {
+        @apply rounded-lg border border-border-default bg-background-elevated shadow-lg;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
     }
 }

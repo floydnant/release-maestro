@@ -8,6 +8,7 @@
     "targets": {
         "build": {
             "executor": "@angular/build:application",
+            "dependsOn": ["design-tokens-check"],
             "outputs": ["{options.outputPath}"],
             "options": {
                 "outputPath": "dist/apps/maestro-renderer",
@@ -25,6 +26,16 @@
             "configurations": {
                 "production": {
                     "baseHref": "./",
+                    "fileReplacements": [
+                        {
+                            "replace": "apps/maestro-renderer/src/environments/environment.ts",
+                            "with": "apps/maestro-renderer/src/environments/environment.prod.ts"
+                        },
+                        {
+                            "replace": "apps/maestro-renderer/src/app/app.routes.ts",
+                            "with": "apps/maestro-renderer/src/app/app.routes.prod.ts"
+                        }
+                    ],
                     "budgets": [
                         {
                             "type": "initial",
@@ -71,6 +82,7 @@
         },
         "lint": {
             "executor": "@nx/eslint:lint",
+            "dependsOn": ["design-tokens-check"],
             "options": {
                 "lintFilePatterns": [
                     "apps/maestro-renderer/tailwind.config.js",
@@ -81,10 +93,37 @@
         },
         "test": {
             "executor": "@nx/jest:jest",
+            "dependsOn": ["design-tokens-check"],
             "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
             "options": {
                 "jestConfig": "apps/maestro-renderer/jest.config.ts",
                 "tsConfig": "apps/maestro-renderer/tsconfig.spec.json"
+            }
+        },
+        "design-tokens-generate": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "node apps/maestro-renderer/tools/design-tokens.cjs generate"
+            }
+        },
+        "design-tokens-watch": {
+            "executor": "nx:run-commands",
+            "continuous": true,
+            "options": {
+                "command": "node apps/maestro-renderer/tools/design-tokens.cjs watch"
+            }
+        },
+        "design-tokens-check": {
+            "executor": "nx:run-commands",
+            "dependsOn": ["design-tokens-test"],
+            "options": {
+                "command": "node apps/maestro-renderer/tools/design-tokens.cjs check"
+            }
+        },
+        "design-tokens-test": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "node --test apps/maestro-renderer/tools/design-tokens.node-test.cjs"
             }
         },
         "serve-static": {

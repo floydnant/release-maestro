@@ -22,6 +22,8 @@ import { IconComponent } from './shared/components/icon/icon.component'
     imports: [RouterModule, TranslateModule, ProgressBarComponent, IconComponent],
 })
 export class AppComponent {
+    readonly showDesignSystem = !webEnv.production
+
     constructor() {
         this.translate.setDefaultLang('en')
         console.log('webEnv', webEnv)
@@ -60,13 +62,13 @@ export class AppComponent {
         if (!progress || progress.phase === 'idle') return []
 
         if (progress.phase === 'error') {
-            return [{ percent: 100, color: 'danger-400' }]
+            return [{ percent: 100, color: 'content.danger' }]
         }
         if (progress.phase === 'completed') {
-            return [{ percent: 100, color: 'submit-400' }]
+            return [{ percent: 100, color: 'content.success' }]
         }
 
         const percent = (progress.current / progress.total) * 100
-        return [{ percent, color: 'submit-400' }]
+        return [{ percent, color: 'content.success' }]
     })
 }
