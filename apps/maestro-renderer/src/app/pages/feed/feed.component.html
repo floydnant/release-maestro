@@ -66,7 +66,7 @@
                             <!-- @TODO: the height on this is very fragile, keep it up to date and come up with a better approach -->
                             <!-- @TODO: we need to add the same kind of shadow effect on the scrolling list here as on the text-column -->
                             <ul
-                                class="tracks | mt-3 max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] overflow-y-auto"
+                                class="tracks | mt-4 max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] overflow-y-auto"
                             >
                                 @for (track of feedItem.data.tracks; track $index) {
                                     <li
@@ -124,51 +124,41 @@
                                         {{ feedItem.data.releaseName }}
                                     </a>
                                 </h1>
-                                @if (feedItem.data.artist) {
-                                    <p class="artist | type-body-sm text-content-secondary">
-                                        by {{ feedItem.data.artist }}
-                                    </p>
-                                }
-                                <div class="dates | mt-3 flex items-center gap-2">
-                                    @if (feedItem.data.releaseDate) {
-                                        <span
-                                            class="badge"
-                                            [title]="
-                                                isInThePast(feedItem.data.releaseDate)
-                                                    ? 'released ' +
-                                                      (feedItem.data.releaseDate | date) +
-                                                      ' • announced ' +
-                                                      formatDateRelative(feedItem.data.emailReceivedAt)
-                                                    : (feedItem.data.releaseDate | date)
-                                            "
-                                        >
+                                <p class="type-body-sm mt-1">
+                                    @if (feedItem.data.artist) {
+                                        <span class="artist | text-content-secondary">
+                                            by {{ feedItem.data.artist }}
+                                        </span>
+                                        <span class="text-content-muted">•</span>
+                                    }
+                                    <span
+                                        class="dates | text-content-muted"
+                                        [title]="
+                                            'released ' +
+                                            (feedItem.data.releaseDate | date) +
+                                            ', announced ' +
+                                            formatDateRelative(feedItem.data.emailReceivedAt)
+                                        "
+                                    >
+                                        @if (feedItem.data.releaseDate) {
                                             {{
                                                 isInThePast(feedItem.data.releaseDate)
                                                     ? 'released'
                                                     : 'releases'
                                             }}
-                                            {{ formatDateRelative(feedItem.data.releaseDate) }}</span
-                                        >
-                                    }
-                                    @if (
-                                        !feedItem.data.releaseDate ||
-                                        !isAfter(feedItem.data.releaseDate, feedItem.data.emailReceivedAt)
-                                    ) {
-                                        <span
-                                            class="type-body-sm text-content-muted"
-                                            [title]="feedItem.data.emailReceivedAt | date: 'medium'"
-                                            >announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
-                                        </span>
-                                    }
-                                </div>
+                                            {{ formatDateRelative(feedItem.data.releaseDate) + ', ' }}
+                                        }
+                                        announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
+                                    </span>
+                                </p>
 
                                 <p
-                                    class="about | type-body-sm mt-5 text-content-secondary"
+                                    class="about | type-body-sm mt-6 text-content-secondary"
                                     [innerHTML]="feedItem.data.about | safe: 'html'"
                                 ></p>
 
                                 <!-- @TODO: abstract this into a <link-meta-previews /> -->
-                                <ul class="links | type-body-sm mt-6 flex flex-wrap gap-1">
+                                <ul class="links | type-body-sm mt-5 flex flex-wrap gap-1">
                                     @for (link of feedItem.data.links; track $index) {
                                         <li class="flex w-full">
                                             <a

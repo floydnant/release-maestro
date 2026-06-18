@@ -3,6 +3,59 @@
     min-height: 100%;
 }
 
+.title-bar {
+    display: flex;
+    height: 2.25rem;
+    flex: 0 0 auto;
+    align-items: stretch;
+    border-bottom: 1px solid theme('colors.border.subtle');
+    background:
+        linear-gradient(
+            90deg,
+            color-mix(in srgb, theme('colors.background.surface') 94%, transparent),
+            transparent
+        ),
+        theme('colors.background.elevated');
+    color: theme('colors.content.secondary');
+    user-select: none;
+    -webkit-app-region: drag;
+}
+
+.title-bar__drag-region {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    padding-left: 0.875rem;
+}
+
+.title-bar__controls {
+    display: flex;
+    -webkit-app-region: no-drag;
+}
+
+.title-bar__button {
+    display: inline-flex;
+    width: 2.875rem;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    color: theme('colors.content.muted');
+    transition:
+        background-color var(--foundation-motion-duration-fast) var(--foundation-motion-easing-standard),
+        color var(--foundation-motion-duration-fast) var(--foundation-motion-easing-standard);
+}
+
+.title-bar__button:hover {
+    background: theme('colors.action.quiet-hover');
+    color: theme('colors.content.primary');
+}
+
+.title-bar__button--close:hover {
+    background: theme('colors.status.danger-background');
+    color: theme('colors.status.danger-content');
+}
+
 .sidebar nav a {
     width: 100%;
     justify-content: flex-start;

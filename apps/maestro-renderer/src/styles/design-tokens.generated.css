@@ -26,7 +26,7 @@
     --foundation-color-neutral-600: hsl(264 7.9% 37.1%);
     --foundation-color-neutral-700: hsl(265.7 10.1% 27.1%);
     --foundation-color-neutral-800: hsl(263.1 14% 18.2%);
-    --foundation-color-neutral-900: hsl(264 19.2% 10.2%);
+    --foundation-color-neutral-900: hsl(264 19.2% 10%);
     --foundation-color-danger-100: hsl(347 100% 95.5%);
     --foundation-color-danger-200: hsl(347.8 100% 88.4%);
     --foundation-color-danger-300: hsl(347.5 100% 78.4%);
@@ -128,7 +128,7 @@
     --color-background-overlay: rgb(25 21 31 / 0.82);
     --color-content-primary: var(--foundation-color-neutral-100);
     --color-content-secondary: var(--foundation-color-neutral-300);
-    --color-content-muted: var(--foundation-color-neutral-400);
+    --color-content-muted: var(--foundation-color-neutral-500);
     --color-content-inverse: var(--foundation-color-neutral-900);
     --color-content-action: var(--foundation-color-purple-200);
     --color-content-success: var(--foundation-color-green-400);

@@ -23,6 +23,7 @@ test('resolves aliases and emits deterministic output', () => {
 
     assert.deepEqual(generate(input), generate(input))
     assert.match(generate(input).css, /--color-content-primary: var\(--foundation-color-ink-100\)/)
+    assert.match(generate(input).electronTs, /nativeWindowBackgroundColor = "#000000"/)
 })
 
 test('rejects missing aliases', () => {

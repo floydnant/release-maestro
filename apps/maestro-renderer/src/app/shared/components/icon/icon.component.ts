@@ -1,9 +1,23 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core'
 import { provideIcons, NgIcon } from '@ng-icons/core'
-import { octCheckCircleFill, octXCircleFill } from '@ng-icons/octicons'
+import {
+    octCheckCircleFill,
+    octDash,
+    octScreenFull,
+    octScreenNormal,
+    octX,
+    octXCircleFill,
+} from '@ng-icons/octicons'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
-const icons = { octCheckCircleFill, octXCircleFill } satisfies Record<string, string>
+const icons = {
+    octCheckCircleFill,
+    octDash,
+    octScreenFull,
+    octScreenNormal,
+    octX,
+    octXCircleFill,
+} satisfies Record<string, string>
 export type IconIdentitfier = keyof typeof icons
 
 @Component({

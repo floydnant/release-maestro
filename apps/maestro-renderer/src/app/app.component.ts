@@ -22,7 +22,14 @@ import { IconComponent } from './shared/components/icon/icon.component'
     imports: [RouterModule, TranslateModule, ProgressBarComponent, IconComponent],
 })
 export class AppComponent {
+    translate = inject(TranslateService)
+    electronService = inject(ElectronService)
+    feedService = inject(FeedService)
+    audioPlayer = inject(WebAudioPlayer)
+
     readonly showDesignSystem = !webEnv.production
+    readonly isElectron = this.electronService.isElectron
+    readonly showCustomWindowControls = this.isElectron && this.electronService.platform !== 'darwin'
 
     constructor() {
         this.translate.setDefaultLang('en')
@@ -37,11 +44,6 @@ export class AppComponent {
         }
     }
 
-    translate = inject(TranslateService)
-    electronService = inject(ElectronService)
-    feedService = inject(FeedService)
-    audioPlayer = inject(WebAudioPlayer)
-
     triggerEmailImport() {
         this.feedService.triggerEmailImport().catch(err => {
             console.error('Failed to trigger email import:', err)
@@ -49,6 +51,24 @@ export class AppComponent {
     }
     cancelEmailImport() {
         this.feedService.cancelEmailImport()
+    }
+
+    minimizeWindow() {
+        this.electronService.minimizeWindow().catch(err => {
+            console.error('Failed to minimize window:', err)
+        })
+    }
+
+    toggleMaximizeWindow() {
+        this.electronService.toggleMaximizeWindow().catch(err => {
+            console.error('Failed to toggle window maximize state:', err)
+        })
+    }
+
+    closeWindow() {
+        this.electronService.closeWindow().catch(err => {
+            console.error('Failed to close window:', err)
+        })
     }
 
     importProgress_ = toSignal(
