@@ -1,9 +1,9 @@
 import { Route } from '@angular/router'
+import { webEnv } from '../environments/environment'
 import { FeedComponent } from './pages/feed/feed.component'
 import { HomeComponent } from './pages/home/home.component'
 import { PageNotFoundComponent } from './pages/page-not-found/page-not-found.component'
 import { SettingsComponent } from './pages/settings/settings.component'
-import { webEnv } from '../environments/environment'
 
 const developmentRoutes: Route[] = webEnv.production
     ? []
@@ -35,6 +35,11 @@ export const appRoutes: Route[] = [
         path: 'settings',
         component: SettingsComponent,
         children: [
+            {
+                path: 'debug',
+                loadComponent: () =>
+                    import('./pages/settings/debug/debug.component').then(m => m.DebugComponent),
+            },
             {
                 path: 'apple-mail',
                 loadComponent: () =>

@@ -164,7 +164,7 @@ describe('MetadataBackendService', () => {
                 type: 'event',
                 requestId: 'scan-1',
                 event: 'item_error',
-                data: { path: '/music/bad.flac', error: 'unsupported' },
+                data: { path: '/music/bad.flac', code: 'UNSUPPORTED_FORMAT', error: 'unsupported' },
             })
             sidecar.emit({
                 type: 'event',
@@ -183,7 +183,12 @@ describe('MetadataBackendService', () => {
                 { phase: 'started', total: 2 },
                 { phase: 'item', metadata },
                 { phase: 'progress', done: 1, total: 2 },
-                { phase: 'itemError', path: '/music/bad.flac', error: 'unsupported' },
+                {
+                    phase: 'itemError',
+                    path: '/music/bad.flac',
+                    code: 'UNSUPPORTED_FORMAT',
+                    error: 'unsupported',
+                },
                 { phase: 'progress', done: 2, total: 2 },
                 { phase: 'completed', count: 1, total: 2 },
             ])

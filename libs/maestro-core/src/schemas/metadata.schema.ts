@@ -240,6 +240,7 @@ export interface ScanItemData {
 
 export interface ScanItemErrorData {
     path: string
+    code?: MetadataErrorCode
     error: string
 }
 
@@ -251,7 +252,7 @@ export type MetadataScanUpdate =
     | { phase: 'started'; total: number }
     | { phase: 'progress'; done: number; total: number }
     | { phase: 'item'; metadata: SongMetadata }
-    | { phase: 'itemError'; path: string; error: string }
+    | { phase: 'itemError'; path: string; code?: MetadataErrorCode; error: string }
     | {
           phase: 'completed'
           count: number
@@ -267,7 +268,7 @@ export type MetadataScanUpdate =
 export type MetadataPrescanUpdate =
     | { phase: 'started' }
     | { phase: 'batch'; items: PrescanFileFact[] }
-    | { phase: 'itemError'; path: string; error: string }
+    | { phase: 'itemError'; path: string; code?: MetadataErrorCode; error: string }
     | { phase: 'completed'; count: number; errors: number }
     | { phase: 'error'; error: MetadataProtocolError }
 
