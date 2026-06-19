@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
-const { flatten, generate, resolveValue } = require('./design-tokens.cjs')
+const { flatten, generate, normalizeLineEndings, resolveValue } = require('./design-tokens.cjs')
 
 const foundations = {
     color: {
@@ -23,7 +23,7 @@ test('resolves aliases and emits deterministic output', () => {
 
     assert.deepEqual(generate(input), generate(input))
     assert.match(generate(input).css, /--color-content-primary: var\(--foundation-color-ink-100\)/)
-    assert.match(generate(input).electronTs, /nativeWindowBackgroundColor = "#000000"/)
+    assert.match(generate(input).electronTs, /nativeWindowBackgroundColor = '#000000'/)
 })
 
 test('rejects missing aliases', () => {
@@ -40,4 +40,8 @@ test('rejects duplicate flattened paths', () => {
         () => flatten({ primary: '#ffffff' }, ['color'], { 'color.primary': '#000000' }),
         /Duplicate token/,
     )
+})
+
+test('normalizes Windows line endings for generated file checks', () => {
+    assert.equal(normalizeLineEndings('alpha\r\nbeta\r\n'), 'alpha\nbeta\n')
 })
