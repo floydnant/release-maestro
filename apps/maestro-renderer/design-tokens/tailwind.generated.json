@@ -1,0 +1,165 @@
+{
+    "colors": {
+        "background": {
+            "canvas": "var(--color-background-canvas)",
+            "surface": "var(--color-background-surface)",
+            "elevated": "var(--color-background-elevated)",
+            "overlay": "var(--color-background-overlay)"
+        },
+        "content": {
+            "primary": "var(--color-content-primary)",
+            "secondary": "var(--color-content-secondary)",
+            "muted": "var(--color-content-muted)",
+            "inverse": "var(--color-content-inverse)",
+            "action": "var(--color-content-action)",
+            "success": "var(--color-content-success)",
+            "warning": "var(--color-content-warning)",
+            "danger": "var(--color-content-danger)",
+            "info": "var(--color-content-info)"
+        },
+        "border": {
+            "subtle": "var(--color-border-subtle)",
+            "default": "var(--color-border-default)",
+            "strong": "var(--color-border-strong)",
+            "focus": "var(--color-border-focus)"
+        },
+        "action": {
+            "primary": "var(--color-action-primary)",
+            "primary-hover": "var(--color-action-primary-hover)",
+            "primary-pressed": "var(--color-action-primary-pressed)",
+            "primary-disabled": "var(--color-action-primary-disabled)",
+            "primary-content": "var(--color-action-primary-content)",
+            "secondary": "var(--color-action-secondary)",
+            "secondary-hover": "var(--color-action-secondary-hover)",
+            "secondary-pressed": "var(--color-action-secondary-pressed)",
+            "secondary-content": "var(--color-action-secondary-content)",
+            "quiet-hover": "var(--color-action-quiet-hover)",
+            "quiet-pressed": "var(--color-action-quiet-pressed)"
+        },
+        "status": {
+            "success-background": "var(--color-status-success-background)",
+            "success-hover": "var(--color-status-success-hover)",
+            "success-content": "var(--color-status-success-content)",
+            "success-border": "var(--color-status-success-border)",
+            "warning-background": "var(--color-status-warning-background)",
+            "warning-hover": "var(--color-status-warning-hover)",
+            "warning-content": "var(--color-status-warning-content)",
+            "warning-border": "var(--color-status-warning-border)",
+            "danger-background": "var(--color-status-danger-background)",
+            "danger-hover": "var(--color-status-danger-hover)",
+            "danger-content": "var(--color-status-danger-content)",
+            "danger-border": "var(--color-status-danger-border)",
+            "info-background": "var(--color-status-info-background)",
+            "info-hover": "var(--color-status-info-hover)",
+            "info-content": "var(--color-status-info-content)",
+            "info-border": "var(--color-status-info-border)"
+        }
+    },
+    "spacing": {
+        "0": "var(--foundation-spacing-0)",
+        "1": "var(--foundation-spacing-1)",
+        "2": "var(--foundation-spacing-2)",
+        "3": "var(--foundation-spacing-3)",
+        "4": "var(--foundation-spacing-4)",
+        "5": "var(--foundation-spacing-5)",
+        "6": "var(--foundation-spacing-6)",
+        "8": "var(--foundation-spacing-8)",
+        "10": "var(--foundation-spacing-10)",
+        "12": "var(--foundation-spacing-12)",
+        "16": "var(--foundation-spacing-16)",
+        "22": "var(--foundation-spacing-22)",
+        "24": "var(--foundation-spacing-24)",
+        "32": "var(--foundation-spacing-32)",
+        "52": "var(--foundation-spacing-52)",
+        "64": "var(--foundation-spacing-64)",
+        "px": "var(--foundation-spacing-px)",
+        "0.5": "var(--foundation-spacing-0-5)",
+        "1.5": "var(--foundation-spacing-1-5)",
+        "2.5": "var(--foundation-spacing-2-5)"
+    },
+    "borderRadius": {
+        "none": "var(--foundation-radius-none)",
+        "sm": "var(--foundation-radius-sm)",
+        "md": "var(--foundation-radius-md)",
+        "lg": "var(--foundation-radius-lg)",
+        "xl": "var(--foundation-radius-xl)",
+        "full": "var(--foundation-radius-full)"
+    },
+    "opacity": {
+        "0": "var(--foundation-opacity-0)",
+        "30": "var(--foundation-opacity-30)",
+        "50": "var(--foundation-opacity-50)",
+        "70": "var(--foundation-opacity-70)",
+        "100": "var(--foundation-opacity-100)"
+    },
+    "boxShadow": {
+        "sm": "var(--foundation-shadow-sm)",
+        "md": "var(--foundation-shadow-md)",
+        "lg": "var(--foundation-shadow-lg)",
+        "focus": "var(--foundation-shadow-focus)",
+        "success-glow": "var(--foundation-shadow-success-glow)",
+        "danger-glow": "var(--foundation-shadow-danger-glow)"
+    },
+    "fontSize": {
+        "hero-title": [
+            "var(--type-hero-title-size)",
+            {
+                "lineHeight": "var(--type-hero-title-line-height)",
+                "letterSpacing": "var(--type-hero-title-letter-spacing)"
+            }
+        ],
+        "section-title": [
+            "var(--type-section-title-size)",
+            {
+                "lineHeight": "var(--type-section-title-line-height)",
+                "letterSpacing": "var(--type-section-title-letter-spacing)"
+            }
+        ],
+        "body-md": [
+            "var(--type-body-md-size)",
+            {
+                "lineHeight": "var(--type-body-md-line-height)",
+                "letterSpacing": "var(--type-body-md-letter-spacing)"
+            }
+        ],
+        "body-sm": [
+            "var(--type-body-sm-size)",
+            {
+                "lineHeight": "var(--type-body-sm-line-height)",
+                "letterSpacing": "var(--type-body-sm-letter-spacing)"
+            }
+        ],
+        "label-md": [
+            "var(--type-label-md-size)",
+            {
+                "lineHeight": "var(--type-label-md-line-height)",
+                "letterSpacing": "var(--type-label-md-letter-spacing)"
+            }
+        ],
+        "label-sm": [
+            "var(--type-label-sm-size)",
+            {
+                "lineHeight": "var(--type-label-sm-line-height)",
+                "letterSpacing": "var(--type-label-sm-letter-spacing)"
+            }
+        ],
+        "code-sm": [
+            "var(--type-code-sm-size)",
+            {
+                "lineHeight": "var(--type-code-sm-line-height)",
+                "letterSpacing": "var(--type-code-sm-letter-spacing)"
+            }
+        ]
+    },
+    "transitionDuration": {
+        "instant": "var(--foundation-motion-duration-instant)",
+        "fast": "var(--foundation-motion-duration-fast)",
+        "moderate": "var(--foundation-motion-duration-moderate)",
+        "slow": "var(--foundation-motion-duration-slow)",
+        "ambient": "var(--foundation-motion-duration-ambient)"
+    },
+    "transitionTimingFunction": {
+        "standard": "var(--foundation-motion-easing-standard)",
+        "emphasized": "var(--foundation-motion-easing-emphasized)"
+    }
+}

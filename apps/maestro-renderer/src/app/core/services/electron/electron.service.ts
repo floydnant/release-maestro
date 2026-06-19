@@ -58,7 +58,26 @@ export class ElectronService {
         return !!(window && window.process && window.process.type)
     }
 
+    get platform(): string | undefined {
+        if (!this.isElectron) return undefined
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (window as any).process.platform
+    }
+
     async openUrl(url: string) {
         await this.ipcRenderer.invoke('open-url', url)
+    }
+
+    async minimizeWindow() {
+        await this.ipcRenderer.invoke('window-minimize')
+    }
+
+    async toggleMaximizeWindow() {
+        return (await this.ipcRenderer.invoke('window-toggle-maximize')) as boolean
+    }
+
+    async closeWindow() {
+        await this.ipcRenderer.invoke('window-close')
     }
 }

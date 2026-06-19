@@ -3,19 +3,6 @@ import { FeedComponent } from './pages/feed/feed.component'
 import { HomeComponent } from './pages/home/home.component'
 import { PageNotFoundComponent } from './pages/page-not-found/page-not-found.component'
 import { SettingsComponent } from './pages/settings/settings.component'
-import { webEnv } from '../environments/environment'
-
-const developmentRoutes: Route[] = webEnv.production
-    ? []
-    : [
-          {
-              path: 'design-system',
-              loadComponent: () =>
-                  import('./pages/design-system/design-system.component').then(
-                      module => module.DesignSystemComponent,
-                  ),
-          },
-      ]
 
 export const appRoutes: Route[] = [
     {
@@ -39,12 +26,11 @@ export const appRoutes: Route[] = [
                 path: 'apple-mail',
                 loadComponent: () =>
                     import('./pages/settings/importers/apple-mail/apple-mail.component').then(
-                        m => m.AppleMailImporterComponent,
+                        module => module.AppleMailImporterComponent,
                     ),
             },
         ],
     },
-    ...developmentRoutes,
     {
         path: '**',
         component: PageNotFoundComponent,

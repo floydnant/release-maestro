@@ -1,0 +1,13 @@
+[
+    ["content.primary", "background.canvas"],
+    ["content.primary", "background.surface"],
+    ["content.secondary", "background.canvas"],
+    ["content.secondary", "background.surface"],
+    ["content.muted", "background.canvas"],
+    ["content.action", "background.canvas"],
+    ["action.primary-content", "action.primary"],
+    ["status.success-content", "status.success-background"],
+    ["status.warning-content", "status.warning-background"],
+    ["status.danger-content", "status.danger-background"],
+    ["status.info-content", "status.info-background"]
+]

@@ -1,9 +1,23 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core'
 import { provideIcons, NgIcon } from '@ng-icons/core'
-import { octCheckCircleFill, octXCircleFill } from '@ng-icons/octicons'
-import { colorFrom, ColorIdentifier } from '../../colors'
+import {
+    octCheckCircleFill,
+    octDash,
+    octScreenFull,
+    octScreenNormal,
+    octX,
+    octXCircleFill,
+} from '@ng-icons/octicons'
+import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
-const icons = { octCheckCircleFill, octXCircleFill } satisfies Record<string, string>
+const icons = {
+    octCheckCircleFill,
+    octDash,
+    octScreenFull,
+    octScreenNormal,
+    octX,
+    octXCircleFill,
+} satisfies Record<string, string>
 export type IconIdentitfier = keyof typeof icons
 
 @Component({
@@ -20,8 +34,8 @@ export type IconIdentitfier = keyof typeof icons
 })
 export class IconComponent {
     name = input.required<IconIdentitfier>()
-    color = input<string | undefined, ColorIdentifier | undefined>(undefined, {
-        transform: v => v && colorFrom(v),
+    color = input<string | undefined, SemanticColorIdentifier | undefined>(undefined, {
+        transform: value => value && semanticColor(value),
     })
     strokeWidth = input<number | undefined>()
     size = input<string>('')

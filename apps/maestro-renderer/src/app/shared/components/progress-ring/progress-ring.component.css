@@ -1,5 +1,6 @@
 .progress-ring {
-    transition: stroke-dashoffset 0.4s;
+    transition: stroke-dashoffset var(--foundation-motion-duration-slow)
+        var(--foundation-motion-easing-standard);
     --rotation: -90deg;
     transform: rotate(var(--rotation));
     transform-origin: 50% 50%;
@@ -9,7 +10,7 @@
     --rotation: -270deg;
 }
 .progress-ring.spin {
-    animation: custom-spin 700ms linear infinite;
+    animation: custom-spin var(--foundation-motion-duration-ambient) linear infinite;
 }
 
 @keyframes custom-spin {

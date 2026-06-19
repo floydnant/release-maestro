@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine e2e e2e-show-report lint format f format-check sure affected db-generate db-studio db-check clean install rebuild-electron rebuild-node version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-show-report lint format f format-check sure affected db-generate db-studio db-check clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -66,6 +66,12 @@ test-electron: ## Run electron backend tests
 	npx nx test maestro-electron
 test-renderer: ## Run renderer tests
 	npx nx test maestro-renderer
+design-tokens: ## Generate renderer design-token artifacts
+	npx nx run maestro-renderer:design-tokens-generate
+design-tokens-watch: ## Regenerate renderer design-token artifacts when token files change
+	npx nx run maestro-renderer:design-tokens-watch
+design-tokens-check: ## Test and verify renderer design-token artifacts
+	npx nx run maestro-renderer:design-tokens-check
 test-engine: ## Run metadata-engine (Rust) tests
 	npx nx test metadata-engine
 

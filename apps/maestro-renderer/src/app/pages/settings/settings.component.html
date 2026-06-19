@@ -1,14 +1,18 @@
-<div class="grid w-full grid-cols-[13rem_1fr]">
-    <div class="border-r border-tinted-750 p-4">
+<div class="grid w-full grid-cols-[13rem_1fr] bg-background-canvas">
+    <div class="border-r border-border-subtle bg-background-surface p-4">
+        <p class="type-label-sm mb-3 text-content-muted">Import sources</p>
         <ul class="">
             <li>
-                <a routerLink="apple-mail" routerLinkActive="active-link" class="btn-nkd-neutral"
+                <a
+                    routerLink="apple-mail"
+                    routerLinkActive="active-link"
+                    class="btn-nkd-neutral block w-full text-left"
                     >Apple Mail</a
                 >
             </li>
         </ul>
     </div>
-    <div class="p-4">
+    <div class="p-6">
         <router-outlet></router-outlet>
     </div>
 </div>

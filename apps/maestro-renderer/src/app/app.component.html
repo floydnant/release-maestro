@@ -1,80 +1,139 @@
-<div class="flex h-screen overflow-hidden">
-    <div class="sidebar | flex w-52 shrink-0 flex-col bg-tinted-750 p-4">
-        <nav>
-            <ul class="flex flex-col gap-px">
-                <li>
-                    <a
-                        class="btn-nkd-neutral"
-                        routerLink="/home"
-                        routerLinkActive="active-link"
-                        [routerLinkActiveOptions]="{ exact: true }"
-                        >Home</a
-                    >
-                </li>
-                <li>
-                    <a class="btn-nkd-neutral" routerLink="/feed" routerLinkActive="active-link">Feed</a>
-                </li>
-                <li>
-                    <a class="btn-nkd-neutral" routerLink="/settings" routerLinkActive="active-link"
-                        >Settings</a
-                    >
-                </li>
-            </ul>
-        </nav>
+<div class="app-shell flex h-screen flex-col overflow-hidden bg-background-canvas">
+    @if (isElectron) {
+        <header class="title-bar">
+            <div class="title-bar__drag-region"></div>
 
-        @if (importProgress(); as importStatus) {
-            @if (importStatus.phase == 'idle') {
-                <hr />
-                <button class="btn-primary" (click)="triggerEmailImport()">Import</button>
-            } @else if (importStatus.phase == 'processing') {
-                <app-progress-bar class="mt-4" [segments]="progressBarSegments() || []"></app-progress-bar>
-
-                <p class="relative mt-3 h-24 overflow-y-hidden align-top text-sm">
-                    {{ importStatus.message }}
-                    <span
-                        class="absolute inset-0 top-10 bg-gradient-to-b from-transparent to-tinted-750"
-                    ></span>
-                </p>
-                <button class="btn-nkd-neutral mt-2" (click)="cancelEmailImport()">Cancel</button>
-            } @else if (importStatus.phase == 'completed') {
-                <hr />
-                <p class="text-sm">
-                    <app-icon
-                        name="octCheckCircleFill"
-                        color="submit-400"
-                        class="translate-y-px align-middle"
-                    ></app-icon>
-                    Done! Processed {{ importStatus.totalProcessed }} emails, imported
-                    {{ importStatus.newlyImported }} new ones.
-                </p>
-                <button class="btn-neutral mt-2" (click)="this.importProgress.set({ phase: 'idle' })">
-                    Cool
-                </button>
-            } @else if (importStatus.phase == 'error') {
-                <app-progress-bar class="mt-4" [segments]="progressBarSegments() || []"></app-progress-bar>
-                <p class="mt-3 text-sm">
-                    <app-icon
-                        name="octXCircleFill"
-                        color="danger-400"
-                        class="translate-y-px align-middle"
-                    ></app-icon>
-                    {{ importStatus.errorMessage }}
-                </p>
-                <button class="btn-primary mt-2" (click)="triggerEmailImport()">Retry</button>
+            @if (showCustomWindowControls) {
+                <div class="title-bar__controls">
+                    <button
+                        class="title-bar__button"
+                        type="button"
+                        title="Minimize"
+                        (click)="minimizeWindow()"
+                    >
+                        <app-icon name="octDash" size="14"></app-icon>
+                    </button>
+                    <button
+                        class="title-bar__button"
+                        type="button"
+                        title="Maximize"
+                        (click)="toggleMaximizeWindow()"
+                    >
+                        <app-icon name="octScreenFull" size="14"></app-icon>
+                    </button>
+                    <button
+                        class="title-bar__button title-bar__button--close"
+                        type="button"
+                        title="Close"
+                        (click)="closeWindow()"
+                    >
+                        <app-icon name="octX" size="14"></app-icon>
+                    </button>
+                </div>
             }
-        }
+        </header>
+    }
 
-        <div class="flex h-full items-center justify-center">
-            <div class="flex flex-col gap-3">
-                <button
-                    class="rounded-md bg-tinted-500 p-2"
-                    (click)="audioPlayer.isPlaying() ? audioPlayer.pause() : audioPlayer.play()"
-                >
-                    {{ audioPlayer.isPlaying() ? 'PAUSE' : 'PLAY' }}
-                </button>
+    <div class="flex min-h-0 grow overflow-hidden">
+        <aside
+            class="sidebar | flex w-52 shrink-0 flex-col border-r border-border-subtle bg-background-surface p-4 shadow-lg"
+        >
+            <nav>
+                <ul class="flex flex-col gap-1">
+                    <li>
+                        <a
+                            class="btn-nkd-neutral"
+                            routerLink="/home"
+                            routerLinkActive="active-link"
+                            [routerLinkActiveOptions]="{ exact: true }"
+                            >Home</a
+                        >
+                    </li>
+                    <li>
+                        <a class="btn-nkd-neutral" routerLink="/feed" routerLinkActive="active-link">Feed</a>
+                    </li>
+                    <li>
+                        <a class="btn-nkd-neutral" routerLink="/settings" routerLinkActive="active-link"
+                            >Settings</a
+                        >
+                    </li>
+                    @if (showDesignSystem) {
+                        <li>
+                            <a
+                                class="btn-nkd-neutral"
+                                routerLink="/design-system"
+                                routerLinkActive="active-link"
+                                >System</a
+                            >
+                        </li>
+                    }
+                </ul>
+            </nav>
+
+            @if (importProgress(); as importStatus) {
+                @if (importStatus.phase == 'idle') {
+                    <hr />
+                    <button class="btn-neutral" (click)="triggerEmailImport()">Import Emails</button>
+                } @else if (importStatus.phase == 'processing') {
+                    <app-progress-bar
+                        class="mt-4"
+                        [segments]="progressBarSegments() || []"
+                    ></app-progress-bar>
+
+                    <p
+                        class="type-body-sm relative mt-3 h-24 overflow-y-hidden align-top text-content-secondary"
+                    >
+                        {{ importStatus.message }}
+                        <span
+                            class="absolute inset-0 top-10 bg-gradient-to-b from-transparent to-background-surface"
+                        ></span>
+                    </p>
+                    <button class="btn-nkd-neutral mt-2" (click)="cancelEmailImport()">Cancel</button>
+                } @else if (importStatus.phase == 'completed') {
+                    <hr />
+                    <p class="type-body-sm text-content-success">
+                        <app-icon
+                            name="octCheckCircleFill"
+                            color="content.success"
+                            class="translate-y-px align-middle text-content-success"
+                        ></app-icon>
+                        Done! Processed {{ importStatus.totalProcessed }} emails, imported
+                        {{ importStatus.newlyImported }} new ones.
+                    </p>
+                    <button class="btn-neutral mt-2" (click)="this.importProgress.set({ phase: 'idle' })">
+                        Cool
+                    </button>
+                } @else if (importStatus.phase == 'error') {
+                    <app-progress-bar
+                        class="mt-4"
+                        [segments]="progressBarSegments() || []"
+                    ></app-progress-bar>
+                    <p class="type-body-sm mt-3 text-content-danger">
+                        <app-icon
+                            name="octXCircleFill"
+                            color="content.danger"
+                            class="translate-y-px align-middle"
+                        ></app-icon>
+                        {{ importStatus.errorMessage }}
+                    </p>
+                    <button class="btn-primary mt-2" (click)="triggerEmailImport()">Retry</button>
+                }
+            }
+
+            <div class="flex h-full items-center justify-center">
+                <div class="flex flex-col gap-3">
+                    <button
+                        class="btn-neutral w-full"
+                        (click)="audioPlayer.isPlaying() ? audioPlayer.pause() : audioPlayer.play()"
+                    >
+                        {{ audioPlayer.isPlaying() ? 'PAUSE' : 'PLAY' }}
+                    </button>
+                </div>
             </div>
-        </div>
-    </div>
+        </aside>
 
-    <router-outlet></router-outlet>
+        <main class="flex min-h-0 min-w-0 grow overflow-hidden bg-background-canvas">
+            <router-outlet></router-outlet>
+        </main>
+    </div>
 </div>
