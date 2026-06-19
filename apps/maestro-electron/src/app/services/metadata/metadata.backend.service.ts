@@ -47,8 +47,8 @@ const translateScanEvent = (event: MetadataEvent): MetadataScanUpdate => {
         case 'item':
             return { phase: 'item', metadata: (event.data as ScanItemData).metadata }
         case 'item_error': {
-            const { path, error } = event.data as ScanItemErrorData
-            return { phase: 'itemError', path, error }
+            const { path, code, error } = event.data as ScanItemErrorData
+            return { phase: 'itemError', path, code, error }
         }
         case 'batch':
             throw new Error('Unexpected batch event during metadata read')
@@ -104,8 +104,8 @@ export class MetadataBackendService {
                             })
                             break
                         case 'item_error': {
-                            const { path, error } = event.data as ScanItemErrorData
-                            subscriber.next({ phase: 'itemError', path, error })
+                            const { path, code, error } = event.data as ScanItemErrorData
+                            subscriber.next({ phase: 'itemError', path, code, error })
                             break
                         }
                     }

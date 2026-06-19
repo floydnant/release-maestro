@@ -73,6 +73,7 @@ export class LibraryBackendService {
                                 subscriber.next({
                                     phase: 'itemError',
                                     path: update.metadata.path,
+                                    code: 'INTERNAL_ERROR',
                                     error: 'Prescan facts missing for metadata result',
                                 })
                             } else {
