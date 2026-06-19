@@ -119,14 +119,14 @@
                                         [href]="feedItem.data.releaseUrl"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="text-content-primary transition-colors duration-fast hover:text-content-action not-hover:no-underline"
+                                        class="select-text text-content-primary transition-colors duration-fast hover:text-content-action not-hover:no-underline"
                                     >
                                         {{ feedItem.data.releaseName }}
                                     </a>
                                 </h1>
                                 <p class="type-body-sm mt-1">
                                     @if (feedItem.data.artist) {
-                                        <span class="artist | text-content-secondary">
+                                        <span class="artist | select-text text-content-secondary">
                                             by {{ feedItem.data.artist }}
                                         </span>
                                         <span class="text-content-muted">•</span>
@@ -153,7 +153,7 @@
                                 </p>
 
                                 <p
-                                    class="about | type-body-sm mt-6 text-content-secondary"
+                                    class="about | type-body-sm mt-6 select-text text-content-secondary"
                                     [innerHTML]="feedItem.data.about | safe: 'html'"
                                 ></p>
 
@@ -222,10 +222,10 @@
                                         alt="Label image for {{ feedItem.data.band.name }}"
                                     />
                                 }
-                                <p class="type-label-md mt-2 text-content-primary">
+                                <p class="type-label-md mt-2 select-text text-content-primary">
                                     {{ feedItem.data.band.name }}
                                 </p>
-                                <p class="type-body-sm text-content-muted">
+                                <p class="type-body-sm select-text text-content-muted">
                                     {{ feedItem.data.band.location }}
                                 </p>
                                 @if (feedItem.data.unsubscribeUrl) {
@@ -241,7 +241,9 @@
                                         <span class="unfollow | absolute inset-0 py-1.5">Unfollow</span>
                                     </a>
                                 }
-                                <p class="type-body-sm mt-2.5 leading-snug text-content-secondary">
+                                <p
+                                    class="type-body-sm mt-2.5 select-text leading-snug text-content-secondary"
+                                >
                                     {{ feedItem.data.band.bio }}
                                 </p>
 

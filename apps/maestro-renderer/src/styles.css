@@ -15,12 +15,17 @@ body {
 
     background: theme('colors.background.canvas');
     color: theme('colors.content.primary');
+
+    user-select: none;
 }
 
 * {
     box-sizing: border-box;
     scrollbar-color: theme('colors.border.default') transparent;
     scrollbar-width: thin;
+}
+::selection {
+    @apply bg-background-elevated text-content-primary;
 }
 @supports not (scrollbar-color: auto) {
     ::-webkit-scrollbar {
@@ -47,13 +52,12 @@ body {
     }
 
     .btn {
-        @apply inline-flex items-center justify-center rounded-lg px-3 py-1.5 transition-colors duration-fast ease-standard;
+        @apply inline-flex cursor-default items-center justify-center rounded-lg px-3 py-1.5 transition-colors duration-fast ease-standard;
         font-family: var(--type-label-md-family);
         font-size: var(--type-label-md-size);
         font-weight: var(--type-label-md-weight);
         line-height: var(--type-label-md-line-height);
         letter-spacing: var(--type-label-md-letter-spacing);
-        /* min-height: var(--foundation-size-control-md); */
     }
     .btn-neutral {
         @apply btn bg-action-secondary text-action-secondary-content active:bg-action-secondary-pressed hover:bg-action-secondary-hover;
