@@ -1,4 +1,4 @@
-<div class="relative h-screen w-full snap-y snap-mandatory snap-always overflow-y-auto px-3">
+<div class="relative size-full min-h-0 snap-y snap-mandatory snap-always overflow-y-auto px-3">
     <div
         class="mx-auto max-w-[65rem]"
         style="--max-feed-item-height: min(100vh, 800px); --feed-item-padding-y: 1.5rem"
@@ -95,9 +95,9 @@
                         </div>
 
                         <div
-                            class="text-column | relative flex max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] flex-col justify-between overflow-y-auto"
+                            class="text-column | relative flex max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] flex-col justify-between"
                         >
-                            <div class="">
+                            <div class="overflow-y-scroll">
                                 @if (feedItem.error; as error) {
                                     <div class="error | mb-1.5 flex items-center gap-2">
                                         <p class="text-content-danger">
