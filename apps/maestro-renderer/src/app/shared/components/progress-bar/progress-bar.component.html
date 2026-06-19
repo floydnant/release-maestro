@@ -6,7 +6,7 @@
     [attr.aria-valuemin]="0"
     [attr.aria-valuemax]="100"
 >
-    <div class="progress-bar | bg-border-subtle flex h-1.5 grow rounded-full transition-colors">
+    <div class="progress-bar | flex h-1.5 grow rounded-full bg-border-subtle transition-colors">
         @for (segment of segments(); track $index) {
             <div
                 class="progress-segment | h-full"

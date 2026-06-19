@@ -74,7 +74,7 @@ body {
     }
 
     .btn-danger {
-        @apply btn hover:bg-status-danger-hover border border-status-danger-border bg-status-danger-background text-status-danger-content;
+        @apply btn border border-status-danger-border bg-status-danger-background text-status-danger-content hover:bg-status-danger-hover;
     }
     .btn-nkd-danger {
         @apply btn text-content-danger hover:bg-status-danger-background;
