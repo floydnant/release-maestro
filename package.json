@@ -74,7 +74,7 @@
         "autoprefixer": "10.4.21",
         "conventional-changelog-cli": "4.1.0",
         "drizzle-kit": "0.31.4",
-        "electron": "36.4.0",
+        "electron": "42.4.1",
         "electron-builder": "26.0.12",
         "electron-debug": "4.1.0",
         "electron-reloader": "1.2.3",
