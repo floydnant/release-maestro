@@ -9,3 +9,5 @@ playwright-report
 apps/maestro-renderer/design-tokens/tailwind.generated.json
 apps/maestro-renderer/src/app/shared/design-tokens.generated.ts
 apps/maestro-renderer/src/styles/design-tokens.generated.css
+
+.nx/self-healing

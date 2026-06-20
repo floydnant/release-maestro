@@ -1,4 +1,4 @@
-export default {
+module.exports = {
     displayName: 'maestro-electron',
     preset: '../../jest.preset.js',
     testEnvironment: 'node',
