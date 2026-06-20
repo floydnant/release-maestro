@@ -12,6 +12,7 @@
                 "outputPath": "dist/apps/maestro-electron",
                 "main": "apps/maestro-electron/src/main.ts",
                 "tsConfig": "apps/maestro-electron/tsconfig.app.json",
+                "webpackConfig": "apps/maestro-electron/webpack.config.cjs",
                 "assets": ["apps/maestro-electron/src/assets"]
             },
             "configurations": {

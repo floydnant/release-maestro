@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common'
-import { Component, ElementRef, HostListener, inject, signal, viewChildren } from '@angular/core'
+import {
+    Component,
+    ElementRef,
+    HostListener,
+    inject,
+    signal,
+    viewChildren,
+    ChangeDetectionStrategy,
+} from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
 import { TranslateModule } from '@ngx-translate/core'
@@ -27,6 +35,7 @@ const getErrorMessage = (error: unknown) => {
     selector: 'app-feed',
     templateUrl: './feed.component.html',
     styleUrls: ['./feed.component.css'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         CommonModule,
         TranslateModule,

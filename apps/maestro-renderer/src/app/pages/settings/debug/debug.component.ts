@@ -1,5 +1,5 @@
 import { JsonPipe } from '@angular/common'
-import { Component, computed, inject, signal } from '@angular/core'
+import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core'
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop'
 import { FormsModule } from '@angular/forms'
 import { MetadataScanUpdate, ScanResult, SongMetadata, SongMetadataUpdate } from '@release-maestro/core'
@@ -37,6 +37,7 @@ const MAX_SCAN_EVENTS = 600
     selector: 'app-debug',
     imports: [FormsModule, JsonPipe, ProgressBarComponent],
     templateUrl: './debug.component.html',
+    changeDetection: ChangeDetectionStrategy.OnPush,
     styles: `
         :host {
             @apply block h-full;

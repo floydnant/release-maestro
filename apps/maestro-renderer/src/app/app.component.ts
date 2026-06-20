@@ -1,4 +1,4 @@
-import { Component, computed, inject, linkedSignal } from '@angular/core'
+import { Component, computed, inject, linkedSignal, ChangeDetectionStrategy } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
@@ -19,6 +19,7 @@ import { IconComponent } from './shared/components/icon/icon.component'
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.css'],
     standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [RouterModule, TranslateModule, ProgressBarComponent, IconComponent],
 })
 export class AppComponent {

@@ -1,4 +1,4 @@
-import { HttpClient, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
+import { HttpClient, provideHttpClient, withInterceptorsFromDi, withXhr } from '@angular/common/http'
 import {
     ApplicationConfig,
     importProvidersFrom,
@@ -20,7 +20,7 @@ export const appConfig: ApplicationConfig = {
     providers: [
         provideBrowserGlobalErrorListeners(),
         provideZoneChangeDetection({ eventCoalescing: true }),
-        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClient(withXhr(), withInterceptorsFromDi()),
         provideRouter(appRoutes),
         importProvidersFrom(
             CoreModule,

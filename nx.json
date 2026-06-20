@@ -80,14 +80,6 @@
             }
         }
     ],
-    "generators": {
-        "@nx/angular:application": {
-            "e2eTestRunner": "playwright",
-            "linter": "eslint",
-            "style": "css",
-            "unitTestRunner": "jest"
-        }
-    },
     "tui": {
         "enabled": false
     },
