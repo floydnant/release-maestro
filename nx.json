@@ -83,5 +83,6 @@
     "tui": {
         "enabled": false
     },
-    "defaultProject": "maestro-electron"
+    "defaultProject": "maestro-electron",
+    "analytics": false
 }
