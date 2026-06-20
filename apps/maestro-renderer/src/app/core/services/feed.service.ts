@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core'
-import { EmailImportProgressUpdate, HydratedFeedItem } from '@release-maestro/core'
+import { EmailImportProgressUpdate, HydratedFeedItem, USE_SAME_MESSAGE } from '@release-maestro/core'
 import { EMPTY, fromEventPattern, map, share } from 'rxjs'
 import { UiSideException } from '../../shared/ui-facing.exceptions'
 import { ElectronService } from './electron/electron.service'
@@ -28,9 +28,9 @@ export class FeedService {
     }
 
     async loadFeed(index: number, count: number): Promise<HydratedFeedItem[]> {
-        const result = await this.electronService.ipcRenderer.invoke('load-feed', index, count)
-        if (result.isError) {
-            throw new UiSideException(result.message, result.userFacingMessage)
+        const result = await this.electronService.ipcRenderer.invoke('load-feed', { index, count })
+        if (!Array.isArray(result)) {
+            throw new UiSideException(result.message, result.userFacingMessage ?? USE_SAME_MESSAGE)
         }
 
         return result
@@ -43,6 +43,10 @@ export class FeedService {
     }
 
     markFeedItemViewed(id: string, feedItemType: HydratedFeedItem['type'], isSnoozed = false): Promise<void> {
-        return this.electronService.ipcRenderer.invoke('mark-feed-item-viewed', id, feedItemType, isSnoozed)
+        return this.electronService.ipcRenderer.invoke('mark-feed-item-viewed', {
+            id,
+            type: feedItemType,
+            isSnoozed,
+        })
     }
 }
