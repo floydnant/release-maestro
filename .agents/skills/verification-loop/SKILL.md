@@ -14,9 +14,10 @@ description: Verification loop using repository make targets.
 ## Commands
 
 - Prefer `make ...` targets over raw `npm run ...` commands
+- See `docs/testing.md` for the repo's test-layer split and E2E isolation conventions
 - `make sure` (runs `make format`, then lint, test, and build; this mutates formatting)
 - `make format-check` (non-mutating formatting check for review/CI-style verification)
-- `make e2e` (for web E2E flows when relevant)
+- `make e2e` / `make e2e-renderer` (for E2E flows when relevant)
 - `make build-prod` (to catch production-only build issues)
 - `nx test|lint|build` with specific projects for targeted checks
 - If a command fails, keep the retry scoped to the touched slice before broadening the check.

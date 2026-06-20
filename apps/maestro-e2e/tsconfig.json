@@ -1,0 +1,25 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "allowJs": true,
+        "outDir": "../../dist/out-tsc",
+        "sourceMap": false,
+        "module": "commonjs",
+        "ignoreDeprecations": "5.0",
+        "strict": true,
+        "noImplicitOverride": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true
+    },
+    "include": [
+        "**/*.ts",
+        "**/*.js",
+        "playwright.renderer.config.ts",
+        "playwright.electron.config.ts",
+        "src/**/*.spec.ts",
+        "src/**/*.spec.js",
+        "src/**/*.test.ts",
+        "src/**/*.test.js",
+        "src/**/*.d.ts"
+    ]
+}

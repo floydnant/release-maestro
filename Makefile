@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-show-report lint format f format-check sure affected db-generate db-studio db-check clean install rebuild-electron rebuild-node version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report lint format f format-check sure affected db-generate db-studio db-check clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -75,10 +75,12 @@ design-tokens-check: ## Test and verify renderer design-token artifacts
 test-engine: ## Run metadata-engine (Rust) tests
 	npx nx test metadata-engine
 
-e2e: ## Run end-to-end tests
-	npx playwright test -c apps/maestro-renderer-e2e/playwright.config.ts
+e2e: ## Run full Electron end-to-end tests
+	npx nx run maestro-e2e:e2e
+e2e-renderer: ## Run renderer only end-to-end tests
+	npx nx run maestro-e2e:e2e-renderer
 e2e-show-report: ## Show the latest e2e test report
-	npx playwright show-report dist/.playwright/apps/maestro-renderer-e2e/playwright-report
+	npx playwright show-report
 
 # Code Quality
 lint: ## Lint all projects
@@ -92,7 +94,7 @@ format-check: ## Check formatting
 sure: format ## Run all checks (format, lint, test, build)
 	npx nx run-many -t lint,build,test -c development --skipNxCache=$(SKIP_NX_CACHE)
 affected: ## Run checks only on affected projects based on git changes
-	npx nx affected -t build,lint,test,e2e --skipNxCache=$(SKIP_NX_CACHE)
+	npx nx affected -t build,lint,test,e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
 
 # Database
 drizzleCommand = mkdir -p .app-data.dev/data && DATABASE_URL=file:./.app-data.dev/data/mailbox-tool.db ELECTRON_RUN_AS_NODE=1 npx electron ./node_modules/drizzle-kit/bin.cjs
