@@ -33,7 +33,7 @@
     <section class="mb-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div class="panel p-4">
             <p class="type-label-sm uppercase text-content-muted">Status</p>
-            <p class="font-mono text-xl font-semibold text-content-primary">
+            <p aria-label="Scan status" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanInFlight() ? 'running' : 'idle' }}
             </p>
         </div>
@@ -43,11 +43,13 @@
         </div>
         <div class="panel p-4">
             <p class="type-label-sm uppercase text-content-muted">Items</p>
-            <p class="font-mono text-xl font-semibold text-content-primary">{{ scanSessionStats().items }}</p>
+            <p aria-label="Scanned items" class="font-mono text-xl font-semibold text-content-primary">
+                {{ scanSessionStats().items }}
+            </p>
         </div>
         <div class="panel p-4">
             <p class="type-label-sm uppercase text-content-muted">Errors</p>
-            <p class="font-mono text-xl font-semibold text-content-primary">
+            <p aria-label="Scan event errors" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanSessionStats().errors }}
             </p>
         </div>
@@ -76,6 +78,7 @@
                 <p class="type-label-sm uppercase text-content-muted">Direct metadata read</p>
                 <h3 class="type-section-title text-content-primary">Inspect file tags</h3>
                 <input
+                    aria-label="Read file path"
                     class="input w-full font-mono text-sm"
                     [ngModel]="readPath()"
                     (ngModelChange)="readPath.set($event)"
@@ -103,6 +106,7 @@
                 }
                 @if (readResult(); as result) {
                     <pre
+                        aria-label="Read result"
                         class="max-h-72 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
                         >{{ result | json }}</pre
                     >
@@ -113,12 +117,14 @@
                 <p class="type-label-sm uppercase text-content-muted">Write probe</p>
                 <h3 class="type-section-title text-content-primary">Apply tag update</h3>
                 <input
+                    aria-label="Write file path"
                     class="input w-full font-mono text-sm"
                     [ngModel]="writePath()"
                     (ngModelChange)="writePath.set($event)"
                     placeholder="/absolute/path/to/song.flac"
                 />
                 <textarea
+                    aria-label="Write tag payload"
                     class="input min-h-36 w-full font-mono text-sm"
                     [ngModel]="writePayloadText()"
                     (ngModelChange)="writePayloadText.set($event)"
@@ -140,6 +146,7 @@
                 }
                 @if (writeResult(); as result) {
                     <pre
+                        aria-label="Write result"
                         class="max-h-72 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
                         >{{ result | json }}</pre
                     >
@@ -172,6 +179,7 @@
                 </div>
 
                 <textarea
+                    aria-label="Library scan paths"
                     class="input min-h-24 w-full font-mono text-sm"
                     [ngModel]="scanPathsText()"
                     (ngModelChange)="scanPathsText.set($event)"
@@ -183,31 +191,46 @@
                 <div class="grid gap-3 md:grid-cols-5">
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
                         <p class="type-label-sm uppercase text-content-muted">New</p>
-                        <p class="font-mono text-xl font-semibold text-content-primary">
+                        <p
+                            aria-label="New songs"
+                            class="font-mono text-xl font-semibold text-content-primary"
+                        >
                             {{ scanSummary()?.new ?? 0 }}
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
                         <p class="type-label-sm uppercase text-content-muted">Changed</p>
-                        <p class="font-mono text-xl font-semibold text-content-primary">
+                        <p
+                            aria-label="Changed songs"
+                            class="font-mono text-xl font-semibold text-content-primary"
+                        >
                             {{ scanSummary()?.changed ?? 0 }}
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
                         <p class="type-label-sm uppercase text-content-muted">Unchanged</p>
-                        <p class="font-mono text-xl font-semibold text-content-primary">
+                        <p
+                            aria-label="Unchanged songs"
+                            class="font-mono text-xl font-semibold text-content-primary"
+                        >
                             {{ scanSummary()?.unchanged ?? 0 }}
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
                         <p class="type-label-sm uppercase text-content-muted">Missing</p>
-                        <p class="font-mono text-xl font-semibold text-content-primary">
+                        <p
+                            aria-label="Missing songs"
+                            class="font-mono text-xl font-semibold text-content-primary"
+                        >
                             {{ scanSummary()?.missing ?? 0 }}
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
                         <p class="type-label-sm uppercase text-content-muted">Summary errors</p>
-                        <p class="font-mono text-xl font-semibold text-content-primary">
+                        <p
+                            aria-label="Summary errors"
+                            class="font-mono text-xl font-semibold text-content-primary"
+                        >
                             {{ scanSummary()?.errors ?? 0 }}
                         </p>
                     </div>
@@ -231,6 +254,7 @@
                             Raw scan summary
                         </summary>
                         <pre
+                            aria-label="Raw scan summary"
                             class="max-h-44 mt-3 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
                             >{{ summary | json }}</pre
                         >
@@ -243,11 +267,19 @@
                     <div>
                         <p class="type-label-sm uppercase text-content-muted">Latest ingested song</p>
                         @if (lastItem(); as item) {
-                            <h3 class="type-section-title mt-1 text-content-primary">
+                            <h3
+                                aria-label="Latest ingested song"
+                                class="type-section-title mt-1 text-content-primary"
+                            >
                                 {{ metadataPreview(item) }}
                             </h3>
                         } @else {
-                            <h3 class="type-section-title mt-1 text-content-primary">No item yet</h3>
+                            <h3
+                                aria-label="Latest ingested song"
+                                class="type-section-title mt-1 text-content-primary"
+                            >
+                                No item yet
+                            </h3>
                         }
                     </div>
                     <button class="btn-neutral" [disabled]="!lastItem()" (click)="setReadPathFromLastItem()">
@@ -264,6 +296,7 @@
                             }
                         </div>
                         <pre
+                            aria-label="Latest ingested metadata"
                             class="max-h-72 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
                             >{{ item | json }}</pre
                         >

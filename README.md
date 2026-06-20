@@ -46,13 +46,15 @@ make lint
 make test
 make build
 make e2e
+make e2e-renderer
 ```
 
 This starts the Angular dev server and the Electron main process with hot reload.
 
 ## Commands
 
-Run `make help` for a list of commands to run.
+Run `make help` for a list of commands to run. See [docs/testing.md](docs/testing.md) for testing
+strategy, E2E conventions, and fixture guidance.
 
 ## Project Structure
 
@@ -60,7 +62,8 @@ Run `make help` for a list of commands to run.
 apps/
   maestro-electron/    Electron main process (backend services, IPC API, database)
   maestro-renderer/    Angular frontend (feed UI, audio player, settings)
-  maestro-renderer-e2e/ E2E tests against the angular frontend
+  maestro-e2e/          Renderer and full Electron E2E tests
+  metadata-engine/     Sidecar worker for reading/writing audio file metadata
 libs/
   maestro-core/        Shared library (Zod schemas, types, utilities)
 apple-scripts/         AppleScript for exporting emails from Apple Mail

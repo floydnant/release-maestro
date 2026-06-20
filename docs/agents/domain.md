@@ -15,13 +15,15 @@ This repo currently has a root `CONTEXT.md` seed glossary. Add context-specific 
 
 If a context needs its own architectural decisions, keep them in that context's `docs/adr/` directory.
 
+For test-layer conventions, E2E isolation, fixture handling, and CI guidance, see `docs/testing.md`.
+
 ## Repository structure
 
 This repo is an Nx monorepo. The active projects are:
 
 - `apps/maestro-electron/` for the Electron main process, IPC, and backend services
 - `apps/maestro-renderer/` for the Angular renderer UI
-- `apps/maestro-renderer-e2e/` for Playwright end-to-end tests
+- `apps/maestro-e2e/` for Playwright end-to-end tests across renderer-only and full Electron flows
 - `apps/metadata-engine/` for reading/writing audio file tags
 - `libs/maestro-core/` for shared schemas, types, and utilities
 

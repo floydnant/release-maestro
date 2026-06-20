@@ -1,0 +1,30 @@
+{
+    "name": "maestro-e2e",
+    "$schema": "../../node_modules/nx/schemas/project-schema.json",
+    "projectType": "application",
+    "sourceRoot": "apps/maestro-e2e/src",
+    "implicitDependencies": ["maestro-renderer", "maestro-electron", "metadata-engine"],
+    "// targets": "to see all targets run: nx show project maestro-e2e --web",
+    "targets": {
+        "e2e": {
+            "dependsOn": ["maestro-electron:build"],
+            "command": "playwright test -c apps/maestro-e2e/playwright.electron.config.ts",
+            "configurations": {
+                "ui": {
+                    "command": "playwright test -c apps/maestro-e2e/playwright.electron.config.ts --ui"
+                }
+            }
+        },
+        "e2e-renderer": {
+            "command": "playwright test -c apps/maestro-e2e/playwright.renderer.config.ts",
+            "configurations": {
+                "ui": {
+                    "command": "playwright test -c apps/maestro-e2e/playwright.renderer.config.ts --ui"
+                }
+            }
+        },
+        "lint": {
+            "executor": "@nx/eslint:lint"
+        }
+    }
+}

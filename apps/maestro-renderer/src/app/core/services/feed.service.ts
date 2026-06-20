@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core'
 import { EmailImportProgressUpdate, HydratedFeedItem } from '@release-maestro/core'
-import { fromEventPattern, map, share } from 'rxjs'
+import { EMPTY, fromEventPattern, map, share } from 'rxjs'
 import { UiSideException } from '../../shared/ui-facing.exceptions'
 import { ElectronService } from './electron/electron.service'
 
@@ -10,13 +10,15 @@ import { ElectronService } from './electron/electron.service'
 export class FeedService {
     private electronService = inject(ElectronService)
 
-    emailImportProgress$ = fromEventPattern<[Electron.IpcRendererEvent, EmailImportProgressUpdate]>(
-        handler => this.electronService.ipcRenderer.on('email-import-progress', handler),
-        handler => this.electronService.ipcRenderer.off('email-import-progress', handler),
-    ).pipe(
-        map(([_event, progress]) => progress),
-        share({ resetOnRefCountZero: true }),
-    )
+    emailImportProgress$ = this.electronService.isElectron
+        ? fromEventPattern<[Electron.IpcRendererEvent, EmailImportProgressUpdate]>(
+              handler => this.electronService.ipcRenderer.on('email-import-progress', handler),
+              handler => this.electronService.ipcRenderer.off('email-import-progress', handler),
+          ).pipe(
+              map(([_event, progress]) => progress),
+              share({ resetOnRefCountZero: true }),
+          )
+        : EMPTY
 
     async triggerEmailImport() {
         await this.electronService.ipcRenderer.invoke('trigger-email-import')

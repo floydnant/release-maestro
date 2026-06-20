@@ -23,6 +23,7 @@
         "noFallthroughCasesInSwitch": true,
         "noImplicitOverride": true,
         "noUncheckedIndexedAccess": true,
+        "noPropertyAccessFromIndexSignature": false,
         "skipLibCheck": true,
         "resolveJsonModule": true,
         "forceConsistentCasingInFileNames": true,

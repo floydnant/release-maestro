@@ -1,23 +1,26 @@
 import { app } from 'electron'
 import envPaths, { Paths } from 'env-paths'
 import { stat } from 'fs/promises'
-import { join } from 'path'
+import { join, resolve } from 'path'
 // App environment paths configuration
 
 export type AppPaths = Paths & { resources: string }
 
 const localDevPath = '.app-data.dev'
+const localDevRoot = process.env.RELEASE_MAESTRO_APP_DATA_DIR
+    ? resolve(process.env.RELEASE_MAESTRO_APP_DATA_DIR)
+    : join(process.cwd(), localDevPath)
 export const appPaths: AppPaths = app.isPackaged
     ? {
           ...envPaths('release-maestro', { suffix: '' }),
           resources: join(process.resourcesPath, '..'),
       }
     : {
-          cache: join(process.cwd(), localDevPath, 'cache'),
-          log: join(process.cwd(), localDevPath, 'log'),
-          temp: join(process.cwd(), localDevPath, 'temp'),
-          data: join(process.cwd(), localDevPath, 'data'),
-          config: join(process.cwd(), localDevPath, 'config'),
+          cache: join(localDevRoot, 'cache'),
+          log: join(localDevRoot, 'log'),
+          temp: join(localDevRoot, 'temp'),
+          data: join(localDevRoot, 'data'),
+          config: join(localDevRoot, 'config'),
           resources: process.cwd(),
       }
 
