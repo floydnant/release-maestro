@@ -6,6 +6,7 @@
     "extraMetadata": {
         "main": "index.js"
     },
+    "files": ["!package.json"],
     "extraFiles": [
         {
             "from": "drizzle",
