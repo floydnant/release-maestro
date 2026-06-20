@@ -22,7 +22,7 @@
         "@angular/router": "20.1.3",
         "@floating-ui/dom": "1.7.4",
         "@ng-icons/core": "32.1.0",
-        "@ng-icons/octicons": "32.1.0",
+        "@ng-icons/octicons": "33.2.4",
         "@tailwindcss/container-queries": "0.1.1",
         "bandcamp-fetch": "2.0.0",
         "better-sqlite3": "12.2.0",
