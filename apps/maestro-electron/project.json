@@ -44,9 +44,15 @@
             "executor": "nx-electron:package",
             "options": {
                 "name": "maestro-electron",
-                "frontendProject": "maestro-renderer",
                 "sourcePath": "dist/apps",
                 "outputPath": "dist/packages",
+                "files": [
+                    {
+                        "from": "maestro-renderer/browser",
+                        "to": "maestro-renderer",
+                        "filter": ["**/*"]
+                    }
+                ],
                 "prepackageOnly": true
             }
         },
@@ -55,9 +61,15 @@
             "executor": "nx-electron:make",
             "options": {
                 "name": "maestro-electron",
-                "frontendProject": "maestro-renderer",
                 "sourcePath": "dist/apps",
-                "outputPath": "dist/executables"
+                "outputPath": "dist/executables",
+                "files": [
+                    {
+                        "from": "maestro-renderer/browser",
+                        "to": "maestro-renderer",
+                        "filter": ["**/*"]
+                    }
+                ]
             },
             "defaultConfiguration": "production"
         },
