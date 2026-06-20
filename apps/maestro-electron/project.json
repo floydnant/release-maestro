@@ -12,6 +12,7 @@
                 "outputPath": "dist/apps/maestro-electron",
                 "main": "apps/maestro-electron/src/main.ts",
                 "tsConfig": "apps/maestro-electron/tsconfig.app.json",
+                "webpackConfig": "apps/maestro-electron/webpack.config.cjs",
                 "assets": ["apps/maestro-electron/src/assets"]
             },
             "configurations": {
@@ -43,9 +44,15 @@
             "executor": "nx-electron:package",
             "options": {
                 "name": "maestro-electron",
-                "frontendProject": "maestro-renderer",
                 "sourcePath": "dist/apps",
                 "outputPath": "dist/packages",
+                "files": [
+                    {
+                        "from": "maestro-renderer/browser",
+                        "to": "maestro-renderer",
+                        "filter": ["**/*"]
+                    }
+                ],
                 "prepackageOnly": true
             }
         },
@@ -54,9 +61,15 @@
             "executor": "nx-electron:make",
             "options": {
                 "name": "maestro-electron",
-                "frontendProject": "maestro-renderer",
                 "sourcePath": "dist/apps",
-                "outputPath": "dist/executables"
+                "outputPath": "dist/executables",
+                "files": [
+                    {
+                        "from": "maestro-renderer/browser",
+                        "to": "maestro-renderer",
+                        "filter": ["**/*"]
+                    }
+                ]
             },
             "defaultConfiguration": "production"
         },

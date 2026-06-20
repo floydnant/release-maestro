@@ -1,4 +1,4 @@
-import { Component, input, Input, ViewEncapsulation } from '@angular/core'
+import { Component, input, Input, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 @Component({
@@ -9,6 +9,7 @@ import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.gene
     host: {
         class: 'inline-block',
     },
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class ProgressRingComponent {

@@ -80,16 +80,9 @@
             }
         }
     ],
-    "generators": {
-        "@nx/angular:application": {
-            "e2eTestRunner": "playwright",
-            "linter": "eslint",
-            "style": "css",
-            "unitTestRunner": "jest"
-        }
-    },
     "tui": {
         "enabled": false
     },
-    "defaultProject": "maestro-electron"
+    "defaultProject": "maestro-electron",
+    "analytics": false
 }

@@ -3,22 +3,10 @@
     "directories": {
         "output": "release/"
     },
-    "files": [
-        "package.json",
-        "node_modules/**/*",
-        "!node_modules/**/*.ts",
-        "!node_modules/**/*.map",
-        {
-            "from": "dist/apps/maestro-electron",
-            "to": ".",
-            "filter": ["**/*", "!**/*.map"]
-        },
-        {
-            "from": "dist/apps/maestro-renderer/browser",
-            "to": "maestro-renderer",
-            "filter": ["**/*"]
-        }
-    ],
+    "extraMetadata": {
+        "main": "index.js"
+    },
+    "files": ["!package.json"],
     "extraFiles": [
         {
             "from": "drizzle",

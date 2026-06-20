@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core'
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core'
 import { TranslateModule } from '@ngx-translate/core'
 
 @Component({
@@ -6,6 +6,7 @@ import { TranslateModule } from '@ngx-translate/core'
     templateUrl: './home.component.html',
     styleUrls: ['./home.component.css'],
     standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [TranslateModule],
 })
 export class HomeComponent implements OnInit {

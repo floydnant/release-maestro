@@ -10,10 +10,11 @@
         // "noFallthroughCasesInSwitch": true,
         // "noPropertyAccessFromIndexSignature": true
         "moduleResolution": "bundler",
-        "ignoreDeprecations": "5.0",
+        "ignoreDeprecations": "6.0",
         "declaration": true,
         "outDir": "../../dist/out-tsc/shared",
-        "rootDir": "."
+        "rootDir": ".",
+        "types": ["node"]
     },
     "files": [],
     "include": [],

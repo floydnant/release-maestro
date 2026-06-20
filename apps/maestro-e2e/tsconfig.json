@@ -5,7 +5,7 @@
         "outDir": "../../dist/out-tsc",
         "sourceMap": false,
         "module": "commonjs",
-        "ignoreDeprecations": "5.0",
+        "ignoreDeprecations": "6.0",
         "strict": true,
         "noImplicitOverride": true,
         "noImplicitReturns": true,

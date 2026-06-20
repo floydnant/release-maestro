@@ -1,4 +1,4 @@
-export default {
+module.exports = {
     displayName: 'maestro-core',
     preset: '../../jest.preset.js',
     testEnvironment: 'node',

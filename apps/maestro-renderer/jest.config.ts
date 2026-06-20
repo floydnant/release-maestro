@@ -1,4 +1,4 @@
-export default {
+module.exports = {
     displayName: 'maestro-renderer',
     preset: '../../jest.preset.js',
     setupFilesAfterEnv: ['<rootDir>/src/test/test-setup.ts'],
