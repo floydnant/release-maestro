@@ -5,8 +5,13 @@ updates:
       schedule:
           interval: 'weekly'
       groups:
-          minor-and-patch:
+          gh-actions:
               applies-to: version-updates
+              update-types:
+                  - 'minor'
+                  - 'patch'
+          gh-actions-security:
+              applies-to: security-updates
               update-types:
                   - 'minor'
                   - 'patch'
@@ -16,8 +21,13 @@ updates:
       schedule:
           interval: 'weekly'
       groups:
-          minor-and-patch:
+          npm:
               applies-to: version-updates
+              update-types:
+                  - 'minor'
+                  - 'patch'
+          npm-security:
+              applies-to: security-updates
               update-types:
                   - 'minor'
                   - 'patch'
@@ -27,8 +37,13 @@ updates:
       schedule:
           interval: 'weekly'
       groups:
-          minor-and-patch:
+          cargo:
               applies-to: version-updates
+              update-types:
+                  - 'minor'
+                  - 'patch'
+          cargo-security:
+              applies-to: security-updates
               update-types:
                   - 'minor'
                   - 'patch'
