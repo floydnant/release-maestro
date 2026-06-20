@@ -21,8 +21,36 @@ updates:
       schedule:
           interval: 'weekly'
       groups:
+          angular:
+              applies-to: version-updates
+              patterns:
+                  - '@angular/*'
+                  - '@angular-devkit/*'
+                  - '@angular-eslint/*'
+                  - 'angular-eslint'
+              update-types:
+                  - 'minor'
+                  - 'patch'
+          nx:
+              applies-to: version-updates
+              patterns:
+                  - '@nx/*'
+                  - '@nrwl/*'
+                  - 'nx'
+                  - 'nx-electron'
+              update-types:
+                  - 'minor'
+                  - 'patch'
           npm:
               applies-to: version-updates
+              exclude-patterns:
+                  - '@angular/*'
+                  - '@angular-devkit/*'
+                  - '@angular-eslint/*'
+                  - 'angular-eslint'
+                  - '@nx/*'
+                  - '@nrwl/*'
+                  - 'nx'
               update-types:
                   - 'minor'
                   - 'patch'
