@@ -91,7 +91,7 @@
         "jsonc-eslint-parser": "2.4.0",
         "nx": "22.7.5",
         "nx-electron": "22.0.0",
-        "playwright": "1.52.0",
+        "playwright": "1.55.1",
         "postcss": "8.5.15",
         "prettier": "3.5.3",
         "prettier-plugin-tailwindcss": "0.6.14",
