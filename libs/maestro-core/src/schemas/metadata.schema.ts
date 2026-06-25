@@ -276,7 +276,7 @@ export type MetadataPrescanUpdate =
 // Typed Electron <-> renderer IPC contract for this feature
 // ---------------------------------------------------------------------------
 
-export const METADATA_IPC_CHANNELS = {
+export const MetadataIpcChannel = {
     ping: 'metadata:ping',
     read: 'metadata:read',
     write: 'metadata:write',
@@ -285,7 +285,7 @@ export const METADATA_IPC_CHANNELS = {
     scanAbort: 'metadata:scan-abort',
 } as const
 
-export type MetadataIpcChannel = (typeof METADATA_IPC_CHANNELS)[keyof typeof METADATA_IPC_CHANNELS]
+export type MetadataIpcChannel = (typeof MetadataIpcChannel)[keyof typeof MetadataIpcChannel]
 
 /** Renderer-facing request payloads (the main process injects the cover-art cache dir). */
 export interface ReadMetadataRequest {
@@ -301,20 +301,5 @@ export interface ScanMetadataRequest {
     paths: string[]
 }
 
-/** `ipcRenderer.invoke(channel, ...args)` → result, typed per channel. */
-export interface MetadataIpcInvokeMap {
-    [METADATA_IPC_CHANNELS.ping]: { args: []; result: PingResult }
-    [METADATA_IPC_CHANNELS.read]: { args: [request: ReadMetadataRequest]; result: SongMetadata | null }
-    [METADATA_IPC_CHANNELS.write]: { args: [request: WriteMetadataRequest]; result: SongMetadata }
-    [METADATA_IPC_CHANNELS.scan]: { args: [request: ScanMetadataRequest]; result: ScanResult }
-}
-
-/** `event.sender.send(channel, payload)` → renderer `on(channel)` payloads. */
-export interface MetadataIpcEventMap {
-    [METADATA_IPC_CHANNELS.scanProgress]: MetadataScanUpdate
-}
-
-/** Fire-and-forget `ipcRenderer.send(channel, ...args)` from renderer → main. */
-export interface MetadataIpcSendMap {
-    [METADATA_IPC_CHANNELS.scanAbort]: []
-}
+// The per-channel payload/result types above are wired into the app-wide typed IPC
+// contract in `ipc/app-ipc.contract.ts` (see `MainIpcContract` / `RendererIpcContract`).

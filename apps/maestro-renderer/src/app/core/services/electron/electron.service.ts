@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core'
-import { ipcRenderer, webFrame } from 'electron'
+import { webFrame } from 'electron'
+import { AppIpcRenderer, asAppIpcRenderer } from '@release-maestro/core'
 import * as childProcess from 'child_process'
 import * as fs from 'fs'
 import * as fsPromises from 'fs/promises'
@@ -8,7 +9,7 @@ import * as fsPromises from 'fs/promises'
     providedIn: 'root',
 })
 export class ElectronService {
-    ipcRenderer!: typeof ipcRenderer
+    ipcRenderer!: AppIpcRenderer
     webFrame!: typeof webFrame
     childProcess!: typeof childProcess
     fs!: typeof fs
@@ -17,7 +18,7 @@ export class ElectronService {
     constructor() {
         if (this.isElectron) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            this.ipcRenderer = (window as any).require('electron').ipcRenderer
+            this.ipcRenderer = asAppIpcRenderer((window as any).require('electron').ipcRenderer)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             this.webFrame = (window as any).require('electron').webFrame
 
@@ -74,7 +75,7 @@ export class ElectronService {
     }
 
     async toggleMaximizeWindow() {
-        return (await this.ipcRenderer.invoke('window-toggle-maximize')) as boolean
+        return await this.ipcRenderer.invoke('window-toggle-maximize')
     }
 
     async closeWindow() {
