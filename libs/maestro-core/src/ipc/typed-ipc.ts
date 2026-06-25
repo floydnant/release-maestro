@@ -30,10 +30,7 @@ export interface TypedIpcRenderer<TIncoming extends IpcContract, TOutgoing exten
         ...args: PayloadArgs<PayloadOf<TOutgoing[K]>>
     ): Promise<ResponseOf<TOutgoing[K]>>
 
-    send<K extends EventChannels<TOutgoing>>(
-        channel: K,
-        ...args: PayloadArgs<PayloadOf<TOutgoing[K]>>
-    ): void
+    send<K extends EventChannels<TOutgoing>>(channel: K, ...args: PayloadArgs<PayloadOf<TOutgoing[K]>>): void
 
     on<K extends EventChannels<TIncoming>>(
         channel: K,
@@ -87,10 +84,7 @@ export interface TypedIpcMain<TIncoming extends IpcContract, TOutgoing extends I
 
 /** Typed view of a `WebContents` for emitting main -> renderer events. */
 export interface TypedWebContents<TOutgoing extends IpcContract> {
-    send<K extends EventChannels<TOutgoing>>(
-        channel: K,
-        ...args: PayloadArgs<PayloadOf<TOutgoing[K]>>
-    ): void
+    send<K extends EventChannels<TOutgoing>>(channel: K, ...args: PayloadArgs<PayloadOf<TOutgoing[K]>>): void
 }
 
 /** Narrow a `WebContents` (e.g. `event.sender`) to the renderer-facing contract. */

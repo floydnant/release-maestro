@@ -46,9 +46,8 @@ export const defineIpcRequest = <TPayload = void, TResponse = void>(): IpcReques
 export const defineIpcEvent = <TPayload = void>(): IpcEventDef<TPayload> => ({ kind: 'event' })
 
 /** Identity helper that preserves the literal channel keys while constraining values. */
-export const defineIpcContract = <const TContract extends IpcContract>(
-    contract: TContract,
-): TContract => contract
+export const defineIpcContract = <const TContract extends IpcContract>(contract: TContract): TContract =>
+    contract
 
 /** Recover the payload type from a channel definition. */
 export type PayloadOf<TDef> =
@@ -59,9 +58,7 @@ export type PayloadOf<TDef> =
           : never
 
 /** Recover the response type from a channel definition (events resolve to `void`). */
-export type ResponseOf<TDef> = TDef extends IpcRequestDef<infer _TPayload, infer TResponse>
-    ? TResponse
-    : void
+export type ResponseOf<TDef> = TDef extends IpcRequestDef<infer _TPayload, infer TResponse> ? TResponse : void
 
 /** A `void` payload becomes zero arguments; anything else becomes a single payload arg. */
 export type PayloadArgs<TPayload> = [TPayload] extends [void] ? [] : [payload: TPayload]
