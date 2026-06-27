@@ -21,7 +21,7 @@
         "@angular/platform-browser-dynamic": "22.0.2",
         "@angular/router": "22.0.2",
         "@floating-ui/dom": "1.7.6",
-        "@ng-icons/core": "32.1.0",
+        "@ng-icons/core": "33.3.0",
         "@ng-icons/octicons": "33.3.0",
         "@tailwindcss/container-queries": "0.1.1",
         "bandcamp-fetch": "2.0.0",
