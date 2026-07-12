@@ -39,7 +39,6 @@ export class AppComponent {
         if (this.electronService.isElectron) {
             console.log('Run in electron')
             console.log('Electron ipcRenderer', this.electronService.ipcRenderer)
-            console.log('NodeJS childProcess', this.electronService.childProcess)
         } else {
             console.log('Run in browser')
         }
