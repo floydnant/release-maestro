@@ -1,12 +1,13 @@
 import { CommonModule } from '@angular/common'
 import {
+    ChangeDetectionStrategy,
     Component,
     ElementRef,
     HostListener,
     inject,
+    resource,
     signal,
     viewChildren,
-    ChangeDetectionStrategy,
 } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
@@ -57,6 +58,9 @@ export class FeedComponent {
 
     feedError = signal<null | string>(null)
     retryNotifier$ = new Subject<void>()
+    hasFeed = resource({
+        loader: () => this.feedService.hasFeed(),
+    })
 
     loadedFeedItemIds = new Set<string>()
     feed = toSignal(

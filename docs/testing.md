@@ -11,8 +11,8 @@ testing conventions; update this guide when test strategy changes.
 
 - Unit tests cover renderer components, Electron backend services, core schemas, and metadata-engine
   behavior close to the code under test.
-- Renderer E2E tests are reserved for a future mocked renderer harness: browser-only scenarios that
-  intentionally fake Electron IPC/backend responses to exercise complex UI states.
+- Renderer E2E tests use a mocked renderer harness: browser-only scenarios that intentionally fake
+  Electron IPC/backend responses to exercise complex UI states.
 - Electron E2E tests launch the full Electron app with Playwright and verify renderer, IPC, Electron
   services, SQLite, and the metadata-engine worker together.
 
@@ -23,9 +23,16 @@ settings dirty/save states, import progress streams, scan progress streams, meta
 UI state matrices that would be slow or awkward to arrange through the real app. Do not use renderer E2E
 for generic routing smoke tests or happy paths that are better covered by full Electron E2E.
 
-A future renderer scenario harness should provide an explicit fake Electron bridge, such as
-`ipcRenderer.invoke`, `ipcRenderer.on`, `ipcRenderer.off`, and `ipcRenderer.send`, with scenario fixtures
-loaded before Angular bootstraps. Until that exists, keep renderer E2E placeholders skipped.
+Renderer E2E uses the scenario harness in `apps/maestro-e2e/src/renderer/scenario-harness.ts`.
+It installs a fake Electron bridge before Angular bootstraps:
+
+- `window.process.type = 'renderer'`, so the real renderer services take their Electron code paths.
+- `window.require('electron').ipcRenderer`, with mocked `invoke`, `send`, `on`, `off`, and `once`.
+- A browser-side scenario backend that tests can inspect and mutate through Playwright helpers.
+
+Do not mock Node modules such as `fs` or `child_process` in renderer E2E. Renderer code should go
+through typed IPC for backend behavior; full Electron E2E covers the real Electron/Node integration.
+See `apps/maestro-e2e/src/renderer/README.md` for harness authoring examples.
 
 ## Commands
 

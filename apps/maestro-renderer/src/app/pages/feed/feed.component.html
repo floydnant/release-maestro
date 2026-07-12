@@ -30,11 +30,11 @@
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
                     <p class="type-section-title text-content-primary">No new releases</p>
-                    @if (this.feedService.hasFeed() | async) {
+                    @if (hasFeed.value() === true) {
                         <p class="type-body-sm mt-2 text-content-muted">
                             You're all caught up! Check back later for new releases.
                         </p>
-                    } @else {
+                    } @else if (hasFeed.value() === false) {
                         <p class="type-body-sm mt-2 text-content-muted">
                             It looks like you haven't set up your feed yet. Go to
                             <a class="" routerLink="/settings">settings</a>
