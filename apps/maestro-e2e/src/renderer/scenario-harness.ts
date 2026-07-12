@@ -20,7 +20,7 @@ export type IpcCall = {
 
 export type ScenarioBehavior =
     | { kind: 'resolve'; value?: IpcPayload }
-    | { kind: 'reject'; message: string }
+    | { kind: 'reject'; message: string; userFacingMessage?: string }
     | { kind: 'pending' }
     | { kind: 'sequence'; steps: ScenarioBehavior[]; fallback?: ScenarioBehavior }
 
@@ -283,7 +283,13 @@ export const createRendererScenario = async (
 
                 const behavior = nextBehavior(channel)
                 if (behavior.kind === 'resolve') return Promise.resolve(behavior.value)
-                if (behavior.kind === 'reject') return Promise.reject(new Error(behavior.message))
+                if (behavior.kind === 'reject') {
+                    const error = new Error(behavior.message)
+                    if (behavior.userFacingMessage) {
+                        Object.assign(error, { userFacingMessage: behavior.userFacingMessage })
+                    }
+                    return Promise.reject(error)
+                }
 
                 return new Promise(resolve => {
                     const pendingCall = { callId: call.id, channel, resolve }

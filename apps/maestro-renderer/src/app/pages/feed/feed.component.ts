@@ -5,7 +5,6 @@ import {
     ElementRef,
     HostListener,
     inject,
-    resource,
     signal,
     viewChildren,
 } from '@angular/core'
@@ -23,7 +22,9 @@ import { IntersectionDirective } from '../../shared/directives/intersection.dire
 import { SafePipe } from '../../shared/pipes/safe.pipe'
 import { formatDateRelative, formatDuration } from '../../shared/utils/formatting.utils'
 
-const getErrorMessage = (error: unknown) => {
+const NUM_PREFETCH_ITEMS = 5
+
+const getUserFacingErrorMessage = (error: unknown) => {
     if (typeof error == 'string') return error
     if (typeof error == 'object' && error != null) {
         if ('userFacingMessage' in error) return String(error.userFacingMessage)
@@ -31,6 +32,12 @@ const getErrorMessage = (error: unknown) => {
 
     return undefined
 }
+
+type FeedState =
+    | { status: 'feed'; items: HydratedFeedItem[] }
+    | { status: 'caught-up'; items: [] }
+    | { status: 'empty'; items: [] }
+    | { status: 'error'; items: HydratedFeedItem[]; error: string }
 
 @Component({
     selector: 'app-feed',
@@ -56,51 +63,57 @@ export class FeedComponent {
     currentFeedIndex = signal(0)
     furthestScrolledIndex = signal(0)
 
-    feedError = signal<null | string>(null)
     retryNotifier$ = new Subject<void>()
-    hasFeed = resource({
-        loader: () => this.feedService.hasFeed(),
-    })
 
     loadedFeedItemIds = new Set<string>()
-    feed = toSignal(
+    feedState = toSignal(
         toObservable(this.furthestScrolledIndex).pipe(
             combineLatestWith(
                 this.retryNotifier$.pipe(mergeWith(fromEvent(window, 'online')), startWith(null)),
             ),
             mergeScan(
-                async (acc, [furthestScrolledIndex]) => {
-                    const numPrefetchItems = 5
-                    const lastLoadedItemIndex = (acc?.length || 0) - 1
+                async (previousState, [furthestScrolledIndex]): Promise<FeedState> => {
+                    const previousItems = previousState?.items ?? []
+                    const lastLoadedItemIndex = previousItems.length - 1
                     const itemCountToFetch =
-                        furthestScrolledIndex + numPrefetchItems - Math.max(lastLoadedItemIndex, 0)
+                        furthestScrolledIndex + NUM_PREFETCH_ITEMS - Math.max(lastLoadedItemIndex, 0)
 
-                    const items = await this.feedService
-                        .loadFeed(lastLoadedItemIndex + 1, itemCountToFetch)
-                        .catch(err => {
-                            console.error('Error loading feed items', err)
-
-                            this.feedError.set(getErrorMessage(err) || 'Failed to load')
-                            return null
-                        })
-                    if (!items) return null
-                    this.feedError.set(null)
-
-                    const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
-                    if (items.length != newItems.length) {
-                        console.warn(
-                            'Duplicate feed items detected:',
-                            items.filter(item => this.loadedFeedItemIds.has(item.id)),
+                    try {
+                        const items = await this.feedService.loadFeed(
+                            lastLoadedItemIndex + 1,
+                            itemCountToFetch,
                         )
-                    }
-                    newItems.forEach(item => this.loadedFeedItemIds.add(item.id))
+                        const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
+                        if (items.length != newItems.length) {
+                            console.warn(
+                                'Duplicate feed items detected:',
+                                items.filter(item => this.loadedFeedItemIds.has(item.id)),
+                            )
+                        }
+                        newItems.forEach(item => this.loadedFeedItemIds.add(item.id))
 
-                    return (acc || []).concat(newItems)
+                        const allItems = previousItems.concat(newItems)
+                        if (allItems.length > 0) return { status: 'feed', items: allItems }
+
+                        return {
+                            status: (await this.feedService.hasFeed()) ? 'caught-up' : 'empty',
+                            items: [],
+                        }
+                    } catch (error) {
+                        console.error('Error loading feed state', error)
+
+                        return {
+                            status: 'error',
+                            items: previousItems,
+                            error: getUserFacingErrorMessage(error) || 'Failed to load',
+                        }
+                    }
                 },
-                null as HydratedFeedItem[] | null,
+                null as FeedState | null,
                 1, // Max concurrent requests: ensures we don't run into race conditions
             ),
         ),
+        { initialValue: null },
     )
 
     @HostListener('document:keydown.Shift.ArrowUp', ['$event'])
@@ -124,7 +137,7 @@ export class FeedComponent {
         event?.preventDefault()
 
         const currentIndex = this.currentFeedIndex()
-        if (currentIndex < (this.feed()?.length || 0) - 1) {
+        if (currentIndex < this.getFeedItems().length - 1) {
             this.currentFeedIndex.set(currentIndex + 1)
             this.furthestScrolledIndex.set(Math.max(this.furthestScrolledIndex(), currentIndex + 1))
             const nextEntry = this.feedEntries()[currentIndex + 1]
@@ -175,7 +188,7 @@ export class FeedComponent {
     @HostListener('document:keydown.S', ['$event'])
     toggleCurrentFeedItemSnoozedState(event?: Event) {
         event?.preventDefault()
-        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
+        const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
             console.warn('No current feed item to snooze')
             return
@@ -216,7 +229,7 @@ export class FeedComponent {
     nextTrack(event?: Event) {
         event?.preventDefault()
 
-        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
+        const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
             console.log('No current feed item')
             return
@@ -254,7 +267,7 @@ export class FeedComponent {
     prevTrack(event?: Event) {
         event?.preventDefault()
 
-        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
+        const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
             console.warn('No current feed item')
             return
@@ -292,7 +305,7 @@ export class FeedComponent {
     openCurrentFeedItemInBrowser(event: Event) {
         event.preventDefault()
 
-        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
+        const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
             console.warn('No current feed item to open in browser')
             return
@@ -312,7 +325,7 @@ export class FeedComponent {
     }
 
     scrollCurrentTrackIntoView() {
-        const currentFeedItem = this.feed()?.[this.currentFeedIndex()]
+        const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
             console.log('No current feed item')
             return
@@ -349,6 +362,11 @@ export class FeedComponent {
         } else {
             assertUnreachable(currentFeedItem.type, `Unhandled feed item type:`)
         }
+    }
+
+    private getFeedItems() {
+        const feedState = this.feedState()
+        return feedState?.status === 'feed' ? feedState.items : []
     }
 
     formatDuration = formatDuration

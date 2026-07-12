@@ -33,6 +33,27 @@ test.describe('renderer scenario E2E', () => {
         await expect(page.getByText("You're all caught up! Check back later for new releases.")).toBeVisible()
     })
 
+    test('renders a recoverable error when checking whether an empty feed has been set up fails', async ({
+        page,
+    }) => {
+        await createRendererScenario(
+            page,
+            scenarioBuilder()
+                .handler('load-feed', { kind: 'resolve', value: [] })
+                .handler('has-feed', {
+                    kind: 'reject',
+                    message: 'Feed setup query timed out',
+                    userFacingMessage: 'Could not check whether your feed is set up. Please try again.',
+                })
+                .build(),
+        )
+
+        await expect(
+            page.getByText('Could not check whether your feed is set up. Please try again.'),
+        ).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
+    })
+
     test('renders a feed load error and recovers on retry', async ({ page }) => {
         const release = createHydratedRelease({ id: 'release-after-retry' })
         const controller = await createRendererScenario(page, rendererScenarios.feed.loadError())
