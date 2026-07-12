@@ -3,48 +3,48 @@
         class="mx-auto max-w-[65rem]"
         style="--max-feed-item-height: min(100vh, 800px); --feed-item-padding-y: 1.5rem"
     >
-        @if (!feed() && !feedError()) {
+        @if (!feedState()) {
             <div class="absolute inset-0 flex -translate-y-22 flex-col items-center justify-center">
                 <app-progress-ring [diameter]="150" [strokeWidth]="8" mode="spinning"></app-progress-ring>
                 <p class="type-label-md text-content-secondary">Loading releases...</p>
             </div>
         }
-        @if (feedError()) {
-            <div
-                class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center"
-            >
-                <p class="text-content-danger">
-                    <app-icon name="octXCircleFill" color="content.danger" size="3rem"></app-icon>
-                </p>
-                <p class="type-label-md mt-2 text-center text-content-danger">
-                    {{ feedError() }}
-                </p>
+        @if (feedState(); as feedState) {
+            @if (feedState.status === 'error') {
+                <div
+                    class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
+                >
+                    <p class="text-content-danger">
+                        <app-icon name="octXCircleFill" color="content.danger" size="3rem"></app-icon>
+                    </p>
+                    <p class="type-label-md mt-2 text-center text-content-danger">
+                        {{ feedState.error }}
+                    </p>
 
-                <button class="btn-nkd-neutral mt-3" (click)="retryNotifier$.next()">Retry</button>
-            </div>
-        }
-
-        @if (!feedError() && feed()) {
-            @if (feed()?.length == 0) {
+                    <button class="btn-nkd-neutral mt-3" (click)="retryNotifier$.next()">Retry</button>
+                </div>
+            } @else if (feedState.status === 'caught-up') {
                 <div
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
                     <p class="type-section-title text-content-primary">No new releases</p>
-                    @if (hasFeed.value() === true) {
-                        <p class="type-body-sm mt-2 text-content-muted">
-                            You're all caught up! Check back later for new releases.
-                        </p>
-                    } @else if (hasFeed.value() === false) {
-                        <p class="type-body-sm mt-2 text-content-muted">
-                            It looks like you haven't set up your feed yet. Go to
-                            <a class="" routerLink="/settings">settings</a>
-                            to get started.
-                        </p>
-                    }
+                    <p class="type-body-sm mt-2 text-content-muted">
+                        You're all caught up! Check back later for new releases.
+                    </p>
+                </div>
+            } @else if (feedState.status === 'empty') {
+                <div
+                    class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
+                >
+                    <p class="type-section-title text-content-primary">No new releases</p>
+                    <p class="type-body-sm mt-2 text-content-muted">
+                        It looks like you haven't set up your feed yet. Go to
+                        <a class="" routerLink="/settings">settings</a>
+                        to get started.
+                    </p>
                 </div>
             }
-
-            @for (feedItem of feed(); track feedItem.id) {
+            @for (feedItem of feedState.status === 'feed' ? feedState.items : []; track feedItem.id) {
                 <div
                     class="feed-entry | my-32 flex max-h-[var(--max-feed-item-height)] min-h-[45vh] snap-center items-center py-[calc(var(--feed-item-padding-y)/2)] transition-all duration-slow ease-standard"
                     [ngClass]="{ 'opacity-30 blur-sm': currentFeedIndex() != $index }"
