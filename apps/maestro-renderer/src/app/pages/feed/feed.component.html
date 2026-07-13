@@ -75,7 +75,6 @@
                                         [ngClass]="{
                                             'text-content-muted': !track.streamUrl,
                                             'font-bold text-content-success': isCurrentTrack(track.streamUrl),
-                                            'mt-2': !$first,
                                         }"
                                     >
                                         @if (track.streamUrl) {
@@ -95,20 +94,17 @@
                                             >
                                                 @if (isCurrentTrack(track.streamUrl)) {
                                                     <app-icon
-                                                        class="text-base"
-                                                        [name]="
-                                                            audioPlayer.isPlaying() ? 'octPause' : 'octPlay'
-                                                        "
+                                                        [name]="audioPlayer.isPlaying() ? 'pause' : 'play'"
                                                     ></app-icon>
                                                 } @else if (feedItem.data.releaseType == 'album') {
                                                     {{ $index + 1 }}.
                                                 } @else {
-                                                    <app-icon name="octPlay"></app-icon>
+                                                    <app-icon name="play"></app-icon>
                                                 }
                                             </button>
                                             <button
                                                 type="button"
-                                                class="track-seeker relative flex min-w-0 grow items-center justify-between gap-2 rounded-sm py-0.5 text-left text-content-primary"
+                                                class="track-seeker relative flex min-w-0 grow items-center justify-between gap-2 rounded-sm py-1 text-left text-content-primary"
                                                 [attr.aria-label]="'Seek within ' + track.title"
                                                 (click)="seekTrack($event, track.streamUrl)"
                                             >
@@ -119,7 +115,7 @@
 
                                                 @if (isCurrentTrack(track.streamUrl)) {
                                                     <span
-                                                        class="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-border-subtle"
+                                                        class="track-progress-bar | absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-border-subtle"
                                                         aria-hidden="true"
                                                     >
                                                         <span
@@ -140,19 +136,12 @@
                                                 {{ track.duration ? formatDuration(track.duration) : '' }}
                                             </span>
                                         }
-                                        <!-- @if (isCurrentTrack(track.streamUrl)) {
-                                            <span
-                                                class="absolute inset-x-0 -bottom-1 h-1 rounded-full bg-border-subtle"
-                                                aria-hidden="true"
-                                            >
-                                                <span
-                                                    class="block h-full rounded-full bg-content-success transition-[width] duration-fast ease-standard"
-                                                    [style.width.%]="trackProgress(track.streamUrl)"
-                                                ></span>
-                                            </span>
-                                        } -->
                                     </li>
                                 }
+
+                                <div
+                                    class="shadow-overlay | sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
+                                ></div>
                             </ul>
                         </div>
 
@@ -260,13 +249,12 @@
                                                 : 'Click to snooze (show again tomorrow)'
                                         "
                                     >
-                                        <!-- @TODO: this may need to be made reactive -->
-                                        <!-- @TODO: use ngx-icons here as well  -->
-                                        <i
-                                            class="{{
-                                                snoozedFeedItems.has(feedItem.id) ? 'fas' : 'far'
-                                            }} fa-alarm-snooze"
-                                        ></i>
+                                        <app-icon
+                                            [name]="
+                                                snoozedFeedItems.has(feedItem.id) ? 'snoozeFilled' : 'snooze'
+                                            "
+                                            size="1.5rem"
+                                        ></app-icon>
                                     </button>
                                 </div>
                             </div>
@@ -324,6 +312,10 @@
                                         </li>
                                     }
                                 </ul>
+
+                                <div
+                                    class="shadow-overlay | sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
+                                ></div>
                             </div>
                         }
                     </div>
