@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core'
-import { provideIcons, NgIcon } from '@ng-icons/core'
+import { NgIcon, provideIcons } from '@ng-icons/core'
 import {
     octCheckCircleFill,
     octDash,
+    octPause,
+    octPlay,
     octScreenFull,
     octScreenNormal,
     octX,
@@ -13,6 +15,8 @@ import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.gene
 const icons = {
     octCheckCircleFill,
     octDash,
+    octPause,
+    octPlay,
     octScreenFull,
     octScreenNormal,
     octX,
@@ -29,7 +33,7 @@ export type IconIdentitfier = keyof typeof icons
     changeDetection: ChangeDetectionStrategy.OnPush,
     viewProviders: [provideIcons(icons)],
     host: {
-        class: 'inline-block',
+        class: 'inline-flex items-center justify-center',
     },
 })
 export class IconComponent {

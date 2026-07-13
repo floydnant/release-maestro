@@ -6,7 +6,7 @@ export class WebAudioPlayer {
     private audioElem: HTMLAudioElement
     private sourceNode: MediaElementAudioSourceNode
     private gainNode: GainNode
-    private interval: ReturnType<typeof setInterval> | undefined
+    private pendingSeekPercent = 0
 
     private constructor() {
         this.audioElem = new Audio()
@@ -20,6 +20,12 @@ export class WebAudioPlayer {
 
         this.audioElem.addEventListener('pause', () => this.isPlaying.set(false))
         this.audioElem.addEventListener('play', () => this.isPlaying.set(true))
+        this.audioElem.addEventListener('timeupdate', () => this.playerTime.set(this.audioElem.currentTime))
+        this.audioElem.addEventListener('durationchange', () => this.updateDuration())
+        this.audioElem.addEventListener('loadedmetadata', () => {
+            this.updateDuration()
+            this.seekTo(this.pendingSeekPercent)
+        })
         this.audioElem.addEventListener('ended', () => {
             this.pause()
             this.ended$.next()
@@ -61,24 +67,22 @@ export class WebAudioPlayer {
     }
 
     seekTo(timePercent: number) {
-        const newTime = this.audioElem.duration * timePercent
+        if (!Number.isFinite(this.audioElem.duration) || this.audioElem.duration <= 0) return
+
+        const newTime = this.audioElem.duration * Math.min(Math.max(timePercent, 0), 1)
         this.audioElem.currentTime = newTime
 
         this.playerTime.set(this.audioElem.currentTime)
     }
     seekBy(seconds: number) {
-        const newTime = this.audioElem.currentTime + seconds
-        if (newTime < 0) {
-            this.audioElem.currentTime = 0
-        } else if (newTime > this.audioElem.duration) {
-            this.audioElem.currentTime = this.audioElem.duration
-        } else {
-            this.audioElem.currentTime = newTime
-        }
+        if (!Number.isFinite(this.audioElem.duration) || this.audioElem.duration <= 0) return
+
+        const newTime = Math.min(Math.max(this.audioElem.currentTime + seconds, 0), this.audioElem.duration)
+        this.audioElem.currentTime = newTime
         this.playerTime.set(newTime)
     }
 
-    playSource(url: string) {
+    playSource(url: string, seekPercent = 0) {
         this.logInfo('Playing source', url)
 
         // const convertedPath = convertFileSrc(source.path).replace("?", "%3F");
@@ -86,13 +90,12 @@ export class WebAudioPlayer {
         this.audioElem.pause()
         this.audioElem.currentTime = 0
         this.audioElem.src = url
-        this.play()
 
         this.currentUrl.set(url)
         this.playerTime.set(0)
-        setTimeout(() => {
-            this.duration.set(this.audioElem.duration)
-        }, 500)
+        this.duration.set(0)
+        this.pendingSeekPercent = Math.min(Math.max(seekPercent, 0), 1)
+        this.play()
     }
 
     play() {
@@ -103,16 +106,11 @@ export class WebAudioPlayer {
         })
 
         this.playerTime.set(this.audioElem.currentTime)
-        clearInterval(this.interval)
-        this.interval = setInterval(() => {
-            this.playerTime.set(this.audioElem.currentTime)
-        }, 500)
     }
 
     pause() {
         if (this.audioElem) {
             this.audioElem.pause()
-            clearInterval(this.interval)
         }
     }
 
@@ -122,6 +120,11 @@ export class WebAudioPlayer {
         } else {
             this.play()
         }
+    }
+
+    private updateDuration() {
+        const duration = this.audioElem.duration
+        this.duration.set(Number.isFinite(duration) && duration > 0 ? duration : 0)
     }
 
     logInfo(message: string, ...args: unknown[]) {

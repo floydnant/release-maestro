@@ -82,6 +82,15 @@ test.describe('renderer scenario E2E', () => {
             .toMatchObject({ channel: 'load-feed', payload: { index: 0, count: 5 } })
     })
 
+    test('renders a playback control for previewable release-feed tracks', async ({ page }) => {
+        const release = createHydratedRelease()
+        release.data.tracks[0]!.streamUrl = 'https://example.com/dawn-test.mp3'
+
+        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+
+        await expect(page.getByRole('button', { name: 'Play Dawn Test' })).toBeVisible()
+    })
+
     test('updates a failed release feed scenario with a new handler before retrying', async ({ page }) => {
         const release = createHydratedRelease({ id: 'release-after-handler-update' })
         const controller = await createRendererScenario(page, rendererScenarios.feed.loadError())

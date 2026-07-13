@@ -70,25 +70,87 @@
                             >
                                 @for (track of feedItem.data.tracks; track $index) {
                                     <li
-                                        class="track | type-body-sm flex justify-between gap-2"
+                                        class="track | type-body-sm relative flex min-h-6 items-center gap-1"
                                         [attr.data-track-index]="$index"
                                         [ngClass]="{
                                             'text-content-muted': !track.streamUrl,
-                                            'font-bold text-content-success':
-                                                track.streamUrl == audioPlayer.currentUrl(),
+                                            'font-bold text-content-success': isCurrentTrack(track.streamUrl),
                                             'mt-2': !$first,
                                         }"
                                     >
-                                        <!-- @TODO: add track seeker for active track -->
-                                        <span>
-                                            @if (feedItem.data.releaseType == 'album') {
-                                                {{ $index + 1 }}.
-                                            }
-                                            {{ track.title }}</span
-                                        >
-                                        <span>
-                                            {{ track.duration ? formatDuration(track.duration) : '' }}
-                                        </span>
+                                        @if (track.streamUrl) {
+                                            <button
+                                                type="button"
+                                                class="track-control grid size-6 shrink-0 place-items-center rounded-sm text-content-secondary transition-colors"
+                                                [ngClass]="{
+                                                    'hover:bg-action-quiet-hover hover:text-content-primary':
+                                                        isCurrentTrack(track.streamUrl),
+                                                }"
+                                                [attr.aria-label]="
+                                                    isCurrentTrack(track.streamUrl) && audioPlayer.isPlaying()
+                                                        ? 'Pause ' + track.title
+                                                        : 'Play ' + track.title
+                                                "
+                                                (click)="toggleTrackPlayback(track.streamUrl)"
+                                            >
+                                                @if (isCurrentTrack(track.streamUrl)) {
+                                                    <app-icon
+                                                        class="text-base"
+                                                        [name]="
+                                                            audioPlayer.isPlaying() ? 'octPause' : 'octPlay'
+                                                        "
+                                                    ></app-icon>
+                                                } @else if (feedItem.data.releaseType == 'album') {
+                                                    {{ $index + 1 }}.
+                                                } @else {
+                                                    <app-icon name="octPlay"></app-icon>
+                                                }
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="track-seeker relative flex min-w-0 grow items-center justify-between gap-2 rounded-sm py-0.5 text-left text-content-primary"
+                                                [attr.aria-label]="'Seek within ' + track.title"
+                                                (click)="seekTrack($event, track.streamUrl)"
+                                            >
+                                                <span class="truncate">{{ track.title }}</span>
+                                                <span class="shrink-0">
+                                                    {{ track.duration ? formatDuration(track.duration) : '' }}
+                                                </span>
+
+                                                @if (isCurrentTrack(track.streamUrl)) {
+                                                    <span
+                                                        class="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-border-subtle"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <span
+                                                            class="block h-full rounded-full bg-content-success transition-[width] duration-fast ease-standard"
+                                                            [style.width.%]="trackProgress(track.streamUrl)"
+                                                        ></span>
+                                                    </span>
+                                                }
+                                            </button>
+                                        } @else {
+                                            <span class="w-6 shrink-0 text-right">
+                                                @if (feedItem.data.releaseType == 'album') {
+                                                    {{ $index + 1 }}.
+                                                }
+                                            </span>
+                                            <span class="min-w-0 grow truncate">{{ track.title }}</span>
+                                            <span class="shrink-0">
+                                                {{ track.duration ? formatDuration(track.duration) : '' }}
+                                            </span>
+                                        }
+                                        <!-- @if (isCurrentTrack(track.streamUrl)) {
+                                            <span
+                                                class="absolute inset-x-0 -bottom-1 h-1 rounded-full bg-border-subtle"
+                                                aria-hidden="true"
+                                            >
+                                                <span
+                                                    class="block h-full rounded-full bg-content-success transition-[width] duration-fast ease-standard"
+                                                    [style.width.%]="trackProgress(track.streamUrl)"
+                                                ></span>
+                                            </span>
+                                        } -->
                                     </li>
                                 }
                             </ul>
