@@ -11,6 +11,7 @@ type MainIpcChannel = keyof MainIpcContract & string
 type RendererIpcChannel = keyof RendererIpcContract & string
 
 type IpcPayload = unknown
+type ScenarioSerializedValue = string
 
 export type IpcCall = {
     id: number
@@ -55,9 +56,54 @@ declare global {
             setHandler: (channel: string, behavior: ScenarioBehavior) => void
             resolvePending: (channel: string, value?: IpcPayload) => void
             emit: (channel: string, payload?: IpcPayload) => void
+            deserialize: (value: ScenarioSerializedValue) => unknown
+            serialize: (value: unknown) => ScenarioSerializedValue
         }
     }
 }
+
+const SCENARIO_SERIALIZED_TYPE_KEY = '__maestroScenarioSerializedType'
+const SCENARIO_SERIALIZED_DATE_TYPE = 'Date'
+const SCENARIO_SERIALIZED_UNDEFINED_TYPE = 'Undefined'
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value == 'object' && value != null
+
+const originalJsonValue = (holder: unknown, key: string, value: unknown): unknown => {
+    if (!isRecord(holder)) return value
+    return Object.prototype.hasOwnProperty.call(holder, key) ? holder[key] : value
+}
+
+const scenarioJsonReplacer = function (this: unknown, key: string, value: unknown): unknown {
+    const originalValue = originalJsonValue(this, key, value)
+
+    if (originalValue instanceof Date) {
+        return {
+            [SCENARIO_SERIALIZED_TYPE_KEY]: SCENARIO_SERIALIZED_DATE_TYPE,
+            value: originalValue.toISOString(),
+        }
+    }
+    if (typeof value == 'undefined') {
+        return { [SCENARIO_SERIALIZED_TYPE_KEY]: SCENARIO_SERIALIZED_UNDEFINED_TYPE }
+    }
+    return value
+}
+
+const isSerializedDate = (value: unknown): value is { value: string } =>
+    isRecord(value) &&
+    value[SCENARIO_SERIALIZED_TYPE_KEY] === SCENARIO_SERIALIZED_DATE_TYPE &&
+    typeof value['value'] == 'string'
+const isSerializedUndefined = (value: unknown): boolean =>
+    isRecord(value) && value[SCENARIO_SERIALIZED_TYPE_KEY] === SCENARIO_SERIALIZED_UNDEFINED_TYPE
+
+const scenarioJsonReviver = (_key: string, value: unknown): unknown =>
+    isSerializedDate(value) ? new Date(value.value) : isSerializedUndefined(value) ? undefined : value
+
+const serializeScenarioValue = (value: unknown): ScenarioSerializedValue =>
+    JSON.stringify(value, scenarioJsonReplacer) as ScenarioSerializedValue
+
+const parseScenarioValue = <T>(value: ScenarioSerializedValue): T =>
+    JSON.parse(value, scenarioJsonReviver) as T
 
 const defaultScenario = (): RendererScenario => ({
     handlers: {
@@ -192,45 +238,68 @@ export const rendererScenarios = {
 export class RendererScenarioController {
     constructor(private readonly page: Page) {}
 
-    calls(channel?: string): Promise<IpcCall[]> {
-        return this.page.evaluate(selectedChannel => window.__maestroScenario.calls(selectedChannel), channel)
-    }
-
-    lastCall(channel: string): Promise<IpcCall | undefined> {
-        return this.page.evaluate(
-            selectedChannel => window.__maestroScenario.lastCall(selectedChannel),
+    async calls(channel?: string): Promise<IpcCall[]> {
+        const serializedCalls = await this.page.evaluate(
+            selectedChannel =>
+                window.__maestroScenario.serialize(window.__maestroScenario.calls(selectedChannel)),
             channel,
         )
+        return parseScenarioValue(serializedCalls)
+    }
+
+    async lastCall(channel: string): Promise<IpcCall | undefined> {
+        const serializedCall = await this.page.evaluate(
+            selectedChannel =>
+                window.__maestroScenario.serialize(window.__maestroScenario.lastCall(selectedChannel)),
+            channel,
+        )
+        return parseScenarioValue(serializedCall)
     }
 
     setHandler(channel: MainIpcChannel, behavior: ScenarioBehavior): Promise<void> {
+        const serializedBehavior = serializeScenarioValue(behavior)
         return this.page.evaluate(
-            ({ selectedChannel, nextBehavior }) =>
-                window.__maestroScenario.setHandler(selectedChannel, nextBehavior),
-            { selectedChannel: channel, nextBehavior: behavior },
+            ({ selectedChannel, nextBehavior }) => {
+                const behavior = window.__maestroScenario.deserialize(nextBehavior) as ScenarioBehavior
+                window.__maestroScenario.setHandler(selectedChannel, behavior)
+            },
+            { selectedChannel: channel, nextBehavior: serializedBehavior },
         )
     }
 
     updateState(handlers: Partial<Record<MainIpcChannel, ScenarioBehavior>>): Promise<void> {
+        const serializedHandlers = serializeScenarioValue(handlers)
         return this.page.evaluate(nextHandlers => {
-            for (const [channel, behavior] of Object.entries(nextHandlers)) {
+            const handlers = window.__maestroScenario.deserialize(nextHandlers) as Partial<
+                Record<MainIpcChannel, ScenarioBehavior>
+            >
+            for (const [channel, behavior] of Object.entries(handlers)) {
                 if (behavior) window.__maestroScenario.setHandler(channel, behavior)
             }
-        }, handlers)
+        }, serializedHandlers)
     }
 
     resolvePending(channel: MainIpcChannel, value?: IpcPayload): Promise<void> {
+        const serializedValue = value == null ? value : serializeScenarioValue(value)
         return this.page.evaluate(
             ({ selectedChannel, nextValue }) =>
-                window.__maestroScenario.resolvePending(selectedChannel, nextValue),
-            { selectedChannel: channel, nextValue: value },
+                window.__maestroScenario.resolvePending(
+                    selectedChannel,
+                    nextValue == null ? nextValue : window.__maestroScenario.deserialize(nextValue),
+                ),
+            { selectedChannel: channel, nextValue: serializedValue },
         )
     }
 
     emit(channel: RendererIpcChannel, payload?: IpcPayload): Promise<void> {
+        const serializedPayload = payload == null ? payload : serializeScenarioValue(payload)
         return this.page.evaluate(
-            ({ selectedChannel, nextPayload }) => window.__maestroScenario.emit(selectedChannel, nextPayload),
-            { selectedChannel: channel, nextPayload: payload },
+            ({ selectedChannel, nextPayload }) =>
+                window.__maestroScenario.emit(
+                    selectedChannel,
+                    nextPayload == null ? nextPayload : window.__maestroScenario.deserialize(nextPayload),
+                ),
+            { selectedChannel: channel, nextPayload: serializedPayload },
         )
     }
 }
@@ -240,139 +309,161 @@ export const createRendererScenario = async (
     scenario: RendererScenario,
     path = '/feed',
 ): Promise<RendererScenarioController> => {
-    await page.addInitScript(initialScenario => {
-        type Listener = (event: unknown, payload?: unknown) => void
+    await page.addInitScript(
+        serialization => {
+            type Listener = (event: unknown, payload?: unknown) => void
 
-        const isRecord = (value: unknown): value is Record<string, unknown> =>
-            typeof value == 'object' && value != null
-        const reviveLoadFeedDates = (value: unknown) => {
-            if (!Array.isArray(value)) return value
+            const isRecord = (value: unknown): value is Record<string, unknown> =>
+                typeof value == 'object' && value != null
 
-            return value.map(feedItem => {
-                if (!isRecord(feedItem) || !isRecord(feedItem['data'])) return feedItem
+            const originalJsonValue = (holder: unknown, key: string, value: unknown): unknown => {
+                if (!isRecord(holder)) return value
+                return Object.prototype.hasOwnProperty.call(holder, key) ? holder[key] : value
+            }
 
-                const data = feedItem['data']
-                return {
-                    ...feedItem,
-                    data: {
-                        ...data,
-                        emailReceivedAt:
-                            typeof data['emailReceivedAt'] == 'string'
-                                ? new Date(data['emailReceivedAt'])
-                                : data['emailReceivedAt'],
-                        releaseDate:
-                            typeof data['releaseDate'] == 'string'
-                                ? new Date(data['releaseDate'])
-                                : data['releaseDate'],
-                    },
-                }
-            })
-        }
-        const reviveIpcPayload = (channel: string, payload: unknown) =>
-            channel == 'load-feed' ? reviveLoadFeedDates(payload) : payload
+            const scenarioJsonReplacer = function (this: unknown, key: string, value: unknown): unknown {
+                const originalValue = originalJsonValue(this, key, value)
 
-        const hydratedScenario = initialScenario as RendererScenario
-        const state: ScenarioState = {
-            handlers: hydratedScenario.handlers,
-            calls: [],
-            nextCallId: 1,
-            pending: {},
-        }
-        const listeners = new Map<string, Set<Listener>>()
-
-        const nextBehavior = (channel: string): ScenarioBehavior => {
-            const behavior = state.handlers[channel]
-            if (!behavior) return { kind: 'reject', message: `No scenario handler configured for ${channel}` }
-
-            if (behavior.kind !== 'sequence') return behavior
-
-            const nextStep = behavior.steps.shift()
-            if (nextStep) return nextStep
-            return (
-                behavior.fallback ?? {
-                    kind: 'reject',
-                    message: `No scenario sequence step left for ${channel}`,
-                }
-            )
-        }
-
-        const settlePending = (
-            channel: string,
-            settle: (pendingCall: ScenarioState['pending'][string][number]) => void,
-        ) => {
-            const pending = state.pending[channel]?.shift()
-            if (!pending) throw new Error(`No pending scenario call for ${channel}`)
-            settle(pending)
-        }
-
-        const ipcRenderer = {
-            invoke(channel: string, payload?: unknown) {
-                const call = { id: state.nextCallId++, channel, payload }
-                state.calls.push(call)
-
-                const behavior = nextBehavior(channel)
-                if (behavior.kind === 'resolve') {
-                    return Promise.resolve(reviveIpcPayload(channel, behavior.value))
-                }
-                if (behavior.kind === 'reject') {
-                    const error = new Error(behavior.message)
-                    if (behavior.userFacingMessage) {
-                        Object.assign(error, { userFacingMessage: behavior.userFacingMessage })
+                if (originalValue instanceof Date) {
+                    return {
+                        [serialization.serializedTypeKey]: serialization.dateType,
+                        value: originalValue.toISOString(),
                     }
-                    return Promise.reject(error)
                 }
+                if (typeof value == 'undefined') {
+                    return { [serialization.serializedTypeKey]: serialization.undefinedType }
+                }
+                return value
+            }
 
-                return new Promise(resolve => {
-                    const pendingCall = { callId: call.id, channel, resolve }
-                    state.pending[channel] = [...(state.pending[channel] ?? []), pendingCall]
-                })
-            },
-            send(channel: string, payload?: unknown) {
-                state.calls.push({ id: state.nextCallId++, channel, payload })
-            },
-            on(channel: string, listener: Listener) {
-                listeners.set(channel, listeners.get(channel) ?? new Set())
-                listeners.get(channel)?.add(listener)
-                return ipcRenderer
-            },
-            off(channel: string, listener: Listener) {
-                listeners.get(channel)?.delete(listener)
-                return ipcRenderer
-            },
-            once(channel: string, listener: Listener) {
-                const onceListener: Listener = (event, payload) => {
-                    ipcRenderer.off(channel, onceListener)
-                    listener(event, payload)
-                }
-                return ipcRenderer.on(channel, onceListener)
-            },
-        }
+            const serializeScenarioValue = (value: unknown) => JSON.stringify(value, scenarioJsonReplacer)
+            const isSerializedDate = (value: unknown): value is { value: string } =>
+                isRecord(value) &&
+                value[serialization.serializedTypeKey] === serialization.dateType &&
+                typeof value['value'] == 'string'
+            const isSerializedUndefined = (value: unknown) =>
+                isRecord(value) && value[serialization.serializedTypeKey] === serialization.undefinedType
+            const scenarioJsonReviver = (_key: string, value: unknown) =>
+                isSerializedDate(value)
+                    ? new Date(value.value)
+                    : isSerializedUndefined(value)
+                      ? undefined
+                      : value
+            const parseScenarioValue = (value: ScenarioSerializedValue) =>
+                JSON.parse(value, scenarioJsonReviver)
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(window as any).process = { type: 'renderer', platform: 'darwin' }
-        const originalRequire = window.require
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(window as any).require = (moduleName: string) => {
-            if (moduleName === 'electron') return { ipcRenderer }
-            if (originalRequire) return originalRequire(moduleName)
-            throw new Error(`Renderer scenario did not mock window.require("${moduleName}")`)
-        }
-        window.__maestroScenario = {
-            calls: channel => state.calls.filter(call => !channel || call.channel === channel),
-            lastCall: channel => state.calls.filter(call => call.channel === channel).at(-1),
-            setHandler: (channel, behavior) => {
-                state.handlers[channel] = behavior
-            },
-            resolvePending: (channel, value) => {
-                settlePending(channel, pendingCall => pendingCall.resolve(reviveIpcPayload(channel, value)))
-            },
-            emit: (channel, payload) => {
-                for (const listener of listeners.get(channel) ?? []) {
-                    listener({}, payload)
-                }
-            },
-        }
-    }, scenario)
+            const hydratedScenario = parseScenarioValue(serialization.scenario) as RendererScenario
+            const state: ScenarioState = {
+                handlers: hydratedScenario.handlers,
+                calls: [],
+                nextCallId: 1,
+                pending: {},
+            }
+            const listeners = new Map<string, Set<Listener>>()
+
+            const nextBehavior = (channel: string): ScenarioBehavior => {
+                const behavior = state.handlers[channel]
+                if (!behavior)
+                    return { kind: 'reject', message: `No scenario handler configured for ${channel}` }
+
+                if (behavior.kind !== 'sequence') return behavior
+
+                const nextStep = behavior.steps.shift()
+                if (nextStep) return nextStep
+                return (
+                    behavior.fallback ?? {
+                        kind: 'reject',
+                        message: `No scenario sequence step left for ${channel}`,
+                    }
+                )
+            }
+
+            const settlePending = (
+                channel: string,
+                settle: (pendingCall: ScenarioState['pending'][string][number]) => void,
+            ) => {
+                const pending = state.pending[channel]?.shift()
+                if (!pending) throw new Error(`No pending scenario call for ${channel}`)
+                settle(pending)
+            }
+
+            const ipcRenderer = {
+                invoke(channel: string, payload?: unknown) {
+                    const call = { id: state.nextCallId++, channel, payload }
+                    state.calls.push(call)
+
+                    const behavior = nextBehavior(channel)
+                    if (behavior.kind === 'resolve') {
+                        return Promise.resolve(behavior.value)
+                    }
+                    if (behavior.kind === 'reject') {
+                        const error = new Error(behavior.message)
+                        if (behavior.userFacingMessage) {
+                            Object.assign(error, { userFacingMessage: behavior.userFacingMessage })
+                        }
+                        return Promise.reject(error)
+                    }
+
+                    return new Promise(resolve => {
+                        const pendingCall = { callId: call.id, channel, resolve }
+                        state.pending[channel] = [...(state.pending[channel] ?? []), pendingCall]
+                    })
+                },
+                send(channel: string, payload?: unknown) {
+                    state.calls.push({ id: state.nextCallId++, channel, payload })
+                },
+                on(channel: string, listener: Listener) {
+                    listeners.set(channel, listeners.get(channel) ?? new Set())
+                    listeners.get(channel)?.add(listener)
+                    return ipcRenderer
+                },
+                off(channel: string, listener: Listener) {
+                    listeners.get(channel)?.delete(listener)
+                    return ipcRenderer
+                },
+                once(channel: string, listener: Listener) {
+                    const onceListener: Listener = (event, payload) => {
+                        ipcRenderer.off(channel, onceListener)
+                        listener(event, payload)
+                    }
+                    return ipcRenderer.on(channel, onceListener)
+                },
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ;(window as any).process = { type: 'renderer', platform: 'darwin' }
+            const originalRequire = window.require
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ;(window as any).require = (moduleName: string) => {
+                if (moduleName === 'electron') return { ipcRenderer }
+                if (originalRequire) return originalRequire(moduleName)
+                throw new Error(`Renderer scenario did not mock window.require("${moduleName}")`)
+            }
+            window.__maestroScenario = {
+                calls: channel => state.calls.filter(call => !channel || call.channel === channel),
+                lastCall: channel => state.calls.filter(call => call.channel === channel).at(-1),
+                setHandler: (channel, behavior) => {
+                    state.handlers[channel] = behavior
+                },
+                resolvePending: (channel, value) => {
+                    settlePending(channel, pendingCall => pendingCall.resolve(value))
+                },
+                emit: (channel, payload) => {
+                    for (const listener of listeners.get(channel) ?? []) {
+                        listener({}, payload)
+                    }
+                },
+                deserialize: parseScenarioValue,
+                serialize: serializeScenarioValue,
+            }
+        },
+        {
+            dateType: SCENARIO_SERIALIZED_DATE_TYPE,
+            scenario: serializeScenarioValue(scenario),
+            serializedTypeKey: SCENARIO_SERIALIZED_TYPE_KEY,
+            undefinedType: SCENARIO_SERIALIZED_UNDEFINED_TYPE,
+        },
+    )
 
     await page.goto(path, { waitUntil: 'domcontentloaded' })
 

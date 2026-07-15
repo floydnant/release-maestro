@@ -25,6 +25,10 @@ The fake `ipcRenderer` supports:
 The scenario backend lives in the browser page. Tests control it through the returned
 `RendererScenarioController`, which uses `page.evaluate` behind the scenes.
 
+Scenario values are serialized with a tagged JSON codec before they cross the Playwright boundary.
+Nested `Date` instances are revived as real `Date` objects in the browser, so fixtures can use dates
+without adding channel-specific revival logic.
+
 ## Basic Usage
 
 ```ts
@@ -89,10 +93,11 @@ Use a pending handler when the UI needs to stay in a loading branch:
 
 ```ts
 const controller = await createRendererScenario(page, scenarioBuilder().feedLoadPending().build())
+const release = createHydratedRelease()
 
 await expect(page.getByText('Loading releases...')).toBeVisible()
-await controller.resolvePending('load-feed', [createHydratedRelease()])
-await expect(page.getByRole('link', { name: 'First Light' })).toBeVisible()
+await controller.resolvePending('load-feed', [release])
+await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
 ```
 
 Use a sequence when a user action should retry a failed request:

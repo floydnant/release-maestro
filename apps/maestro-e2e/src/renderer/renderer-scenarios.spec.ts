@@ -83,6 +83,65 @@ test.describe('renderer scenario E2E', () => {
             .toMatchObject({ channel: 'load-feed', payload: { index: 0, count: 5 } })
     })
 
+    test('revives nested dates across the scenario IPC boundary', async ({ page }) => {
+        const initialCapturedAt = new Date('2026-07-01T12:34:56.000Z')
+        const updatedCapturedAt = new Date('2026-07-02T12:34:56.000Z')
+        const pendingCapturedAt = new Date('2026-07-03T12:34:56.000Z')
+
+        const scenario = scenarioBuilder()
+            .handler('metadata:read', {
+                kind: 'resolve',
+                value: { nested: [{ capturedAt: initialCapturedAt }] },
+            })
+            .handler('metadata:scan', { kind: 'pending' })
+            .build()
+        const controller = await createRendererScenario(page, scenario)
+
+        const readCapturedAt = (channel: string) =>
+            page.evaluate(async selectedChannel => {
+                const electronModule = window.require?.('electron') as {
+                    ipcRenderer: { invoke: (channel: string) => Promise<unknown> }
+                }
+                const value = (await electronModule.ipcRenderer.invoke(selectedChannel)) as {
+                    nested: { capturedAt: Date }[]
+                }
+                const capturedAt = value.nested[0]?.capturedAt
+
+                return {
+                    isDate: capturedAt instanceof Date,
+                    iso: capturedAt?.toISOString(),
+                }
+            }, channel)
+
+        await expect(readCapturedAt('metadata:read')).resolves.toEqual({
+            isDate: true,
+            iso: initialCapturedAt.toISOString(),
+        })
+
+        await controller.setHandler('metadata:read', {
+            kind: 'resolve',
+            value: { nested: [{ capturedAt: updatedCapturedAt }] },
+        })
+
+        await expect(readCapturedAt('metadata:read')).resolves.toEqual({
+            isDate: true,
+            iso: updatedCapturedAt.toISOString(),
+        })
+
+        const pendingResult = readCapturedAt('metadata:scan')
+        await expect
+            .poll(async () => controller.lastCall('metadata:scan'))
+            .toMatchObject({ channel: 'metadata:scan' })
+        await controller.resolvePending('metadata:scan', {
+            nested: [{ capturedAt: pendingCapturedAt }],
+        })
+
+        await expect(pendingResult).resolves.toEqual({
+            isDate: true,
+            iso: pendingCapturedAt.toISOString(),
+        })
+    })
+
     test('plays and seeks a real preview stream', async ({ page }) => {
         const release = createHydratedRelease()
 
