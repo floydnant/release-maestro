@@ -1,12 +1,24 @@
 // Covers preview playback and seeking behavior for feed item tracks.
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 import { createHydratedRelease, createRendererScenario, scenarioBuilder } from '../scenario-harness'
+
+const createFeedWithPlayableTrack = async (page: Page) => {
+    const release = createHydratedRelease()
+
+    await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+
+    return release
+}
+
+const startKarasuPlayback = async (page: Page) => {
+    await createFeedWithPlayableTrack(page)
+    await page.getByRole('button', { name: 'Play Karasu' }).click()
+    await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
+}
 
 test.describe('release feed playback scenarios', () => {
     test('plays and seeks a real preview stream', async ({ page }) => {
-        const release = createHydratedRelease()
-
-        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+        await createFeedWithPlayableTrack(page)
 
         await page.getByRole('button', { name: 'Play Karasu' }).click()
         await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
@@ -37,5 +49,31 @@ test.describe('release feed playback scenarios', () => {
                 return currentTime / duration
             })
             .toBeGreaterThan(0.7)
+    })
+
+    test('toggles the current track from the sidebar playback control', async ({ page }) => {
+        await startKarasuPlayback(page)
+
+        await page.getByRole('button', { name: 'PAUSE', exact: true }).click()
+
+        await expect(page.getByRole('button', { name: 'Play Karasu' })).toBeVisible()
+        await expect(page.getByRole('button', { name: 'PLAY', exact: true })).toBeVisible()
+
+        await page.getByRole('button', { name: 'PLAY', exact: true }).click()
+
+        await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
+        await expect(page.getByRole('button', { name: 'PAUSE', exact: true })).toBeVisible()
+    })
+
+    test('toggles the current track with the spacebar shortcut', async ({ page }) => {
+        await startKarasuPlayback(page)
+
+        await page.keyboard.press('Space')
+
+        await expect(page.getByRole('button', { name: 'Play Karasu' })).toBeVisible()
+
+        await page.keyboard.press('Space')
+
+        await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
     })
 })

@@ -25,4 +25,41 @@ test.describe('release feed import scenarios', () => {
 
         await expect.poll(async () => controller.calls('email-import-abort')).toHaveLength(1)
     })
+
+    test('renders completed import results and returns to the idle import action', async ({ page }) => {
+        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+
+        await expect(page.getByRole('button', { name: 'Import Emails' })).toBeVisible()
+
+        await controller.emit('email-import-progress', {
+            phase: 'completed',
+            totalProcessed: 8,
+            totalImported: 5,
+            newlyImported: 3,
+        })
+
+        await expect(page.getByText('Done! Processed 8 emails, imported 3 new ones.')).toBeVisible()
+
+        await page.getByRole('button', { name: 'Cool' }).click()
+
+        await expect(page.getByRole('button', { name: 'Import Emails' })).toBeVisible()
+        await expect(page.getByText('Done! Processed 8 emails, imported 3 new ones.')).toBeHidden()
+    })
+
+    test('renders import errors and retries the import action', async ({ page }) => {
+        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+
+        await expect(page.getByRole('button', { name: 'Import Emails' })).toBeVisible()
+
+        await controller.emit('email-import-progress', {
+            phase: 'error',
+            errorMessage: 'Apple Mail export failed',
+        })
+
+        await expect(page.getByText('Apple Mail export failed')).toBeVisible()
+
+        await page.getByRole('button', { name: 'Retry' }).click()
+
+        await expect.poll(async () => controller.calls('trigger-email-import')).toHaveLength(1)
+    })
 })

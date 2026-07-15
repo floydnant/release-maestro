@@ -180,7 +180,7 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
     type: 'BANDCAMP.TRALBUM',
     error: null,
     data: {
-        releaseUrl: 'https://example.bandcamp.com/album/first-light',
+        releaseUrl: 'https://example.bandcamp.com/album/gecko',
         releaseDate: null,
         emailReceivedAt: new Date('2026-06-20T10:00:00.000Z'),
         isEmailRead: false,
@@ -211,7 +211,7 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
                 titleLink: null,
                 albumPreorder: false,
                 streamUrl:
-                    'https://github.com/floydnant/release-maestro/raw/refs/heads/main/fixtures/06-karasu-ktmp3.mp3',
+                    'https://github.com/floydnant/release-maestro/raw/db7766d68cbb1d8053c1ca471195e6f10c3c2d32/fixtures/06-karasu-ktmp3.mp3',
             },
         ],
     },
