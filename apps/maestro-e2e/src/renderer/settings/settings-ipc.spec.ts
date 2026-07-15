@@ -1,0 +1,26 @@
+// Covers settings pages that load and save state through mocked IPC handlers.
+import { expect, test } from '@playwright/test'
+import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
+
+test.describe('settings IPC scenarios', () => {
+    test('loads and saves settings through configured IPC handlers', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .settings({ emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Bandcamp Inbox' } } })
+            .handler('set-settings', { kind: 'resolve' })
+            .build()
+        const controller = await createRendererScenario(page, scenario, '/settings/apple-mail')
+
+        const mailboxInput = page.getByLabel('Mailbox Name')
+        await expect(mailboxInput).toHaveValue('Bandcamp Inbox')
+
+        await mailboxInput.fill('New Releases')
+        await page.getByRole('button', { name: 'Save' }).click()
+
+        await expect
+            .poll(async () => controller.lastCall('set-settings'))
+            .toMatchObject({
+                channel: 'set-settings',
+                payload: { emailPluginConfig: { APPLE_MAIL: { mailboxName: 'New Releases' } } },
+            })
+    })
+})
