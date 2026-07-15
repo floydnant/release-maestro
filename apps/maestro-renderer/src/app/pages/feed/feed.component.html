@@ -64,33 +64,94 @@
                             />
 
                             <!-- @TODO: the height on this is very fragile, keep it up to date and come up with a better approach -->
-                            <!-- @TODO: we need to add the same kind of shadow effect on the scrolling list here as on the text-column -->
                             <ul
-                                class="tracks | mt-4 max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] overflow-y-auto"
+                                class="tracks | mt-3 max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] overflow-y-auto"
                             >
                                 @for (track of feedItem.data.tracks; track $index) {
                                     <li
-                                        class="track | type-body-sm flex justify-between gap-2"
+                                        class="track | type-body-sm relative flex min-h-6 items-center gap-1"
                                         [attr.data-track-index]="$index"
                                         [ngClass]="{
                                             'text-content-muted': !track.streamUrl,
-                                            'font-bold text-content-success':
-                                                track.streamUrl == audioPlayer.currentUrl(),
-                                            'mt-2': !$first,
+                                            'font-bold text-content-success': isCurrentTrack(track.streamUrl),
                                         }"
                                     >
-                                        <!-- @TODO: add track seeker for active track -->
-                                        <span>
-                                            @if (feedItem.data.releaseType == 'album') {
-                                                {{ $index + 1 }}.
-                                            }
-                                            {{ track.title }}</span
-                                        >
-                                        <span>
-                                            {{ track.duration ? formatDuration(track.duration) : '' }}
-                                        </span>
+                                        @if (track.streamUrl) {
+                                            <button
+                                                type="button"
+                                                class="track-control grid size-6 shrink-0 place-items-center rounded-sm text-content-secondary transition-colors"
+                                                [ngClass]="{
+                                                    'hover:bg-action-quiet-hover hover:text-content-primary':
+                                                        isCurrentTrack(track.streamUrl),
+                                                }"
+                                                [attr.aria-label]="
+                                                    isCurrentTrack(track.streamUrl) && audioPlayer.isPlaying()
+                                                        ? 'Pause ' + track.title
+                                                        : 'Play ' + track.title
+                                                "
+                                                (mousedown)="$event.preventDefault()"
+                                                (click)="toggleTrackPlayback(track.streamUrl)"
+                                            >
+                                                @if (isCurrentTrack(track.streamUrl)) {
+                                                    <app-icon
+                                                        [name]="audioPlayer.isPlaying() ? 'pause' : 'play'"
+                                                    ></app-icon>
+                                                } @else if (feedItem.data.releaseType == 'album') {
+                                                    {{ $index + 1 }}.
+                                                } @else {
+                                                    <app-icon name="play"></app-icon>
+                                                }
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="track-seeker relative flex min-w-0 grow items-center justify-between gap-2 rounded-sm py-1 text-left text-content-primary"
+                                                [attr.aria-label]="'Seek within ' + track.title"
+                                                (mousedown)="$event.preventDefault()"
+                                                (click)="seekTrack($event, track.streamUrl)"
+                                            >
+                                                <span class="truncate">{{ track.title }}</span>
+                                                <span class="shrink-0">
+                                                    {{ track.duration ? formatDuration(track.duration) : '' }}
+                                                </span>
+
+                                                @if (isCurrentTrack(track.streamUrl)) {
+                                                    <span
+                                                        class="track-progress-bar | absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-border-subtle"
+                                                        role="progressbar"
+                                                        [attr.aria-label]="track.title + ' playback progress'"
+                                                        aria-valuemin="0"
+                                                        [attr.aria-valuemax]="audioPlayer.duration() || 1"
+                                                        [attr.aria-valuenow]="audioPlayer.playerTime()"
+                                                        [attr.aria-valuetext]="
+                                                            formatDuration(audioPlayer.playerTime()) +
+                                                            ' of ' +
+                                                            formatDuration(audioPlayer.duration())
+                                                        "
+                                                    >
+                                                        <span
+                                                            class="block h-full rounded-full bg-content-success transition-[width] duration-fast ease-standard"
+                                                            [style.width.%]="trackProgress(track.streamUrl)"
+                                                        ></span>
+                                                    </span>
+                                                }
+                                            </button>
+                                        } @else {
+                                            <span class="w-6 shrink-0 text-right">
+                                                @if (feedItem.data.releaseType == 'album') {
+                                                    {{ $index + 1 }}.
+                                                }
+                                            </span>
+                                            <span class="min-w-0 grow truncate">{{ track.title }}</span>
+                                            <span class="shrink-0">
+                                                {{ track.duration ? formatDuration(track.duration) : '' }}
+                                            </span>
+                                        }
                                     </li>
                                 }
+
+                                <div
+                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
+                                ></div>
                             </ul>
                         </div>
 
@@ -185,7 +246,7 @@
 
                             <div class="feed-controls | sticky bottom-0 mt-4 flex justify-end">
                                 <div
-                                    class="shadow-overlay | z-0 size-full bg-gradient-to-b from-transparent to-background-canvas"
+                                    class="shadow-overlay | pointer-events-none z-0 size-full bg-gradient-to-b from-transparent to-background-canvas"
                                 ></div>
 
                                 <div class="flex rounded-tl-xl text-xl">
@@ -198,13 +259,12 @@
                                                 : 'Click to snooze (show again tomorrow)'
                                         "
                                     >
-                                        <!-- @TODO: this may need to be made reactive -->
-                                        <!-- @TODO: use ngx-icons here as well  -->
-                                        <i
-                                            class="{{
-                                                snoozedFeedItems.has(feedItem.id) ? 'fas' : 'far'
-                                            }} fa-alarm-snooze"
-                                        ></i>
+                                        <app-icon
+                                            [name]="
+                                                snoozedFeedItems.has(feedItem.id) ? 'snoozeFilled' : 'snooze'
+                                            "
+                                            size="1.5rem"
+                                        ></app-icon>
                                     </button>
                                 </div>
                             </div>
@@ -262,6 +322,10 @@
                                         </li>
                                     }
                                 </ul>
+
+                                <div
+                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
+                                ></div>
                             </div>
                         }
                     </div>

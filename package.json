@@ -23,6 +23,7 @@
         "@floating-ui/dom": "1.7.6",
         "@ng-icons/core": "34.0.0",
         "@ng-icons/octicons": "33.3.0",
+        "@ng-icons/solar-icons": "34.0.0",
         "@tailwindcss/container-queries": "0.1.1",
         "bandcamp-fetch": "2.0.0",
         "better-sqlite3": "12.11.1",

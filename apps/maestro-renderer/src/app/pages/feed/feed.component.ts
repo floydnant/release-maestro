@@ -224,6 +224,43 @@ export class FeedComponent {
         }
     }
 
+    toggleTrackPlayback(streamUrl: string) {
+        if (this.audioPlayer.currentUrl() == streamUrl) {
+            this.audioPlayer.togglePlay()
+            return
+        }
+
+        this.audioPlayer.playSource(streamUrl)
+        this.scrollCurrentTrackIntoView()
+    }
+
+    seekTrack(event: MouseEvent, streamUrl: string) {
+        const trackSeeker = event.currentTarget as HTMLElement
+        const { left, width } = trackSeeker.getBoundingClientRect()
+        const seekPercent = width > 0 ? Math.min(Math.max((event.clientX - left) / width, 0), 1) : 0
+
+        if (this.audioPlayer.currentUrl() == streamUrl) {
+            this.audioPlayer.seekTo(seekPercent)
+            return
+        }
+
+        this.audioPlayer.playSource(streamUrl, seekPercent)
+        this.scrollCurrentTrackIntoView()
+    }
+
+    isCurrentTrack(streamUrl: string | null) {
+        return streamUrl != null && streamUrl == this.audioPlayer.currentUrl()
+    }
+
+    trackProgress(streamUrl: string | null) {
+        if (!this.isCurrentTrack(streamUrl)) return 0
+
+        const duration = this.audioPlayer.duration()
+        if (!Number.isFinite(duration) || duration <= 0) return 0
+
+        return Math.min(Math.max((this.audioPlayer.playerTime() / duration) * 100, 0), 100)
+    }
+
     @HostListener('document:keydown.ArrowDown', ['$event'])
     @HostListener('document:keydown.J', ['$event'])
     nextTrack(event?: Event) {

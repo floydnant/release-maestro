@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core'
-import { provideIcons, NgIcon } from '@ng-icons/core'
+import { NgIcon, provideIcons } from '@ng-icons/core'
 import {
     octCheckCircleFill,
     octDash,
@@ -8,6 +8,8 @@ import {
     octX,
     octXCircleFill,
 } from '@ng-icons/octicons'
+import { solarAlarmSleepBold, solarPauseBold, solarPlayBold } from '@ng-icons/solar-icons/bold'
+import { solarAlarmSleep } from '@ng-icons/solar-icons/outline'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 const icons = {
@@ -17,6 +19,10 @@ const icons = {
     octScreenNormal,
     octX,
     octXCircleFill,
+    play: solarPlayBold,
+    pause: solarPauseBold,
+    snooze: solarAlarmSleep,
+    snoozeFilled: solarAlarmSleepBold,
 } satisfies Record<string, string>
 export type IconIdentitfier = keyof typeof icons
 
@@ -29,7 +35,7 @@ export type IconIdentitfier = keyof typeof icons
     changeDetection: ChangeDetectionStrategy.OnPush,
     viewProviders: [provideIcons(icons)],
     host: {
-        class: 'inline-block',
+        class: 'inline-flex items-center justify-center',
     },
 })
 export class IconComponent {

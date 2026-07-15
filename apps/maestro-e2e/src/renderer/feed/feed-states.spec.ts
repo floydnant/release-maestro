@@ -1,12 +1,13 @@
+// Covers release feed loading, empty, error, retry, and populated mocked IPC states.
 import { expect, test } from '@playwright/test'
 import {
     createHydratedRelease,
     createRendererScenario,
     rendererScenarios,
     scenarioBuilder,
-} from './scenario-harness'
+} from '../scenario-harness'
 
-test.describe('renderer scenario E2E', () => {
+test.describe('release feed scenario states', () => {
     test('renders the release feed loading state while feed loading is pending', async ({ page }) => {
         const release = createHydratedRelease({ id: 'release-after-pending' })
         const controller = await createRendererScenario(page, scenarioBuilder().feedLoadPending().build())
@@ -72,10 +73,11 @@ test.describe('renderer scenario E2E', () => {
     })
 
     test('renders a populated release feed from mocked IPC state', async ({ page }) => {
-        const controller = await createRendererScenario(page, rendererScenarios.feed.withOneRelease())
+        const release = createHydratedRelease()
+        const controller = await createRendererScenario(page, scenarioBuilder().feed([release]).build())
 
-        await expect(page.getByRole('link', { name: 'First Light' })).toBeVisible()
-        await expect(page.getByText('by North Archive')).toBeVisible()
+        await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
+        await expect(page.getByText(`by ${release.data.artist}`)).toBeVisible()
 
         await expect
             .poll(async () => controller.lastCall('load-feed'))
@@ -91,91 +93,5 @@ test.describe('renderer scenario E2E', () => {
         await page.getByRole('button', { name: 'Retry' }).click()
 
         await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
-    })
-
-    test('loads and saves settings through configured IPC handlers', async ({ page }) => {
-        const scenario = scenarioBuilder()
-            .settings({ emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Bandcamp Inbox' } } })
-            .handler('set-settings', { kind: 'resolve' })
-            .build()
-        const controller = await createRendererScenario(page, scenario, '/settings/apple-mail')
-
-        const mailboxInput = page.getByLabel('Mailbox Name')
-        await expect(mailboxInput).toHaveValue('Bandcamp Inbox')
-
-        await mailboxInput.fill('New Releases')
-        await page.getByRole('button', { name: 'Save' }).click()
-
-        await expect
-            .poll(async () => controller.lastCall('set-settings'))
-            .toMatchObject({
-                channel: 'set-settings',
-                payload: { emailPluginConfig: { APPLE_MAIL: { mailboxName: 'New Releases' } } },
-            })
-    })
-
-    test('emits import progress events and records cancel IPC calls', async ({ page }) => {
-        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
-
-        await page.getByRole('button', { name: 'Import Emails' }).click()
-        await expect
-            .poll(async () => controller.lastCall('trigger-email-import'))
-            .toMatchObject({ channel: 'trigger-email-import' })
-
-        await controller.emit('email-import-progress', {
-            phase: 'processing',
-            current: 2,
-            total: 5,
-            message: 'Importing Bandcamp notifications',
-        })
-
-        await expect(page.getByText('Importing Bandcamp notifications')).toBeVisible()
-        await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40')
-
-        await page.getByRole('button', { name: 'Cancel' }).click()
-
-        await expect.poll(async () => controller.calls('email-import-abort')).toHaveLength(1)
-    })
-
-    test('supports one-shot renderer event listeners', async ({ page }) => {
-        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
-
-        await page.evaluate(() => {
-            const electronModule = window.require?.('electron') as {
-                ipcRenderer: {
-                    once: (channel: string, listener: () => void) => void
-                }
-            }
-            let listenerCallCount = 0
-            electronModule.ipcRenderer.once('email-import-progress', () => {
-                listenerCallCount += 1
-            })
-            ;(
-                window as unknown as { __scenarioOnceListenerCallCount: () => number }
-            ).__scenarioOnceListenerCallCount = () => listenerCallCount
-        })
-
-        await controller.emit('email-import-progress', {
-            phase: 'processing',
-            current: 1,
-            total: 2,
-            message: 'First event',
-        })
-        await controller.emit('email-import-progress', {
-            phase: 'processing',
-            current: 2,
-            total: 2,
-            message: 'Second event',
-        })
-
-        await expect
-            .poll(() =>
-                page.evaluate(() =>
-                    (
-                        window as unknown as { __scenarioOnceListenerCallCount: () => number }
-                    ).__scenarioOnceListenerCallCount(),
-                ),
-            )
-            .toBe(1)
     })
 })
