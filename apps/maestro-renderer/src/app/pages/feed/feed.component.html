@@ -89,6 +89,7 @@
                                                         ? 'Pause ' + track.title
                                                         : 'Play ' + track.title
                                                 "
+                                                (mousedown)="$event.preventDefault()"
                                                 (click)="toggleTrackPlayback(track.streamUrl)"
                                             >
                                                 @if (isCurrentTrack(track.streamUrl)) {
@@ -105,6 +106,7 @@
                                                 type="button"
                                                 class="track-seeker relative flex min-w-0 grow items-center justify-between gap-2 rounded-sm py-1 text-left text-content-primary"
                                                 [attr.aria-label]="'Seek within ' + track.title"
+                                                (mousedown)="$event.preventDefault()"
                                                 (click)="seekTrack($event, track.streamUrl)"
                                             >
                                                 <span class="truncate">{{ track.title }}</span>

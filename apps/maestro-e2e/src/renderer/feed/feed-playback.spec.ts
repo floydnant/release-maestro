@@ -76,4 +76,26 @@ test.describe('release feed playback scenarios', () => {
 
         await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
     })
+
+    test('shows the track seeker focus ring only for keyboard focus', async ({ page }) => {
+        await createFeedWithPlayableTrack(page)
+
+        const seeker = page.getByRole('button', { name: 'Seek within Karasu' })
+
+        await seeker.click()
+        await page.keyboard.press('Space')
+
+        await expect(seeker).not.toBeFocused()
+        await expect
+            .poll(async () => seeker.evaluate(element => element.matches(':focus-visible')))
+            .toBe(false)
+
+        await page.getByRole('button', { name: /^(Play|Pause) Karasu$/ }).focus()
+        await page.keyboard.press('Tab')
+
+        await expect(seeker).toBeFocused()
+        await expect
+            .poll(async () => seeker.evaluate(element => element.matches(':focus-visible')))
+            .toBe(true)
+    })
 })
