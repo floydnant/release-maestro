@@ -139,15 +139,15 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
         emailReceivedAt: new Date('2026-06-20T10:00:00.000Z'),
         isEmailRead: false,
         emailId: 'email-1',
-        releaseName: 'First Light',
+        releaseName: 'Gecko',
         band: {
-            name: 'North Archive',
+            name: 'Shiva Chandra',
             imageUrl: null,
             location: 'Berlin, Germany',
             bio: 'Quiet electronics and patient melodies.',
             links: [{ url: 'https://example.bandcamp.com', text: 'Bandcamp' }],
         },
-        artist: 'North Archive',
+        artist: 'Shiva Chandra',
         releaseType: 'album',
         about: 'A small release fixture for renderer scenario tests.',
         links: [],
@@ -158,13 +158,14 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
         iframeUrl: null,
         tracks: [
             {
-                title: 'Dawn Test',
+                title: 'Karasu',
                 id: 1,
-                artist: 'North Archive',
+                artist: 'Shiva Chandra',
                 duration: 184,
                 titleLink: null,
                 albumPreorder: false,
-                streamUrl: null,
+                streamUrl:
+                    'https://github.com/floydnant/release-maestro/raw/refs/heads/main/fixtures/06-karasu-ktmp3.mp3',
             },
         ],
     },
@@ -242,6 +243,34 @@ export const createRendererScenario = async (
     await page.addInitScript(initialScenario => {
         type Listener = (event: unknown, payload?: unknown) => void
 
+        const isRecord = (value: unknown): value is Record<string, unknown> =>
+            typeof value == 'object' && value != null
+        const reviveLoadFeedDates = (value: unknown) => {
+            if (!Array.isArray(value)) return value
+
+            return value.map(feedItem => {
+                if (!isRecord(feedItem) || !isRecord(feedItem['data'])) return feedItem
+
+                const data = feedItem['data']
+                return {
+                    ...feedItem,
+                    data: {
+                        ...data,
+                        emailReceivedAt:
+                            typeof data['emailReceivedAt'] == 'string'
+                                ? new Date(data['emailReceivedAt'])
+                                : data['emailReceivedAt'],
+                        releaseDate:
+                            typeof data['releaseDate'] == 'string'
+                                ? new Date(data['releaseDate'])
+                                : data['releaseDate'],
+                    },
+                }
+            })
+        }
+        const reviveIpcPayload = (channel: string, payload: unknown) =>
+            channel == 'load-feed' ? reviveLoadFeedDates(payload) : payload
+
         const hydratedScenario = initialScenario as RendererScenario
         const state: ScenarioState = {
             handlers: hydratedScenario.handlers,
@@ -282,7 +311,9 @@ export const createRendererScenario = async (
                 state.calls.push(call)
 
                 const behavior = nextBehavior(channel)
-                if (behavior.kind === 'resolve') return Promise.resolve(behavior.value)
+                if (behavior.kind === 'resolve') {
+                    return Promise.resolve(reviveIpcPayload(channel, behavior.value))
+                }
                 if (behavior.kind === 'reject') {
                     const error = new Error(behavior.message)
                     if (behavior.userFacingMessage) {
@@ -333,7 +364,7 @@ export const createRendererScenario = async (
                 state.handlers[channel] = behavior
             },
             resolvePending: (channel, value) => {
-                settlePending(channel, pendingCall => pendingCall.resolve(value))
+                settlePending(channel, pendingCall => pendingCall.resolve(reviveIpcPayload(channel, value)))
             },
             emit: (channel, payload) => {
                 for (const listener of listeners.get(channel) ?? []) {

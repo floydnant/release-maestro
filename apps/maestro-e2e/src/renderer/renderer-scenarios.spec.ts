@@ -72,23 +72,51 @@ test.describe('renderer scenario E2E', () => {
     })
 
     test('renders a populated release feed from mocked IPC state', async ({ page }) => {
-        const controller = await createRendererScenario(page, rendererScenarios.feed.withOneRelease())
+        const release = createHydratedRelease()
+        const controller = await createRendererScenario(page, scenarioBuilder().feed([release]).build())
 
-        await expect(page.getByRole('link', { name: 'First Light' })).toBeVisible()
-        await expect(page.getByText('by North Archive')).toBeVisible()
+        await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
+        await expect(page.getByText(`by ${release.data.artist}`)).toBeVisible()
 
         await expect
             .poll(async () => controller.lastCall('load-feed'))
             .toMatchObject({ channel: 'load-feed', payload: { index: 0, count: 5 } })
     })
 
-    test('renders a playback control for previewable release-feed tracks', async ({ page }) => {
+    test('plays and seeks a real preview stream', async ({ page }) => {
         const release = createHydratedRelease()
-        release.data.tracks[0]!.streamUrl = 'https://example.com/dawn-test.mp3'
 
         await createRendererScenario(page, scenarioBuilder().feed([release]).build())
 
-        await expect(page.getByRole('button', { name: 'Play Dawn Test' })).toBeVisible()
+        await page.getByRole('button', { name: 'Play Karasu' }).click()
+        await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
+
+        const progress = page.getByRole('progressbar', { name: 'Karasu playback progress' })
+        await expect
+            .poll(async () => Number((await progress.getAttribute('aria-valuemax')) ?? 0), {
+                timeout: 15_000,
+            })
+            .toBeGreaterThan(1)
+
+        const seeker = page.getByRole('button', { name: 'Seek within Karasu' })
+        const seekerBox = await seeker.boundingBox()
+        // eslint-disable-next-line playwright/no-conditional-in-test
+        if (!seekerBox) throw new Error('Track seeker was not rendered')
+
+        await seeker.click({
+            position: {
+                x: seekerBox.width * 0.8,
+                y: seekerBox.height / 2,
+            },
+        })
+
+        await expect
+            .poll(async () => {
+                const currentTime = Number((await progress.getAttribute('aria-valuenow')) ?? 0)
+                const duration = Number((await progress.getAttribute('aria-valuemax')) ?? 1)
+                return currentTime / duration
+            })
+            .toBeGreaterThan(0.7)
     })
 
     test('updates a failed release feed scenario with a new handler before retrying', async ({ page }) => {

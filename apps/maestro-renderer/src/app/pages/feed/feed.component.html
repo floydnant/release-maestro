@@ -64,9 +64,8 @@
                             />
 
                             <!-- @TODO: the height on this is very fragile, keep it up to date and come up with a better approach -->
-                            <!-- @TODO: we need to add the same kind of shadow effect on the scrolling list here as on the text-column -->
                             <ul
-                                class="tracks | mt-4 max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] overflow-y-auto"
+                                class="tracks | mt-3 max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] overflow-y-auto"
                             >
                                 @for (track of feedItem.data.tracks; track $index) {
                                     <li
@@ -116,7 +115,16 @@
                                                 @if (isCurrentTrack(track.streamUrl)) {
                                                     <span
                                                         class="track-progress-bar | absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-border-subtle"
-                                                        aria-hidden="true"
+                                                        role="progressbar"
+                                                        [attr.aria-label]="track.title + ' playback progress'"
+                                                        aria-valuemin="0"
+                                                        [attr.aria-valuemax]="audioPlayer.duration() || 1"
+                                                        [attr.aria-valuenow]="audioPlayer.playerTime()"
+                                                        [attr.aria-valuetext]="
+                                                            formatDuration(audioPlayer.playerTime()) +
+                                                            ' of ' +
+                                                            formatDuration(audioPlayer.duration())
+                                                        "
                                                     >
                                                         <span
                                                             class="block h-full rounded-full bg-content-success transition-[width] duration-fast ease-standard"
@@ -140,7 +148,7 @@
                                 }
 
                                 <div
-                                    class="shadow-overlay | sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
+                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
                                 ></div>
                             </ul>
                         </div>
@@ -236,7 +244,7 @@
 
                             <div class="feed-controls | sticky bottom-0 mt-4 flex justify-end">
                                 <div
-                                    class="shadow-overlay | z-0 size-full bg-gradient-to-b from-transparent to-background-canvas"
+                                    class="shadow-overlay | pointer-events-none z-0 size-full bg-gradient-to-b from-transparent to-background-canvas"
                                 ></div>
 
                                 <div class="flex rounded-tl-xl text-xl">
@@ -314,7 +322,7 @@
                                 </ul>
 
                                 <div
-                                    class="shadow-overlay | sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
+                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
                                 ></div>
                             </div>
                         }

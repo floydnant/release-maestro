@@ -1,6 +1,6 @@
-import { defineConfig } from '@playwright/test'
-import { nxE2EPreset } from '@nx/playwright/preset'
 import { workspaceRoot } from '@nx/devkit'
+import { nxE2EPreset } from '@nx/playwright/preset'
+import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
     ...nxE2EPreset(__filename, { testDir: './src/electron' }),
@@ -12,7 +12,7 @@ export default defineConfig({
         timeout: 20_000,
     },
     use: {
-        trace: 'on-first-retry',
+        trace: 'retain-on-failure-and-retries',
     },
     webServer: {
         command: 'make serve-renderer',

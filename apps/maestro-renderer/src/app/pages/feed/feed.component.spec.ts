@@ -13,8 +13,11 @@ describe(FeedComponent.name, () => {
     let fixture: ComponentFixture<FeedComponent>
     let audioPlayer: {
         currentUrl: WritableSignal<string | null>
+        duration: WritableSignal<number>
         playSource: jest.Mock
+        playerTime: WritableSignal<number>
         seekTo: jest.Mock
+        togglePlay: jest.Mock
     }
 
     beforeEach(waitForAsync(() => {
@@ -76,5 +79,40 @@ describe(FeedComponent.name, () => {
 
         expect(audioPlayer.seekTo).toHaveBeenCalledWith(0.75)
         expect(audioPlayer.playSource).not.toHaveBeenCalled()
+    })
+
+    it('toggles playback for the active track', () => {
+        const streamUrl = 'https://example.com/preview.mp3'
+        audioPlayer.currentUrl.set(streamUrl)
+
+        component.toggleTrackPlayback(streamUrl)
+
+        expect(audioPlayer.togglePlay).toHaveBeenCalledTimes(1)
+        expect(audioPlayer.playSource).not.toHaveBeenCalled()
+    })
+
+    it('starts a different track from the beginning when its control is clicked', () => {
+        const scrollCurrentTrackIntoView = jest
+            .spyOn(component, 'scrollCurrentTrackIntoView')
+            .mockImplementation()
+
+        component.toggleTrackPlayback('https://example.com/another-preview.mp3')
+
+        expect(audioPlayer.playSource).toHaveBeenCalledWith('https://example.com/another-preview.mp3')
+        expect(scrollCurrentTrackIntoView).toHaveBeenCalledTimes(1)
+    })
+
+    it('reports the current track progress as a bounded percentage', () => {
+        const streamUrl = 'https://example.com/preview.mp3'
+        audioPlayer.currentUrl.set(streamUrl)
+        audioPlayer.duration.set(200)
+        audioPlayer.playerTime.set(50)
+
+        expect(component.trackProgress(streamUrl)).toBe(25)
+
+        audioPlayer.playerTime.set(300)
+
+        expect(component.trackProgress(streamUrl)).toBe(100)
+        expect(component.trackProgress('https://example.com/another-preview.mp3')).toBe(0)
     })
 })
