@@ -29,21 +29,19 @@ describe('LibraryBackendService', () => {
             ingestMetadata: jest.fn(),
         }
         const metadataService = {
-            prescan: jest.fn(
-                (): Observable<MetadataPrescanUpdate> =>
-                    from<MetadataPrescanUpdate[]>([
-                        { phase: 'started' },
-                        { phase: 'batch', items: [fact] },
-                        { phase: 'completed', count: 1, errors: 0 },
-                    ]),
+            prescan: jest.fn((): Observable<MetadataPrescanUpdate> =>
+                from<MetadataPrescanUpdate[]>([
+                    { phase: 'started' },
+                    { phase: 'batch', items: [fact] },
+                    { phase: 'completed', count: 1, errors: 0 },
+                ]),
             ),
-            readFiles: jest.fn(
-                (): Observable<MetadataScanUpdate> =>
-                    from<MetadataScanUpdate[]>([
-                        { phase: 'started', total: 1 },
-                        { phase: 'item', metadata },
-                        { phase: 'completed', count: 1, total: 1 },
-                    ]),
+            readFiles: jest.fn((): Observable<MetadataScanUpdate> =>
+                from<MetadataScanUpdate[]>([
+                    { phase: 'started', total: 1 },
+                    { phase: 'item', metadata },
+                    { phase: 'completed', count: 1, total: 1 },
+                ]),
             ),
         }
         const service = new LibraryBackendService(

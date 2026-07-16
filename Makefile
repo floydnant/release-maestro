@@ -87,6 +87,8 @@ lint: ## Lint all projects
 	npx nx run-many -t lint --output-style=stream --skipNxCache=$(SKIP_NX_CACHE)
 format: ## Format all files
 	npx prettier --write "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"
+	@echo ""
+	@git status --short
 f: format
 format-check: ## Check formatting
 	npx prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"

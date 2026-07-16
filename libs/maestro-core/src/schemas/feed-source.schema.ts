@@ -23,8 +23,7 @@ export type BandcampEmailFansBoughtMusicFeedSourceItem = z.infer<
 >
 
 export type BandcampEmailFeedSourceItem =
-    | BandcampEmailNewReleaseFeedSourceItem
-    | BandcampEmailFansBoughtMusicFeedSourceItem
+    BandcampEmailNewReleaseFeedSourceItem | BandcampEmailFansBoughtMusicFeedSourceItem
 
 // @TODO:
 export const linkStashBandcampTralbumFeedSourceItem = z.never()

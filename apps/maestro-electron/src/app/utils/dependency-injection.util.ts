@@ -38,8 +38,7 @@ export type FactoryProvider<TInjectionToken extends InjectionToken<object>> = {
  * A provider is a configuration object that describes how to resolve an injection token.
  */
 export type Provider<TInjectionToken extends InjectionToken<object>> =
-    | ValueProvider<TInjectionToken>
-    | FactoryProvider<TInjectionToken>
+    ValueProvider<TInjectionToken> | FactoryProvider<TInjectionToken>
 
 export type OnDestroyFn = () => void | Promise<void>
 
