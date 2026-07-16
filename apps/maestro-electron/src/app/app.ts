@@ -1,9 +1,10 @@
-import { BrowserWindow, screen, shell } from 'electron'
+import { BrowserWindow, screen, session, shell } from 'electron'
 import { join } from 'path'
 import { format } from 'url'
 import { environment } from '../environments/environment'
 import { rendererAppName, rendererAppPort } from './constants'
 import { nativeWindowBackgroundColor } from './design-tokens.generated'
+import { configurePermissionPolicy } from './permissions'
 
 export default class App {
     // Keep a global reference of the window object, if you don't, the window will
@@ -44,6 +45,8 @@ export default class App {
         // This method will be called when Electron has finished
         // initialization and is ready to create browser windows.
         // Some APIs can only be used after this event occurs.
+
+        configurePermissionPolicy(session.defaultSession)
 
         // Initialize DI container and services
         try {
