@@ -77,8 +77,7 @@ Use a Mermaid `flowchart` or `graph` when the point is "X calls Y calls Z, and l
       C -.leak.-> D[PricingClient]
       classDef leak stroke:#dc2626,stroke-width:2px;
       class C,D leak
-  </pre
-    >
+  </pre>
 </div>
 ```
 

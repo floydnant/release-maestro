@@ -128,13 +128,7 @@ export interface MetadataProtocolError {
 }
 
 export type MetadataMethod =
-    | 'ping'
-    | 'read_file'
-    | 'read_files'
-    | 'prescan'
-    | 'scan'
-    | 'write_tags'
-    | 'cancel'
+    'ping' | 'read_file' | 'read_files' | 'prescan' | 'scan' | 'write_tags' | 'cancel'
 
 export interface MetadataRequest<TParams = unknown> {
     type: 'request'
