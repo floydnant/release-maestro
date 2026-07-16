@@ -158,7 +158,7 @@
                         <div
                             class="text-column | relative flex max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] flex-col justify-between"
                         >
-                            <div class="overflow-y-scroll">
+                            <div class="overflow-x-hidden overflow-y-scroll">
                                 @if (feedItem.error; as error) {
                                     <div class="error | mb-1.5 flex items-center gap-2">
                                         <p class="text-content-danger">
@@ -242,30 +242,34 @@
                                         </li>
                                     }
                                 </ul>
-                            </div>
 
-                            <div class="feed-controls | sticky bottom-0 mt-4 flex justify-end">
                                 <div
-                                    class="shadow-overlay | pointer-events-none z-0 size-full bg-gradient-to-b from-transparent to-background-canvas"
-                                ></div>
+                                    class="feed-controls | sticky inset-x-0 bottom-0 mt-4 flex h-10 justify-end"
+                                >
+                                    <div
+                                        class="shadow-overlay | pointer-events-none z-0 size-full bg-gradient-to-b from-transparent to-background-canvas"
+                                    ></div>
 
-                                <div class="flex rounded-tl-xl text-xl">
-                                    <button
-                                        class="-mr-2 flex items-center gap-2 p-2 text-content-muted transition-colors duration-fast hover:text-content-primary"
-                                        (click)="toggleCurrentFeedItemSnoozedState()"
-                                        [title]="
-                                            snoozedFeedItems.has(feedItem.id)
-                                                ? 'Click to un-snooze (dont\'t show again)'
-                                                : 'Click to snooze (show again tomorrow)'
-                                        "
-                                    >
-                                        <app-icon
-                                            [name]="
-                                                snoozedFeedItems.has(feedItem.id) ? 'snoozeFilled' : 'snooze'
+                                    <div class="flex rounded-tl-xl text-xl">
+                                        <button
+                                            class="-mr-2 flex items-center gap-2 p-2 text-content-muted transition-colors duration-fast hover:text-content-primary"
+                                            (click)="toggleCurrentFeedItemSnoozedState()"
+                                            [title]="
+                                                snoozedFeedItems.has(feedItem.id)
+                                                    ? 'Click to un-snooze (dont\'t show again)'
+                                                    : 'Click to snooze (show again tomorrow)'
                                             "
-                                            size="1.5rem"
-                                        ></app-icon>
-                                    </button>
+                                        >
+                                            <app-icon
+                                                [name]="
+                                                    snoozedFeedItems.has(feedItem.id)
+                                                        ? 'snoozeFilled'
+                                                        : 'snooze'
+                                                "
+                                                size="1.5rem"
+                                            ></app-icon>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

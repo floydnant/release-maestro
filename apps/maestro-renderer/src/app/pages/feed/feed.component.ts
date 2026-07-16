@@ -23,6 +23,7 @@ import { SafePipe } from '../../shared/pipes/safe.pipe'
 import { formatDateRelative, formatDuration } from '../../shared/utils/formatting.utils'
 
 const NUM_PREFETCH_ITEMS = 5
+const SEEK_BY_SECONDS = 30
 
 const getUserFacingErrorMessage = (error: unknown) => {
     if (typeof error == 'string') return error
@@ -205,13 +206,13 @@ export class FeedComponent {
     @HostListener('document:keydown.L', ['$event'])
     seekBackward(event: Event) {
         event.preventDefault()
-        this.audioPlayer.seekBy(15)
+        this.audioPlayer.seekBy(SEEK_BY_SECONDS)
     }
     @HostListener('document:keydown.ArrowLeft', ['$event'])
     @HostListener('document:keydown.H', ['$event'])
     seekForward(event: Event) {
         event.preventDefault()
-        this.audioPlayer.seekBy(-15)
+        this.audioPlayer.seekBy(-SEEK_BY_SECONDS)
     }
 
     @HostListener('document:keydown.Space', ['$event'])
