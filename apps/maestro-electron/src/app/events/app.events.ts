@@ -3,17 +3,18 @@
  * between the frontend and the electron backend.
  */
 
-import { ipcMain, shell } from 'electron'
+import { dialog, ipcMain, shell } from 'electron'
 import { diContainer } from '../di'
 // import { DatabaseClient } from '../database/database.client' // TODO: Use when needed
 import {
     asAppIpcMain,
     FeedLoadError,
+    LibraryIpcChannel,
     MetadataIpcChannel,
-    ScanResult,
     toRendererEmitter,
 } from '@release-maestro/core'
-import { LibraryBackendService } from '../services/library/library.backend.service'
+import App from '../app'
+import { LibraryScanService } from '../services/library/library-scan.service'
 import { MetadataBackendService } from '../services/metadata/metadata.backend.service'
 import { SettingsBackendService } from '../services/settings.backend.service'
 
@@ -129,42 +130,32 @@ ipc.handle(MetadataIpcChannel.write, async (_event, request) => {
     return metadataService.writeTags(request.path, request.update)
 })
 
-// Scan streams per-file results/progress over `scan-progress` and resolves with a
-// summary when finished. Cancellation arrives on the fire-and-forget `scan-abort`.
-ipc.handle(MetadataIpcChannel.scan, async (event, request) => {
-    const abortController = new AbortController()
-    const abortHandler = () => abortController.abort()
-    ipc.once(MetadataIpcChannel.scanAbort, abortHandler)
+// ---------------------------------------------------------------------------
+// Library scans (lifecycle owned by LibraryScanService; status is streamed to
+// all windows on `library:scan-status`)
+// ---------------------------------------------------------------------------
 
-    const libraryService = await diContainer.get(LibraryBackendService)
-    const update$ = libraryService.scan(request.paths, abortController.signal)
-    const emitter = toRendererEmitter(event.sender)
+ipc.handle(LibraryIpcChannel.pickFolders, async () => {
+    const options: Electron.OpenDialogOptions = {
+        properties: ['openDirectory', 'multiSelections', 'createDirectory'],
+    }
+    const result = App.mainWindow
+        ? await dialog.showOpenDialog(App.mainWindow, options)
+        : await dialog.showOpenDialog(options)
+    return result.canceled ? null : result.filePaths
+})
 
-    return new Promise<ScanResult | undefined>((resolve, reject) => {
-        let summary: ScanResult | undefined
-        update$.subscribe({
-            next: update => {
-                emitter.send(MetadataIpcChannel.scanProgress, update)
-                if (update.phase == 'completed') {
-                    summary = {
-                        count: update.count,
-                        total: update.total,
-                        unchanged: update.unchanged,
-                        changed: update.changed,
-                        new: update.new,
-                        missing: update.missing,
-                        errors: update.errors,
-                    }
-                }
-            },
-            error: err => {
-                ipc.removeListener(MetadataIpcChannel.scanAbort, abortHandler)
-                reject(err)
-            },
-            complete: () => {
-                ipc.removeListener(MetadataIpcChannel.scanAbort, abortHandler)
-                resolve(summary)
-            },
-        })
-    })
+ipc.handle(LibraryIpcChannel.startScan, async (_event, request) => {
+    const scanService = await diContainer.get(LibraryScanService)
+    return scanService.startScan(request.trigger, request.paths)
+})
+
+ipc.on(LibraryIpcChannel.cancelScan, async () => {
+    const scanService = await diContainer.get(LibraryScanService)
+    scanService.cancel()
+})
+
+ipc.handle(LibraryIpcChannel.getScanStatus, async () => {
+    const scanService = await diContainer.get(LibraryScanService)
+    return scanService.getSnapshot()
 })

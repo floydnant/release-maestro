@@ -1,6 +1,6 @@
 <div class="app-shell flex h-screen flex-col overflow-hidden bg-background-canvas">
     @if (isElectron) {
-        <header class="title-bar">
+        <header class="title-bar" [class.title-bar--overlay]="isImportRoute()">
             <div class="title-bar__drag-region"></div>
 
             @if (showCustomWindowControls) {
@@ -35,102 +35,140 @@
     }
 
     <div class="flex min-h-0 grow overflow-hidden">
-        <aside
-            class="sidebar | flex w-52 shrink-0 flex-col border-r border-border-subtle bg-background-surface p-4 shadow-lg"
-        >
-            <nav>
-                <ul class="flex flex-col gap-1">
-                    <li>
-                        <a
-                            class="btn-nkd-neutral"
-                            routerLink="/home"
-                            routerLinkActive="active-link"
-                            [routerLinkActiveOptions]="{ exact: true }"
-                            >Home</a
-                        >
-                    </li>
-                    <li>
-                        <a class="btn-nkd-neutral" routerLink="/feed" routerLinkActive="active-link">Feed</a>
-                    </li>
-                    <li>
-                        <a class="btn-nkd-neutral" routerLink="/settings" routerLinkActive="active-link"
-                            >Settings</a
-                        >
-                    </li>
-                    @if (showDesignSystem) {
+        @if (!isImportRoute()) {
+            <aside
+                class="sidebar | flex w-52 shrink-0 flex-col border-r border-border-subtle bg-background-surface p-4 shadow-lg"
+            >
+                <nav>
+                    <ul class="flex flex-col gap-1">
                         <li>
                             <a
                                 class="btn-nkd-neutral"
-                                routerLink="/design-system"
+                                routerLink="/home"
                                 routerLinkActive="active-link"
-                                >System</a
+                                [routerLinkActiveOptions]="{ exact: true }"
+                                >Home</a
                             >
                         </li>
+                        <li>
+                            <a class="btn-nkd-neutral" routerLink="/feed" routerLinkActive="active-link"
+                                >Feed</a
+                            >
+                        </li>
+                        <li>
+                            <a class="btn-nkd-neutral" routerLink="/settings" routerLinkActive="active-link"
+                                >Settings</a
+                            >
+                        </li>
+                        @if (showDesignSystem) {
+                            <li>
+                                <a
+                                    class="btn-nkd-neutral"
+                                    routerLink="/design-system"
+                                    routerLinkActive="active-link"
+                                    >System</a
+                                >
+                            </li>
+                        }
+                    </ul>
+                </nav>
+
+                @if (importProgress(); as importStatus) {
+                    @if (importStatus.phase == 'idle') {
+                        <hr />
+                        <button class="btn-neutral" (click)="triggerEmailImport()">Import Emails</button>
+                    } @else if (importStatus.phase == 'processing') {
+                        <app-progress-bar
+                            class="mt-4"
+                            [segments]="progressBarSegments() || []"
+                        ></app-progress-bar>
+
+                        <p
+                            class="type-body-sm relative mt-3 h-24 overflow-y-hidden align-top text-content-secondary"
+                        >
+                            {{ importStatus.message }}
+                            <span
+                                class="absolute inset-0 top-10 bg-gradient-to-b from-transparent to-background-surface"
+                            ></span>
+                        </p>
+                        <button class="btn-nkd-neutral mt-2" (click)="cancelEmailImport()">Cancel</button>
+                    } @else if (importStatus.phase == 'completed') {
+                        <hr />
+                        <p class="type-body-sm text-content-success">
+                            <app-icon
+                                name="octCheckCircleFill"
+                                color="content.success"
+                                class="translate-y-px align-middle text-content-success"
+                            ></app-icon>
+                            Done! Processed {{ importStatus.totalProcessed }} emails, imported
+                            {{ importStatus.newlyImported }} new ones.
+                        </p>
+                        <button class="btn-neutral mt-2" (click)="this.importProgress.set({ phase: 'idle' })">
+                            Cool
+                        </button>
+                    } @else if (importStatus.phase == 'error') {
+                        <app-progress-bar
+                            class="mt-4"
+                            [segments]="progressBarSegments() || []"
+                        ></app-progress-bar>
+                        <p class="type-body-sm mt-3 text-content-danger">
+                            <app-icon
+                                name="octXCircleFill"
+                                color="content.danger"
+                                class="translate-y-px align-middle"
+                            ></app-icon>
+                            {{ importStatus.errorMessage }}
+                        </p>
+                        <button class="btn-primary mt-2" (click)="triggerEmailImport()">Retry</button>
                     }
-                </ul>
-            </nav>
-
-            @if (importProgress(); as importStatus) {
-                @if (importStatus.phase == 'idle') {
-                    <hr />
-                    <button class="btn-neutral" (click)="triggerEmailImport()">Import Emails</button>
-                } @else if (importStatus.phase == 'processing') {
-                    <app-progress-bar
-                        class="mt-4"
-                        [segments]="progressBarSegments() || []"
-                    ></app-progress-bar>
-
-                    <p
-                        class="type-body-sm relative mt-3 h-24 overflow-y-hidden align-top text-content-secondary"
-                    >
-                        {{ importStatus.message }}
-                        <span
-                            class="absolute inset-0 top-10 bg-gradient-to-b from-transparent to-background-surface"
-                        ></span>
-                    </p>
-                    <button class="btn-nkd-neutral mt-2" (click)="cancelEmailImport()">Cancel</button>
-                } @else if (importStatus.phase == 'completed') {
-                    <hr />
-                    <p class="type-body-sm text-content-success">
-                        <app-icon
-                            name="octCheckCircleFill"
-                            color="content.success"
-                            class="translate-y-px align-middle text-content-success"
-                        ></app-icon>
-                        Done! Processed {{ importStatus.totalProcessed }} emails, imported
-                        {{ importStatus.newlyImported }} new ones.
-                    </p>
-                    <button class="btn-neutral mt-2" (click)="this.importProgress.set({ phase: 'idle' })">
-                        Cool
-                    </button>
-                } @else if (importStatus.phase == 'error') {
-                    <app-progress-bar
-                        class="mt-4"
-                        [segments]="progressBarSegments() || []"
-                    ></app-progress-bar>
-                    <p class="type-body-sm mt-3 text-content-danger">
-                        <app-icon
-                            name="octXCircleFill"
-                            color="content.danger"
-                            class="translate-y-px align-middle"
-                        ></app-icon>
-                        {{ importStatus.errorMessage }}
-                    </p>
-                    <button class="btn-primary mt-2" (click)="triggerEmailImport()">Retry</button>
                 }
-            }
 
-            <div class="flex h-full items-center justify-center">
-                <div class="flex flex-col gap-3">
-                    <button
-                        class="btn-neutral w-full"
-                        (click)="audioPlayer.isPlaying() ? audioPlayer.pause() : audioPlayer.play()"
-                    >
-                        {{ audioPlayer.isPlaying() ? 'PAUSE' : 'PLAY' }}
-                    </button>
+                @if (showLibraryScanIndicator()) {
+                    @if (libraryService.scanStatus(); as scanStatus) {
+                        <hr />
+                        <p class="type-body-sm flex items-center gap-2 text-content-secondary">
+                            <app-progress-ring
+                                mode="spinning"
+                                [diameter]="16"
+                                [strokeWidth]="2"
+                            ></app-progress-ring>
+                            Scanning library…
+                        </p>
+                        @if (scanStatus.phase === 'discovering') {
+                            <p class="type-body-sm mt-2 text-content-muted">
+                                {{ scanStatus.discovered }} files found
+                            </p>
+                        } @else {
+                            <app-progress-bar
+                                class="mt-2"
+                                [segments]="libraryScanSegments()"
+                            ></app-progress-bar>
+                            <p class="type-body-sm mt-2 text-content-muted">
+                                {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
+                                @if (scanStatus.errors > 0) {
+                                    <span class="text-content-danger">· {{ scanStatus.errors }} failed</span>
+                                }
+                            </p>
+                        }
+                    }
+                } @else if (showLibrarySetupCta()) {
+                    <hr />
+                    <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
+                    <a class="btn-primary mt-2 text-center" routerLink="/import">Set up library</a>
+                }
+
+                <div class="flex h-full items-center justify-center">
+                    <div class="flex flex-col gap-3">
+                        <button
+                            class="btn-neutral w-full"
+                            (click)="audioPlayer.isPlaying() ? audioPlayer.pause() : audioPlayer.play()"
+                        >
+                            {{ audioPlayer.isPlaying() ? 'PAUSE' : 'PLAY' }}
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </aside>
+            </aside>
+        }
 
         <main class="flex min-h-0 min-w-0 grow overflow-hidden bg-background-canvas">
             <router-outlet></router-outlet>

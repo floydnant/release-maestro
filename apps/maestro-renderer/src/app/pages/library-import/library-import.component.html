@@ -1,0 +1,238 @@
+<div class="relative size-full overflow-hidden bg-black">
+    @switch (step()) {
+        @case ('pick') {
+            <div class="size-full overflow-y-auto">
+                <div class="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-8 py-16">
+                    <h1 class="type-hero-title text-content-primary">Set up your music library</h1>
+                    <p class="type-body-md mt-3 text-content-secondary">
+                        Choose the folders where your music lives. Release Maestro scans them, reads the
+                        tags and cover art, and keeps everything up to date from then on.
+                    </p>
+
+                    <div class="panel mt-8 p-2">
+                        @if (pendingFolders().length === 0) {
+                            <p class="type-body-sm px-3 py-6 text-center text-content-muted">
+                                Add your music collection.
+                            </p>
+                        }
+                        @for (folder of pendingFolders(); track folder) {
+                            <div
+                                class="flex items-center gap-3 rounded px-3 py-2 hover:bg-background-elevated"
+                            >
+                                <p class="type-body-sm flex min-w-0 grow" [title]="folder">
+                                    <span class="truncate text-content-muted">{{
+                                        folderParent(folder)
+                                    }}</span
+                                    ><span class="shrink-0 font-semibold text-content-primary">{{
+                                        folderName(folder)
+                                    }}</span>
+                                </p>
+                                <button
+                                    class="btn-nkd-neutral shrink-0"
+                                    type="button"
+                                    title="Remove folder"
+                                    (click)="removeFolder(folder)"
+                                >
+                                    <app-icon name="octX" size="14"></app-icon>
+                                </button>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mt-4 flex items-center gap-3">
+                        <button class="btn-nkd-neutral text-content-muted" type="button" (click)="skip()">
+                            Skip for now
+                        </button>
+                        <span class="grow"></span>
+
+                        <button class="btn-neutral" type="button" (click)="addFolders()">
+                            Add folders…
+                        </button>
+                        <button
+                            class="btn-primary"
+                            type="button"
+                            [disabled]="pendingFolders().length == 0 || startInFlight()"
+                            (click)="startImport()"
+                        >
+                            Start import
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @case ('scanning') {
+            @if (library.scanStatus(); as status) {
+                <app-import-mosaic
+                    class="absolute inset-0"
+                    [albums]="library.mosaicAlbums()"
+                ></app-import-mosaic>
+                <div class="mosaic-veil pointer-events-none absolute inset-0"></div>
+
+                <div class="absolute inset-0 flex flex-col justify-center">
+                    <div class="content-band">
+                        <div class="mx-auto w-full max-w-2xl px-8 text-center">
+                            <h1 class="type-hero-title text-content-primary">Importing your library</h1>
+                        <p
+                            class="type-body-md mt-2 flex items-center justify-center gap-2 text-content-secondary"
+                        >
+                            @if (status.phase === 'discovering') {
+                                <app-progress-ring
+                                    mode="spinning"
+                                    [diameter]="18"
+                                    [strokeWidth]="2.5"
+                                ></app-progress-ring>
+                                Discovering files… {{ status.discovered }} found so far
+                            } @else if (status.phase === 'reading') {
+                                Reading tracks… {{ status.readDone }} / {{ status.readTotal }}
+                            } @else if (status.phase === 'cancelled') {
+                                Import cancelled
+                            } @else if (status.phase === 'error') {
+                                Import failed
+                            }
+                        </p>
+
+                        @if (status.phase === 'reading') {
+                            <app-progress-bar class="mt-6" [segments]="progressSegments()"></app-progress-bar>
+                        }
+
+                        <div class="mx-auto mt-6 grid max-w-xl grid-cols-4 gap-3">
+                            <div class="text-center">
+                                <p class="type-section-title text-content-primary">
+                                    {{ status.discovered }}
+                                </p>
+                                <p class="type-label-sm mt-1 text-content-muted">Discovered</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="type-section-title text-content-primary">
+                                    {{ status.imported }}
+                                </p>
+                                <p class="type-label-sm mt-1 text-content-muted">Imported</p>
+                            </div>
+                            <div class="text-center">
+                                <p
+                                    class="type-section-title"
+                                    [class.text-content-danger]="status.errors > 0"
+                                    [class.text-content-primary]="status.errors === 0"
+                                >
+                                    {{ status.errors }}
+                                </p>
+                                <p class="type-label-sm mt-1 text-content-muted">Failed</p>
+                            </div>
+                            <div class="text-center">
+                                <p
+                                    class="type-section-title"
+                                    [class.text-content-warning]="status.normalizationIssues > 0"
+                                    [class.text-content-primary]="status.normalizationIssues === 0"
+                                >
+                                    {{ status.normalizationIssues }}
+                                </p>
+                                <p class="type-label-sm mt-1 text-content-muted">With Issues</p>
+                            </div>
+                        </div>
+
+                        @if (terminalStatus(); as terminal) {
+                            @if (terminal.phase === 'cancelled') {
+                                <p class="type-body-md mt-6 text-content-primary">
+                                    The next startup scan picks up where this one left off.
+                                </p>
+                            } @else {
+                                <p class="type-body-md mt-6 text-content-danger">
+                                    <app-icon
+                                        name="octXCircleFill"
+                                        color="content.danger"
+                                        class="translate-y-px align-middle"
+                                    ></app-icon>
+                                    {{ terminal.lastErrorMessage || 'The import failed unexpectedly.' }}
+                                </p>
+                            }
+                            <div class="mt-4 flex justify-center gap-3">
+                                <button class="btn-nkd-neutral" type="button" (click)="finish()">
+                                    @if (terminal.phase === 'cancelled') {
+                                        Continue
+                                    } @else {
+                                        Continue anyway
+                                    }
+                                </button>
+                                <button class="btn-neutral" type="button" (click)="backToFolders()">
+                                    Change folders
+                                </button>
+                                <button class="btn-primary" type="button" (click)="retryScan()">
+                                    @if (terminal.phase === 'cancelled') {
+                                        Resume import
+                                    } @else {
+                                        Retry import
+                                    }
+                                </button>
+                            </div>
+                        } @else {
+                            <div class="mt-6">
+                                <button class="btn-nkd-neutral text-content-muted" (click)="cancelScan()">
+                                    Cancel import
+                                </button>
+                            </div>
+                        }
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        @case ('done') {
+            @if (library.scanStatus(); as status) {
+                @if (noFilesFound()) {
+                    <div class="size-full overflow-y-auto">
+                        <div
+                            class="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-8 py-16"
+                        >
+                            <h1 class="type-hero-title text-content-primary">No audio files found</h1>
+                            <p class="type-body-md mt-3 text-content-secondary">
+                                We couldn't find any supported audio files in the selected folders. Pick
+                                the folder(s) that contain your music and try again.
+                            </p>
+                            <div class="mt-6">
+                                <button class="btn-primary" type="button" (click)="backToFolders()">
+                                    Choose different folders
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                } @else {
+                    <app-import-mosaic
+                        class="absolute inset-0"
+                        [albums]="library.mosaicAlbums()"
+                    ></app-import-mosaic>
+                    <div class="mosaic-veil pointer-events-none absolute inset-0"></div>
+
+                    <div class="absolute inset-0 flex flex-col justify-center">
+                        <div class="content-band">
+                            <div class="mx-auto w-full max-w-2xl px-8 text-center">
+                            <p class="text-content-success">
+                                <app-icon
+                                    name="octCheckCircleFill"
+                                    color="content.success"
+                                    size="2.5rem"
+                                ></app-icon>
+                            </p>
+                            <h1 class="type-hero-title mt-3 text-content-primary">
+                                Your library is ready
+                            </h1>
+                            <p class="type-body-md mt-2 text-content-secondary">
+                                {{ summaryLine(status) }}
+                            </p>
+                            <div class="mt-8 flex justify-center gap-3">
+                                <button class="btn-nkd-neutral" type="button" (click)="backToFolders()">
+                                    Change folders
+                                </button>
+                                <button class="btn-primary" type="button" (click)="finish()">
+                                    Take me to my library
+                                </button>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        }
+    }
+</div>

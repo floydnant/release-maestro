@@ -1,17 +1,20 @@
 import { Component, computed, inject, linkedSignal, ChangeDetectionStrategy } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
-import { RouterModule } from '@angular/router'
+import { NavigationEnd, Router, RouterModule } from '@angular/router'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
-import { Observable } from 'rxjs'
+import { filter, map, Observable } from 'rxjs'
 import { EmailImportProgressUpdate } from '@release-maestro/core'
 import { webEnv } from '../environments/environment'
 import { ElectronService } from './core/services'
 import { WebAudioPlayer } from './core/services/audio-player.service'
 import { FeedService } from './core/services/feed.service'
+import { LibraryService } from './core/services/library.service'
+import { SettingsService } from './core/settings/settings.service'
 import {
     ProgressBarComponent,
     ProgressBarSegment,
 } from './shared/components/progress-bar/progress-bar.component'
+import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
 import { IconComponent } from './shared/components/icon/icon.component'
 
 @Component({
@@ -20,13 +23,16 @@ import { IconComponent } from './shared/components/icon/icon.component'
     styleUrls: ['./app.component.css'],
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterModule, TranslateModule, ProgressBarComponent, IconComponent],
+    imports: [RouterModule, TranslateModule, ProgressBarComponent, ProgressRingComponent, IconComponent],
 })
 export class AppComponent {
     translate = inject(TranslateService)
     electronService = inject(ElectronService)
     feedService = inject(FeedService)
     audioPlayer = inject(WebAudioPlayer)
+    libraryService = inject(LibraryService)
+    private settingsService = inject(SettingsService)
+    private router = inject(Router)
 
     readonly showDesignSystem = !webEnv.production
     readonly isElectron = this.electronService.isElectron
@@ -91,4 +97,32 @@ export class AppComponent {
         const percent = (progress.current / progress.total) * 100
         return [{ percent, color: 'content.success' }]
     })
+
+    // --- library scan indicator / setup nudge -------------------------------
+
+    private currentUrl = toSignal(
+        this.router.events.pipe(
+            filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+            map(event => event.urlAfterRedirects),
+        ),
+        { initialValue: this.router.url },
+    )
+
+    /** The onboarding/import flow takes over the whole window: no sidebar, title bar floats on top. */
+    isImportRoute = computed(() => this.currentUrl().startsWith('/import'))
+
+    /** Compact background-scan indicator; hidden on /import where the full-page UI shows the same scan. */
+    showLibraryScanIndicator = computed(() => this.libraryService.isScanning() && !this.isImportRoute())
+
+    /** Nudge users who skipped onboarding (or lost their folders) toward library setup. */
+    showLibrarySetupCta = computed(() => {
+        const settings = this.settingsService.settings.value()
+        if (!settings) return false
+        const hasFolders = (settings.libraryFolders?.length ?? 0) > 0
+        return !hasFolders && !this.isImportRoute()
+    })
+
+    libraryScanSegments = computed((): ProgressBarSegment[] => [
+        { percent: this.libraryService.readProgressPercent(), color: 'content.success' },
+    ])
 }

@@ -28,6 +28,8 @@ const launchReleaseMaestro = async (appDataDir: string): Promise<ElectronApplica
 
 const openDebugConsole = async (page: Page): Promise<void> => {
     await expect(page).toHaveTitle(/Release Maestro/)
+    // A fresh app-data dir lands in the full-window library onboarding (no sidebar) — skip past it.
+    await page.getByRole('button', { name: 'Skip for now' }).click()
     await page.getByRole('link', { name: 'Settings' }).click()
     await page.getByRole('link', { name: 'Debug' }).click()
     await expect(page.getByRole('heading', { name: 'Debug Console' })).toBeVisible()
@@ -107,26 +109,26 @@ test('writes tags to a copied fixture file and reads the update back', async ({}
 test('scans a temp library and persists reconciliation state across scans', async ({}, testInfo) => {
     const { libraryDir } = await copyFixtureLibrary(testInfo)
 
+    await expect(metric(page, 'Scan status')).toHaveText('idle')
     await page.getByLabel('Library scan paths').fill(libraryDir)
     await page.getByRole('button', { name: 'Start Scan' }).click()
 
-    await expect(metric(page, 'Scan status')).toHaveText('idle')
+    await expect(metric(page, 'Scan status')).toHaveText('completed')
     await expect(metric(page, 'New songs')).toHaveText('1')
     await expect(metric(page, 'Changed songs')).toHaveText('0')
     await expect(metric(page, 'Unchanged songs')).toHaveText('0')
     await expect(metric(page, 'Missing songs')).toHaveText('0')
-    await expect(metric(page, 'Summary errors')).toHaveText('0')
-    await expect(metric(page, 'Scanned items')).toHaveText('1')
+    await expect(metric(page, 'Scan errors')).toHaveText('0')
+    await expect(metric(page, 'Imported items')).toHaveText('1')
     await expect(metric(page, 'Raw scan summary')).toContainText('"new": 1')
-    await expect(metric(page, 'Latest ingested metadata')).toContainText('karasu.mp3')
 
     await page.getByRole('button', { name: 'Start Scan' }).click()
 
-    await expect(metric(page, 'Scan status')).toHaveText('idle')
     await expect(metric(page, 'New songs')).toHaveText('0')
     await expect(metric(page, 'Changed songs')).toHaveText('0')
     await expect(metric(page, 'Unchanged songs')).toHaveText('1')
     await expect(metric(page, 'Missing songs')).toHaveText('0')
-    await expect(metric(page, 'Summary errors')).toHaveText('0')
+    await expect(metric(page, 'Scan errors')).toHaveText('0')
+    await expect(metric(page, 'Scan status')).toHaveText('completed')
     await expect(metric(page, 'Raw scan summary')).toContainText('"unchanged": 1')
 })

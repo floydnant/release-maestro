@@ -26,7 +26,7 @@ describe('LibraryBackendService', () => {
             markNotSeenPresent: jest.fn(() => 2),
             countSongsNeedingMetadata: jest.fn(() => 1),
             listSongsNeedingMetadata: jest.fn().mockReturnValueOnce([fact]).mockReturnValueOnce([]),
-            ingestMetadata: jest.fn(),
+            ingestMetadata: jest.fn(() => 0),
         }
         const metadataService = {
             prescan: jest.fn((): Observable<MetadataPrescanUpdate> =>
@@ -56,6 +56,7 @@ describe('LibraryBackendService', () => {
         expect(metadataService.readFiles).toHaveBeenCalledWith([fact.path], undefined)
         expect(repository.ingestMetadata).toHaveBeenCalledWith(metadata, fact, expect.any(Date))
         expect(updates).toEqual([
+            { phase: 'discovery', discovered: 1, new: 1, changed: 0, unchanged: 0 },
             { phase: 'started', total: 1 },
             { phase: 'item', metadata },
             { phase: 'progress', done: 1, total: 1 },

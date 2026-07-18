@@ -11,6 +11,7 @@ import { coverArtCacheDir, resolveMetadataEngineBinaryPath } from './app-env'
 import { DiContainer } from './utils/dependency-injection.util'
 import { LibraryBackendRepository } from './services/library/library.backend.repository'
 import { LibraryBackendService } from './services/library/library.backend.service'
+import { LibraryScanService } from './services/library/library-scan.service'
 
 export const diContainer = new DiContainer({
     providers: [
@@ -67,6 +68,14 @@ export const diContainer = new DiContainer({
                 new LibraryBackendService(
                     await di.get(LibraryBackendRepository),
                     await di.get(MetadataBackendService),
+                ),
+        },
+        {
+            provide: LibraryScanService,
+            useFactory: async di =>
+                new LibraryScanService(
+                    await di.get(LibraryBackendService),
+                    await di.get(SettingsBackendService),
                 ),
         },
     ],

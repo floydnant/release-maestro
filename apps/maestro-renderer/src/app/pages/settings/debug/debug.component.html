@@ -33,7 +33,7 @@
         <div class="panel p-4">
             <p class="type-label-sm uppercase text-content-muted">Status</p>
             <p aria-label="Scan status" class="font-mono text-xl font-semibold text-content-primary">
-                {{ scanInFlight() ? 'running' : 'idle' }}
+                {{ scanStatus()?.phase ?? 'idle' }}
             </p>
         </div>
         <div class="panel p-4">
@@ -41,21 +41,21 @@
             <p class="font-mono text-xl font-semibold text-content-primary">{{ progress() }}%</p>
         </div>
         <div class="panel p-4">
-            <p class="type-label-sm uppercase text-content-muted">Items</p>
-            <p aria-label="Scanned items" class="font-mono text-xl font-semibold text-content-primary">
-                {{ scanSessionStats().items }}
+            <p class="type-label-sm uppercase text-content-muted">Discovered</p>
+            <p aria-label="Discovered files" class="font-mono text-xl font-semibold text-content-primary">
+                {{ scanStatus()?.discovered ?? 0 }}
+            </p>
+        </div>
+        <div class="panel p-4">
+            <p class="type-label-sm uppercase text-content-muted">Imported</p>
+            <p aria-label="Imported items" class="font-mono text-xl font-semibold text-content-primary">
+                {{ scanStatus()?.imported ?? 0 }}
             </p>
         </div>
         <div class="panel p-4">
             <p class="type-label-sm uppercase text-content-muted">Errors</p>
-            <p aria-label="Scan event errors" class="font-mono text-xl font-semibold text-content-primary">
-                {{ scanSessionStats().errors }}
-            </p>
-        </div>
-        <div class="panel p-4">
-            <p class="type-label-sm uppercase text-content-muted">Total events</p>
-            <p class="font-mono text-xl font-semibold text-content-primary">
-                {{ scanSessionStats().events }}
+            <p aria-label="Scan errors" class="font-mono text-xl font-semibold text-content-primary">
+                {{ scanStatus()?.errors ?? 0 }}
             </p>
         </div>
         <div class="panel p-4">
@@ -85,9 +85,6 @@
                 />
                 <div class="flex flex-wrap gap-2">
                     <button class="btn-primary" (click)="readFile()">Read File</button>
-                    <button class="btn-neutral" [disabled]="!lastItem()" (click)="setReadPathFromLastItem()">
-                        Use Last Scan Item
-                    </button>
                     <button
                         class="btn-nkd-neutral"
                         [disabled]="!readPath()"
@@ -158,19 +155,16 @@
                         <p class="type-label-sm uppercase text-content-muted">Persisted library scan</p>
                         <h3 class="type-section-title mt-1 text-content-primary">Full Library Scan</h3>
                         <p class="type-body-sm mt-2 text-content-secondary">
-                            Enter one root per line. Summary values come from Electron/main after DB
-                            reconciliation.
+                            Enter one root per line, or leave empty to scan the configured library folders.
+                            Runs through the shared LibraryScanService (same as onboarding and startup
+                            rescans).
                         </p>
                     </div>
                     <div class="flex gap-2">
                         @if (!scanInFlight()) {
-                            <button class="btn-primary" [disabled]="scanInFlight()" (click)="startScan()">
-                                Start Scan
-                            </button>
+                            <button class="btn-primary" (click)="startScan()">Start Scan</button>
                         } @else {
-                            <button class="btn-neutral" [disabled]="!scanInFlight()" (click)="cancelScan()">
-                                Cancel
-                            </button>
+                            <button class="btn-neutral" (click)="cancelScan()">Cancel</button>
                         }
                     </div>
                 </div>
@@ -192,7 +186,7 @@
                             aria-label="New songs"
                             class="font-mono text-xl font-semibold text-content-primary"
                         >
-                            {{ scanSummary()?.new ?? 0 }}
+                            {{ scanStatus()?.new ?? 0 }}
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
@@ -201,7 +195,7 @@
                             aria-label="Changed songs"
                             class="font-mono text-xl font-semibold text-content-primary"
                         >
-                            {{ scanSummary()?.changed ?? 0 }}
+                            {{ scanStatus()?.changed ?? 0 }}
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
@@ -210,7 +204,7 @@
                             aria-label="Unchanged songs"
                             class="font-mono text-xl font-semibold text-content-primary"
                         >
-                            {{ scanSummary()?.unchanged ?? 0 }}
+                            {{ scanStatus()?.unchanged ?? 0 }}
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
@@ -219,24 +213,44 @@
                             aria-label="Missing songs"
                             class="font-mono text-xl font-semibold text-content-primary"
                         >
-                            {{ scanSummary()?.missing ?? 0 }}
+                            {{ scanStatus()?.summary?.missing ?? 0 }}
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
-                        <p class="type-label-sm uppercase text-content-muted">Summary errors</p>
+                        <p class="type-label-sm uppercase text-content-muted">Tag issues</p>
                         <p
-                            aria-label="Summary errors"
+                            aria-label="Normalization issues"
                             class="font-mono text-xl font-semibold text-content-primary"
                         >
-                            {{ scanSummary()?.errors ?? 0 }}
+                            {{ scanStatus()?.normalizationIssues ?? 0 }}
                         </p>
                     </div>
                 </div>
 
-                @if (latestProgress(); as update) {
-                    <p class="type-body-sm text-content-secondary">
-                        Deep metadata reads: {{ update.done }} / {{ update.total }}
-                    </p>
+                @if (scanStatus(); as status) {
+                    @if (status.phase === 'reading') {
+                        <p class="type-body-sm text-content-secondary">
+                            Deep metadata reads: {{ status.readDone }} / {{ status.readTotal }}
+                        </p>
+                    }
+                    @if (status.lastErrorMessage; as lastError) {
+                        <p
+                            class="rounded-lg border border-status-danger-border bg-status-danger-background p-3 text-sm text-status-danger-content"
+                        >
+                            Last error: {{ lastError }}
+                        </p>
+                    }
+                    @if (status.summary; as summary) {
+                        <details class="rounded-lg border border-border-subtle bg-background-canvas p-3">
+                            <summary class="cursor-pointer text-sm font-semibold text-content-primary">
+                                Raw scan summary
+                            </summary>
+                            <pre
+                                aria-label="Raw scan summary"
+                                class="max-h-44 mt-3 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
+                                >{{ summary | json }}</pre>
+                        </details>
+                    }
                 }
                 @if (scanError(); as error) {
                     <p
@@ -245,162 +259,45 @@
                         {{ error }}
                     </p>
                 }
-                @if (scanSummary(); as summary) {
-                    <details class="rounded-lg border border-border-subtle bg-background-canvas p-3">
-                        <summary class="cursor-pointer text-sm font-semibold text-content-primary">
-                            Raw scan summary
-                        </summary>
-                        <pre
-                            aria-label="Raw scan summary"
-                            class="max-h-44 mt-3 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
-                            >{{ summary | json }}</pre>
-                    </details>
-                }
-            </section>
-
-            <section class="panel space-y-3 p-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <p class="type-label-sm uppercase text-content-muted">Latest ingested song</p>
-                        @if (lastItem(); as item) {
-                            <h3
-                                aria-label="Latest ingested song"
-                                class="type-section-title mt-1 text-content-primary"
-                            >
-                                {{ metadataPreview(item) }}
-                            </h3>
-                        } @else {
-                            <h3
-                                aria-label="Latest ingested song"
-                                class="type-section-title mt-1 text-content-primary"
-                            >
-                                No item yet
-                            </h3>
-                        }
-                    </div>
-                    <button class="btn-neutral" [disabled]="!lastItem()" (click)="setReadPathFromLastItem()">
-                        Inspect latest
-                    </button>
-                </div>
-                @if (lastItem(); as item) {
-                    <div class="grid gap-3 lg:grid-cols-[8rem_1fr]">
-                        <div
-                            class="aspect-square overflow-hidden rounded-lg border border-border-subtle bg-background-canvas"
-                        >
-                            @if (item.coverPath) {
-                                <img class="size-full object-cover" [src]="item.coverPath" alt="" />
-                            }
-                        </div>
-                        <pre
-                            aria-label="Latest ingested metadata"
-                            class="max-h-72 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
-                            >{{ item | json }}</pre>
-                    </div>
-                }
             </section>
 
             <section class="panel overflow-hidden p-0">
                 <div class="flex items-center justify-between gap-3 border-b border-border-subtle p-4">
                     <div>
-                        <p class="type-label-sm uppercase text-content-muted">Stream log</p>
-                        <h3 class="type-section-title mt-1 text-content-primary">Recent scan events</h3>
+                        <p class="type-label-sm uppercase text-content-muted">Status stream</p>
+                        <h3 class="type-section-title mt-1 text-content-primary">Scan status snapshots</h3>
                     </div>
-                    <button class="btn-nkd-neutral" (click)="clearScanEvents()">Clear</button>
+                    <button class="btn-nkd-neutral" (click)="clearScanLog()">Clear</button>
                 </div>
-
-                @if (lastError(); as errorUpdate) {
-                    <div
-                        class="border-b border-status-danger-border bg-status-danger-background p-3 text-sm text-status-danger-content"
-                    >
-                        Last error: {{ eventDetail(errorUpdate) }}
-                    </div>
-                }
 
                 <div class="max-h-[32rem] overflow-auto">
-                    @for (entry of recentScanEvents(); track entry.id) {
-                        @if (isErrorEvent(entry.update)) {
-                            <button
-                                type="button"
+                    @for (entry of recentScanLogEntries(); track entry.id) {
+                        <div
+                            class="grid min-h-10 grid-cols-[5.5rem_5rem_7rem_minmax(0,1fr)] items-center gap-3 border-b border-border-subtle px-3 py-2 text-xs"
+                        >
+                            <span class="font-mono text-content-muted">{{ formatTime(entry.at) }}</span>
+                            <span class="truncate font-mono text-content-muted">
+                                #{{ entry.status.scanId }} {{ entry.status.trigger }}
+                            </span>
+                            <span
                                 [class]="
-                                    'grid min-h-10 w-full cursor-default grid-cols-[5.5rem_9rem_7rem_minmax(0,1fr)] items-center gap-3 border-b border-border-subtle px-3 py-2 text-left text-xs transition-colors hover:bg-action-quiet-hover ' +
-                                    (selectedErrorEvent()?.id == entry.id ? 'bg-action-quiet-pressed' : '')
+                                    'rounded-full border px-2 py-0.5 text-center font-mono ' +
+                                    scanPhaseClass(entry.status.phase)
                                 "
-                                (click)="selectErrorEvent(entry)"
                             >
-                                <span class="font-mono text-content-muted">{{ formatTime(entry.at) }}</span>
-                                <span class="truncate font-mono text-content-danger">
-                                    {{ eventDiscriminator(entry.update) }}
-                                </span>
-                                <span
-                                    [class]="
-                                        'rounded-full border px-2 py-0.5 text-center font-mono ' +
-                                        scanPhaseClass(entry.update.phase)
-                                    "
-                                >
-                                    {{ entry.update.phase }}
-                                </span>
-                                <span
-                                    class="truncate font-mono text-content-secondary"
-                                    [title]="eventDetail(entry.update)"
-                                >
-                                    {{ eventSummary(entry.update) }}
-                                </span>
-                            </button>
-                        } @else {
-                            <div
-                                class="grid min-h-10 grid-cols-[5.5rem_9rem_7rem_minmax(0,1fr)] items-center gap-3 border-b border-border-subtle px-3 py-2 text-xs"
+                                {{ entry.status.phase }}
+                            </span>
+                            <span
+                                class="truncate font-mono text-content-secondary"
+                                [title]="logEntryDetail(entry.status)"
                             >
-                                <span class="font-mono text-content-muted">{{ formatTime(entry.at) }}</span>
-                                <span class="truncate font-mono text-content-muted">
-                                    {{ eventDiscriminator(entry.update) }}
-                                </span>
-                                <span
-                                    [class]="
-                                        'rounded-full border px-2 py-0.5 text-center font-mono ' +
-                                        scanPhaseClass(entry.update.phase)
-                                    "
-                                >
-                                    {{ entry.update.phase }}
-                                </span>
-                                <span
-                                    class="truncate font-mono text-content-secondary"
-                                    [title]="eventDetail(entry.update)"
-                                >
-                                    {{ eventSummary(entry.update) }}
-                                </span>
-                            </div>
-                        }
+                                {{ logEntryDetail(entry.status) }}
+                            </span>
+                        </div>
                     } @empty {
-                        <p class="p-4 text-sm text-content-muted">No scan events yet.</p>
+                        <p class="p-4 text-sm text-content-muted">No scan status updates yet.</p>
                     }
                 </div>
-
-                @if (selectedErrorEvent(); as selected) {
-                    <div class="border-t border-border-subtle bg-background-canvas p-4">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <p class="type-label-sm uppercase text-content-muted">Selected error</p>
-                                <h4 class="mt-1 font-mono text-sm font-semibold text-content-primary">
-                                    {{ eventDiscriminator(selected.update) }}
-                                </h4>
-                            </div>
-                            <button class="btn-nkd-neutral" (click)="selectedErrorEvent.set(null)">
-                                Close
-                            </button>
-                        </div>
-                        @if (errorEventPath(selected.update)) {
-                            <p class="mt-3 break-all font-mono text-xs text-content-secondary">
-                                {{ errorEventPath(selected.update) }}
-                            </p>
-                        }
-                        <p class="mt-3 whitespace-pre-wrap text-sm text-content-primary">
-                            {{ eventSummary(selected.update) }}
-                        </p>
-                        <pre
-                            class="max-h-72 mt-3 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
-                            >{{ selectedErrorPayload() | json }}</pre>
-                    </div>
-                }
             </section>
         </div>
     </div>

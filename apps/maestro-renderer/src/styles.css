@@ -100,6 +100,10 @@ body {
         min-height: var(--foundation-size-control-md);
     }
 
+    [disabled] {
+        @apply cursor-not-allowed;
+    }
+
     hr {
         @apply my-4 border-border-subtle;
     }

@@ -12,12 +12,16 @@ import type { AppSettings } from '../schemas/app-settings.schema'
 import type { EmailImportProgressUpdate } from '../schemas/email.schema'
 import type { HydratedFeedItem } from '../schemas/feed.schema'
 import {
+    LibraryIpcChannel,
+    type LibraryScanSnapshot,
+    type LibraryScanStatus,
+    type LibraryScanStatusEvent,
+    type StartLibraryScanRequest,
+} from '../schemas/library.schema'
+import {
     MetadataIpcChannel,
-    type MetadataScanUpdate,
     type PingResult,
     type ReadMetadataRequest,
-    type ScanMetadataRequest,
-    type ScanResult,
     type SongMetadata,
     type WriteMetadataRequest,
 } from '../schemas/metadata.schema'
@@ -61,15 +65,19 @@ export const MainIpcContract = defineIpcContract({
     [MetadataIpcChannel.ping]: defineIpcRequest<void, PingResult>(),
     [MetadataIpcChannel.read]: defineIpcRequest<ReadMetadataRequest, SongMetadata | null>(),
     [MetadataIpcChannel.write]: defineIpcRequest<WriteMetadataRequest, SongMetadata>(),
-    [MetadataIpcChannel.scan]: defineIpcRequest<ScanMetadataRequest, ScanResult | undefined>(),
-    [MetadataIpcChannel.scanAbort]: defineIpcEvent(),
+
+    // library scans (main-process-owned lifecycle, see LibraryScanService)
+    [LibraryIpcChannel.pickFolders]: defineIpcRequest<void, string[] | null>(),
+    [LibraryIpcChannel.startScan]: defineIpcRequest<StartLibraryScanRequest, LibraryScanStatus>(),
+    [LibraryIpcChannel.cancelScan]: defineIpcEvent(),
+    [LibraryIpcChannel.getScanStatus]: defineIpcRequest<void, LibraryScanSnapshot>(),
 })
 export type MainIpcContract = typeof MainIpcContract
 
 /** Events the renderer listens for; the main process emits these via `webContents.send`. */
 export const RendererIpcContract = defineIpcContract({
     'email-import-progress': defineIpcEvent<EmailImportProgressUpdate>(),
-    [MetadataIpcChannel.scanProgress]: defineIpcEvent<MetadataScanUpdate>(),
+    [LibraryIpcChannel.scanStatus]: defineIpcEvent<LibraryScanStatusEvent>(),
 })
 export type RendererIpcContract = typeof RendererIpcContract
 

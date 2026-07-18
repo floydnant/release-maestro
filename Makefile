@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report lint format f format-check sure affected db-generate db-studio db-check clean install rebuild-electron rebuild-node version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report lint format f format-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -107,6 +107,8 @@ db-studio: ## Open drizzle studio
 	$(drizzleCommand) studio 
 db-check: ## Check the database
 	$(drizzleCommand) check
+db-truncate-library: ## Truncate library tables (keeps migrations + feed tables) and delete the library scan state
+	ELECTRON_RUN_AS_NODE=1 npx electron apps/maestro-electron/tools/db-truncate-library.cjs
 
 # Maintenance
 clean: ## Clean build outputs and caches

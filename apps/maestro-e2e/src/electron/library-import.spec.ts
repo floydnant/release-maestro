@@ -1,0 +1,116 @@
+import { expect, test } from '@playwright/test'
+import { _electron as electron, ElectronApplication, Page } from 'playwright'
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
+import { buildTaggedLibrary } from './tagged-library.fixture'
+
+const workspaceRoot = join(__dirname, '../../../..')
+const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
+
+const cleanEnv = (): Record<string, string> => {
+    const env = Object.fromEntries(
+        Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] == 'string'),
+    )
+    delete env.ELECTRON_RUN_AS_NODE
+    return env
+}
+
+const launchReleaseMaestro = async (appDataDir: string): Promise<ElectronApplication> =>
+    electron.launch({
+        args: [electronMainPath],
+        cwd: workspaceRoot,
+        env: {
+            ...cleanEnv(),
+            ELECTRON_IS_DEV: '1',
+            RELEASE_MAESTRO_APP_DATA_DIR: appDataDir,
+        },
+    })
+
+/** Replace the native folder picker with a stub returning the given directory. */
+const stubFolderPicker = (app: ElectronApplication, directory: string): Promise<void> =>
+    app.evaluate(({ dialog }, dir) => {
+        dialog.showOpenDialog = (async () => ({
+            canceled: false,
+            filePaths: [dir],
+            bookmarks: [],
+        })) as typeof dialog.showOpenDialog
+    }, directory)
+
+let electronApp: ElectronApplication | undefined
+let page: Page
+
+test.afterEach(async () => {
+    await electronApp?.close()
+    electronApp = undefined
+})
+
+test('first run gates into onboarding, imports a library, and shows the cover mosaic', async ({}, testInfo) => {
+    const appDataDir = testInfo.outputPath('app-data')
+    await mkdir(appDataDir, { recursive: true })
+    const libraryDir = await buildTaggedLibrary(testInfo)
+
+    electronApp = await launchReleaseMaestro(appDataDir)
+    page = await electronApp.firstWindow()
+
+    // With no configured folders, the guard routes straight into onboarding.
+    await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
+    await expect(page).toHaveURL(/\/import$/)
+    await expect(page.getByRole('button', { name: 'Start import' })).toBeDisabled()
+
+    await stubFolderPicker(electronApp, libraryDir)
+    await page.getByRole('button', { name: 'Add folders…' }).click()
+    await expect(page.getByText(libraryDir)).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('import-pick.png') })
+    await page.getByRole('button', { name: 'Start import' }).click()
+
+    // Scan finishes into the done step with the summary and a populated mosaic.
+    await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
+    await expect(page.getByText(/6 tracks imported/)).toBeVisible()
+    // 4 albums but only 3 distinct artworks (two share identical cover bytes) —
+    // the content-addressed dedupe must collapse them to exactly 3 tiles.
+    await expect.poll(async () => page.locator('app-import-mosaic img').count(), { timeout: 10_000 }).toBe(3)
+    await page.screenshot({ path: testInfo.outputPath('import-done.png') })
+
+    await page.getByRole('button', { name: 'Take me to my library' }).click()
+    await expect(page).toHaveURL(/\/home$/)
+
+    // Settings → Library reflects the persisted folder and completed scan.
+    await page.getByRole('link', { name: 'Settings' }).click()
+    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await expect(page.getByText(libraryDir)).toBeVisible()
+    await expect(page.getByText(/Last scan: .*6 tracks/)).toBeVisible()
+
+    // Relaunch: guard passes, startup rescan self-heals (all unchanged).
+    await electronApp.close()
+    electronApp = await launchReleaseMaestro(appDataDir)
+    page = await electronApp.firstWindow()
+    await expect(page).toHaveURL(/\/home$/)
+    await page.getByRole('link', { name: 'Settings' }).click()
+    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await expect(page.getByText(/Last scan: .*6 tracks/)).toBeVisible({ timeout: 20_000 })
+})
+
+test('onboarding can be skipped and keeps nudging via the sidebar CTA', async ({}, testInfo) => {
+    const appDataDir = testInfo.outputPath('app-data')
+    await mkdir(appDataDir, { recursive: true })
+
+    electronApp = await launchReleaseMaestro(appDataDir)
+    page = await electronApp.firstWindow()
+
+    await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
+    await page.getByRole('button', { name: 'Skip for now' }).click()
+
+    await expect(page).toHaveURL(/\/home$/)
+    await expect(page.getByText("Your music library isn't set up yet.")).toBeVisible()
+
+    // The CTA re-summons onboarding.
+    await page.getByRole('link', { name: 'Set up library' }).click()
+    await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
+
+    // Skip persists across relaunches: no gate, CTA still nudges.
+    await electronApp.close()
+    electronApp = await launchReleaseMaestro(appDataDir)
+    page = await electronApp.firstWindow()
+    await expect(page).toHaveURL(/\/home$/)
+    await expect(page.getByText("Your music library isn't set up yet.")).toBeVisible()
+})

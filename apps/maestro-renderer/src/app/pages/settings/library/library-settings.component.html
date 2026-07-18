@@ -1,0 +1,63 @@
+<div class="max-w-2xl">
+    <h2 class="type-section-title text-content-primary">Library folders</h2>
+    <p class="type-body-sm mt-1 text-content-muted">
+        The root folders of your music collection. Saving changes runs a rescan; files under removed
+        folders stay in the database but are marked as no longer present.
+    </p>
+
+    <div class="panel mt-4 p-2">
+        @if (folders().length === 0) {
+            <p class="type-body-sm px-3 py-4 text-center text-content-muted">
+                No library folders configured.
+            </p>
+        }
+        @for (folder of folders(); track folder) {
+            <div class="flex items-center gap-3 rounded px-3 py-2 hover:bg-background-elevated">
+                <p class="type-body-sm flex min-w-0 grow" [title]="folder">
+                    <span class="truncate text-content-muted">{{ folderParent(folder) }}</span
+                    ><span class="shrink-0 font-semibold text-content-primary">{{
+                        folderName(folder)
+                    }}</span>
+                </p>
+                <button
+                    class="btn-nkd-neutral shrink-0"
+                    type="button"
+                    title="Remove folder"
+                    (click)="removeFolder(folder)"
+                >
+                    <app-icon name="octX" size="14"></app-icon>
+                </button>
+            </div>
+        }
+    </div>
+
+    <div class="mt-4 flex items-center gap-3">
+        <button class="btn-neutral" type="button" (click)="addFolders()">Add folders…</button>
+        <button
+            class="btn-primary"
+            type="button"
+            [disabled]="saveInFlight() || library.isScanning() || folders().length === 0"
+            (click)="saveAndRescan()"
+        >
+            {{ isDirty() ? 'Save and rescan' : 'Rescan now' }}
+        </button>
+    </div>
+
+    <h2 class="type-section-title mt-8 text-content-primary">Scan status</h2>
+    @if (library.isScanning()) {
+        @if (library.scanStatus(); as scanStatus) {
+            <p class="type-body-sm mt-2 flex items-center gap-2 text-content-secondary">
+                <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
+                @if (scanStatus.phase === 'discovering') {
+                    Discovering files… {{ scanStatus.discovered }} found
+                } @else {
+                    Reading tracks… {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
+                }
+            </p>
+        }
+    } @else if (lastScanText(); as lastScan) {
+        <p class="type-body-sm mt-2 text-content-secondary">Last scan: {{ lastScan }}</p>
+    } @else {
+        <p class="type-body-sm mt-2 text-content-muted">No scan has completed yet.</p>
+    }
+</div>

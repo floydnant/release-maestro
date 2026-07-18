@@ -21,6 +21,18 @@
     -webkit-app-region: drag;
 }
 
+/* Full-window routes (library onboarding): the bar floats transparently over the
+   content so the window stays draggable while the page owns every pixel. */
+.title-bar--overlay {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 50;
+    border-bottom: none;
+    background: transparent;
+}
+
 .title-bar__drag-region {
     display: flex;
     min-width: 0;

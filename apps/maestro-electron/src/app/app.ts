@@ -60,8 +60,23 @@ export default class App {
             setTimeout(() => {
                 App.initMainWindow()
                 App.loadMainWindow()
+                App.startLibraryStartupScan()
             }, 400)
         }
+    }
+
+    /**
+     * Kick off the idempotent startup rescan of the configured library folders.
+     * No-ops (idle status) when no folders are configured, so first-run onboarding
+     * never competes with it. The renderer syncs via `library:get-scan-status`.
+     */
+    private static startLibraryStartupScan() {
+        void (async () => {
+            const { diContainer } = await import('./di')
+            const { LibraryScanService } = await import('./services/library/library-scan.service')
+            const scanService = await diContainer.get(LibraryScanService)
+            scanService.startScan('startup')
+        })().catch(error => console.error('Failed to start library startup scan:', error))
     }
 
     private static async initializeServices() {
