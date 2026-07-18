@@ -27,21 +27,19 @@ describe('LibraryBackendService', () => {
         const repository = newRepositoryMock()
         const scanSeenAt = repository.nextScanSeenAt()
         const metadataService = {
-            prescan: jest.fn(
-                (): Observable<MetadataPrescanUpdate> =>
-                    from<MetadataPrescanUpdate[]>([
-                        { phase: 'started' },
-                        { phase: 'batch', items: [fact] },
-                        { phase: 'completed', count: 1, errors: 0 },
-                    ]),
+            prescan: jest.fn((): Observable<MetadataPrescanUpdate> =>
+                from<MetadataPrescanUpdate[]>([
+                    { phase: 'started' },
+                    { phase: 'batch', items: [fact] },
+                    { phase: 'completed', count: 1, errors: 0 },
+                ]),
             ),
-            readFiles: jest.fn(
-                (): Observable<MetadataScanUpdate> =>
-                    from<MetadataScanUpdate[]>([
-                        { phase: 'started', total: 1 },
-                        { phase: 'item', metadata },
-                        { phase: 'completed', count: 1, total: 1 },
-                    ]),
+            readFiles: jest.fn((): Observable<MetadataScanUpdate> =>
+                from<MetadataScanUpdate[]>([
+                    { phase: 'started', total: 1 },
+                    { phase: 'item', metadata },
+                    { phase: 'completed', count: 1, total: 1 },
+                ]),
             ),
         }
         const service = new LibraryBackendService(
@@ -78,14 +76,13 @@ describe('LibraryBackendService', () => {
         repository.countSongsNeedingMetadata.mockReturnValue(0)
         repository.listSongsNeedingMetadata.mockReset().mockReturnValue([])
         const metadataService = {
-            prescan: jest.fn(
-                (): Observable<MetadataPrescanUpdate> =>
-                    from<MetadataPrescanUpdate[]>([
-                        { phase: 'started' },
-                        { phase: 'batch', items: [fact] },
-                        { phase: 'itemError', path: '/music/locked', error: 'EACCES' },
-                        { phase: 'completed', count: 1, errors: 1 },
-                    ]),
+            prescan: jest.fn((): Observable<MetadataPrescanUpdate> =>
+                from<MetadataPrescanUpdate[]>([
+                    { phase: 'started' },
+                    { phase: 'batch', items: [fact] },
+                    { phase: 'itemError', path: '/music/locked', error: 'EACCES' },
+                    { phase: 'completed', count: 1, errors: 1 },
+                ]),
             ),
             readFiles: jest.fn(),
         }

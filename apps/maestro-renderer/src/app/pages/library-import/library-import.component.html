@@ -5,8 +5,8 @@
                 <div class="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-8 py-16">
                     <h1 class="type-hero-title text-content-primary">Set up your music library</h1>
                     <p class="type-body-md mt-3 text-content-secondary">
-                        Choose the folders where your music lives. Release Maestro scans them, reads the
-                        tags and cover art, and keeps everything up to date from then on.
+                        Choose the folders where your music lives. Release Maestro scans them, reads the tags
+                        and cover art, and keeps everything up to date from then on.
                     </p>
 
                     <div class="panel mt-8 p-2">
@@ -17,7 +17,7 @@
                         }
                         @for (folder of pendingFolders(); track folder) {
                             <div
-                                class="flex items-center gap-3 rounded px-3 py-2 hover:bg-background-elevated"
+                                class="rounded flex items-center gap-3 px-3 py-2 hover:bg-background-elevated"
                             >
                                 <div class="min-w-0 grow">
                                     <p class="type-body-sm flex min-w-0" [title]="folder">
@@ -35,8 +35,8 @@
                                             </p>
                                         } @else if (validation.nestedUnder) {
                                             <p class="type-body-sm mt-0.5 text-content-muted">
-                                                Already covered by {{ validation.nestedUnder }} — it
-                                                will be skipped.
+                                                Already covered by {{ validation.nestedUnder }} — it will be
+                                                skipped.
                                             </p>
                                         }
                                     }
@@ -59,9 +59,7 @@
                         </button>
                         <span class="grow"></span>
 
-                        <button class="btn-neutral" type="button" (click)="addFolders()">
-                            Add folders…
-                        </button>
+                        <button class="btn-neutral" type="button" (click)="addFolders()">Add folders…</button>
                         <button
                             class="btn-primary"
                             type="button"
@@ -190,10 +188,7 @@
                                 }
                             } @else {
                                 <div class="mt-6">
-                                    <button
-                                        class="btn-nkd-neutral text-content-muted"
-                                        (click)="cancelScan()"
-                                    >
+                                    <button class="btn-nkd-neutral text-content-muted" (click)="cancelScan()">
                                         Cancel import
                                     </button>
                                 </div>
@@ -213,8 +208,8 @@
                         >
                             <h1 class="type-hero-title text-content-primary">No audio files found</h1>
                             <p class="type-body-md mt-3 text-content-secondary">
-                                We couldn't find any supported audio files in the selected folders. Pick
-                                the folder(s) that contain your music and try again.
+                                We couldn't find any supported audio files in the selected folders. Pick the
+                                folder(s) that contain your music and try again.
                             </p>
                             <div class="mt-6">
                                 <button class="btn-primary" type="button" (click)="backToFolders()">

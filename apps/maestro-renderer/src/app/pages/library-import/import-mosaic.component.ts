@@ -1,12 +1,4 @@
-import {
-    ChangeDetectionStrategy,
-    Component,
-    DestroyRef,
-    effect,
-    inject,
-    input,
-    signal,
-} from '@angular/core'
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal } from '@angular/core'
 import { LibraryAlbumPreview } from '@release-maestro/core'
 import { fileUrl } from '../../shared/utils/file-url.util'
 
@@ -39,14 +31,9 @@ const DRAIN_FACTOR = 20
         class: 'block overflow-hidden',
     },
     template: `
-        <div
-            class="grid gap-1.5"
-            [style.grid-template-columns]="'repeat(' + columns() + ', minmax(0, 1fr))'"
-        >
+        <div class="grid gap-1.5" [style.grid-template-columns]="'repeat(' + columns() + ', minmax(0, 1fr))'">
             @for (cell of cells(); track $index) {
-                <div
-                    class="relative aspect-square overflow-hidden rounded-md"
-                >
+                <div class="relative aspect-square overflow-hidden rounded-md">
                     @if (cell) {
                         <!-- Tracking by revision recreates the nodes on replacement, restarting the animations. -->
                         @for (revisionCell of [cell]; track revisionCell.revision) {

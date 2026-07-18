@@ -109,7 +109,12 @@ describe('LibraryScanService', () => {
         updates$.next({ phase: 'itemError', path: '/music/locked.flac', error: 'EACCES' })
         updates$.next({ phase: 'started', total: 2 })
         // …and a failure during the read phase stay separately counted.
-        updates$.next({ phase: 'itemError', path: '/music/corrupt.mp3', code: 'PARSE_FAILED', error: 'bad frame' })
+        updates$.next({
+            phase: 'itemError',
+            path: '/music/corrupt.mp3',
+            code: 'PARSE_FAILED',
+            error: 'bad frame',
+        })
         updates$.next({ phase: 'progress', done: 2, total: 2 })
         updates$.next({
             phase: 'completed',

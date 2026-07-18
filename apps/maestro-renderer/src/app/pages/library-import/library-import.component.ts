@@ -52,7 +52,7 @@ type ImportStep = 'pick' | 'scanning' | 'done'
            fading out above and below so the cover wall shines around it. Its height
            follows the content, so it always fits the UI instead of an arbitrary shape. */
         .content-band {
-            @apply w-fit mx-auto py-16 px-10 bg-black/70 backdrop-blur-md rounded-xl border border-border-subtle shadow-lg;
+            @apply mx-auto w-fit rounded-xl border border-border-subtle bg-black/70 px-10 py-16 shadow-lg backdrop-blur-md;
         }
     `,
 })

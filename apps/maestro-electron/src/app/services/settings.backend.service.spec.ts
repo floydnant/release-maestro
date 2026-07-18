@@ -41,9 +41,7 @@ describe('SettingsBackendService', () => {
         service.setSettings({ libraryFolders: ['/music'], emailPluginConfig: {} })
 
         expect(() => service.patchSettings({ libraryFolders: 'nope' as unknown as string[] })).toThrow()
-        expect(() =>
-            service.setSettings({ libraryFolders: [42] } as unknown as AppSettings),
-        ).toThrow()
+        expect(() => service.setSettings({ libraryFolders: [42] } as unknown as AppSettings)).toThrow()
 
         expect(service.getSettings().libraryFolders).toEqual(['/music'])
     })

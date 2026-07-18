@@ -112,8 +112,17 @@ const defaultScenario = (): RendererScenario => ({
         'window-close': { kind: 'resolve' },
         'get-app-version': { kind: 'resolve', value: '0.0.0-scenario' },
         'open-url': { kind: 'resolve' },
-        'get-settings': { kind: 'resolve', value: { emailPluginConfig: {} } satisfies AppSettings },
+        // A configured library keeps the onboarding route guard from redirecting
+        // scenario navigations to /import.
+        'get-settings': {
+            kind: 'resolve',
+            value: {
+                libraryFolders: ['/scenario/music'],
+                emailPluginConfig: {},
+            } satisfies AppSettings,
+        },
         'set-settings': { kind: 'resolve' },
+        'patch-settings': { kind: 'resolve' },
         'trigger-email-import': { kind: 'resolve' },
         'load-feed': { kind: 'resolve', value: [] },
         'has-feed': { kind: 'resolve', value: false },
@@ -121,7 +130,12 @@ const defaultScenario = (): RendererScenario => ({
         'metadata:ping': { kind: 'resolve', value: { ok: true } },
         'metadata:read': { kind: 'resolve', value: null },
         'metadata:write': { kind: 'resolve' },
-        'metadata:scan': { kind: 'resolve' },
+        'library:get-scan-status': {
+            kind: 'resolve',
+            value: { status: null, albums: [], lastScan: null },
+        },
+        'library:validate-roots': { kind: 'resolve', value: [] },
+        'library:pick-folders': { kind: 'resolve', value: null },
     },
 })
 

@@ -60,17 +60,17 @@ body {
         letter-spacing: var(--type-label-md-letter-spacing);
     }
     .btn-neutral {
-        @apply btn bg-action-secondary text-action-secondary-content active:bg-action-secondary-pressed hover:bg-action-secondary-hover;
+        @apply btn bg-action-secondary text-action-secondary-content hover:bg-action-secondary-hover active:bg-action-secondary-pressed;
     }
     .btn-nkd-neutral {
-        @apply btn text-content-secondary active:bg-action-quiet-pressed hover:bg-action-quiet-hover hover:text-content-primary;
+        @apply btn text-content-secondary hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed;
     }
     .btn-muted {
         @apply btn bg-background-surface text-content-muted hover:bg-background-elevated hover:text-content-secondary;
     }
 
     .btn-primary {
-        @apply btn bg-action-primary text-action-primary-content shadow-sm active:bg-action-primary-pressed hover:bg-action-primary-hover;
+        @apply btn bg-action-primary text-action-primary-content shadow-sm hover:bg-action-primary-hover active:bg-action-primary-pressed;
     }
 
     .btn-danger {

@@ -30,8 +30,7 @@ export const diContainer = new DiContainer({
         },
         {
             provide: SettingsBackendService,
-            useFactory: () =>
-                new SettingsBackendService(confStore<AppSettings>(appPaths.config, 'settings')),
+            useFactory: () => new SettingsBackendService(confStore<AppSettings>(appPaths.config, 'settings')),
         },
         {
             provide: EmailBackendRepository,

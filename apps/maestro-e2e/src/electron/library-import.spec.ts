@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { _electron as electron, ElectronApplication, Page } from 'playwright'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { buildTaggedLibrary } from './tagged-library.fixture'
 
@@ -74,11 +74,13 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     await page.getByRole('button', { name: 'Take me to my library' }).click()
     await expect(page).toHaveURL(/\/home$/)
 
-    // Settings → Library reflects the persisted folder and completed scan.
+    // Settings → Library reflects the persisted folder and the session's terminal result.
     await page.getByRole('link', { name: 'Settings' }).click()
     await page.getByRole('link', { name: 'Library', exact: true }).click()
     await expect(page.getByText(libraryDir)).toBeVisible()
-    await expect(page.getByText(/Last scan: .*6 tracks/)).toBeVisible()
+    await expect(page.getByLabel('Latest scan result')).toContainText('Completed')
+    await expect(page.getByLabel('Latest scan result')).toContainText('6 imported')
+    await expect(page.getByText(/Last completed scan: .*6 tracks/)).toBeVisible()
 
     // Relaunch: guard passes, startup rescan self-heals (all unchanged).
     await electronApp.close()
@@ -87,7 +89,38 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     await expect(page).toHaveURL(/\/home$/)
     await page.getByRole('link', { name: 'Settings' }).click()
     await page.getByRole('link', { name: 'Library', exact: true }).click()
-    await expect(page.getByText(/Last scan: .*6 tracks/)).toBeVisible({ timeout: 20_000 })
+    // The startup rescan produces a fresh terminal result (nothing new to import),
+    // while the persisted aggregate still reports the library size.
+    await expect(page.getByLabel('Latest scan result')).toContainText('Completed', { timeout: 20_000 })
+    await expect(page.getByText(/Last completed scan: .*6 tracks/)).toBeVisible({ timeout: 20_000 })
+})
+
+test('failed files surface in Library Settings, linked from onboarding', async ({}, testInfo) => {
+    const appDataDir = testInfo.outputPath('app-data')
+    await mkdir(appDataDir, { recursive: true })
+    const libraryDir = await buildTaggedLibrary(testInfo)
+    // A garbage "audio" file: discovered by extension, fails the metadata read.
+    await writeFile(join(libraryDir, 'zz-broken.mp3'), 'this is not audio')
+
+    electronApp = await launchReleaseMaestro(appDataDir)
+    page = await electronApp.firstWindow()
+
+    await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
+    await stubFolderPicker(electronApp, libraryDir)
+    await page.getByRole('button', { name: 'Add folders…' }).click()
+    await page.getByRole('button', { name: 'Start import' }).click()
+
+    // Completion summary counts the failure and links to the details.
+    await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
+    await expect(page.getByText(/6 tracks imported · 1 failed/)).toBeVisible()
+    await page.getByRole('link', { name: 'View failed files' }).click()
+
+    await expect(page).toHaveURL(/\/settings\/library$/)
+    await expect(page.getByRole('heading', { name: 'Failed files' })).toBeVisible()
+    const failedList = page.getByLabel('Failed files')
+    await expect(failedList).toContainText('zz-broken.mp3')
+    await expect(page.getByText('Details are from the current app session.')).toBeVisible()
+    await expect(page.getByLabel('Latest scan result')).toContainText('1 failed')
 })
 
 test('onboarding can be skipped and keeps nudging via the sidebar CTA', async ({}, testInfo) => {

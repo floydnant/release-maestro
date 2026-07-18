@@ -1,8 +1,8 @@
 <div class="max-w-2xl">
     <h2 class="type-section-title text-content-primary">Library folders</h2>
     <p class="type-body-sm mt-1 text-content-muted">
-        The root folders of your music collection. Saving changes runs a rescan; files under removed
-        folders stay in the database but are marked as no longer present.
+        The root folders of your music collection. Saving changes runs a rescan; files under removed folders
+        stay in the database but are marked as no longer present.
     </p>
 
     <div class="panel mt-4 p-2">
@@ -12,7 +12,7 @@
             </p>
         }
         @for (folder of folders(); track folder) {
-            <div class="flex items-center gap-3 rounded px-3 py-2 hover:bg-background-elevated">
+            <div class="rounded flex items-center gap-3 px-3 py-2 hover:bg-background-elevated">
                 <div class="min-w-0 grow">
                     <p class="type-body-sm flex min-w-0" [title]="folder">
                         <span class="truncate text-content-muted">{{ folderParent(folder) }}</span
@@ -95,16 +95,14 @@
         @if (terminalResult.failures.length > 0) {
             <h2 class="type-section-title mt-8 text-content-primary">Failed files</h2>
             <p class="type-body-sm mt-1 text-content-muted">
-                {{ terminalResult.discoveryFailureCount + terminalResult.readFailureCount }} file(s)
-                could not be imported. Details are from the current app session.
+                {{ terminalResult.discoveryFailureCount + terminalResult.readFailureCount }} file(s) could not
+                be imported. Details are from the current app session.
             </p>
             <div class="panel mt-3 p-2" aria-label="Failed files">
                 @for (failure of terminalResult.failures; track failure.path) {
                     <div class="rounded px-3 py-2 hover:bg-background-elevated">
                         <p class="type-body-sm flex min-w-0" [title]="failure.path">
-                            <span class="truncate text-content-muted">{{
-                                folderParent(failure.path)
-                            }}</span
+                            <span class="truncate text-content-muted">{{ folderParent(failure.path) }}</span
                             ><span class="shrink-0 font-semibold text-content-primary">{{
                                 folderName(failure.path)
                             }}</span>
