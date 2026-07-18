@@ -31,15 +31,20 @@ ipc.handle('open-url', async (_event, url) => {
     shell.openExternal(url)
 })
 
-// Settings management
+// Settings management (all reads/writes go through schema validation)
 ipc.handle('get-settings', async () => {
     const settingsService = await diContainer.get(SettingsBackendService)
-    return settingsService.store.store
+    return settingsService.getSettings()
 })
 
 ipc.handle('set-settings', async (_event, store) => {
     const settingsService = await diContainer.get(SettingsBackendService)
-    settingsService.store.store = store
+    return settingsService.setSettings(store)
+})
+
+ipc.handle('patch-settings', async (_event, patch) => {
+    const settingsService = await diContainer.get(SettingsBackendService)
+    return settingsService.patchSettings(patch)
 })
 
 // Handle email import functionality

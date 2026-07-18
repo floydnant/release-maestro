@@ -1,4 +1,8 @@
+import Conf from 'conf'
+import { AppSettings } from '@release-maestro/core'
+import { appPaths } from './app-env'
 import { DatabaseClient } from './database/database.client'
+import { PersistentStore } from './utils/persistent-store.util'
 import { SettingsBackendService } from './services/settings.backend.service'
 import { EmailBackendRepository } from './services/email/email.backend.repository'
 import { FeedBackendRepository } from './services/feed/feed.backend.repository'
@@ -11,7 +15,11 @@ import { coverArtCacheDir, resolveMetadataEngineBinaryPath } from './app-env'
 import { DiContainer } from './utils/dependency-injection.util'
 import { LibraryBackendRepository } from './services/library/library.backend.repository'
 import { LibraryBackendService } from './services/library/library.backend.service'
-import { LibraryScanService } from './services/library/library-scan.service'
+import { LibraryScanService, LibraryScanState } from './services/library/library-scan.service'
+
+/** `conf` satisfies the store surface; the cast narrows its wider overloads. */
+const confStore = <T extends Record<string, unknown>>(cwd: string, configName: string) =>
+    new Conf<T>({ cwd, configName }) as unknown as PersistentStore<T>
 
 export const diContainer = new DiContainer({
     providers: [
@@ -21,7 +29,8 @@ export const diContainer = new DiContainer({
         },
         {
             provide: SettingsBackendService,
-            useFactory: () => new SettingsBackendService(),
+            useFactory: () =>
+                new SettingsBackendService(confStore<AppSettings>(appPaths.config, 'settings')),
         },
         {
             provide: EmailBackendRepository,
@@ -76,6 +85,7 @@ export const diContainer = new DiContainer({
                 new LibraryScanService(
                     await di.get(LibraryBackendService),
                     await di.get(SettingsBackendService),
+                    confStore<LibraryScanState>(appPaths.data, 'library-state'),
                 ),
         },
     ],

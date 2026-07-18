@@ -48,7 +48,13 @@ export const MainIpcContract = defineIpcContract({
 
     // settings
     'get-settings': defineIpcRequest<void, AppSettings>(),
-    'set-settings': defineIpcRequest<AppSettings>(),
+    'set-settings': defineIpcRequest<AppSettings, AppSettings>(),
+    /**
+     * Lost-update-safe partial write: the main process merges the patch onto the
+     * latest stored settings, validates, persists, and returns the authoritative
+     * result. Prefer this over `set-settings` for single-field changes.
+     */
+    'patch-settings': defineIpcRequest<Partial<AppSettings>, AppSettings>(),
 
     // feed
     'trigger-email-import': defineIpcRequest(),

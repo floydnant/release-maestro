@@ -96,17 +96,12 @@ export class LibraryService {
 
     /** Persist the full list of library folders (deduped, order preserved). */
     async saveFolders(folders: string[]): Promise<void> {
-        const settings = await this.electronService.ipcRenderer.invoke('get-settings')
-        await this.settingsService.setSettings({
-            ...settings,
-            libraryFolders: [...new Set(folders)],
-        })
+        await this.settingsService.patchSettings({ libraryFolders: [...new Set(folders)] })
     }
 
     /** Remember that the user skipped library onboarding (keeps the nudge CTA instead). */
     async setOnboardingSkipped(): Promise<void> {
-        const settings = await this.electronService.ipcRenderer.invoke('get-settings')
-        await this.settingsService.setSettings({ ...settings, libraryOnboardingSkipped: true })
+        await this.settingsService.patchSettings({ libraryOnboardingSkipped: true })
     }
 
     private applyStatusEvent(statusEvent: LibraryScanStatusEvent): void {

@@ -7,9 +7,8 @@ import {
     LibraryScanTrigger,
     toRendererEmitter,
 } from '@release-maestro/core'
-import Conf from 'conf'
 import { BrowserWindow } from 'electron'
-import { appPaths } from '../../app-env'
+import { PersistentStore } from '../../utils/persistent-store.util'
 import { SettingsBackendService } from '../settings.backend.service'
 import { LibraryBackendService } from './library.backend.service'
 
@@ -18,8 +17,8 @@ const BROADCAST_INTERVAL_MS = 200
 /** Album previews retained for late-mounting UI reseeds (`get-scan-status`). */
 const SNAPSHOT_ALBUM_LIMIT = 200
 
-interface LibraryScanState {
-    lastScan: LibraryLastScanInfo | null
+export interface LibraryScanState extends Record<string, unknown> {
+    lastScan?: LibraryLastScanInfo | null
 }
 
 /**
@@ -41,20 +40,16 @@ export class LibraryScanService {
     private dirty = false
     private broadcastTimer: NodeJS.Timeout | null = null
 
-    /**
-     * Main-owned scan state lives in its own conf file, and in the *data* dir (not
-     * config): it's derived state that rides along with the database, not user
-     * configuration. Its own file also keeps it safe from the renderer replacing
-     * the whole `settings` store on `set-settings`.
-     */
-    private readonly stateStore = new Conf<LibraryScanState>({
-        cwd: appPaths.data,
-        configName: 'library-state',
-    })
-
     constructor(
         private readonly library: LibraryBackendService,
         private readonly settings: SettingsBackendService,
+        /**
+         * Main-owned scan state lives in its own conf file, and in the *data* dir
+         * (not config): it's derived state that rides along with the database, not
+         * user configuration. Its own file also keeps it safe from the renderer
+         * replacing the whole `settings` store on `set-settings`. Wired in di.ts.
+         */
+        private readonly stateStore: PersistentStore<LibraryScanState>,
     ) {
         console.log('[LibraryScanService] state store path:', this.stateStore.path)
     }
@@ -72,7 +67,7 @@ export class LibraryScanService {
     startScan(trigger: LibraryScanTrigger, paths?: string[]): LibraryScanStatus {
         if (this.status && this.isScanning) return this.status
 
-        const roots = paths ?? this.settings.store.get('libraryFolders') ?? []
+        const roots = paths ?? this.settings.getSettings().libraryFolders ?? []
         const status: LibraryScanStatus = {
             scanId: ++this.scanIdCounter,
             trigger,
