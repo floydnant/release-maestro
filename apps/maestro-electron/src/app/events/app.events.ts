@@ -14,6 +14,7 @@ import {
     toRendererEmitter,
 } from '@release-maestro/core'
 import App from '../app'
+import { LibraryRootsService } from '../services/library/library-roots.service'
 import { LibraryScanService } from '../services/library/library-scan.service'
 import { MetadataBackendService } from '../services/metadata/metadata.backend.service'
 import { SettingsBackendService } from '../services/settings.backend.service'
@@ -147,7 +148,15 @@ ipc.handle(LibraryIpcChannel.pickFolders, async () => {
     const result = App.mainWindow
         ? await dialog.showOpenDialog(App.mainWindow, options)
         : await dialog.showOpenDialog(options)
-    return result.canceled ? null : result.filePaths
+    if (result.canceled) return null
+
+    const rootsService = await diContainer.get(LibraryRootsService)
+    return rootsService.canonicalizeSelection(result.filePaths)
+})
+
+ipc.handle(LibraryIpcChannel.validateRoots, async (_event, request) => {
+    const rootsService = await diContainer.get(LibraryRootsService)
+    return rootsService.validate(request.paths)
 })
 
 ipc.handle(LibraryIpcChannel.startScan, async (_event, request) => {

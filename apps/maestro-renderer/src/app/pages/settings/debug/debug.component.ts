@@ -194,7 +194,7 @@ export class DebugComponent {
         switch (phase) {
             case 'completed':
                 return 'border-status-success-border bg-status-success-background text-status-success-content'
-            case 'error':
+            case 'failed':
                 return 'border-status-danger-border bg-status-danger-background text-status-danger-content'
             case 'cancelled':
                 return 'border-status-warning-border bg-status-warning-background text-status-warning-content'
@@ -207,20 +207,23 @@ export class DebugComponent {
     }
 
     logEntryDetail(status: LibraryScanStatus): string {
+        const terminal = status.terminal
         switch (status.phase) {
             case 'discovering':
                 return `discovered ${status.discovered} (new ${status.new}, changed ${status.changed}, unchanged ${status.unchanged})`
             case 'reading':
-                return `read ${status.readDone}/${status.readTotal}, imported ${status.imported}, errors ${status.errors}, issues ${status.normalizationIssues}`
+                return `read ${status.readDone}/${status.readTotal}, imported ${status.imported}, failed ${status.failedFiles}, issues ${status.normalizationIssues}`
             case 'completed':
-                return `count ${status.summary?.count ?? 0}, total ${status.summary?.total ?? 0}, new ${
-                    status.summary?.new ?? 0
-                }, changed ${status.summary?.changed ?? 0}, unchanged ${
-                    status.summary?.unchanged ?? 0
-                }, missing ${status.summary?.missing ?? 0}, errors ${status.summary?.errors ?? 0}`
-            case 'error':
+                return `imported ${terminal?.imported ?? 0}, discovered ${
+                    terminal?.discovered ?? 0
+                }, new ${terminal?.new ?? 0}, changed ${terminal?.changed ?? 0}, unchanged ${
+                    terminal?.unchanged ?? 0
+                }, missing ${terminal?.missing ?? 0}, failed ${
+                    (terminal?.discoveryFailureCount ?? 0) + (terminal?.readFailureCount ?? 0)
+                }`
+            case 'failed':
             case 'cancelled':
-                return status.lastErrorMessage ?? '—'
+                return terminal?.error?.message ?? '—'
             case 'idle':
                 return 'no library folders configured'
         }

@@ -4,6 +4,7 @@ import {
     LibraryAlbumPreview,
     LibraryIpcChannel,
     LibraryLastScanInfo,
+    LibraryRootValidation,
     LibraryScanStatus,
     LibraryScanStatusEvent,
     StartLibraryScanRequest,
@@ -18,7 +19,9 @@ import { SettingsService } from '../settings/settings.service'
  * The main process broadcasts full status snapshots on `library:scan-status`
  * (throttled), so this service just mirrors the latest event into signals.
  * It subscribes eagerly for the whole app lifetime and seeds itself from
- * `library:get-scan-status`, so late-mounting views never miss a running scan.
+ * `library:get-scan-status`. Push events and pulled snapshots are ordered by
+ * `(scanId, revision)` — whichever is newer wins, so races between the two can
+ * never regress local state.
  */
 @Injectable({
     providedIn: 'root',
@@ -31,13 +34,12 @@ export class LibraryService {
     private readonly mosaicAlbums_ = signal<LibraryAlbumPreview[]>([])
     private readonly lastScan_ = signal<LibraryLastScanInfo | null>(null)
     private seenCoverPaths = new Set<string>()
-    private receivedPush = false
 
     /** Latest scan status snapshot (null until the first scan of this app session). */
     readonly scanStatus = this.scanStatus_.asReadonly()
     /** Album cover previews of the current/last scan, in arrival order (for the mosaic). */
     readonly mosaicAlbums = this.mosaicAlbums_.asReadonly()
-    /** Persisted summary of the last completed scan. */
+    /** Persisted aggregate of the last completed scan. */
     readonly lastScan = this.lastScan_.asReadonly()
 
     readonly isScanning = computed(() => {
@@ -75,8 +77,9 @@ export class LibraryService {
     async refreshSnapshot(): Promise<void> {
         const snapshot = await this.electronService.ipcRenderer.invoke(LibraryIpcChannel.getScanStatus)
         this.lastScan_.set(snapshot.lastScan)
-        if (snapshot.status && (!this.receivedPush || this.scanStatus() === null)) {
-            this.scanStatus_.set(snapshot.status)
+        if (snapshot.status && this.applyStatus(snapshot.status)) {
+            // The pulled snapshot is authoritative for this scan: reseed the mosaic
+            // from its cumulative album list (dedup state included).
             this.seenCoverPaths = new Set(snapshot.albums.map(album => album.coverPath))
             this.mosaicAlbums_.set(snapshot.albums)
         }
@@ -84,6 +87,10 @@ export class LibraryService {
 
     pickFolders(): Promise<string[] | null> {
         return this.electronService.ipcRenderer.invoke(LibraryIpcChannel.pickFolders)
+    }
+
+    validateRoots(paths: string[]): Promise<LibraryRootValidation[]> {
+        return this.electronService.ipcRenderer.invoke(LibraryIpcChannel.validateRoots, { paths })
     }
 
     startScan(trigger: StartLibraryScanRequest['trigger'], paths?: string[]): Promise<LibraryScanStatus> {
@@ -104,15 +111,31 @@ export class LibraryService {
         await this.settingsService.patchSettings({ libraryOnboardingSkipped: true })
     }
 
-    private applyStatusEvent(statusEvent: LibraryScanStatusEvent): void {
-        this.receivedPush = true
-        const previous = this.scanStatus()
-        if (!previous || previous.scanId !== statusEvent.status.scanId) {
+    /**
+     * Apply a status if it is not older than the current one. Returns whether it
+     * was applied. Moving to a *different* scan resets the mosaic exactly once.
+     */
+    private applyStatus(incoming: LibraryScanStatus): boolean {
+        const current = this.scanStatus_()
+        if (current) {
+            if (incoming.scanId < current.scanId) return false
+            if (incoming.scanId === current.scanId && incoming.revision < current.revision) return false
+        }
+        if (!current || current.scanId !== incoming.scanId) {
             this.seenCoverPaths = new Set()
             this.mosaicAlbums_.set([])
         }
-        this.scanStatus_.set(statusEvent.status)
+        this.scanStatus_.set(incoming)
+        return true
+    }
 
+    private applyStatusEvent(statusEvent: LibraryScanStatusEvent): void {
+        this.applyStatus(statusEvent.status)
+
+        // Album deltas are safe to merge whenever they belong to the scan we are
+        // showing — cover-path dedup makes replays idempotent.
+        const current = this.scanStatus_()
+        if (!current || current.scanId !== statusEvent.status.scanId) return
         const additions = statusEvent.newAlbums.filter(album => !this.seenCoverPaths.has(album.coverPath))
         if (additions.length > 0) {
             for (const album of additions) this.seenCoverPaths.add(album.coverPath)

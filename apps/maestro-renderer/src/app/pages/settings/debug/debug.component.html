@@ -55,7 +55,7 @@
         <div class="panel p-4">
             <p class="type-label-sm uppercase text-content-muted">Errors</p>
             <p aria-label="Scan errors" class="font-mono text-xl font-semibold text-content-primary">
-                {{ scanStatus()?.errors ?? 0 }}
+                {{ scanStatus()?.failedFiles ?? 0 }}
             </p>
         </div>
         <div class="panel p-4">
@@ -213,7 +213,7 @@
                             aria-label="Missing songs"
                             class="font-mono text-xl font-semibold text-content-primary"
                         >
-                            {{ scanStatus()?.summary?.missing ?? 0 }}
+                            {{ scanStatus()?.terminal?.missing ?? 0 }}
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
@@ -233,22 +233,22 @@
                             Deep metadata reads: {{ status.readDone }} / {{ status.readTotal }}
                         </p>
                     }
-                    @if (status.lastErrorMessage; as lastError) {
+                    @if (status.terminal?.error; as terminalError) {
                         <p
                             class="rounded-lg border border-status-danger-border bg-status-danger-background p-3 text-sm text-status-danger-content"
                         >
-                            Last error: {{ lastError }}
+                            {{ terminalError.code }}: {{ terminalError.message }}
                         </p>
                     }
-                    @if (status.summary; as summary) {
+                    @if (status.terminal; as terminal) {
                         <details class="rounded-lg border border-border-subtle bg-background-canvas p-3">
                             <summary class="cursor-pointer text-sm font-semibold text-content-primary">
-                                Raw scan summary
+                                Raw terminal result
                             </summary>
                             <pre
                                 aria-label="Raw scan summary"
                                 class="max-h-44 mt-3 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
-                                >{{ summary | json }}</pre>
+                                >{{ terminal | json }}</pre>
                         </details>
                     }
                 }

@@ -13,12 +13,25 @@
         }
         @for (folder of folders(); track folder) {
             <div class="flex items-center gap-3 rounded px-3 py-2 hover:bg-background-elevated">
-                <p class="type-body-sm flex min-w-0 grow" [title]="folder">
-                    <span class="truncate text-content-muted">{{ folderParent(folder) }}</span
-                    ><span class="shrink-0 font-semibold text-content-primary">{{
-                        folderName(folder)
-                    }}</span>
-                </p>
+                <div class="min-w-0 grow">
+                    <p class="type-body-sm flex min-w-0" [title]="folder">
+                        <span class="truncate text-content-muted">{{ folderParent(folder) }}</span
+                        ><span class="shrink-0 font-semibold text-content-primary">{{
+                            folderName(folder)
+                        }}</span>
+                    </p>
+                    @if (validationFor(folder); as validation) {
+                        @if (!validation.available) {
+                            <p class="type-body-sm mt-0.5 text-content-danger">
+                                {{ validation.error || 'This folder is not available.' }}
+                            </p>
+                        } @else if (validation.nestedUnder) {
+                            <p class="type-body-sm mt-0.5 text-content-muted">
+                                Already covered by {{ validation.nestedUnder }} — it will be skipped.
+                            </p>
+                        }
+                    }
+                </div>
                 <button
                     class="btn-nkd-neutral shrink-0"
                     type="button"
@@ -36,12 +49,19 @@
         <button
             class="btn-primary"
             type="button"
-            [disabled]="saveInFlight() || library.isScanning() || folders().length === 0"
+            [disabled]="
+                saveInFlight() || library.isScanning() || folders().length === 0 || hasInvalidFolders()
+            "
             (click)="saveAndRescan()"
         >
             {{ isDirty() ? 'Save and rescan' : 'Rescan now' }}
         </button>
     </div>
+    @if (hasInvalidFolders()) {
+        <p class="type-body-sm mt-2 text-content-danger">
+            Remove or fix the unavailable folders before saving.
+        </p>
+    }
 
     <h2 class="type-section-title mt-8 text-content-primary">Scan status</h2>
     @if (library.isScanning()) {
@@ -55,9 +75,56 @@
                 }
             </p>
         }
+    } @else if (terminalSummaryText(); as summaryText) {
+        <p class="type-body-sm mt-2 text-content-secondary" aria-label="Latest scan result">
+            {{ summaryText }}
+        </p>
+        @if (terminal()?.error; as terminalError) {
+            <p class="type-body-sm mt-1 text-content-danger">{{ terminalError.message }}</p>
+        }
     } @else if (lastScanText(); as lastScan) {
         <p class="type-body-sm mt-2 text-content-secondary">Last scan: {{ lastScan }}</p>
     } @else {
         <p class="type-body-sm mt-2 text-content-muted">No scan has completed yet.</p>
+    }
+    @if (terminalSummaryText() && lastScanText(); as lastScan) {
+        <p class="type-body-sm mt-1 text-content-muted">Last completed scan: {{ lastScan }}</p>
+    }
+
+    @if (terminal(); as terminalResult) {
+        @if (terminalResult.failures.length > 0) {
+            <h2 class="type-section-title mt-8 text-content-primary">Failed files</h2>
+            <p class="type-body-sm mt-1 text-content-muted">
+                {{ terminalResult.discoveryFailureCount + terminalResult.readFailureCount }} file(s)
+                could not be imported. Details are from the current app session.
+            </p>
+            <div class="panel mt-3 p-2" aria-label="Failed files">
+                @for (failure of terminalResult.failures; track failure.path) {
+                    <div class="rounded px-3 py-2 hover:bg-background-elevated">
+                        <p class="type-body-sm flex min-w-0" [title]="failure.path">
+                            <span class="truncate text-content-muted">{{
+                                folderParent(failure.path)
+                            }}</span
+                            ><span class="shrink-0 font-semibold text-content-primary">{{
+                                folderName(failure.path)
+                            }}</span>
+                        </p>
+                        <p class="type-body-sm mt-0.5 text-content-danger">
+                            {{ failure.message }}
+                            @if (failure.code) {
+                                <span class="badge ml-1 border border-border-subtle font-mono">{{
+                                    failure.code
+                                }}</span>
+                            }
+                        </p>
+                    </div>
+                }
+                @if (terminalResult.failuresTruncated) {
+                    <p class="type-body-sm px-3 py-2 text-content-muted">
+                        Only the first {{ terminalResult.failures.length }} failures are listed.
+                    </p>
+                }
+            </div>
+        }
     }
 </div>

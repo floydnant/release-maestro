@@ -13,10 +13,12 @@ import type { EmailImportProgressUpdate } from '../schemas/email.schema'
 import type { HydratedFeedItem } from '../schemas/feed.schema'
 import {
     LibraryIpcChannel,
+    type LibraryRootValidation,
     type LibraryScanSnapshot,
     type LibraryScanStatus,
     type LibraryScanStatusEvent,
     type StartLibraryScanRequest,
+    type ValidateLibraryRootsRequest,
 } from '../schemas/library.schema'
 import {
     MetadataIpcChannel,
@@ -74,6 +76,10 @@ export const MainIpcContract = defineIpcContract({
 
     // library scans (main-process-owned lifecycle, see LibraryScanService)
     [LibraryIpcChannel.pickFolders]: defineIpcRequest<void, string[] | null>(),
+    [LibraryIpcChannel.validateRoots]: defineIpcRequest<
+        ValidateLibraryRootsRequest,
+        LibraryRootValidation[]
+    >(),
     [LibraryIpcChannel.startScan]: defineIpcRequest<StartLibraryScanRequest, LibraryScanStatus>(),
     [LibraryIpcChannel.cancelScan]: defineIpcEvent(),
     [LibraryIpcChannel.getScanStatus]: defineIpcRequest<void, LibraryScanSnapshot>(),

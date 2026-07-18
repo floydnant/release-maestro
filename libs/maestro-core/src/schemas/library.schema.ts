@@ -1,4 +1,4 @@
-import type { MetadataScanUpdate, ScanResult } from './metadata.schema'
+import type { MetadataErrorCode, MetadataScanUpdate, ScanResult } from './metadata.schema'
 
 // ---------------------------------------------------------------------------
 // Library scan — main-process-owned scan lifecycle, renderer-facing status
@@ -6,6 +6,7 @@ import type { MetadataScanUpdate, ScanResult } from './metadata.schema'
 
 export const LibraryIpcChannel = {
     pickFolders: 'library:pick-folders',
+    validateRoots: 'library:validate-roots',
     startScan: 'library:start-scan',
     cancelScan: 'library:cancel-scan',
     getScanStatus: 'library:get-scan-status',
@@ -16,7 +17,86 @@ export type LibraryIpcChannel = (typeof LibraryIpcChannel)[keyof typeof LibraryI
 
 export type LibraryScanTrigger = 'startup' | 'manual' | 'onboarding' | 'debug'
 
-export type LibraryScanPhase = 'idle' | 'discovering' | 'reading' | 'completed' | 'cancelled' | 'error'
+// ---------------------------------------------------------------------------
+// Root validation
+// ---------------------------------------------------------------------------
+
+/** Per-root validation result, in the same order as the request paths. */
+export interface LibraryRootValidation {
+    /** The path as configured/selected. */
+    path: string
+    /** `realpath`-canonicalized path (deterministically resolved when realpath fails). */
+    canonicalPath: string
+    /** Whether the root exists, is a directory, and is readable. */
+    available: boolean
+    /** Canonical path of another root in the same set that already contains this one. */
+    nestedUnder?: string
+    /** Human-readable reason when `available` is false. */
+    error?: string
+}
+
+export interface ValidateLibraryRootsRequest {
+    paths: string[]
+}
+
+export type LibraryScanPhase = 'idle' | 'discovering' | 'reading' | LibraryScanOutcome
+
+/** How a scan ended. Every non-idle scan terminates in exactly one of these. */
+export type LibraryScanOutcome = 'completed' | 'cancelled' | 'failed'
+
+/** Which pipeline stage a file failed in — kept distinct so counts stay meaningful. */
+export type LibraryScanFailureStage = 'discovery' | 'read'
+
+export interface LibraryScanFileFailure {
+    stage: LibraryScanFailureStage
+    path: string
+    code?: MetadataErrorCode
+    message: string
+}
+
+export interface LibraryScanTerminalError {
+    code: 'ROOTS_UNAVAILABLE' | 'SCAN_ERROR'
+    message: string
+    /** The configured roots that were unavailable (for ROOTS_UNAVAILABLE). */
+    unavailableRoots?: string[]
+}
+
+/**
+ * Explicit terminal summary of a scan. Produced exactly once per scan; carried on
+ * the status snapshot (`LibraryScanStatus.terminal`). Failure *details* exist only
+ * in the in-memory snapshot of the current app session — after a relaunch only the
+ * persisted aggregate (`LibraryLastScanInfo`) remains until the startup scan runs.
+ */
+export interface LibraryScanTerminalResult {
+    outcome: LibraryScanOutcome
+    scanId: number
+    trigger: LibraryScanTrigger
+    roots: string[]
+    startedAt: number
+    finishedAt: number
+    /** Files seen by discovery. */
+    discovered: number
+    new: number
+    changed: number
+    unchanged: number
+    missing: number
+    /** Deep metadata reads planned / attempted (attempted = succeeded + failed). */
+    readTotal: number
+    readsAttempted: number
+    /** Tracks successfully ingested. */
+    imported: number
+    // Failure counts are tracked explicitly per stage — they are NOT derivable
+    // from `failures.length` (which is capped) or from `attempted - imported`.
+    discoveryFailureCount: number
+    readFailureCount: number
+    /** Per-file details for this session, capped — see `failuresTruncated`. */
+    failures: LibraryScanFileFailure[]
+    failuresTruncated: boolean
+    /** Distinct tracks ingested during this scan that have open normalization issues. */
+    normalizationIssues: number
+    /** Scan-level failure (outcome 'failed'); null for completed/cancelled. */
+    error: LibraryScanTerminalError | null
+}
 
 /**
  * Deduped album preview streamed to the renderer for the import cover mosaic.
@@ -37,6 +117,12 @@ export interface LibraryAlbumPreview {
  */
 export interface LibraryScanStatus {
     scanId: number
+    /**
+     * Monotonic within a scan: bumped on every status mutation. Together with
+     * `scanId` it totally orders snapshots, so push events and pull snapshots
+     * can race without the renderer ever regressing to stale state.
+     */
+    revision: number
     trigger: LibraryScanTrigger
     phase: LibraryScanPhase
     roots: string[]
@@ -51,12 +137,12 @@ export interface LibraryScanStatus {
     readDone: number
     readTotal: number
     imported: number
-    errors: number
+    /** Files that failed so far (all stages). Details land in `terminal.failures`. */
+    failedFiles: number
     /** Distinct tracks ingested during this scan that have at least one open normalization issue. */
     normalizationIssues: number
-    lastErrorMessage: string | null
-    /** Set once `phase` is `completed`. */
-    summary: ScanResult | null
+    /** Set exactly once when the scan reaches a terminal phase. */
+    terminal: LibraryScanTerminalResult | null
 }
 
 /** Persisted record of the last successfully completed scan. */

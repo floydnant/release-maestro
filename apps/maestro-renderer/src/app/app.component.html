@@ -145,8 +145,10 @@
                             ></app-progress-bar>
                             <p class="type-body-sm mt-2 text-content-muted">
                                 {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
-                                @if (scanStatus.errors > 0) {
-                                    <span class="text-content-danger">· {{ scanStatus.errors }} failed</span>
+                                @if (scanStatus.failedFiles > 0) {
+                                    <span class="text-content-danger"
+                                        >· {{ scanStatus.failedFiles }} failed</span
+                                    >
                                 }
                             </p>
                         }

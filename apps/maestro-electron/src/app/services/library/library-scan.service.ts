@@ -2,20 +2,28 @@ import {
     LibraryAlbumPreview,
     LibraryIpcChannel,
     LibraryLastScanInfo,
+    LibraryScanFailureStage,
+    LibraryScanFileFailure,
+    LibraryScanOutcome,
     LibraryScanSnapshot,
     LibraryScanStatus,
+    LibraryScanTerminalError,
+    LibraryScanTerminalResult,
     LibraryScanTrigger,
     toRendererEmitter,
 } from '@release-maestro/core'
 import { BrowserWindow } from 'electron'
 import { PersistentStore } from '../../utils/persistent-store.util'
 import { SettingsBackendService } from '../settings.backend.service'
+import { LibraryRootsService } from './library-roots.service'
 import { LibraryBackendService } from './library.backend.service'
 
 /** How often (at most) scan-status snapshots are pushed to the renderer. */
 const BROADCAST_INTERVAL_MS = 200
 /** Album previews retained for late-mounting UI reseeds (`get-scan-status`). */
 const SNAPSHOT_ALBUM_LIMIT = 200
+/** Cap on per-file failure *details*; the failure counts always stay exact. */
+const FAILURE_DETAIL_LIMIT = 1_000
 
 export interface LibraryScanState extends Record<string, unknown> {
     lastScan?: LibraryLastScanInfo | null
@@ -26,9 +34,14 @@ export interface LibraryScanState extends Record<string, unknown> {
  *
  * Exactly one scan runs at a time (`startScan` is idempotent while scanning).
  * Status is kept as a full snapshot and broadcast to all windows on a dirty-flag
- * throttle, so late subscribers can rely on "latest event == current state" and
- * `getSnapshot()` covers the gap before the first subscription. Only the album
- * cover previews for the import mosaic are delta-shaped (`newAlbums`).
+ * throttle; `revision` orders snapshots within a scan so pushes and pulls can
+ * race safely. Only the album cover previews for the import mosaic are
+ * delta-shaped (`newAlbums`).
+ *
+ * Roots are validated here — the scan boundary — regardless of what the renderer
+ * checked: if any configured root is unavailable the scan fails up front instead
+ * of scanning a subset, so a temporarily unmounted drive can never cause its
+ * whole library to be reconciled as missing.
  */
 export class LibraryScanService {
     private status: LibraryScanStatus | null = null
@@ -43,6 +56,7 @@ export class LibraryScanService {
     constructor(
         private readonly library: LibraryBackendService,
         private readonly settings: SettingsBackendService,
+        private readonly roots: LibraryRootsService,
         /**
          * Main-owned scan state lives in its own conf file, and in the *data* dir
          * (not config): it's derived state that rides along with the database, not
@@ -64,31 +78,40 @@ export class LibraryScanService {
      * of starting another — callers racing (startup vs. onboarding vs. debug) simply
      * attach to the scan in flight.
      */
-    startScan(trigger: LibraryScanTrigger, paths?: string[]): LibraryScanStatus {
+    async startScan(trigger: LibraryScanTrigger, paths?: string[]): Promise<LibraryScanStatus> {
         if (this.status && this.isScanning) return this.status
 
-        const roots = paths ?? this.settings.getSettings().libraryFolders ?? []
-        const status: LibraryScanStatus = {
-            scanId: ++this.scanIdCounter,
-            trigger,
-            phase: roots.length === 0 ? 'idle' : 'discovering',
-            roots,
-            startedAt: Date.now(),
-            finishedAt: null,
-            discovered: 0,
-            new: 0,
-            changed: 0,
-            unchanged: 0,
-            readDone: 0,
-            readTotal: 0,
-            imported: 0,
-            errors: 0,
-            normalizationIssues: 0,
-            lastErrorMessage: null,
-            summary: null,
-        }
+        const configuredRoots = paths ?? this.settings.getSettings().libraryFolders ?? []
+        const status = this.newStatus(trigger, configuredRoots)
         this.status = status
-        if (roots.length === 0) return status
+        if (configuredRoots.length === 0) {
+            // Nothing configured: stay idle. Deliberately no scan and no
+            // reconciliation — an empty selection must never mark songs missing.
+            return status
+        }
+
+        const validations = await this.roots.validate(configuredRoots)
+        const unavailable = validations.filter(validation => !validation.available)
+        if (unavailable.length > 0) {
+            // Refuse to scan a subset: reconciling only the reachable roots would
+            // mark every song under the unreachable ones as missing.
+            this.finishWithoutScan(status, 'failed', {
+                code: 'ROOTS_UNAVAILABLE',
+                message: `Library folder${unavailable.length > 1 ? 's' : ''} unavailable: ${unavailable
+                    .map(validation => validation.path)
+                    .join(', ')}`,
+                unavailableRoots: unavailable.map(validation => validation.path),
+            })
+            return status
+        }
+
+        // Canonical roots, minus duplicates and roots nested under another root
+        // (scanning both would be redundant).
+        const effectiveRoots = validations
+            .filter(validation => validation.nestedUnder === undefined)
+            .map(validation => validation.canonicalPath)
+        status.roots = effectiveRoots
+        this.touch(status)
 
         this.albums.clear()
         this.pendingNewAlbums = []
@@ -96,7 +119,13 @@ export class LibraryScanService {
         const { signal } = this.abortController
         this.startBroadcasting()
 
-        this.library.scan(roots, signal).subscribe({
+        /** Failures before the deep-read phase starts are discovery failures. */
+        let failureStage: LibraryScanFailureStage = 'discovery'
+        const failures: LibraryScanFileFailure[] = []
+        let discoveryFailureCount = 0
+        let readFailureCount = 0
+
+        this.library.scan(effectiveRoots, signal).subscribe({
             next: update => {
                 switch (update.phase) {
                     case 'discovery':
@@ -106,6 +135,7 @@ export class LibraryScanService {
                         status.unchanged = update.unchanged
                         break
                     case 'started':
+                        failureStage = 'read'
                         status.phase = 'reading'
                         status.readTotal = update.total
                         break
@@ -120,48 +150,78 @@ export class LibraryScanService {
                         status.normalizationIssues = update.normalizationIssues
                         break
                     case 'itemError':
-                        status.errors += 1
-                        status.lastErrorMessage = update.error
+                        if (failureStage === 'discovery') discoveryFailureCount += 1
+                        else readFailureCount += 1
+                        status.failedFiles += 1
+                        if (failures.length < FAILURE_DETAIL_LIMIT) {
+                            failures.push({
+                                stage: failureStage,
+                                path: update.path,
+                                ...(update.code !== undefined ? { code: update.code } : {}),
+                                message: update.error,
+                            })
+                        }
                         break
-                    case 'completed':
-                        status.phase = 'completed'
-                        status.finishedAt = Date.now()
-                        status.summary = {
+                    case 'completed': {
+                        this.finishScan(status, 'completed', {
+                            failures,
+                            discoveryFailureCount,
+                            readFailureCount,
+                            missing: update.missing ?? 0,
+                            error: null,
+                        })
+                        this.stateStore.set('lastScan', {
                             count: update.count,
                             total: update.total,
                             unchanged: update.unchanged,
                             changed: update.changed,
                             new: update.new,
                             missing: update.missing,
-                            errors: update.errors,
-                        }
-                        this.stateStore.set('lastScan', {
-                            ...status.summary,
-                            finishedAt: status.finishedAt,
+                            errors: status.failedFiles,
+                            finishedAt: status.finishedAt as number,
                             roots: status.roots,
                             normalizationIssues: status.normalizationIssues,
                         })
                         break
+                    }
                     case 'error':
-                        status.lastErrorMessage = update.error.message
+                        // Stream-level error update; the observable terminates right after.
                         break
                 }
-                this.dirty = true
+                this.touch(status)
             },
             error: err => {
                 // An aborted deep read surfaces as a stream error — report it as a cancellation.
-                status.phase = signal.aborted ? 'cancelled' : 'error'
-                status.finishedAt = Date.now()
-                if (!signal.aborted) {
-                    status.lastErrorMessage = err instanceof Error ? err.message : String(err)
-                }
+                const outcome: LibraryScanOutcome = signal.aborted ? 'cancelled' : 'failed'
+                this.finishScan(status, outcome, {
+                    failures,
+                    discoveryFailureCount,
+                    readFailureCount,
+                    missing: 0,
+                    error:
+                        outcome === 'failed'
+                            ? {
+                                  code: 'SCAN_ERROR',
+                                  message: err instanceof Error ? err.message : String(err),
+                              }
+                            : null,
+                })
                 this.finishBroadcasting()
             },
             complete: () => {
                 // An aborted scan completes without a `completed` update.
-                if (status.phase !== 'completed') {
-                    status.phase = signal.aborted ? 'cancelled' : 'error'
-                    status.finishedAt = Date.now()
+                if (status.terminal === null) {
+                    const outcome: LibraryScanOutcome = signal.aborted ? 'cancelled' : 'failed'
+                    this.finishScan(status, outcome, {
+                        failures,
+                        discoveryFailureCount,
+                        readFailureCount,
+                        missing: 0,
+                        error:
+                            outcome === 'failed'
+                                ? { code: 'SCAN_ERROR', message: 'The scan ended unexpectedly' }
+                                : null,
+                    })
                 }
                 this.finishBroadcasting()
             },
@@ -180,6 +240,90 @@ export class LibraryScanService {
             albums: [...this.albums.values()].slice(-SNAPSHOT_ALBUM_LIMIT),
             lastScan: this.stateStore.get('lastScan') ?? null,
         }
+    }
+
+    private newStatus(trigger: LibraryScanTrigger, roots: string[]): LibraryScanStatus {
+        return {
+            scanId: ++this.scanIdCounter,
+            revision: 0,
+            trigger,
+            phase: roots.length === 0 ? 'idle' : 'discovering',
+            roots,
+            startedAt: Date.now(),
+            finishedAt: null,
+            discovered: 0,
+            new: 0,
+            changed: 0,
+            unchanged: 0,
+            readDone: 0,
+            readTotal: 0,
+            imported: 0,
+            failedFiles: 0,
+            normalizationIssues: 0,
+            terminal: null,
+        }
+    }
+
+    /** Terminal transition for scans that never reached the pipeline (e.g. bad roots). */
+    private finishWithoutScan(
+        status: LibraryScanStatus,
+        outcome: LibraryScanOutcome,
+        error: LibraryScanTerminalError | null,
+    ): void {
+        this.startBroadcasting()
+        this.finishScan(status, outcome, {
+            failures: [],
+            discoveryFailureCount: 0,
+            readFailureCount: 0,
+            missing: 0,
+            error,
+        })
+        this.finishBroadcasting()
+    }
+
+    private finishScan(
+        status: LibraryScanStatus,
+        outcome: LibraryScanOutcome,
+        details: {
+            failures: LibraryScanFileFailure[]
+            discoveryFailureCount: number
+            readFailureCount: number
+            missing: number
+            error: LibraryScanTerminalError | null
+        },
+    ): void {
+        status.phase = outcome
+        status.finishedAt = Date.now()
+        const terminal: LibraryScanTerminalResult = {
+            outcome,
+            scanId: status.scanId,
+            trigger: status.trigger,
+            roots: status.roots,
+            startedAt: status.startedAt,
+            finishedAt: status.finishedAt,
+            discovered: status.discovered,
+            new: status.new,
+            changed: status.changed,
+            unchanged: status.unchanged,
+            missing: details.missing,
+            readTotal: status.readTotal,
+            readsAttempted: status.readDone,
+            imported: status.imported,
+            discoveryFailureCount: details.discoveryFailureCount,
+            readFailureCount: details.readFailureCount,
+            failures: details.failures,
+            failuresTruncated:
+                details.discoveryFailureCount + details.readFailureCount > details.failures.length,
+            normalizationIssues: status.normalizationIssues,
+            error: details.error,
+        }
+        status.terminal = terminal
+        this.touch(status)
+    }
+
+    private touch(status: LibraryScanStatus): void {
+        status.revision += 1
+        this.dirty = true
     }
 
     private collectAlbumPreview(metadata: {
@@ -205,7 +349,6 @@ export class LibraryScanService {
     }
 
     private finishBroadcasting(): void {
-        this.dirty = true
         this.broadcastIfDirty()
         if (this.broadcastTimer) {
             clearInterval(this.broadcastTimer)

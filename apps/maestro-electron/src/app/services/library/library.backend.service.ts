@@ -62,6 +62,11 @@ export class LibraryBackendService {
                     })
                 })
 
+                // Absent-file reconciliation only runs when it is provably safe:
+                //  - not cancelled (a cancelled discovery has not seen every file), and
+                //  - discovery had no errors (an unreadable subtree must not mark
+                //    its files as missing).
+                if (abortSignal?.aborted) return
                 const missing = prescanErrors == 0 ? this.repository.markNotSeenPresent(scanStartedAt) : 0
                 const metadataReadTotal = this.repository.countSongsNeedingMetadata()
                 let metadataReadDone = 0

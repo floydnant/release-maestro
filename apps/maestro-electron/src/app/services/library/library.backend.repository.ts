@@ -32,11 +32,15 @@ import {
     stableHash,
 } from './library-normalization'
 
+/**
+ * Change-detection tallies for one prescan batch. The deep-read queue is NOT
+ * derived from this — `listSongsNeedingMetadata` (fingerprint mismatch in the DB)
+ * is the sole source, which also makes interrupted scans resumable.
+ */
 export interface PrescanBatchComparison {
     unchanged: number
     changed: number
     new: number
-    needsMetadata: PrescanFileFact[]
 }
 
 const titleFromFileName = (fileName: string): string => fileName.replace(/\.[^.]+$/, '').trim() || fileName
@@ -62,7 +66,7 @@ export class LibraryBackendRepository {
 
     processPrescanBatch(facts: PrescanFileFact[], seenAt: Date): PrescanBatchComparison {
         if (facts.length == 0) {
-            return { unchanged: 0, changed: 0, new: 0, needsMetadata: [] }
+            return { unchanged: 0, changed: 0, new: 0 }
         }
 
         const existingSongs = this.database.db
@@ -83,7 +87,6 @@ export class LibraryBackendRepository {
             unchanged: 0,
             changed: 0,
             new: 0,
-            needsMetadata: [],
         }
 
         this.database.db.transaction(tx => {
@@ -110,7 +113,6 @@ export class LibraryBackendRepository {
                         })
                         .run()
                     comparison.new += 1
-                    comparison.needsMetadata.push(fact)
                     continue
                 }
 
@@ -120,7 +122,6 @@ export class LibraryBackendRepository {
                     comparison.unchanged += 1
                 } else {
                     comparison.changed += 1
-                    comparison.needsMetadata.push(fact)
                 }
             }
         })

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core'
-import { Router } from '@angular/router'
-import { LibraryScanStatus } from '@release-maestro/core'
+import { Router, RouterModule } from '@angular/router'
+import { LibraryRootValidation, LibraryScanTerminalResult } from '@release-maestro/core'
 import { ElectronService } from '../../core/services'
 import { LibraryService } from '../../core/services/library.service'
 import { IconComponent } from '../../shared/components/icon/icon.component'
@@ -22,7 +22,13 @@ type ImportStep = 'pick' | 'scanning' | 'done'
  */
 @Component({
     selector: 'app-library-import',
-    imports: [ProgressBarComponent, ProgressRingComponent, IconComponent, ImportMosaicComponent],
+    imports: [
+        RouterModule,
+        ProgressBarComponent,
+        ProgressRingComponent,
+        IconComponent,
+        ImportMosaicComponent,
+    ],
     templateUrl: './library-import.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     styles: `
@@ -58,12 +64,14 @@ export class LibraryImportComponent {
     readonly step = signal<ImportStep>('pick')
     readonly pendingFolders = signal<string[]>([])
     readonly startInFlight = signal(false)
+    readonly rootValidations = signal<LibraryRootValidation[]>([])
+    private validationToken = 0
 
-    /** Set while the scanning step shows a terminal (cancelled/error) state. */
-    readonly terminalStatus = computed(() => {
-        const status = this.library.scanStatus()
-        if (!status) return null
-        return status.phase === 'cancelled' || status.phase === 'error' ? status : null
+    /** Terminal result shown as a banner on the scanning step (cancelled/failed). */
+    readonly terminalBanner = computed<LibraryScanTerminalResult | null>(() => {
+        const terminal = this.library.scanStatus()?.terminal
+        if (!terminal) return null
+        return terminal.outcome === 'cancelled' || terminal.outcome === 'failed' ? terminal : null
     })
 
     readonly progressSegments = computed<ProgressBarSegment[]>(() => [
@@ -71,9 +79,14 @@ export class LibraryImportComponent {
     ])
 
     readonly noFilesFound = computed(() => {
-        const summary = this.library.scanStatus()?.summary
-        return summary != null && summary.total === 0
+        const terminal = this.library.scanStatus()?.terminal
+        return terminal?.outcome === 'completed' && terminal.discovered === 0
     })
+
+    /** Folders may only be saved/scanned when every selection validated cleanly. */
+    readonly hasInvalidFolders = computed(() =>
+        this.rootValidations().some(validation => !validation.available),
+    )
 
     constructor() {
         void this.initialize()
@@ -81,9 +94,22 @@ export class LibraryImportComponent {
         // Follow the running scan into the done step while the user is watching.
         effect(() => {
             const status = this.library.scanStatus()
-            if (this.step() === 'scanning' && status?.phase === 'completed') {
+            if (this.step() === 'scanning' && status?.terminal?.outcome === 'completed') {
                 this.step.set('done')
             }
+        })
+
+        // Re-validate the selection whenever it changes.
+        effect(() => {
+            const folders = this.pendingFolders()
+            const token = ++this.validationToken
+            if (folders.length === 0 || !this.electronService.isElectron) {
+                this.rootValidations.set([])
+                return
+            }
+            void this.library.validateRoots(folders).then(validations => {
+                if (token === this.validationToken) this.rootValidations.set(validations)
+            })
         })
     }
 
@@ -99,6 +125,10 @@ export class LibraryImportComponent {
         }
     }
 
+    validationFor(folder: string): LibraryRootValidation | undefined {
+        return this.rootValidations().find(validation => validation.path === folder)
+    }
+
     async addFolders(): Promise<void> {
         const picked = await this.library.pickFolders()
         if (!picked?.length) return
@@ -111,7 +141,7 @@ export class LibraryImportComponent {
 
     async startImport(): Promise<void> {
         const folders = this.pendingFolders()
-        if (folders.length === 0 || this.startInFlight()) return
+        if (folders.length === 0 || this.hasInvalidFolders() || this.startInFlight()) return
         this.startInFlight.set(true)
         try {
             await this.library.saveFolders(folders)
@@ -151,12 +181,11 @@ export class LibraryImportComponent {
         return splitPathBaseName(path).base || path
     }
 
-    summaryLine(status: LibraryScanStatus): string {
-        const summary = status.summary
-        if (!summary) return ''
-        const parts = [`${summary.count} tracks imported`]
-        if (summary.errors) parts.push(`${summary.errors} failed`)
-        if (status.normalizationIssues) parts.push(`${status.normalizationIssues} with tag issues`)
+    summaryLine(terminal: LibraryScanTerminalResult): string {
+        const failed = terminal.discoveryFailureCount + terminal.readFailureCount
+        const parts = [`${terminal.imported} tracks imported`]
+        if (failed) parts.push(`${failed} failed`)
+        if (terminal.normalizationIssues) parts.push(`${terminal.normalizationIssues} with tag issues`)
         return parts.join(' · ')
     }
 }
