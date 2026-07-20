@@ -179,36 +179,36 @@ pub enum ReadSongMetadataError {
 impl fmt::Display for ReadSongMetadataError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ReadSongMetadataError::FileNotFound { path } => {
-                write!(formatter, "File not found: {path}")
+            ReadSongMetadataError::FileNotFound { path: _ } => {
+                write!(formatter, "File not found")
             }
-            ReadSongMetadataError::FileMetadataReadFailed { path, message } => {
+            ReadSongMetadataError::FileMetadataReadFailed { path: _, message } => {
                 write!(
                     formatter,
-                    "Failed to read file metadata for {path}: {message}"
+                    "Failed to read file metadata: {message}"
                 )
             }
-            ReadSongMetadataError::UnsupportedFormat { path, extension } => {
+            ReadSongMetadataError::UnsupportedFormat { path: _, extension } => {
                 let extension = extension.as_deref().unwrap_or("none");
                 write!(
                     formatter,
-                    "Unsupported audio format for {path}: {extension}"
+                    "Unsupported audio format: {extension}"
                 )
             }
-            ReadSongMetadataError::MetadataParseFailed { path, message } => {
+            ReadSongMetadataError::MetadataParseFailed { path: _, message } => {
                 write!(
                     formatter,
-                    "Failed to read file metadata from {path}: {message}"
+                    "Failed to read file metadata: {message}"
                 )
             }
-            ReadSongMetadataError::FileNameMissing { path } => {
-                write!(formatter, "Failed to read file name for {path}")
+            ReadSongMetadataError::FileNameMissing { path: _ } => {
+                write!(formatter, "Failed to read file name")
             }
-            ReadSongMetadataError::NotAnAudioFile { path, extension } => {
+            ReadSongMetadataError::NotAnAudioFile { path: _, extension } => {
                 let extension = extension.as_deref().unwrap_or("none");
                 write!(
                     formatter,
-                    "Not an audio file: {path} (extension: {extension})"
+                    "Not an audio file (extension: {extension})"
                 )
             }
         }
@@ -463,8 +463,7 @@ fn rename_file(path: &str, new_file_name: &str) -> Result<String, String> {
     let new_path = current_path.with_file_name(new_file_name);
     fs::rename(current_path, &new_path).map_err(|error| {
         format!(
-            "Failed to rename file to '{}': {}",
-            new_path.display(),
+            "Failed to rename file: {}",
             error
         )
     })?;
@@ -570,7 +569,7 @@ pub fn update_song_metadata(
     };
 
     read_song_metadata_v2(Path::new(&final_path), cover_art_cache_dir)
-        .map_err(|error| format!("Failed to reload updated metadata from {final_path}: {error}"))
+        .map_err(|error| format!("Failed to reload updated metadata: {error}"))
 }
 
 pub fn read_song_metadata_v2(
@@ -819,8 +818,7 @@ pub fn read_song_metadata_v2(
                 });
                 if file_ext.is_none() {
                     eprintln!(
-                        "Unsupported or missing MIME type for cover art in {}: {:?}",
-                        path,
+                        "Unsupported or missing MIME type for cover art: {:?}",
                         cover.mime_type()
                     );
                     return None;
@@ -848,7 +846,7 @@ pub fn read_song_metadata_v2(
                 match fs::write(cover_path.clone(), cover.data()) {
                     Ok(_) => Some(cover_path),
                     Err(err) => {
-                        eprintln!("Failed to write cover art to {}: {:?}", cover_path, err);
+                        eprintln!("Failed to write cover art: {:?}", err);
                         None
                     }
                 }
