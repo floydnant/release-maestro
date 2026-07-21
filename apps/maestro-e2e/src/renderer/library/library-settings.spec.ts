@@ -122,6 +122,36 @@ test.describe('library settings scenarios', () => {
         await expect(page.getByText('Details are from the current app session.')).toBeVisible()
     })
 
+    test('long settings content can be scrolled to the end', async ({ page }) => {
+        await page.setViewportSize({ width: 1000, height: 500 })
+        const failures: LibraryScanTerminalResult['failures'] = Array.from({ length: 20 }, (_, index) => ({
+            stage: 'read' as const,
+            path: `/music/albums/broken-track-${index + 1}.mp3`,
+            code: 'PARSE_FAILED',
+            message: `Could not parse audio stream ${index + 1}`,
+        }))
+        const terminal = terminalResult({
+            failures,
+            readFailureCount: failures.length,
+        })
+        const scenario = scenarioBuilder()
+            .settings({ libraryFolders: ['/music'], emailPluginConfig: {} })
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: scanStatus(terminal), albums: [], lastScan: null },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/settings/library')
+
+        const lastFailure = page.getByText('broken-track-20.mp3')
+        await expect(lastFailure).not.toBeInViewport()
+
+        await page.getByRole('heading', { name: 'Library folders' }).hover()
+        await page.mouse.wheel(0, 10_000)
+
+        await expect(lastFailure).toBeInViewport()
+    })
+
     test('after a relaunch only the persisted aggregate is shown', async ({ page }) => {
         const scenario = scenarioBuilder()
             .settings({ libraryFolders: ['/music'], emailPluginConfig: {} })
