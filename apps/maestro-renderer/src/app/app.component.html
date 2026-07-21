@@ -123,35 +123,31 @@
                     }
                 }
 
-                @if (showLibraryScanIndicator()) {
-                    @if (libraryService.scanStatus(); as scanStatus) {
-                        <hr />
-                        <p class="type-body-sm flex items-center gap-2 text-content-secondary">
-                            <app-progress-ring
-                                mode="spinning"
-                                [diameter]="16"
-                                [strokeWidth]="2"
-                            ></app-progress-ring>
-                            Scanning library…
-                        </p>
-                        @if (scanStatus.phase === 'discovering') {
-                            <p class="type-body-sm mt-2 text-content-muted">
-                                {{ scanStatus.discovered }} files found
-                            </p>
-                        } @else {
+                @if (scanIndicator(); as scan) {
+                    <hr />
+                    <p class="type-body-sm flex items-center gap-2 text-content-secondary">
+                        <app-progress-ring
+                            mode="spinning"
+                            [diameter]="16"
+                            [strokeWidth]="2"
+                        ></app-progress-ring>
+                        Scanning library…
+                    </p>
+                    @if (scan.phase === 'discovering') {
+                        <p class="type-body-sm mt-2 text-content-muted">{{ scan.discovered }} files found</p>
+                    } @else {
+                        @if (scan.showProgressBar) {
                             <app-progress-bar
                                 class="mt-2"
                                 [segments]="libraryScanSegments()"
                             ></app-progress-bar>
-                            <p class="type-body-sm mt-2 text-content-muted">
-                                {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
-                                @if (scanStatus.failedFiles > 0) {
-                                    <span class="text-content-danger"
-                                        >· {{ scanStatus.failedFiles }} failed</span
-                                    >
-                                }
-                            </p>
                         }
+                        <p class="type-body-sm mt-2 text-content-muted">
+                            {{ scan.readDone }}/{{ scan.readTotal }}
+                            @if (scan.failedFiles > 0) {
+                                <span class="text-content-danger">· {{ scan.failedFiles }} failed</span>
+                            }
+                        </p>
                     }
                 } @else if (showLibrarySetupCta()) {
                     <hr />

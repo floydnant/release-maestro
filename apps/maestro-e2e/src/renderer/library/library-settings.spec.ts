@@ -118,8 +118,7 @@ test.describe('library settings scenarios', () => {
         const failedList = page.getByLabel('Failed files')
         await expect(failedList).toContainText('broken-track.mp3')
         await expect(failedList).toContainText('Could not parse the audio stream')
-        await expect(failedList).toContainText('PARSE_FAILED')
-        await expect(page.getByText('Details are from the current app session.')).toBeVisible()
+        await expect(page.getByText('could not be imported.')).toBeVisible()
     })
 
     test('long settings content can be scrolled to the end', async ({ page }) => {

@@ -119,7 +119,7 @@ test('failed files surface in Library Settings, linked from onboarding', async (
     await expect(page.getByRole('heading', { name: 'Failed files' })).toBeVisible()
     const failedList = page.getByLabel('Failed files')
     await expect(failedList).toContainText('zz-broken.mp3')
-    await expect(page.getByText('Details are from the current app session.')).toBeVisible()
+    await expect(page.getByText('could not be imported.')).toBeVisible()
     await expect(page.getByLabel('Latest scan result')).toContainText('1 failed')
 })
 
