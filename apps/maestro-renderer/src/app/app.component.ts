@@ -1,4 +1,6 @@
+import { NgClass } from '@angular/common'
 import {
+    ChangeDetectionStrategy,
     Component,
     computed,
     DestroyRef,
@@ -6,25 +8,24 @@ import {
     inject,
     linkedSignal,
     signal,
-    ChangeDetectionStrategy,
 } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
-import { filter, map, Observable } from 'rxjs'
 import { EmailImportProgressUpdate } from '@release-maestro/core'
+import { filter, map, Observable } from 'rxjs'
 import { webEnv } from '../environments/environment'
 import { ElectronService } from './core/services'
 import { WebAudioPlayer } from './core/services/audio-player.service'
 import { FeedService } from './core/services/feed.service'
 import { LibraryService } from './core/services/library.service'
 import { SettingsService } from './core/settings/settings.service'
+import { IconComponent } from './shared/components/icon/icon.component'
 import {
     ProgressBarComponent,
     ProgressBarSegment,
 } from './shared/components/progress-bar/progress-bar.component'
 import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
-import { IconComponent } from './shared/components/icon/icon.component'
 import { MinDwellPacer } from './shared/utils/min-dwell-pacer'
 
 /** Compact model the sidebar renders for a running background scan. */
@@ -34,8 +35,6 @@ interface ScanIndicatorView {
     readDone: number
     readTotal: number
     failedFiles: number
-    /** Startup scans are effectively discovery-only, so they skip the progress bar. */
-    showProgressBar: boolean
 }
 
 /**
@@ -44,7 +43,7 @@ interface ScanIndicatorView {
  * indicator flashes on and off, or blinks between phases, faster than the eye can
  * follow. Other scans (manual rescans) are shown in real time.
  */
-const STARTUP_PHASE_MIN_DWELL_MS = 900
+const STARTUP_PHASE_MIN_DWELL_MS = 1000
 
 @Component({
     selector: 'app-root',
@@ -52,7 +51,14 @@ const STARTUP_PHASE_MIN_DWELL_MS = 900
     styleUrls: ['./app.component.css'],
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterModule, TranslateModule, ProgressBarComponent, ProgressRingComponent, IconComponent],
+    imports: [
+        RouterModule,
+        TranslateModule,
+        ProgressBarComponent,
+        ProgressRingComponent,
+        IconComponent,
+        NgClass,
+    ],
 })
 export class AppComponent {
     translate = inject(TranslateService)
@@ -65,7 +71,7 @@ export class AppComponent {
 
     readonly showDesignSystem = !webEnv.production
     readonly isElectron = this.electronService.isElectron
-    readonly showCustomWindowControls = this.isElectron && this.electronService.platform !== 'darwin'
+    readonly isMacos = this.isElectron && this.electronService.platform === 'darwin'
 
     triggerEmailImport() {
         this.feedService.triggerEmailImport().catch(err => {
@@ -184,7 +190,6 @@ export class AppComponent {
             readDone: status.readDone,
             readTotal: status.readTotal,
             failedFiles: status.failedFiles,
-            showProgressBar: status.phase === 'reading' && !isStartup,
         }
         return {
             key: status.phase,

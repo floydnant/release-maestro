@@ -55,13 +55,13 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     // With no configured folders, the guard routes straight into onboarding.
     await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
     await expect(page).toHaveURL(/\/import$/)
-    await expect(page.getByRole('button', { name: 'Start import' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled()
 
     await stubFolderPicker(electronApp, libraryDir)
-    await page.getByRole('button', { name: 'Add folders…' }).click()
+    await page.getByRole('button', { name: 'Add folders' }).click()
     await expect(page.getByText(libraryDir)).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('import-pick.png') })
-    await page.getByRole('button', { name: 'Start import' }).click()
+    await page.getByRole('button', { name: 'Continue' }).click()
 
     // Scan finishes into the done step with the summary and a populated mosaic.
     await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
@@ -107,8 +107,8 @@ test('failed files surface in Library Settings, linked from onboarding', async (
 
     await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
     await stubFolderPicker(electronApp, libraryDir)
-    await page.getByRole('button', { name: 'Add folders…' }).click()
-    await page.getByRole('button', { name: 'Start import' }).click()
+    await page.getByRole('button', { name: 'Add folders' }).click()
+    await page.getByRole('button', { name: 'Continue' }).click()
 
     // Completion summary counts the failure and links to the details.
     await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()

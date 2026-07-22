@@ -1,38 +1,73 @@
 <div class="app-shell flex h-screen flex-col overflow-hidden bg-background-canvas">
-    @if (isElectron) {
-        <header class="title-bar" [class.title-bar--overlay]="isImportRoute()">
-            <div class="title-bar__drag-region"></div>
+    <header class="title-bar" [class.title-bar--overlay]="isImportRoute()">
+        <div
+            class="title-bar__drag-region | flex items-center justify-start"
+            [ngClass]="{ 'ml-52': isMacos }"
+        >
+            @if (scanIndicator(); as scan) {
+                <p class="type-body-sm flex items-center gap-1 px-2 text-content-secondary">
+                    @if (scan.phase === 'reading') {
+                        <app-progress-ring
+                            mode="progress"
+                            [diameter]="25"
+                            [strokeWidth]="2.5"
+                            color="content.success"
+                            bgColor="background.surface"
+                            [progress]="(scan.readDone / scan.readTotal) * 100"
+                        ></app-progress-ring>
+                    } @else {
+                        <app-progress-ring
+                            mode="spinning"
+                            [diameter]="25"
+                            [strokeWidth]="2.5"
+                            color="content.secondary"
+                            bgColor="background.surface"
+                        ></app-progress-ring>
+                    }
 
-            @if (showCustomWindowControls) {
-                <div class="title-bar__controls">
-                    <button
-                        class="title-bar__button"
-                        type="button"
-                        title="Minimize"
-                        (click)="minimizeWindow()"
-                    >
-                        <app-icon name="octDash" size="14"></app-icon>
-                    </button>
-                    <button
-                        class="title-bar__button"
-                        type="button"
-                        title="Maximize"
-                        (click)="toggleMaximizeWindow()"
-                    >
-                        <app-icon name="octScreenFull" size="14"></app-icon>
-                    </button>
-                    <button
-                        class="title-bar__button title-bar__button--close"
-                        type="button"
-                        title="Close"
-                        (click)="closeWindow()"
-                    >
-                        <app-icon name="octX" size="14"></app-icon>
-                    </button>
-                </div>
+                    @if (scan.phase === 'discovering') {
+                        Scanning library…
+                    } @else {
+                        Reading
+                        <span class="font-mono">{{ scan.readDone }}/{{ scan.readTotal }}</span> tracks
+                        @if (scan.failedFiles > 0) {
+                            <span class="text-content-danger"
+                                >· <span class="font-mono">{{ scan.failedFiles }}</span> Failed</span
+                            >
+                        }
+                    }
+                </p>
+            } @else if (showLibrarySetupCta()) {
+                <hr />
+                <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
+                <a class="btn-primary mt-2 text-center" routerLink="/import">Set up library</a>
             }
-        </header>
-    }
+        </div>
+
+        @if (!isMacos) {
+            <div class="title-bar__controls">
+                <button class="title-bar__button" type="button" title="Minimize" (click)="minimizeWindow()">
+                    <app-icon name="octDash" size="14"></app-icon>
+                </button>
+                <button
+                    class="title-bar__button"
+                    type="button"
+                    title="Maximize"
+                    (click)="toggleMaximizeWindow()"
+                >
+                    <app-icon name="octScreenFull" size="14"></app-icon>
+                </button>
+                <button
+                    class="title-bar__button title-bar__button--close"
+                    type="button"
+                    title="Close"
+                    (click)="closeWindow()"
+                >
+                    <app-icon name="octX" size="14"></app-icon>
+                </button>
+            </div>
+        }
+    </header>
 
     <div class="flex min-h-0 grow overflow-hidden">
         @if (!isImportRoute()) {
@@ -121,38 +156,6 @@
                         </p>
                         <button class="btn-primary mt-2" (click)="triggerEmailImport()">Retry</button>
                     }
-                }
-
-                @if (scanIndicator(); as scan) {
-                    <hr />
-                    <p class="type-body-sm flex items-center gap-2 text-content-secondary">
-                        <app-progress-ring
-                            mode="spinning"
-                            [diameter]="16"
-                            [strokeWidth]="2"
-                        ></app-progress-ring>
-                        Scanning library…
-                    </p>
-                    @if (scan.phase === 'discovering') {
-                        <p class="type-body-sm mt-2 text-content-muted">{{ scan.discovered }} files found</p>
-                    } @else {
-                        @if (scan.showProgressBar) {
-                            <app-progress-bar
-                                class="mt-2"
-                                [segments]="libraryScanSegments()"
-                            ></app-progress-bar>
-                        }
-                        <p class="type-body-sm mt-2 text-content-muted">
-                            {{ scan.readDone }}/{{ scan.readTotal }}
-                            @if (scan.failedFiles > 0) {
-                                <span class="text-content-danger">· {{ scan.failedFiles }} failed</span>
-                            }
-                        </p>
-                    }
-                } @else if (showLibrarySetupCta()) {
-                    <hr />
-                    <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
-                    <a class="btn-primary mt-2 text-center" routerLink="/import">Set up library</a>
                 }
 
                 <div class="flex h-full items-center justify-center">

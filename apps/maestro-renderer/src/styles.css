@@ -118,11 +118,11 @@ body {
     }
 
     .panel {
-        @apply rounded-lg border border-border-subtle bg-background-surface shadow-md;
+        @apply rounded-xl border border-border-subtle bg-background-surface shadow-md;
     }
 
     .surface-elevated {
-        @apply rounded-lg border border-border-default bg-background-elevated shadow-lg;
+        @apply rounded-xl border border-border-default bg-background-elevated shadow-lg;
     }
 }
 

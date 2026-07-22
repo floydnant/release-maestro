@@ -47,8 +47,8 @@ test('cancelling an import mid-scan self-heals via the startup rescan', async ({
     await app.evaluate(({ dialog }, dir) => {
         dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [dir], bookmarks: [] })) as never
     }, libraryDir)
-    await page.getByRole('button', { name: 'Add folders…' }).click()
-    await page.getByRole('button', { name: 'Start import' }).click()
+    await page.getByRole('button', { name: 'Add folders' }).click()
+    await page.getByRole('button', { name: 'Continue' }).click()
 
     await expect(page.getByRole('heading', { name: 'Importing your library' })).toBeVisible()
     await expect(page.getByText(/Reading tracks…/)).toBeVisible({ timeout: 30_000 })

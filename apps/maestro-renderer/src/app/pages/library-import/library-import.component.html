@@ -1,81 +1,143 @@
-<div class="relative size-full overflow-hidden bg-black">
+<div
+    class="relative size-full overflow-hidden"
+    [ngClass]="{
+        'bg-background-canvas': step() === 'pick',
+        'bg-black': step() !== 'pick',
+    }"
+>
     @switch (step()) {
         @case ('pick') {
             <div class="size-full overflow-y-auto">
                 <div class="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-8 py-16">
                     <h1 class="type-hero-title text-content-primary">Set up your music library</h1>
                     <p class="type-body-md mt-3 text-content-secondary">
-                        Choose the folders where your music lives. Release Maestro scans them, reads the tags
-                        and cover art, and keeps everything up to date from then on.
+                        Choose the folders where your music lives. Release Maestro keeps them up to date from
+                        then on.
                     </p>
 
-                    <div class="panel mt-8 p-2">
+                    <div
+                        class="mt-8"
+                        (dragenter)="onDragEnter($event)"
+                        (dragover)="onDragOver($event)"
+                        (dragleave)="onDragLeave()"
+                        (drop)="onDrop($event)"
+                    >
                         @if (pendingFolders().length === 0) {
-                            <p class="type-body-sm px-3 py-6 text-center text-content-muted">
-                                Add your music collection.
-                            </p>
-                        }
-                        @for (folder of pendingFolders(); track folder) {
-                            <div
-                                class="rounded flex items-center gap-3 px-3 py-2 hover:bg-background-elevated"
+                            <button
+                                type="button"
+                                class="dropzone | flex h-[130px] w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-8 py-6 text-center transition-colors"
+                                [class.dropzone--active]="isDragging()"
+                                aria-label="Add folders"
+                                (click)="addFolders()"
                             >
-                                <div class="min-w-0 grow">
-                                    <p class="type-body-sm flex min-w-0" [title]="folder">
-                                        <span class="truncate text-content-muted">{{
-                                            folderParent(folder)
-                                        }}</span
-                                        ><span class="shrink-0 font-semibold text-content-primary">{{
-                                            folderName(folder)
-                                        }}</span>
-                                    </p>
-                                    @if (validationFor(folder); as validation) {
-                                        @if (!validation.available) {
-                                            <p class="type-body-sm mt-0.5 text-content-danger">
-                                                {{ validation.error || 'This folder is not available.' }}
-                                            </p>
-                                        } @else if (validation.nestedUnder) {
-                                            <p class="type-body-sm mt-0.5 text-content-muted">
-                                                Already covered by {{ validation.nestedUnder }} — it will be
-                                                skipped.
-                                            </p>
-                                        }
-                                    }
-                                </div>
-                                <button
-                                    class="btn-nkd-neutral shrink-0"
-                                    type="button"
-                                    title="Remove folder"
-                                    (click)="removeFolder(folder)"
+                                <app-icon
+                                    name="octFileDirectory"
+                                    size="1.75rem"
+                                    class="text-content-muted"
+                                ></app-icon>
+                                <span class="type-body-md mt-1 font-semibold text-content-primary"
+                                    >Drop folders here</span
                                 >
-                                    <app-icon name="octX" size="14"></app-icon>
+                                <span class="type-body-sm -mt-2 text-content-muted">or click to browse</span>
+                            </button>
+                        } @else {
+                            <div
+                                class="panel | relative flex min-h-[130px] flex-col overflow-hidden transition-colors"
+                                [class.dropzone-list--active]="isDragging()"
+                            >
+                                <ul>
+                                    @for (folder of pendingFolders(); track folder) {
+                                        <li
+                                            class="folder-row | group flex items-center gap-3 px-4 py-3 transition-colors"
+                                        >
+                                            <app-icon
+                                                name="octFileDirectory"
+                                                size="1.1rem"
+                                                class="shrink-0 text-content-muted"
+                                            ></app-icon>
+                                            <div class="min-w-0 grow">
+                                                <p class="type-body-md flex min-w-0" [title]="folder">
+                                                    <span class="truncate text-content-secondary">{{
+                                                        folderParent(folder)
+                                                    }}</span
+                                                    ><span
+                                                        class="shrink-0 font-semibold text-content-primary"
+                                                        >{{ folderName(folder) }}</span
+                                                    >
+                                                </p>
+                                                @if (validationFor(folder); as validation) {
+                                                    @if (!validation.available) {
+                                                        <p class="type-body-sm text-content-danger">
+                                                            {{
+                                                                validation.error ||
+                                                                    'This folder is not available.'
+                                                            }}
+                                                        </p>
+                                                    } @else if (validation.nestedUnder) {
+                                                        <p class="type-body-sm text-content-muted">
+                                                            Skipping, already covered by
+                                                            {{ validation.nestedUnder }}
+                                                        </p>
+                                                    }
+                                                }
+                                            </div>
+                                            <button
+                                                class="btn-nkd-neutral shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                                                type="button"
+                                                title="Remove folder"
+                                                (click)="removeFolder(folder)"
+                                            >
+                                                <app-icon name="octX" size="14"></app-icon>
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
+                                <button
+                                    type="button"
+                                    class="add-row flex w-full grow items-center justify-center gap-2 border-t border-border-subtle px-4 py-3 text-left transition-colors"
+                                    aria-label="Add folders"
+                                    (click)="addFolders()"
+                                >
+                                    <span class="inline-flex items-center gap-2">
+                                        <app-icon name="octPlus" size="1rem"></app-icon>
+                                        Add another folder
+                                    </span>
                                 </button>
+
+                                @if (isDragging()) {
+                                    <div
+                                        class="dropzone-overlay pointer-events-none absolute inset-0 flex items-center justify-center gap-2"
+                                    >
+                                        <app-icon name="octFileDirectoryFill" size="1.25rem"></app-icon>
+                                        <span class="type-body-md font-semibold">Drop to add</span>
+                                    </div>
+                                }
                             </div>
                         }
                     </div>
 
-                    <div class="mt-4 flex items-center gap-3">
+                    @if (hasInvalidFolders()) {
+                        <p class="type-body-sm mt-3 text-content-danger">
+                            Remove or fix the unavailable folders to start the import.
+                        </p>
+                    }
+
+                    <div class="mt-8 flex items-center gap-3">
                         <button class="btn-nkd-neutral text-content-muted" type="button" (click)="skip()">
                             Skip for now
                         </button>
                         <span class="grow"></span>
-
-                        <button class="btn-neutral" type="button" (click)="addFolders()">Add folders…</button>
                         <button
-                            class="btn-primary"
+                            class="btn-primary disabled:shadow-none disabled:bg-action-primary-disabled disabled:text-content-muted"
                             type="button"
                             [disabled]="
                                 pendingFolders().length == 0 || hasInvalidFolders() || startInFlight()
                             "
                             (click)="startImport()"
                         >
-                            Start import
+                            Continue
                         </button>
                     </div>
-                    @if (hasInvalidFolders()) {
-                        <p class="type-body-sm mt-3 text-right text-content-danger">
-                            Remove or fix the unavailable folders to start the import.
-                        </p>
-                    }
                 </div>
             </div>
         }
@@ -103,7 +165,10 @@
                                     ></app-progress-ring>
                                     Discovering files… {{ status.discovered }} found so far
                                 } @else if (status.phase === 'reading') {
-                                    Reading tracks… {{ status.readDone }} / {{ status.readTotal }}
+                                    Reading tracks…
+                                    <span class="font-mono"
+                                        >{{ status.readDone }} / {{ status.readTotal }}</span
+                                    >
                                 } @else if (status.phase === 'cancelled') {
                                     Import cancelled
                                 } @else if (status.phase === 'failed') {
@@ -113,27 +178,27 @@
 
                             @if (status.phase === 'reading') {
                                 <app-progress-bar
-                                    class="mt-6"
+                                    class="mt-6 block"
                                     [segments]="progressSegments()"
                                 ></app-progress-bar>
                             }
 
                             <div class="mx-auto mt-6 grid max-w-xl grid-cols-4 gap-3">
                                 <div class="text-center">
-                                    <p class="type-section-title text-content-primary">
+                                    <p class="type-section-title font-mono text-content-primary">
                                         {{ status.discovered }}
                                     </p>
                                     <p class="type-label-sm mt-1 text-content-muted">Discovered</p>
                                 </div>
                                 <div class="text-center">
-                                    <p class="type-section-title text-content-primary">
+                                    <p class="type-section-title font-mono text-content-primary">
                                         {{ status.imported }}
                                     </p>
                                     <p class="type-label-sm mt-1 text-content-muted">Imported</p>
                                 </div>
                                 <div class="text-center">
                                     <p
-                                        class="type-section-title"
+                                        class="type-section-title font-mono"
                                         [class.text-content-danger]="status.failedFiles > 0"
                                         [class.text-content-primary]="status.failedFiles === 0"
                                     >
@@ -143,7 +208,7 @@
                                 </div>
                                 <div class="text-center">
                                     <p
-                                        class="type-section-title"
+                                        class="type-section-title font-mono"
                                         [class.text-content-warning]="status.normalizationIssues > 0"
                                         [class.text-content-primary]="status.normalizationIssues === 0"
                                     >
