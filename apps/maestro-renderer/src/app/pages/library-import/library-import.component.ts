@@ -93,6 +93,8 @@ export class LibraryImportComponent {
     readonly rootValidations = signal<LibraryRootValidation[]>([])
     /** True while folders are being dragged over the folder area (drop-target highlight). */
     readonly isDragging = signal(false)
+    /** Scan this page is following; a completed *older* scan must not flip us to "done". */
+    private readonly watchedScanId = signal<number | null>(null)
     private validationToken = 0
     // Depth counter so dragenter/dragleave bubbling over children doesn't flicker.
     private dragDepth = 0
@@ -124,7 +126,8 @@ export class LibraryImportComponent {
         // Follow the running scan into the done step while the user is watching.
         effect(() => {
             const status = this.library.scanStatus()
-            if (this.step() === 'scanning' && status?.terminal?.outcome === 'completed') {
+            if (!status || status.scanId !== this.watchedScanId()) return
+            if (this.step() === 'scanning' && status.terminal?.outcome === 'completed') {
                 this.step.set('done')
             }
         })
@@ -146,6 +149,7 @@ export class LibraryImportComponent {
     private async initialize(): Promise<void> {
         await this.library.synced
         if (this.library.isScanning()) {
+            this.watchedScanId.set(this.library.scanStatus()?.scanId ?? null)
             this.step.set('scanning')
             return
         }
@@ -210,7 +214,8 @@ export class LibraryImportComponent {
         this.startInFlight.set(true)
         try {
             await this.library.saveFolders(folders)
-            await this.library.startScan('onboarding')
+            const status = await this.library.startScan('onboarding')
+            this.watchedScanId.set(status.scanId)
             this.step.set('scanning')
         } finally {
             this.startInFlight.set(false)
@@ -218,7 +223,9 @@ export class LibraryImportComponent {
     }
 
     async retryScan(): Promise<void> {
-        await this.library.startScan('onboarding')
+        const status = await this.library.startScan('onboarding')
+        this.watchedScanId.set(status.scanId)
+        this.step.set('scanning')
     }
 
     cancelScan(): void {

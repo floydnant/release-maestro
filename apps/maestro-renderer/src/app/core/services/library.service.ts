@@ -93,8 +93,21 @@ export class LibraryService {
         return this.electronService.ipcRenderer.invoke(LibraryIpcChannel.validateRoots, { paths })
     }
 
-    startScan(trigger: StartLibraryScanRequest['trigger'], paths?: string[]): Promise<LibraryScanStatus> {
-        return this.electronService.ipcRenderer.invoke(LibraryIpcChannel.startScan, { trigger, paths })
+    /**
+     * Start a scan. The returned status is applied right away so callers never
+     * observe the *previous* scan's terminal state after this resolves (the first
+     * pushed status event may be a throttle-tick away).
+     */
+    async startScan(
+        trigger: StartLibraryScanRequest['trigger'],
+        paths?: string[],
+    ): Promise<LibraryScanStatus> {
+        const status = await this.electronService.ipcRenderer.invoke(LibraryIpcChannel.startScan, {
+            trigger,
+            paths,
+        })
+        this.applyStatus(status)
+        return status
     }
 
     cancelScan(): void {

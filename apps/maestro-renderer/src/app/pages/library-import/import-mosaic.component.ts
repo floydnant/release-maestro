@@ -23,12 +23,12 @@ interface MosaicCell {
 const TICK_MS = 140
 /** Desired tile edge length, in px; the grid picks the column/row count nearest to this. */
 const TARGET_TILE_PX = 150
-/** Empty cells filled per tick — a calm, steady build-up of the wall. */
-const FILL_PER_TICK = 3
-/** Filled cells refreshed per tick once the wall is full — a gentle, non-hectic shimmer. */
-const CHURN_PER_TICK = 1
+/** Empty cells filled per tick — a brisk but steady build-up of the wall. */
+const FILL_PER_TICK = 5
+/** Filled cells refreshed per tick once the wall is full — a lively, non-hectic shimmer. */
+const CHURN_PER_TICK = 3
 /** Upper bound on the queued backlog, so completion never triggers a catch-up burst. */
-const MAX_PENDING = 12
+const MAX_PENDING = 24
 
 /**
  * Full-bleed album-cover mosaic for the library import: covers pop in as tracks
