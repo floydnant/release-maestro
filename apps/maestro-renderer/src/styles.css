@@ -51,8 +51,12 @@ body {
         @apply bg-action-secondary text-action-primary-content shadow-sm hover:bg-action-secondary-hover;
     }
 
+    button,
+    [role='button'] {
+        @apply cursor-default;
+    }
     .btn {
-        @apply inline-flex cursor-default items-center justify-center rounded-lg px-3 py-1.5 transition-colors duration-fast ease-standard;
+        @apply inline-flex cursor-default items-center justify-center rounded-lg px-3 py-1.5 transition-colors duration-fast ease-standard disabled:bg-action-primary-disabled disabled:text-content-muted;
         font-family: var(--type-label-md-family);
         font-size: var(--type-label-md-size);
         font-weight: var(--type-label-md-weight);

@@ -63,9 +63,12 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     await page.screenshot({ path: testInfo.outputPath('import-pick.png') })
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    // Scan finishes into the done step with the summary and a populated mosaic.
+    // Scan finishes into the done step: the live stat tiles settle at their final
+    // values (the "Imported" ticker lands on 6) and the mosaic is populated.
     await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
-    await expect(page.getByText(/6 tracks imported/)).toBeVisible()
+    await expect(page.locator('.grid-cols-4 div.text-center').filter({ hasText: 'Imported' })).toContainText(
+        '6',
+    )
     // 4 albums but only 3 distinct artworks (two share identical cover bytes) —
     // the content-addressed dedupe must collapse them to exactly 3 tiles.
     await expect.poll(async () => page.locator('app-import-mosaic img').count(), { timeout: 10_000 }).toBe(3)
@@ -110,9 +113,14 @@ test('failed files surface in Library Settings, linked from onboarding', async (
     await page.getByRole('button', { name: 'Add folders' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    // Completion summary counts the failure and links to the details.
+    // The completion stat tiles count the import and the failure, and link to details.
     await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
-    await expect(page.getByText(/6 tracks imported · 1 failed/)).toBeVisible()
+    await expect(page.locator('.grid-cols-4 div.text-center').filter({ hasText: 'Imported' })).toContainText(
+        '6',
+    )
+    await expect(page.locator('.grid-cols-4 div.text-center').filter({ hasText: 'Failed' })).toContainText(
+        '1',
+    )
     await page.getByRole('link', { name: 'View failed files' }).click()
 
     await expect(page).toHaveURL(/\/settings\/library$/)

@@ -54,8 +54,11 @@ test('cancelling an import mid-scan self-heals via the startup rescan', async ({
     await expect(page.getByText(/Reading tracks…/)).toBeVisible({ timeout: 30_000 })
     await page.screenshot({ path: testInfo.outputPath('import-mid-scan.png') })
 
-    // The mosaic never exceeds its DOM cap (10×8 cells × entering + leaving img).
-    expect(await page.locator('app-import-mosaic img').count()).toBeLessThanOrEqual(160)
+    // The mosaic is DOM-capped to its (responsive) grid: at most 2 imgs per cell
+    // (an entering cover plus the one it replaces), never one per scanned track.
+    const cellCount = await page.locator('app-import-mosaic .mosaic-cell').count()
+    expect(cellCount).toBeGreaterThan(0)
+    expect(await page.locator('app-import-mosaic img').count()).toBeLessThanOrEqual(2 * cellCount)
 
     // Cancel mid-read; if the scan won the race and completed, the cancel branch is moot.
     const cancelButton = page.getByRole('button', { name: 'Cancel import' })

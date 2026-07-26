@@ -61,7 +61,7 @@ type ImportStep = 'pick' | 'scanning' | 'done'
            (Translucent fills use color-mix — Tailwind's /opacity modifier isn't
            available on these custom color tokens under @apply.) */
         .dropzone {
-            @apply cursor-pointer border-border-default hover:border-border-strong hover:bg-background-surface;
+            @apply border-border-default hover:border-border-strong hover:bg-background-surface;
             background: color-mix(in srgb, theme('colors.background.surface') 40%, transparent);
         }
         .dropzone--active,
@@ -74,9 +74,6 @@ type ImportStep = 'pick' | 'scanning' | 'done'
         .dropzone-list--active {
             @apply border-border-focus;
             background: color-mix(in srgb, theme('colors.status.info-background') 40%, transparent);
-        }
-        .add-row {
-            @apply cursor-pointer text-content-secondary hover:bg-action-quiet-hover hover:text-content-primary;
         }
         /* The "Drop to add" cue shown over the list while dragging. */
         .dropzone-overlay {
@@ -247,14 +244,6 @@ export class LibraryImportComponent {
 
     folderName(path: string): string {
         return splitPathBaseName(path).base || path
-    }
-
-    summaryLine(terminal: LibraryScanTerminalResult): string {
-        const failed = terminal.discoveryFailureCount + terminal.readFailureCount
-        const parts = [`${terminal.imported} tracks imported`]
-        if (failed) parts.push(`${failed} failed`)
-        if (terminal.normalizationIssues) parts.push(`${terminal.normalizationIssues} with tag issues`)
-        return parts.join(' · ')
     }
 }
 

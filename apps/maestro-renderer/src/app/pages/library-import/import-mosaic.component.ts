@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal } from '@angular/core'
+import {
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    ElementRef,
+    effect,
+    inject,
+    input,
+    signal,
+} from '@angular/core'
 import { LibraryAlbumPreview } from '@release-maestro/core'
 import { fileUrl } from '../../shared/utils/file-url.util'
 
@@ -10,30 +19,44 @@ interface MosaicCell {
     revision: number
 }
 
-/** Pace at which queued covers are placed — keeps every tile visible ≥100ms even on fast scans. */
-const TICK_MS = 100
-/** Fraction of the backlog drained per tick, so the mosaic catches up smoothly on huge libraries. */
-const DRAIN_FACTOR = 20
+/** Cadence at which covers are placed/refreshed. */
+const TICK_MS = 140
+/** Desired tile edge length, in px; the grid picks the column/row count nearest to this. */
+const TARGET_TILE_PX = 150
+/** Empty cells filled per tick — a calm, steady build-up of the wall. */
+const FILL_PER_TICK = 3
+/** Filled cells refreshed per tick once the wall is full — a gentle, non-hectic shimmer. */
+const CHURN_PER_TICK = 1
+/** Upper bound on the queued backlog, so completion never triggers a catch-up burst. */
+const MAX_PENDING = 12
 
 /**
  * Full-bleed album-cover mosaic for the library import: covers pop in as tracks
- * are scanned, fading in (and the replaced cover fading out) on a fixed grid with
- * a hard DOM cap. Incoming covers are queued and placed at most every {@link TICK_MS}
- * per cell slot, so a too-fast scan never causes flicker. Sized via `columns`/`rows`;
- * the default 10×8 of square tiles overshoots typical window aspect ratios, so as a
- * positioned background it covers the whole window (overflow is clipped by the host).
+ * are scanned, fading in (and the replaced cover fading out).
+ *
+ * The grid is responsive — columns/rows are derived from the host size so tiles
+ * stay near {@link TARGET_TILE_PX} and cover the whole window at any aspect ratio.
+ * Covers are queued and placed at a *constant* rate (independent of how far the
+ * scan is ahead), so pacing never speeds up under a backlog nor bursts at the end.
+ * Empty cells fill first ({@link FILL_PER_TICK}); once full the wall shimmers
+ * gently ({@link CHURN_PER_TICK}). When `active` goes false (scan finished) the
+ * wall finishes filling any gaps and then settles instead of churning forever.
  */
 @Component({
     selector: 'app-import-mosaic',
     imports: [],
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
-        class: 'block overflow-hidden',
+        class: 'block size-full overflow-hidden',
     },
     template: `
-        <div class="grid gap-1.5" [style.grid-template-columns]="'repeat(' + columns() + ', minmax(0, 1fr))'">
+        <div
+            class="grid size-full gap-1.5"
+            [style.grid-template-columns]="'repeat(' + cols() + ', minmax(0, 1fr))'"
+            [style.grid-template-rows]="'repeat(' + rows() + ', minmax(0, 1fr))'"
+        >
             @for (cell of cells(); track $index) {
-                <div class="relative aspect-square overflow-hidden rounded-md">
+                <div class="mosaic-cell relative overflow-hidden rounded-md">
                     @if (cell) {
                         <!-- Tracking by revision recreates the nodes on replacement, restarting the animations. -->
                         @for (revisionCell of [cell]; track revisionCell.revision) {
@@ -66,17 +89,17 @@ const DRAIN_FACTOR = 20
         }
 
         .mosaic-tile--enter {
-            animation: mosaic-tile-enter 500ms var(--foundation-motion-easing-emphasized) backwards;
+            animation: mosaic-tile-enter 650ms var(--foundation-motion-easing-emphasized) backwards;
         }
 
         .mosaic-tile--leave {
-            animation: mosaic-tile-leave 500ms var(--foundation-motion-easing-standard) forwards;
+            animation: mosaic-tile-leave 650ms var(--foundation-motion-easing-standard) forwards;
         }
 
         @keyframes mosaic-tile-enter {
             from {
                 opacity: 0;
-                transform: scale(0.88);
+                transform: scale(0.92);
             }
             to {
                 opacity: 1;
@@ -107,74 +130,100 @@ const DRAIN_FACTOR = 20
 export class ImportMosaicComponent {
     /** Cumulative album previews in arrival order (append-only; shrinks only on a new scan). */
     albums = input.required<LibraryAlbumPreview[]>()
-    columns = input(10)
-    rows = input(8)
+    /** While false (scan reached a terminal state) the wall settles instead of churning. */
+    active = input(true)
 
+    readonly cols = signal(1)
+    readonly rows = signal(1)
     readonly cells = signal<(MosaicCell | null)[]>([])
 
+    private readonly host = inject<ElementRef<HTMLElement>>(ElementRef)
     private pending: LibraryAlbumPreview[] = []
     private consumedCount = 0
-    /** Shuffled cell indexes so covers scatter across the whole window instead of filling row by row. */
-    private placementOrder: number[] = []
-    private placedCount = 0
     private revisionCounter = 0
 
     readonly fileUrl = fileUrl
 
     constructor() {
+        // Ingest newly arrived albums into a bounded backlog.
         effect(() => {
             const albums = this.albums()
-            if (albums.length < this.consumedCount) this.reset()
+            if (albums.length < this.consumedCount) this.resetQueue()
             if (albums.length > this.consumedCount) {
                 this.pending.push(...albums.slice(this.consumedCount))
                 this.consumedCount = albums.length
+                if (this.pending.length > MAX_PENDING) this.pending = this.pending.slice(-MAX_PENDING)
             }
         })
 
-        const timer = setInterval(() => this.placePendingCovers(), TICK_MS)
-        inject(DestroyRef).onDestroy(() => clearInterval(timer))
+        const resizeObserver = new ResizeObserver(() => this.measure())
+        resizeObserver.observe(this.host.nativeElement)
+        this.measure()
+
+        const timer = setInterval(() => this.tick(), TICK_MS)
+        inject(DestroyRef).onDestroy(() => {
+            clearInterval(timer)
+            resizeObserver.disconnect()
+        })
     }
 
     tileTitle(album: LibraryAlbumPreview): string {
         return [album.artist, album.albumTitle].filter(Boolean).join(' — ')
     }
 
-    private reset(): void {
+    /** Recompute the column/row count from the host size, preserving placed covers. */
+    private measure(): void {
+        const element = this.host.nativeElement
+        const width = element.clientWidth
+        const height = element.clientHeight
+        if (width === 0 || height === 0) return
+        const cols = Math.max(1, Math.round(width / TARGET_TILE_PX))
+        const rows = Math.max(1, Math.round(height / TARGET_TILE_PX))
+        if (cols === this.cols() && rows === this.rows()) return
+        this.cols.set(cols)
+        this.rows.set(rows)
+        this.resizeGrid(cols * rows)
+    }
+
+    private resizeGrid(cellCount: number): void {
+        this.cells.update(cells => {
+            if (cells.length === cellCount) return cells
+            const next = cells.slice(0, cellCount)
+            while (next.length < cellCount) next.push(null)
+            return next
+        })
+    }
+
+    private resetQueue(): void {
         this.pending = []
         this.consumedCount = 0
-        this.placedCount = 0
-        this.placementOrder = []
-        this.cells.set([])
+        this.cells.set(Array.from({ length: this.cols() * this.rows() }, () => null))
     }
 
-    private ensureGrid(cellCount: number): void {
-        if (this.cells().length === cellCount) return
-        this.placementOrder = Array.from({ length: cellCount }, (_, i) => i)
-        for (let i = this.placementOrder.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1))
-            ;[this.placementOrder[i], this.placementOrder[j]] = [
-                this.placementOrder[j] as number,
-                this.placementOrder[i] as number,
-            ]
-        }
-        this.placedCount = 0
-        this.cells.set(Array.from({ length: cellCount }, () => null))
-    }
-
-    private placePendingCovers(): void {
+    private tick(): void {
         if (this.pending.length === 0) return
-        const cellCount = this.columns() * this.rows()
-        this.ensureGrid(cellCount)
-        // Adaptive drain: catch up on a backlog without ever replacing a cell
-        // more than once per tick (each cover stays visible ≥ TICK_MS).
-        const batchSize = Math.min(Math.ceil(this.pending.length / DRAIN_FACTOR), cellCount)
-        const batch = this.pending.splice(0, batchSize)
+        const cells = this.cells()
+        const empties: number[] = []
+        for (let i = 0; i < cells.length; i++) if (!cells[i]) empties.push(i)
 
-        this.cells.update(cells => {
-            const next = [...cells]
-            for (const album of batch) {
-                const index = this.placementOrder[this.placedCount % cellCount] as number
-                this.placedCount += 1
+        let targets: number[]
+        if (empties.length > 0) {
+            // Fill gaps first — a satisfying build-up.
+            targets = pickRandom(empties, Math.min(FILL_PER_TICK, empties.length, this.pending.length))
+        } else if (this.active()) {
+            // Full wall, still scanning: refresh a few random tiles.
+            targets = pickRandom(range(cells.length), Math.min(CHURN_PER_TICK, this.pending.length))
+        } else {
+            // Full wall and the scan is done: settle.
+            return
+        }
+        if (targets.length === 0) return
+
+        this.cells.update(current => {
+            const next = [...current]
+            for (const index of targets) {
+                const album = this.pending.shift()
+                if (!album) break
                 next[index] = {
                     current: album,
                     previous: next[index]?.current ?? null,
@@ -185,3 +234,17 @@ export class ImportMosaicComponent {
         })
     }
 }
+
+/** Pick up to `count` distinct random elements from `items`. */
+const pickRandom = <T>(items: T[], count: number): T[] => {
+    const pool = [...items]
+    const picked: T[] = []
+    for (let i = 0; i < count && pool.length > 0; i++) {
+        const index = Math.floor(Math.random() * pool.length)
+        picked.push(pool[index] as T)
+        pool.splice(index, 1)
+    }
+    return picked
+}
+
+const range = (length: number): number[] => Array.from({ length }, (_, index) => index)
