@@ -5,16 +5,7 @@
 
 </div>
 
-A desktop app for tracking and discovering music releases from Bandcamp. Import release notifications from your inbox, browse a rich feed with cover art and metadata, and preview tracks — all without leaving the app.
-
-## Features
-
-- **Release feed** — Scrollable feed of music releases with cover art, tracklists, and artist info
-- **Notification import** — Import Bandcamp notification emails via Apple Mail on macOS
-- **Hydration** — Scrapes Bandcamp pages to enrich feed items with full metadata
-- **Audio player** — Preview tracks directly in the feed
-- **Keyboard navigation** — Navigate the feed with `J`/`K` or arrow keys
-- **Local database** — All data stored locally in SQLite via Drizzle ORM
+A desktop app for your music. Scan your local collection into a searchable library, and track new releases from Bandcamp by importing notifications from your inbox — browse both with cover art and full metadata, without leaving the app.
 
 ## Tech Stack
 
@@ -56,19 +47,31 @@ This starts the Angular dev server and the Electron main process with hot reload
 Run `make help` for a list of commands to run. See [docs/testing.md](docs/testing.md) for testing
 strategy, E2E conventions, and fixture guidance.
 
+## Documentation
+
+- [CONTEXT-MAP.md](CONTEXT-MAP.md) — the two product contexts (music library, release feed), their
+  glossaries in [docs/contexts/](docs/contexts/), and which projects each context spans
+- [docs/adr/](docs/adr/) — architectural decisions and the reasoning behind non-obvious ones
+- [docs/testing.md](docs/testing.md) — test layers, E2E conventions, fixtures
+
 ## Project Structure
 
 ```
 apps/
   maestro-electron/    Electron main process (backend services, IPC API, database)
-  maestro-renderer/    Angular frontend (feed UI, audio player, settings)
+  maestro-renderer/    Angular frontend (feed UI, library import, audio player, settings)
   maestro-e2e/          Renderer and full Electron E2E tests
   metadata-engine/     Sidecar worker for reading/writing audio file metadata
 libs/
   maestro-core/        Shared library (Zod schemas, types, utilities)
 apple-scripts/         AppleScript for exporting emails from Apple Mail
 drizzle/               Database migrations
+docs/                  ADRs, context glossaries, testing guide
 ```
+
+Note that the project layout is not the product layout: both product contexts (music library, release
+feed) cut across `maestro-electron`, `maestro-renderer`, and `maestro-core`. See
+[CONTEXT-MAP.md](CONTEXT-MAP.md).
 
 ## Building for Distribution
 
@@ -92,6 +95,16 @@ To generate a new migration after changing the schema:
 
 ```bash
 make db-generate
+```
+
+Not all state lives in SQLite. User settings are a `conf` file in the app's **config** dir; library
+scan state (`library-state.json`) is a separate `conf` file in the **data** dir, because it is derived
+state that belongs with the database rather than user configuration
+([ADR 0001](docs/adr/0001-main-process-owns-scan-lifecycle.md)). To reset just the library — song
+tables plus that sidecar, leaving migrations and the release feed intact:
+
+```bash
+make db-truncate-library
 ```
 
 ## License

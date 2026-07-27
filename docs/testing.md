@@ -34,6 +34,11 @@ Do not mock Node modules such as `fs` or `child_process` in renderer E2E. Render
 through typed IPC for backend behavior; full Electron E2E covers the real Electron/Node integration.
 See `apps/maestro-e2e/src/renderer/README.md` for harness authoring examples.
 
+The harness's default scenario reports a **configured library folder**. Without it the library
+onboarding route guard redirects every scenario navigation to `/import`, and unrelated tests fail for
+reasons that have nothing to do with what they assert. A test that wants the onboarding state must opt
+into it explicitly by overriding `get-settings`.
+
 ## Commands
 
 ```bash
@@ -74,3 +79,20 @@ Electron E2E tests should isolate both filesystem inputs and app state:
 
 Reusable test fixtures live in `fixtures/`. Tests may copy from that directory, but should not mutate
 source fixture files. Keep large media fixtures intentional because they affect checkout and CI time.
+
+### Generated media over committed media
+
+Library scan tests need many distinctly-tagged audio files with distinct cover art. Committing them
+would mean megabytes of near-identical binaries in every checkout, so
+`apps/maestro-e2e/src/electron/tagged-library.fixture.ts` **generates** a temp library at test time by
+re-tagging the audio of the single committed MP3 fixture. Prefer extending that generator over adding
+binary fixtures.
+
+Two details there are load-bearing and easy to break:
+
+- Cover art is deduped by content hash, so identical images collapse to one album preview. The
+  generator appends salt bytes after each PNG's `IEND` chunk — invisible to decoders, but enough to
+  make otherwise-identical covers hash differently. Two albums deliberately share a salt so the dedup
+  path stays covered.
+- The default library is shaped for assertions (6 tracks, 4 albums, 3 distinct artworks). Changing
+  those counts will break tests that assert on them rather than just the tests you are editing.
