@@ -96,7 +96,7 @@ test.describe('library settings scenarios', () => {
             .build()
         await createRendererScenario(page, scenario, '/settings/library')
 
-        await expect(page.getByText(/Already covered by \/music/)).toBeVisible()
+        await expect(page.getByText(/Skipping, already covered by \/music/)).toBeVisible()
         await expect(page.getByRole('button', { name: /Rescan now|Save and rescan/ })).toBeEnabled()
     })
 
