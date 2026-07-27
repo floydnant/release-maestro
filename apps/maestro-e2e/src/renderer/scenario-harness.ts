@@ -21,6 +21,8 @@ export type IpcCall = {
 
 export type ScenarioBehavior =
     | { kind: 'resolve'; value?: IpcPayload }
+    | { kind: 'set-settings' }
+    | { kind: 'patch-settings' }
     | { kind: 'reject'; message: string; userFacingMessage?: string }
     | { kind: 'pending' }
     | { kind: 'sequence'; steps: ScenarioBehavior[]; fallback?: ScenarioBehavior }
@@ -31,6 +33,7 @@ export type RendererScenario = {
 
 type ScenarioState = {
     handlers: Record<string, ScenarioBehavior>
+    settings: AppSettings
     calls: IpcCall[]
     nextCallId: number
     pending: Record<
@@ -121,8 +124,8 @@ const defaultScenario = (): RendererScenario => ({
                 emailPluginConfig: {},
             } satisfies AppSettings,
         },
-        'set-settings': { kind: 'resolve' },
-        'patch-settings': { kind: 'resolve' },
+        'set-settings': { kind: 'set-settings' },
+        'patch-settings': { kind: 'patch-settings' },
         'trigger-email-import': { kind: 'resolve' },
         'load-feed': { kind: 'resolve', value: [] },
         'has-feed': { kind: 'resolve', value: false },
@@ -367,8 +370,13 @@ export const createRendererScenario = async (
                 JSON.parse(value, scenarioJsonReviver)
 
             const hydratedScenario = parseScenarioValue(serialization.scenario) as RendererScenario
+            const getSettingsBehavior = hydratedScenario.handlers['get-settings']
+            if (getSettingsBehavior?.kind !== 'resolve') {
+                throw new Error('Renderer scenarios require a resolving get-settings handler')
+            }
             const state: ScenarioState = {
                 handlers: hydratedScenario.handlers,
+                settings: getSettingsBehavior.value as AppSettings,
                 calls: [],
                 nextCallId: 1,
                 pending: {},
@@ -409,6 +417,14 @@ export const createRendererScenario = async (
                     const behavior = nextBehavior(channel)
                     if (behavior.kind === 'resolve') {
                         return Promise.resolve(behavior.value)
+                    }
+                    if (behavior.kind === 'set-settings') {
+                        state.settings = payload as AppSettings
+                        return Promise.resolve(state.settings)
+                    }
+                    if (behavior.kind === 'patch-settings') {
+                        state.settings = { ...state.settings, ...(payload as Partial<AppSettings>) }
+                        return Promise.resolve(state.settings)
                     }
                     if (behavior.kind === 'reject') {
                         const error = new Error(behavior.message)

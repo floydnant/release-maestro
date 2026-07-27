@@ -9,7 +9,6 @@ test.describe('settings IPC scenarios', () => {
                 library: { folders: ['/scenario/music'] },
                 emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Bandcamp Inbox' } },
             })
-            .handler('set-settings', { kind: 'resolve' })
             .build()
         const controller = await createRendererScenario(page, scenario, '/settings/apple-mail')
 
@@ -36,7 +35,6 @@ test.describe('settings IPC scenarios', () => {
                 library: { folders: ['/scenario/music'] },
                 emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Bandcamp Inbox' } },
             })
-            .handler('set-settings', { kind: 'resolve' })
             .build()
         await createRendererScenario(page, scenario, '/settings/apple-mail')
 

@@ -3,6 +3,43 @@ import { expect, test } from '@playwright/test'
 import { createRendererScenario, rendererScenarios, scenarioBuilder } from '../scenario-harness'
 
 test.describe('renderer scenario IPC harness', () => {
+    test('returns authoritative settings from set and patch handlers', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .settings({
+                library: { folders: ['/music'] },
+                emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Bandcamp' } },
+            })
+            .build()
+        await createRendererScenario(page, scenario)
+
+        const results = await page.evaluate(async () => {
+            const electronModule = window.require?.('electron') as {
+                ipcRenderer: {
+                    invoke: (channel: string, payload: unknown) => Promise<unknown>
+                }
+            }
+            const setResult = await electronModule.ipcRenderer.invoke('set-settings', {
+                library: { folders: ['/archive'] },
+                emailPluginConfig: { APPLE_MAIL: { mailboxName: 'New Releases' } },
+            })
+            const patchResult = await electronModule.ipcRenderer.invoke('patch-settings', {
+                library: { folders: ['/archive', '/usb'] },
+            })
+            return { setResult, patchResult }
+        })
+
+        expect(results).toEqual({
+            setResult: {
+                library: { folders: ['/archive'] },
+                emailPluginConfig: { APPLE_MAIL: { mailboxName: 'New Releases' } },
+            },
+            patchResult: {
+                library: { folders: ['/archive', '/usb'] },
+                emailPluginConfig: { APPLE_MAIL: { mailboxName: 'New Releases' } },
+            },
+        })
+    })
+
     test('revives nested dates across the scenario IPC boundary', async ({ page }) => {
         const initialCapturedAt = new Date('2026-07-01T12:34:56.000Z')
         const updatedCapturedAt = new Date('2026-07-02T12:34:56.000Z')
