@@ -1,0 +1,23 @@
+/* Empty-state drop zone: a dashed target that also opens the folder picker.
+   (Translucent fills use color-mix — Tailwind's /opacity modifier isn't
+   available on these custom color tokens under @apply.) */
+.dropzone {
+    @apply border-border-default hover:border-border-strong hover:bg-background-surface;
+    background: color-mix(in srgb, theme('colors.background.surface') 40%, transparent);
+}
+.dropzone--active,
+.dropzone--active:hover {
+    @apply border-border-focus;
+    background: color-mix(in srgb, theme('colors.status.info-background') 50%, transparent);
+}
+
+/* Populated folder list doubles as a drop target; it tints while dragging. */
+.dropzone-list--active {
+    @apply border-border-focus;
+    background: color-mix(in srgb, theme('colors.status.info-background') 40%, transparent);
+}
+/* The "Drop to add" cue shown over the list while dragging. */
+.dropzone-overlay {
+    @apply text-content-info backdrop-blur-sm;
+    background: color-mix(in srgb, theme('colors.status.info-background') 70%, transparent);
+}

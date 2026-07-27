@@ -41,6 +41,11 @@ export class ElectronService {
         await this.ipcRenderer.invoke('open-url', url)
     }
 
+    /** Show a file or folder in the OS file manager (Finder / Explorer), selected. */
+    async revealInFileManager(path: string) {
+        await this.ipcRenderer.invoke('reveal-in-file-manager', path)
+    }
+
     async minimizeWindow() {
         await this.ipcRenderer.invoke('window-minimize')
     }

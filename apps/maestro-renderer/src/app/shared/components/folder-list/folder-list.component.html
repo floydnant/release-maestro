@@ -1,0 +1,81 @@
+<div
+    (dragenter)="onDragEnter($event)"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave()"
+    (drop)="onDrop($event)"
+>
+    @if (folders().length === 0) {
+        <button
+            type="button"
+            class="dropzone | py-14 flex h-[130px] w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-8 text-center transition-colors"
+            [ngClass]="{
+                'dropzone--active': isDragging(),
+            }"
+            aria-label="Add folders"
+            (click)="browse.emit()"
+        >
+            <app-icon name="octFileDirectory" size="1.75rem" class="text-content-muted"></app-icon>
+            <span class="type-body-md mt-1 font-semibold text-content-primary">Drop folders here</span>
+            <span class="type-body-sm -mt-2 text-content-muted">or click to browse</span>
+        </button>
+    } @else {
+        <div
+            class="panel | relative flex flex-col transition-colors"
+            [ngClass]="{
+                'dropzone-list--active': isDragging(),
+                'min-h-[130px]': useMinHeight(),
+            }"
+        >
+            <ul>
+                @for (folder of folders(); track folder) {
+                    <li class="folder-row | group flex items-center gap-3 px-4 py-3 transition-colors">
+                        <app-icon
+                            name="octFileDirectory"
+                            size="1.1rem"
+                            class="shrink-0 text-content-muted"
+                        ></app-icon>
+                        <div class="min-w-0 grow">
+                            <p class="type-body-md flex min-w-0" [title]="folder">
+                                <span class="truncate text-content-muted">{{ folderParent(folder) }}</span
+                                ><span class="truncate font-semibold text-content-primary">{{
+                                    folderName(folder)
+                                }}</span>
+                            </p>
+                            @if (validationFor(folder); as validation) {
+                                @if (!validation.available) {
+                                    <p class="type-body-sm text-content-danger">
+                                        {{ validation.error || 'This folder is not available.' }}
+                                    </p>
+                                } @else if (validation.nestedUnder) {
+                                    <p class="type-body-sm text-content-muted opacity-70">
+                                        Skipping, already covered by {{ validation.nestedUnder }}
+                                    </p>
+                                }
+                            }
+                        </div>
+                        <button
+                            class="remove-folder-btn | btn-nkd-neutral shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                            type="button"
+                            title="Remove folder"
+                            (click)="folderRemoved.emit(folder)"
+                        >
+                            <app-icon name="octX" size="14"></app-icon>
+                        </button>
+                    </li>
+                }
+            </ul>
+
+            <!-- The host's "add folders" affordance, if it puts one inside the list. -->
+            <ng-content></ng-content>
+
+            @if (isDragging()) {
+                <div
+                    class="dropzone-overlay pointer-events-none absolute inset-0 flex items-center justify-center gap-2"
+                >
+                    <app-icon name="octFileDirectoryFill" size="1.25rem"></app-icon>
+                    <span class="type-body-md font-semibold">Drop to add</span>
+                </div>
+            }
+        </div>
+    }
+</div>

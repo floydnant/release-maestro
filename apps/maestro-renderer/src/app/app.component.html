@@ -37,10 +37,6 @@
                         }
                     }
                 </p>
-            } @else if (showLibrarySetupCta()) {
-                <hr />
-                <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
-                <a class="btn-primary mt-2 text-center" routerLink="/import">Set up library</a>
             }
         </div>
 
@@ -107,6 +103,12 @@
                         }
                     </ul>
                 </nav>
+
+                @if (showLibrarySetupCta()) {
+                    <hr />
+                    <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
+                    <a class="btn-primary mt-2 block text-center" routerLink="/import">Set up library</a>
+                }
 
                 @if (importProgress(); as importStatus) {
                     @if (importStatus.phase == 'idle') {

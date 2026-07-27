@@ -32,6 +32,11 @@ ipc.handle('open-url', async (_event, url) => {
     shell.openExternal(url)
 })
 
+// Reveal a file/folder in the OS file manager (e.g. a failed import from settings)
+ipc.handle('reveal-in-file-manager', async (_event, path) => {
+    shell.showItemInFolder(path)
+})
+
 // Settings management (all reads/writes go through schema validation)
 ipc.handle('get-settings', async () => {
     const settingsService = await diContainer.get(SettingsBackendService)

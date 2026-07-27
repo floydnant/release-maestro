@@ -4,13 +4,13 @@ import { Router, RouterModule } from '@angular/router'
 import { LibraryRootValidation, LibraryScanTerminalResult } from '@release-maestro/core'
 import { ElectronService } from '../../core/services'
 import { LibraryService } from '../../core/services/library.service'
+import { FolderListComponent } from '../../shared/components/folder-list/folder-list.component'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import {
     ProgressBarComponent,
     ProgressBarSegment,
 } from '../../shared/components/progress-bar/progress-bar.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
-import { splitPathBaseName } from '../../shared/utils/formatting.utils'
 import { ImportMosaicComponent } from './import-mosaic.component'
 
 type ImportStep = 'pick' | 'scanning' | 'done'
@@ -29,6 +29,7 @@ type ImportStep = 'pick' | 'scanning' | 'done'
         ProgressRingComponent,
         IconComponent,
         ImportMosaicComponent,
+        FolderListComponent,
         NgClass,
     ],
     templateUrl: './library-import.component.html',
@@ -56,30 +57,6 @@ type ImportStep = 'pick' | 'scanning' | 'done'
         .content-band {
             @apply mx-auto w-fit rounded-xl border border-border-subtle bg-black/70 px-10 py-16 shadow-lg backdrop-blur-md;
         }
-
-        /* Empty-state drop zone: a dashed target that also opens the folder picker.
-           (Translucent fills use color-mix — Tailwind's /opacity modifier isn't
-           available on these custom color tokens under @apply.) */
-        .dropzone {
-            @apply border-border-default hover:border-border-strong hover:bg-background-surface;
-            background: color-mix(in srgb, theme('colors.background.surface') 40%, transparent);
-        }
-        .dropzone--active,
-        .dropzone--active:hover {
-            @apply border-border-focus;
-            background: color-mix(in srgb, theme('colors.status.info-background') 50%, transparent);
-        }
-
-        /* Populated folder list doubles as a drop target; it tints while dragging. */
-        .dropzone-list--active {
-            @apply border-border-focus;
-            background: color-mix(in srgb, theme('colors.status.info-background') 40%, transparent);
-        }
-        /* The "Drop to add" cue shown over the list while dragging. */
-        .dropzone-overlay {
-            @apply text-content-info backdrop-blur-sm;
-            background: color-mix(in srgb, theme('colors.status.info-background') 70%, transparent);
-        }
     `,
 })
 export class LibraryImportComponent {
@@ -91,13 +68,9 @@ export class LibraryImportComponent {
     readonly pendingFolders = signal<string[]>([])
     readonly startInFlight = signal(false)
     readonly rootValidations = signal<LibraryRootValidation[]>([])
-    /** True while folders are being dragged over the folder area (drop-target highlight). */
-    readonly isDragging = signal(false)
     /** Scan this page is following; a completed *older* scan must not flip us to "done". */
     private readonly watchedScanId = signal<number | null>(null)
     private validationToken = 0
-    // Depth counter so dragenter/dragleave bubbling over children doesn't flicker.
-    private dragDepth = 0
 
     /** Terminal result shown as a banner on the scanning step (cancelled/failed). */
     readonly terminalBanner = computed<LibraryScanTerminalResult | null>(() => {
@@ -159,10 +132,6 @@ export class LibraryImportComponent {
         }
     }
 
-    validationFor(folder: string): LibraryRootValidation | undefined {
-        return this.rootValidations().find(validation => validation.path === folder)
-    }
-
     async addFolders(): Promise<void> {
         const picked = await this.library.pickFolders()
         if (!picked?.length) return
@@ -173,37 +142,7 @@ export class LibraryImportComponent {
         this.pendingFolders.update(folders => folders.filter(f => f !== folder))
     }
 
-    onDragEnter(event: DragEvent): void {
-        if (!hasFileDrag(event)) return
-        event.preventDefault()
-        this.dragDepth++
-        this.isDragging.set(true)
-    }
-
-    onDragOver(event: DragEvent): void {
-        if (!hasFileDrag(event)) return
-        // Both preventDefault and a copy dropEffect are required for `drop` to fire.
-        event.preventDefault()
-        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
-    }
-
-    onDragLeave(): void {
-        this.dragDepth = Math.max(0, this.dragDepth - 1)
-        if (this.dragDepth === 0) this.isDragging.set(false)
-    }
-
-    onDrop(event: DragEvent): void {
-        event.preventDefault()
-        this.dragDepth = 0
-        this.isDragging.set(false)
-        const paths = Array.from(event.dataTransfer?.files ?? [])
-            .map(file => this.electronService.getPathForFile(file))
-            .filter((path): path is string => path !== null)
-        // Non-folder drops (files) are kept too — validation flags them as "Not a folder".
-        this.addPaths(paths)
-    }
-
-    private addPaths(paths: string[]): void {
+    addPaths(paths: string[]): void {
         if (paths.length === 0) return
         this.pendingFolders.update(folders => [...new Set([...folders, ...paths])])
     }
@@ -244,16 +183,4 @@ export class LibraryImportComponent {
     async finish(): Promise<void> {
         await this.router.navigate(['/home'])
     }
-
-    folderParent(path: string): string {
-        return splitPathBaseName(path).parent
-    }
-
-    folderName(path: string): string {
-        return splitPathBaseName(path).base || path
-    }
 }
-
-/** True when a drag carries filesystem items (so we can offer to add them as folders). */
-const hasFileDrag = (event: DragEvent): boolean =>
-    Array.from(event.dataTransfer?.types ?? []).includes('Files')

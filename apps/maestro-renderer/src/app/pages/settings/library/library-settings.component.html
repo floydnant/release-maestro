@@ -5,44 +5,15 @@
         stay in the database but are marked as no longer present.
     </p>
 
-    <div class="panel mt-4 p-2">
-        @if (folders().length === 0) {
-            <p class="type-body-sm px-3 py-4 text-center text-content-muted">
-                No library folders configured.
-            </p>
-        }
-        @for (folder of folders(); track folder) {
-            <div class="rounded flex items-center gap-3 px-3 py-2">
-                <div class="min-w-0 grow">
-                    <p class="type-body-sm flex min-w-0" [title]="folder">
-                        <span class="truncate text-content-muted">{{ folderParent(folder) }}</span
-                        ><span class="truncate font-semibold text-content-primary">{{
-                            folderName(folder)
-                        }}</span>
-                    </p>
-                    @if (validationFor(folder); as validation) {
-                        @if (!validation.available) {
-                            <p class="type-body-sm mt-0.5 text-content-danger">
-                                {{ validation.error || 'This folder is not available.' }}
-                            </p>
-                        } @else if (validation.nestedUnder) {
-                            <p class="type-body-sm mt-0.5 text-content-muted">
-                                Skipping, already covered by {{ validation.nestedUnder }}
-                            </p>
-                        }
-                    }
-                </div>
-                <button
-                    class="btn-nkd-neutral shrink-0"
-                    type="button"
-                    title="Remove folder"
-                    (click)="removeFolder(folder)"
-                >
-                    <app-icon name="octX" size="14"></app-icon>
-                </button>
-            </div>
-        }
-    </div>
+    <app-folder-list
+        class="mt-4 block"
+        [folders]="folders()"
+        [validations]="rootValidations()"
+        (foldersDropped)="addPaths($event)"
+        (browse)="addFolders()"
+        (folderRemoved)="removeFolder($event)"
+        [useMinHeight]="false"
+    ></app-folder-list>
 
     <div class="mt-4 flex items-center gap-3">
         <button class="btn-neutral" type="button" (click)="addFolders()">Add folders…</button>
@@ -102,16 +73,29 @@
             </p>
             <div class="panel mt-3 p-2" aria-label="Failed files">
                 @for (failure of terminalResult.failures; track failure.path) {
-                    <div class="rounded select-text px-3 py-2">
-                        <p class="type-body-sm mt-0.5 text-content-danger">
-                            {{ failure.message }}
-                        </p>
-                        <p class="type-body-sm flex min-w-0" [title]="failure.path">
-                            <span class="truncate text-content-muted">{{ folderParent(failure.path) }}</span
-                            ><span class="shrink-0 font-semibold text-content-primary">{{
-                                folderName(failure.path)
-                            }}</span>
-                        </p>
+                    <div class="rounded group flex items-center gap-3 px-3 py-2">
+                        <div class="min-w-0 grow select-text">
+                            <p class="type-body-sm mt-0.5 text-content-danger">
+                                {{ failure.message }}
+                            </p>
+                            <p class="type-body-sm flex min-w-0" [title]="failure.path">
+                                <span class="truncate text-content-muted">{{
+                                    folderParent(failure.path)
+                                }}</span
+                                ><span class="shrink-0 font-semibold text-content-primary">{{
+                                    folderName(failure.path)
+                                }}</span>
+                            </p>
+                        </div>
+                        <button
+                            class="btn-nkd-neutral shrink-0 text-content-muted hover:text-content-primary"
+                            type="button"
+                            [title]="revealLabel"
+                            [attr.aria-label]="revealLabel + ': ' + failure.path"
+                            (click)="revealFile(failure.path)"
+                        >
+                            <app-icon name="octFileDirectoryOpenFill" size="16"></app-icon>
+                        </button>
                     </div>
                 }
                 @if (terminalResult.failuresTruncated) {

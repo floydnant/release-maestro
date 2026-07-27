@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } 
 import { LibraryRootValidation, LibraryScanTerminalResult } from '@release-maestro/core'
 import { ElectronService } from '../../../core/services'
 import { LibraryService } from '../../../core/services/library.service'
+import { FolderListComponent } from '../../../shared/components/folder-list/folder-list.component'
 import { IconComponent } from '../../../shared/components/icon/icon.component'
 import { ProgressRingComponent } from '../../../shared/components/progress-ring/progress-ring.component'
 import { formatDateRelative, splitPathBaseName } from '../../../shared/utils/formatting.utils'
@@ -20,7 +21,7 @@ const OUTCOME_LABELS: Record<LibraryScanTerminalResult['outcome'], string> = {
  */
 @Component({
     selector: 'app-library-settings',
-    imports: [IconComponent, ProgressRingComponent],
+    imports: [IconComponent, ProgressRingComponent, FolderListComponent],
     templateUrl: './library-settings.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -108,9 +109,9 @@ export class LibrarySettingsComponent {
         this.savedFolders.set(folders)
     }
 
-    validationFor(folder: string): LibraryRootValidation | undefined {
-        return this.rootValidations().find(validation => validation.path === folder)
-    }
+    /** "Reveal in Finder" on macOS, the generic wording everywhere else. */
+    readonly revealLabel =
+        this.electronService.platform === 'darwin' ? 'Reveal in Finder' : 'Show in file manager'
 
     folderParent(path: string): string {
         return splitPathBaseName(path).parent
@@ -123,11 +124,21 @@ export class LibrarySettingsComponent {
     async addFolders(): Promise<void> {
         const picked = await this.library.pickFolders()
         if (!picked?.length) return
-        this.folders.update(folders => [...new Set([...folders, ...picked])])
+        this.addPaths(picked)
+    }
+
+    addPaths(paths: string[]): void {
+        if (paths.length === 0) return
+        this.folders.update(folders => [...new Set([...folders, ...paths])])
     }
 
     removeFolder(folder: string): void {
         this.folders.update(folders => folders.filter(f => f !== folder))
+    }
+
+    /** Open the OS file manager on a failed file, so the user can inspect it. */
+    revealFile(path: string): void {
+        void this.electronService.revealInFileManager(path)
     }
 
     async saveAndRescan(): Promise<void> {

@@ -46,6 +46,8 @@ export const MainIpcContract = defineIpcContract({
     'window-close': defineIpcRequest(),
     'get-app-version': defineIpcRequest<void, string>(),
     'open-url': defineIpcRequest<string>(),
+    /** Show a file or folder in the OS file manager (Finder / Explorer), selected. */
+    'reveal-in-file-manager': defineIpcRequest<string>(),
     quit: defineIpcEvent<number>(),
 
     // settings

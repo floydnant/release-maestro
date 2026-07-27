@@ -144,13 +144,14 @@ export class AppComponent {
         this.scanIndicator.set(view),
     )
 
-    /** Nudge users who skipped onboarding (or lost their folders) toward library setup. */
+    /**
+     * Nudge users who skipped onboarding (or lost their folders) toward library
+     * setup. Lives in the sidebar, so it is only ever rendered off the import route.
+     */
     showLibrarySetupCta = computed(() => {
-        if (this.scanIndicator() !== null) return false
         const settings = this.settingsService.settings.value()
         if (!settings) return false
-        const hasFolders = (settings.libraryFolders?.length ?? 0) > 0
-        return !hasFolders && !this.isImportRoute()
+        return (settings.libraryFolders?.length ?? 0) === 0
     })
 
     libraryScanSegments = computed((): ProgressBarSegment[] => {
