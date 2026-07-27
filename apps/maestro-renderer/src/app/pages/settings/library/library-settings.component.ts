@@ -48,6 +48,18 @@ export class LibrarySettingsComponent {
     /** Terminal result of the most recent scan in this app session. */
     readonly terminal = computed(() => this.library.scanStatus()?.terminal ?? null)
 
+    /**
+     * Roots the last scan could not reach. Their tracks were reconciled as missing,
+     * so the count is only explicable alongside this list.
+     */
+    readonly unavailableRootsText = computed(() => {
+        const unavailable = this.terminal()?.unavailableRoots ?? []
+        if (unavailable.length === 0) return null
+        return `Could not reach ${unavailable.join(', ')} — tracks under ${
+            unavailable.length === 1 ? 'it' : 'them'
+        } are marked missing until the folder is back.`
+    })
+
     readonly terminalSummaryText = computed(() => {
         const terminal = this.terminal()
         if (!terminal) return null

@@ -1,6 +1,6 @@
 import { expect, test, TestInfo } from '@playwright/test'
 import { _electron as electron, ElectronApplication, Page } from 'playwright'
-import { cp, mkdir } from 'node:fs/promises'
+import { cp, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const workspaceRoot = join(__dirname, '../../../..')
@@ -131,4 +131,24 @@ test('scans a temp library and persists reconciliation state across scans', asyn
     await expect(metric(page, 'Scan errors')).toHaveText('0')
     await expect(metric(page, 'Scan status')).toHaveText('completed')
     await expect(metric(page, 'Raw scan summary')).toContainText('"unchanged": 1')
+})
+
+// ADR 0003: an unreachable root is not a scan failure. The tracks under it are
+// genuinely unavailable, so the scan completes and reconciles them to missing.
+test('a root that disappears completes the scan and marks its tracks missing', async ({}, testInfo) => {
+    const { libraryDir } = await copyFixtureLibrary(testInfo)
+
+    await page.getByLabel('Library scan paths').fill(libraryDir)
+    await page.getByRole('button', { name: 'Start Scan' }).click()
+
+    await expect(metric(page, 'Scan status')).toHaveText('completed')
+    await expect(metric(page, 'New songs')).toHaveText('1')
+
+    // Unplug the drive.
+    await rm(libraryDir, { recursive: true, force: true })
+    await page.getByRole('button', { name: 'Start Scan' }).click()
+
+    await expect(metric(page, 'Scan status')).toHaveText('completed')
+    await expect(metric(page, 'Missing songs')).toHaveText('1')
+    await expect(metric(page, 'Scan errors')).toHaveText('0')
 })

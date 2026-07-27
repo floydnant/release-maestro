@@ -53,6 +53,11 @@
         @if (terminal()?.error; as terminalError) {
             <p class="type-body-sm mt-1 text-content-danger">{{ terminalError.message }}</p>
         }
+        @if (unavailableRootsText(); as unavailableText) {
+            <p class="type-body-sm mt-1 text-content-warning" aria-label="Unavailable folders">
+                {{ unavailableText }}
+            </p>
+        }
     } @else if (lastScanText(); as lastScan) {
         <p class="type-body-sm mt-2 text-content-secondary">Last scan: {{ lastScan }}</p>
     } @else {

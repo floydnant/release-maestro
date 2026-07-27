@@ -55,7 +55,7 @@ describe('LibraryScanService', () => {
         expect(backend.scan).not.toHaveBeenCalled()
     })
 
-    it('fails up front when any root is unavailable — no partial scan', async () => {
+    it('scans the reachable roots and reports the unreachable ones', async () => {
         settings.getSettings.mockReturnValue({ library: { folders: ['/music', '/usb/drive'] } })
         roots.validate.mockResolvedValue([
             availableRoot('/music'),
@@ -64,14 +64,25 @@ describe('LibraryScanService', () => {
 
         const status = await service.startScan('startup')
 
-        expect(backend.scan).not.toHaveBeenCalled()
-        expect(status.phase).toBe('failed')
-        expect(status.terminal).toMatchObject({
-            outcome: 'failed',
-            error: { code: 'ROOTS_UNAVAILABLE', unavailableRoots: ['/usb/drive'] },
-        })
-        // Nothing persisted for a failed scan.
-        expect(stateStore.get('lastScan')).toBeUndefined()
+        // The unplugged drive is dropped from the walk, not treated as fatal.
+        expect(backend.scan).toHaveBeenCalledWith(['/music'], expect.anything())
+        expect(status.phase).toBe('discovering')
+        expect(status.roots).toEqual(['/music'])
+        expect(status.unavailableRoots).toEqual(['/usb/drive'])
+    })
+
+    it('still scans when every root is unavailable, so the library reconciles to missing', async () => {
+        settings.getSettings.mockReturnValue({ library: { folders: ['/usb/drive'] } })
+        roots.validate.mockResolvedValue([
+            { path: '/usb/drive', canonicalPath: '/usb/drive', available: false, error: 'not found' },
+        ])
+
+        const status = await service.startScan('startup')
+
+        // An empty walk discovers nothing, which is what marks everything missing.
+        expect(backend.scan).toHaveBeenCalledWith([], expect.anything())
+        expect(status.roots).toEqual([])
+        expect(status.unavailableRoots).toEqual(['/usb/drive'])
     })
 
     it('scans canonical roots and omits roots nested under another root', async () => {

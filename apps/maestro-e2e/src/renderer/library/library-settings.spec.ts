@@ -15,6 +15,7 @@ const terminalResult = (overrides: Partial<LibraryScanTerminalResult> = {}): Lib
     changed: 0,
     unchanged: 8,
     missing: 0,
+    unavailableRoots: [],
     readTotal: 2,
     readsAttempted: 2,
     imported: 1,
@@ -40,6 +41,7 @@ const scanStatus = (terminal: LibraryScanTerminalResult): LibraryScanStatus => (
     trigger: terminal.trigger,
     phase: terminal.outcome,
     roots: terminal.roots,
+    unavailableRoots: terminal.unavailableRoots,
     startedAt: terminal.startedAt,
     finishedAt: terminal.finishedAt,
     discovered: terminal.discovered,
@@ -182,9 +184,8 @@ test.describe('library settings scenarios', () => {
             failures: [],
             readFailureCount: 0,
             error: {
-                code: 'ROOTS_UNAVAILABLE',
-                message: 'Library folder unavailable: /usb/library',
-                unavailableRoots: ['/usb/library'],
+                code: 'SCAN_ERROR',
+                message: 'The metadata engine stopped responding',
             },
         })
         const scenario = scenarioBuilder()
@@ -197,6 +198,33 @@ test.describe('library settings scenarios', () => {
         await createRendererScenario(page, scenario, '/settings/library')
 
         await expect(page.getByLabel('Latest scan result')).toContainText('Failed')
-        await expect(page.getByText('Library folder unavailable: /usb/library')).toBeVisible()
+        await expect(page.getByText('The metadata engine stopped responding')).toBeVisible()
+    })
+
+    // An unreachable root is not a failure: the scan completes over what it could
+    // reach and the rest reconciles to missing, so the UI has to explain the count.
+    test('an unreachable root completes the scan and explains the missing tracks', async ({ page }) => {
+        const terminal = terminalResult({
+            outcome: 'completed',
+            missing: 42,
+            unavailableRoots: ['/usb/library'],
+            failures: [],
+            readFailureCount: 0,
+        })
+        const scenario = scenarioBuilder()
+            .settings({
+                library: { folders: ['/music', '/usb/library'] },
+                emailPluginConfig: {},
+            })
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: scanStatus(terminal), albums: [], lastScan: null },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/settings/library')
+
+        await expect(page.getByLabel('Latest scan result')).toContainText('Completed')
+        await expect(page.getByLabel('Latest scan result')).toContainText('42 missing')
+        await expect(page.getByLabel('Unavailable folders')).toContainText('/usb/library')
     })
 })

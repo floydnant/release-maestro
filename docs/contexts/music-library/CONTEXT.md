@@ -49,12 +49,18 @@ _Avoid_: full scan, tag scan
 
 **Reconciliation**:
 Marking songs absent (`present = false`) when discovery did not see them. Skipped when the scan was
-cancelled, since a cancelled discovery has not seen every file.
+cancelled, since a cancelled discovery has not seen every file — see ADR 0003.
 _Avoid_: pruning, cleanup, deletion
 
 **Missing**:
-A song in the database whose file was not seen by the last complete discovery. Missing songs are
-retained, not deleted.
+A song in the database whose file was not seen by the last complete discovery. `present` means "the
+app can reach this file now", not "this file exists somewhere" — so tracks on an unplugged drive are
+missing. Missing songs are retained, not deleted, and come back on the next scan that reaches them.
+
+**Unavailable root**:
+A configured root the scan could not reach. Dropped from the walk; its tracks go missing. Reported on
+the scan status so the UI can explain the count — not an error (ADR 0003). Distinct from a root that
+fails _picker_ validation, which is refused at save time.
 
 **Terminal result**:
 The one-shot summary produced when a scan ends, carrying the outcome (`completed`, `cancelled`,

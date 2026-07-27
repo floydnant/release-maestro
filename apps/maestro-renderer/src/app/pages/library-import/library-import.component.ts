@@ -81,6 +81,19 @@ export class LibraryImportComponent {
         return terminal?.outcome === 'completed' && terminal.discovered === 0
     })
 
+    /**
+     * Roots the scan could not reach. Rare here — the picker blocks saving an
+     * unavailable folder — but a drive can still vanish mid-flow, and this page
+     * also reports on scans it did not start.
+     */
+    readonly unavailableRootsText = computed(() => {
+        const unavailable = this.library.scanStatus()?.terminal?.unavailableRoots ?? []
+        if (unavailable.length === 0) return null
+        return `Could not reach ${unavailable.join(', ')} — tracks under ${
+            unavailable.length === 1 ? 'it' : 'them'
+        } are marked missing until the folder is back.`
+    })
+
     /** Folders may only be saved/scanned when every selection validated cleanly. */
     readonly hasInvalidFolders = computed(() =>
         this.rootValidations().some(validation => !validation.available),

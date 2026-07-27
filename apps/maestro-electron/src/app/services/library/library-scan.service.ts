@@ -39,9 +39,9 @@ export interface LibraryScanState extends Record<string, unknown> {
  * delta-shaped (`newAlbums`).
  *
  * Roots are validated here — the scan boundary — regardless of what the renderer
- * checked: if any configured root is unavailable the scan fails up front instead
- * of scanning a subset, so a temporarily unmounted drive can never cause its
- * whole library to be reconciled as missing.
+ * checked, but an unreachable root does not stop the scan: it is simply dropped
+ * from the walk, and everything under it reconciles to missing like any other
+ * file the scan did not see (see ADR 0003).
  */
 export class LibraryScanService {
     private status: LibraryScanStatus | null = null
@@ -91,26 +91,20 @@ export class LibraryScanService {
         }
 
         const validations = await this.roots.validate(configuredRoots)
-        const unavailable = validations.filter(validation => !validation.available)
-        if (unavailable.length > 0) {
-            // Refuse to scan a subset: reconciling only the reachable roots would
-            // mark every song under the unreachable ones as missing.
-            this.finishWithoutScan(status, 'failed', {
-                code: 'ROOTS_UNAVAILABLE',
-                message: `Library folder${unavailable.length > 1 ? 's' : ''} unavailable: ${unavailable
-                    .map(validation => validation.path)
-                    .join(', ')}`,
-                unavailableRoots: unavailable.map(validation => validation.path),
-            })
-            return status
-        }
 
-        // Canonical roots, minus duplicates and roots nested under another root
-        // (scanning both would be redundant).
+        // Canonical roots, minus duplicates, roots nested under another root
+        // (scanning both would be redundant), and roots we cannot reach.
         const effectiveRoots = validations
-            .filter(validation => validation.nestedUnder === undefined)
+            .filter(validation => validation.available && validation.nestedUnder === undefined)
             .map(validation => validation.canonicalPath)
+        // Unreachable roots are reported, not fatal: the scan walks what it can and
+        // the rest reconciles to missing. `effectiveRoots` may legitimately be empty
+        // — that scan discovers nothing and marks the whole library missing, which
+        // is the honest answer when no configured folder is reachable.
         status.roots = effectiveRoots
+        status.unavailableRoots = validations
+            .filter(validation => !validation.available)
+            .map(validation => validation.path)
         this.touch(status)
 
         this.albums.clear()
@@ -249,6 +243,7 @@ export class LibraryScanService {
             trigger,
             phase: roots.length === 0 ? 'idle' : 'discovering',
             roots,
+            unavailableRoots: [],
             startedAt: Date.now(),
             finishedAt: null,
             discovered: 0,
@@ -262,23 +257,6 @@ export class LibraryScanService {
             normalizationIssues: 0,
             terminal: null,
         }
-    }
-
-    /** Terminal transition for scans that never reached the pipeline (e.g. bad roots). */
-    private finishWithoutScan(
-        status: LibraryScanStatus,
-        outcome: LibraryScanOutcome,
-        error: LibraryScanTerminalError | null,
-    ): void {
-        this.startBroadcasting()
-        this.finishScan(status, outcome, {
-            failures: [],
-            discoveryFailureCount: 0,
-            readFailureCount: 0,
-            missing: 0,
-            error,
-        })
-        this.finishBroadcasting()
     }
 
     private finishScan(
@@ -306,6 +284,7 @@ export class LibraryScanService {
             changed: status.changed,
             unchanged: status.unchanged,
             missing: details.missing,
+            unavailableRoots: status.unavailableRoots,
             readTotal: status.readTotal,
             readsAttempted: status.readDone,
             imported: status.imported,

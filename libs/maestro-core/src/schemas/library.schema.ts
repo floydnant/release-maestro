@@ -55,10 +55,8 @@ export interface LibraryScanFileFailure {
 }
 
 export interface LibraryScanTerminalError {
-    code: 'ROOTS_UNAVAILABLE' | 'SCAN_ERROR'
+    code: 'SCAN_ERROR'
     message: string
-    /** The configured roots that were unavailable (for ROOTS_UNAVAILABLE). */
-    unavailableRoots?: string[]
 }
 
 /**
@@ -80,6 +78,12 @@ export interface LibraryScanTerminalResult {
     changed: number
     unchanged: number
     missing: number
+    /**
+     * Configured roots that could not be reached, so nothing under them was seen.
+     * Not an error — their tracks are reconciled as missing like any other absent
+     * file. Reported so the UI can explain a sudden jump in `missing`.
+     */
+    unavailableRoots: string[]
     /** Deep metadata reads planned / attempted (attempted = succeeded + failed). */
     readTotal: number
     readsAttempted: number
@@ -125,7 +129,10 @@ export interface LibraryScanStatus {
     revision: number
     trigger: LibraryScanTrigger
     phase: LibraryScanPhase
+    /** The roots actually being scanned: canonical, deduped, reachable. */
     roots: string[]
+    /** Configured roots that could not be reached; nothing under them will be seen. */
+    unavailableRoots: string[]
     startedAt: number
     finishedAt: number | null
     // discovery (prescan) phase

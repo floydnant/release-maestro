@@ -169,6 +169,14 @@
                     </div>
 
                     @if (step() === 'done') {
+                        @if (unavailableRootsText(); as unavailableText) {
+                            <p
+                                class="type-body-sm mt-6 text-content-warning"
+                                aria-label="Unavailable folders"
+                            >
+                                {{ unavailableText }}
+                            </p>
+                        }
                         <div class="mt-8 flex items-center justify-center gap-3">
                             <button class="btn-nkd-neutral" type="button" (click)="backToFolders()">
                                 Change folders
