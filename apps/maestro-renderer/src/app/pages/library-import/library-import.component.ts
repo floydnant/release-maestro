@@ -78,20 +78,26 @@ export class LibraryImportComponent {
 
     readonly noFilesFound = computed(() => {
         const terminal = this.library.scanStatus()?.terminal
-        return terminal?.outcome === 'completed' && terminal.discovered === 0
+        return (
+            terminal?.outcome === 'completed' &&
+            terminal.discovered === 0 &&
+            terminal.unavailableFolders.length === 0
+        )
     })
 
     /**
-     * Folders the scan could not reach. Rare here — the picker blocks saving an
-     * unavailable folder — but a drive can still vanish mid-flow, and this page
-     * also reports on scans it did not start.
+     * Folders the scan could not reach. Validation is advisory, so unavailable
+     * folders can be saved deliberately; a folder can also become unavailable
+     * between validation and the scan.
      */
     readonly unavailableFoldersText = computed(() => {
-        const unavailable = this.library.scanStatus()?.terminal?.unavailableFolders ?? []
+        const terminal = this.library.scanStatus()?.terminal
+        const unavailable = terminal?.unavailableFolders ?? []
         if (unavailable.length === 0) return null
-        return `Could not reach ${unavailable.join(', ')} — tracks under ${
-            unavailable.length === 1 ? 'it' : 'them'
-        } are marked missing until the folder is back.`
+        const missing = terminal?.missing ?? 0
+        return `Could not reach ${unavailable.join(', ')} — ${missing} ${
+            missing === 1 ? 'track is' : 'tracks are'
+        } marked missing until ${unavailable.length === 1 ? 'the folder is' : 'the folders are'} back.`
     })
 
     constructor() {

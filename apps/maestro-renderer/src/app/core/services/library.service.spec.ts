@@ -155,4 +155,42 @@ describe('LibraryService snapshot/event ordering', () => {
 
         expect(service.scanStatus()?.readDone).toBe(4)
     })
+
+    it('canonicalizes and deduplicates every folder source before persisting', async () => {
+        ipcRenderer.invoke.mockImplementation((channel: string) => {
+            if (channel === LibraryIpcChannel.getScanStatus) {
+                return new Promise<LibraryScanSnapshot>(resolve => {
+                    resolveSnapshot = resolve
+                })
+            }
+            if (channel === LibraryIpcChannel.validateFolders) {
+                return Promise.resolve([
+                    { path: '/link', canonicalPath: '/music', available: true },
+                    { path: '/music', canonicalPath: '/music', available: true },
+                    {
+                        path: '/offline',
+                        canonicalPath: '/offline',
+                        available: false,
+                        error: 'Folder not found',
+                    },
+                ])
+            }
+            if (channel === 'patch-settings') {
+                return Promise.resolve({
+                    library: { folders: ['/music', '/offline'] },
+                    emailPluginConfig: {},
+                })
+            }
+            return Promise.resolve(undefined)
+        })
+        const service = setup()
+        resolveSnapshot({ status: null, albums: [], lastScan: null })
+        await service.synced
+
+        await service.saveFolders(['/link', '/music', '/offline'])
+
+        expect(ipcRenderer.invoke).toHaveBeenCalledWith('patch-settings', {
+            library: { folders: ['/music', '/offline'] },
+        })
+    })
 })

@@ -114,9 +114,15 @@ export class LibraryService {
         this.electronService.ipcRenderer.send(LibraryIpcChannel.cancelScan)
     }
 
-    /** Persist the full list of library folders (deduped, order preserved). */
+    /**
+     * Persist the full list of library folders in canonical form. Validation runs
+     * in the main process and is advisory: unavailable and nested folders remain
+     * configured, while aliases of the same canonical path collapse to one.
+     */
     async saveFolders(folders: string[]): Promise<void> {
-        await this.settingsService.patchSettings({ library: { folders: [...new Set(folders)] } })
+        const validations = await this.validateFolders(folders)
+        const canonicalFolders = [...new Set(validations.map(validation => validation.canonicalPath))]
+        await this.settingsService.patchSettings({ library: { folders: canonicalFolders } })
     }
 
     /** Remember that the user skipped library onboarding (keeps the nudge CTA instead). */
