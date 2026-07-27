@@ -94,11 +94,6 @@ export class LibraryImportComponent {
         } are marked missing until the folder is back.`
     })
 
-    /** Folders may only be saved/scanned when every selection validated cleanly. */
-    readonly hasInvalidFolders = computed(() =>
-        this.rootValidations().some(validation => !validation.available),
-    )
-
     constructor() {
         void this.initialize()
 
@@ -111,7 +106,9 @@ export class LibraryImportComponent {
             }
         })
 
-        // Re-validate the selection whenever it changes.
+        // Re-validate the selection whenever it changes. Advisory only — nothing
+        // waits on or blocks on the result (ADR 0003), so a pending validation can
+        // never gate the import.
         effect(() => {
             const folders = this.pendingFolders()
             const token = ++this.validationToken
@@ -155,7 +152,7 @@ export class LibraryImportComponent {
 
     async startImport(): Promise<void> {
         const folders = this.pendingFolders()
-        if (folders.length === 0 || this.hasInvalidFolders() || this.startInFlight()) return
+        if (folders.length === 0 || this.startInFlight()) return
         this.startInFlight.set(true)
         try {
             await this.library.saveFolders(folders)

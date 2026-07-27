@@ -45,8 +45,11 @@
                             </p>
                             @if (validationFor(folder); as validation) {
                                 @if (!validation.available) {
-                                    <p class="type-body-sm text-content-danger">
+                                    <!-- A status, not an error: scanning is still allowed, and the
+                                         tracks under this folder simply reconcile to missing. -->
+                                    <p class="type-body-sm text-content-warning">
                                         {{ validation.error || 'This folder is not available.' }}
+                                        <span class="opacity-80">Its tracks are marked missing.</span>
                                     </p>
                                 } @else if (validation.nestedUnder) {
                                     <p class="type-body-sm text-content-muted opacity-70">

@@ -41,10 +41,6 @@ export class LibrarySettingsComponent {
         return folders.length !== saved.length || folders.some((folder, i) => folder !== saved[i])
     })
 
-    readonly hasInvalidFolders = computed(() =>
-        this.rootValidations().some(validation => !validation.available),
-    )
-
     /** Terminal result of the most recent scan in this app session. */
     readonly terminal = computed(() => this.library.scanStatus()?.terminal ?? null)
 
@@ -99,7 +95,9 @@ export class LibrarySettingsComponent {
             }
         })
 
-        // Re-validate the staged folders whenever they change.
+        // Re-validate the staged folders whenever they change. Advisory only: an
+        // unreachable folder is reported, never a blocker (ADR 0003) — rescanning
+        // with a drive unplugged is exactly how its tracks get marked missing.
         effect(() => {
             const folders = this.folders()
             const token = ++this.validationToken
@@ -154,7 +152,7 @@ export class LibrarySettingsComponent {
     }
 
     async saveAndRescan(): Promise<void> {
-        if (this.saveInFlight() || this.library.isScanning() || this.hasInvalidFolders()) return
+        if (this.saveInFlight() || this.library.isScanning()) return
         this.saveInFlight.set(true)
         try {
             if (this.isDirty()) {

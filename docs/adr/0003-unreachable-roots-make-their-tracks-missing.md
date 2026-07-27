@@ -24,6 +24,8 @@ empty library for a stale full one.
   root. That guard is deliberately left in place and is a narrower question than this ADR settles: an
   unreadable subtree is not the same signal as an absent volume, and one flaky read should not flip a
   library to missing.
-- Picker-time validation is unchanged: the import and library-settings pages still refuse to _save_ a
-  folder that is not currently readable. Choosing a broken folder is a user error worth catching;
-  finding one broken later is a fact worth recording.
+- **Nothing in the UI blocks on folder availability.** Both folder pickers still call
+  `library:validate-roots`, but purely to display status — an unreachable folder is annotated, a
+  nested one is marked as skipped, and neither disables saving or rescanning. Blocking would
+  contradict this ADR at the worst moment: with a drive unplugged, "Rescan now" is exactly the action
+  that reconciles its tracks to missing, so disabling it strands the user with a stale library.

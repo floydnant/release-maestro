@@ -57,7 +57,9 @@ const scanStatus = (terminal: LibraryScanTerminalResult): LibraryScanStatus => (
 })
 
 test.describe('library settings scenarios', () => {
-    test('an unavailable root shows its error and blocks saving', async ({ page }) => {
+    // Rescanning with a drive unplugged is how its tracks get marked missing, so an
+    // unreachable folder is reported but must never disable the rescan (ADR 0003).
+    test('an unavailable root is reported without blocking a rescan', async ({ page }) => {
         const scenario = scenarioBuilder()
             .settings({ library: { folders: ['/music', '/usb/library'] }, emailPluginConfig: {} })
             .handler('library:validate-roots', {
@@ -75,9 +77,9 @@ test.describe('library settings scenarios', () => {
             .build()
         await createRendererScenario(page, scenario, '/settings/library')
 
-        await expect(page.getByText('Folder not found (is the drive connected?)')).toBeVisible()
-        await expect(page.getByRole('button', { name: /Rescan now|Save and rescan/ })).toBeDisabled()
-        await expect(page.getByText('Remove or fix the unavailable folders before saving.')).toBeVisible()
+        await expect(page.getByText(/Folder not found \(is the drive connected\?\)/)).toBeVisible()
+        await expect(page.getByText('Its tracks are marked missing.')).toBeVisible()
+        await expect(page.getByRole('button', { name: /Rescan now|Save and rescan/ })).toBeEnabled()
     })
 
     test('a nested root is marked as skipped without blocking saves', async ({ page }) => {

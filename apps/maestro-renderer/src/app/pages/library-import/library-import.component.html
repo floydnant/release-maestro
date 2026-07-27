@@ -33,12 +33,6 @@
                     </button>
                 </app-folder-list>
 
-                @if (hasInvalidFolders()) {
-                    <p class="type-body-sm mt-3 text-content-danger">
-                        Remove or fix the unavailable folders to start the import.
-                    </p>
-                }
-
                 <div class="mt-8 flex items-center gap-3">
                     <button class="btn-nkd-neutral text-content-muted" type="button" (click)="skip()">
                         Skip for now
@@ -47,7 +41,7 @@
                     <button
                         class="btn-primary"
                         type="button"
-                        [disabled]="pendingFolders().length == 0 || hasInvalidFolders() || startInFlight()"
+                        [disabled]="pendingFolders().length == 0 || startInFlight()"
                         (click)="startImport()"
                     >
                         Continue

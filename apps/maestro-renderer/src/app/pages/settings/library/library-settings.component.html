@@ -20,19 +20,12 @@
         <button
             class="btn-primary"
             type="button"
-            [disabled]="
-                saveInFlight() || library.isScanning() || folders().length === 0 || hasInvalidFolders()
-            "
+            [disabled]="saveInFlight() || library.isScanning() || folders().length === 0"
             (click)="saveAndRescan()"
         >
             {{ isDirty() ? 'Save and rescan' : 'Rescan now' }}
         </button>
     </div>
-    @if (hasInvalidFolders()) {
-        <p class="type-body-sm mt-2 text-content-danger">
-            Remove or fix the unavailable folders before saving.
-        </p>
-    }
 
     <h2 class="type-section-title mt-8 text-content-primary">Scan status</h2>
     @if (library.isScanning()) {
