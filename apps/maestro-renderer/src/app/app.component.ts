@@ -151,7 +151,7 @@ export class AppComponent {
     showLibrarySetupCta = computed(() => {
         const settings = this.settingsService.settings.value()
         if (!settings) return false
-        return (settings.libraryFolders?.length ?? 0) === 0
+        return (settings.library?.folders?.length ?? 0) === 0
     })
 
     libraryScanSegments = computed((): ProgressBarSegment[] => {

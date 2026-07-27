@@ -81,7 +81,7 @@ export class LibraryScanService {
     async startScan(trigger: LibraryScanTrigger, paths?: string[]): Promise<LibraryScanStatus> {
         if (this.status && this.isScanning) return this.status
 
-        const configuredRoots = paths ?? this.settings.getSettings().libraryFolders ?? []
+        const configuredRoots = paths ?? this.settings.getSettings().library?.folders ?? []
         const status = this.newStatus(trigger, configuredRoots)
         this.status = status
         if (configuredRoots.length === 0) {

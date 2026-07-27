@@ -31,7 +31,7 @@ describe('LibraryScanService', () => {
         roots = {
             validate: jest.fn((paths: string[]) => Promise.resolve(paths.map(availableRoot))),
         }
-        settings = { getSettings: jest.fn(() => ({ libraryFolders: ['/music'] })) }
+        settings = { getSettings: jest.fn(() => ({ library: { folders: ['/music'] } })) }
         stateStore = new InMemoryStore<LibraryScanState>()
         service = new LibraryScanService(
             backend as unknown as LibraryBackendService,
@@ -46,7 +46,7 @@ describe('LibraryScanService', () => {
     })
 
     it('stays idle for empty roots and never touches the pipeline', async () => {
-        settings.getSettings.mockReturnValue({ libraryFolders: [] })
+        settings.getSettings.mockReturnValue({ library: { folders: [] } })
 
         const status = await service.startScan('startup')
 
@@ -56,7 +56,7 @@ describe('LibraryScanService', () => {
     })
 
     it('fails up front when any root is unavailable — no partial scan', async () => {
-        settings.getSettings.mockReturnValue({ libraryFolders: ['/music', '/usb/drive'] })
+        settings.getSettings.mockReturnValue({ library: { folders: ['/music', '/usb/drive'] } })
         roots.validate.mockResolvedValue([
             availableRoot('/music'),
             { path: '/usb/drive', canonicalPath: '/usb/drive', available: false, error: 'not found' },
@@ -75,7 +75,7 @@ describe('LibraryScanService', () => {
     })
 
     it('scans canonical roots and omits roots nested under another root', async () => {
-        settings.getSettings.mockReturnValue({ libraryFolders: ['/link', '/music/albums', '/music'] })
+        settings.getSettings.mockReturnValue({ library: { folders: ['/link', '/music/albums', '/music'] } })
         roots.validate.mockResolvedValue([
             { path: '/link', canonicalPath: '/music', available: true },
             {

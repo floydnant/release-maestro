@@ -104,7 +104,7 @@ export class LibrarySettingsComponent {
     private async loadFolders(): Promise<void> {
         if (!this.electronService.isElectron) return
         const settings = await this.electronService.ipcRenderer.invoke('get-settings')
-        const folders = settings.libraryFolders ?? []
+        const folders = settings.library?.folders ?? []
         this.folders.set(folders)
         this.savedFolders.set(folders)
     }

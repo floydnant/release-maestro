@@ -121,7 +121,7 @@ export class LibraryImportComponent {
         }
         if (this.electronService.isElectron) {
             const settings = await this.electronService.ipcRenderer.invoke('get-settings')
-            this.pendingFolders.set(settings.libraryFolders ?? [])
+            this.pendingFolders.set(settings.library?.folders ?? [])
         }
     }
 

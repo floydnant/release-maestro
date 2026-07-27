@@ -116,12 +116,12 @@ export class LibraryService {
 
     /** Persist the full list of library folders (deduped, order preserved). */
     async saveFolders(folders: string[]): Promise<void> {
-        await this.settingsService.patchSettings({ libraryFolders: [...new Set(folders)] })
+        await this.settingsService.patchSettings({ library: { folders: [...new Set(folders)] } })
     }
 
     /** Remember that the user skipped library onboarding (keeps the nudge CTA instead). */
     async setOnboardingSkipped(): Promise<void> {
-        await this.settingsService.patchSettings({ libraryOnboardingSkipped: true })
+        await this.settingsService.patchSettings({ library: { onboardingSkipped: true } })
     }
 
     /**

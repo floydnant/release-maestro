@@ -57,7 +57,7 @@ const scanStatus = (terminal: LibraryScanTerminalResult): LibraryScanStatus => (
 test.describe('library settings scenarios', () => {
     test('an unavailable root shows its error and blocks saving', async ({ page }) => {
         const scenario = scenarioBuilder()
-            .settings({ libraryFolders: ['/music', '/usb/library'], emailPluginConfig: {} })
+            .settings({ library: { folders: ['/music', '/usb/library'] }, emailPluginConfig: {} })
             .handler('library:validate-roots', {
                 kind: 'resolve',
                 value: [
@@ -80,7 +80,7 @@ test.describe('library settings scenarios', () => {
 
     test('a nested root is marked as skipped without blocking saves', async ({ page }) => {
         const scenario = scenarioBuilder()
-            .settings({ libraryFolders: ['/music', '/music/albums'], emailPluginConfig: {} })
+            .settings({ library: { folders: ['/music', '/music/albums'] }, emailPluginConfig: {} })
             .handler('library:validate-roots', {
                 kind: 'resolve',
                 value: [
@@ -103,7 +103,7 @@ test.describe('library settings scenarios', () => {
     test('failed files from the session terminal result are listed with details', async ({ page }) => {
         const terminal = terminalResult()
         const scenario = scenarioBuilder()
-            .settings({ libraryFolders: ['/music'], emailPluginConfig: {} })
+            .settings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
             .handler('library:get-scan-status', {
                 kind: 'resolve',
                 value: { status: scanStatus(terminal), albums: [], lastScan: null },
@@ -134,7 +134,7 @@ test.describe('library settings scenarios', () => {
             readFailureCount: failures.length,
         })
         const scenario = scenarioBuilder()
-            .settings({ libraryFolders: ['/music'], emailPluginConfig: {} })
+            .settings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
             .handler('library:get-scan-status', {
                 kind: 'resolve',
                 value: { status: scanStatus(terminal), albums: [], lastScan: null },
@@ -153,7 +153,7 @@ test.describe('library settings scenarios', () => {
 
     test('after a relaunch only the persisted aggregate is shown', async ({ page }) => {
         const scenario = scenarioBuilder()
-            .settings({ libraryFolders: ['/music'], emailPluginConfig: {} })
+            .settings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
             .handler('library:get-scan-status', {
                 kind: 'resolve',
                 value: {
@@ -188,7 +188,7 @@ test.describe('library settings scenarios', () => {
             },
         })
         const scenario = scenarioBuilder()
-            .settings({ libraryFolders: ['/music'], emailPluginConfig: {} })
+            .settings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
             .handler('library:get-scan-status', {
                 kind: 'resolve',
                 value: { status: scanStatus(terminal), albums: [], lastScan: null },

@@ -24,6 +24,14 @@ export class SettingsBackendService {
      * change individual fields — callers never read-modify-replace the whole store.
      */
     patchSettings(patch: Partial<AppSettings>): AppSettings {
-        return this.setSettings({ ...this.getSettings(), ...patch })
+        const current = this.getSettings()
+        return this.setSettings({
+            ...current,
+            ...patch,
+            // Grouped settings merge one level deep: a narrow patch (say, only
+            // `onboardingSkipped`) must not drop its siblings the way a plain
+            // top-level spread would.
+            library: { ...current.library, ...patch.library },
+        })
     }
 }

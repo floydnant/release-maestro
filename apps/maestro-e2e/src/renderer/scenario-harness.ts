@@ -117,7 +117,7 @@ const defaultScenario = (): RendererScenario => ({
         'get-settings': {
             kind: 'resolve',
             value: {
-                libraryFolders: ['/scenario/music'],
+                library: { folders: ['/scenario/music'] },
                 emailPluginConfig: {},
             } satisfies AppSettings,
         },

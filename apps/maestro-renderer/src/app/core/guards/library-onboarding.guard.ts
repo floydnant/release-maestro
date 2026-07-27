@@ -15,8 +15,8 @@ export const libraryOnboardingGuard: CanActivateFn = async () => {
     if (!electronService.isElectron) return true
 
     const settings = await electronService.ipcRenderer.invoke('get-settings')
-    const hasLibrary = (settings.libraryFolders?.length ?? 0) > 0
-    if (hasLibrary || settings.libraryOnboardingSkipped) return true
+    const hasLibrary = (settings.library?.folders?.length ?? 0) > 0
+    if (hasLibrary || settings.library?.onboardingSkipped) return true
 
     return router.createUrlTree(['/import'])
 }
