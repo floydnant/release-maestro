@@ -83,7 +83,12 @@
         <div class="mosaic-veil pointer-events-none absolute inset-0"></div>
 
         <div class="absolute inset-0 flex flex-col justify-center">
-            <div class="content-band">
+            <!-- Full-width band behind the centered UI: solid black through the content,
+                fading out above and below so the cover wall shines around it. Its height
+                follows the content, so it always fits the UI instead of an arbitrary shape. -->
+            <div
+                class="content-band | mx-auto w-fit rounded-xl border border-border-subtle bg-black/70 px-10 py-16 shadow-lg backdrop-blur-md"
+            >
                 <div class="mx-auto w-full max-w-2xl px-8 text-center">
                     @if (step() === 'done') {
                         <p class="text-content-success">

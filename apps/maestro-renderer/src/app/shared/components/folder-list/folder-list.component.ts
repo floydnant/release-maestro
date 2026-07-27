@@ -19,7 +19,6 @@ import { IconComponent } from '../icon/icon.component'
     selector: 'app-folder-list',
     imports: [IconComponent, NgClass],
     templateUrl: './folder-list.component.html',
-    styleUrls: ['./folder-list.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FolderListComponent {

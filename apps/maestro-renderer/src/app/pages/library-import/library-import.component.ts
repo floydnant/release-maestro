@@ -50,13 +50,6 @@ type ImportStep = 'pick' | 'scanning' | 'done'
                 rgb(0 0 0 / 0.9) 100%
             );
         }
-
-        /* Full-width band behind the centered UI: solid black through the content,
-           fading out above and below so the cover wall shines around it. Its height
-           follows the content, so it always fits the UI instead of an arbitrary shape. */
-        .content-band {
-            @apply mx-auto w-fit rounded-xl border border-border-subtle bg-black/70 px-10 py-16 shadow-lg backdrop-blur-md;
-        }
     `,
 })
 export class LibraryImportComponent {

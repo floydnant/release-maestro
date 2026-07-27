@@ -17,7 +17,7 @@ const emailPluginConfigSchema = z
  */
 export const appSettingsSchema = z.object({
     /** Root folders of the user's music library. Absent/empty until onboarding/setup. */
-    libraryFolders: z.array(z.string()).optional(),
+    libraryFolders: z.string().array().optional(),
     /** Set when the user explicitly skips library onboarding (keeps the nudge CTA instead). */
     libraryOnboardingSkipped: z.boolean().optional(),
     emailPluginConfig: emailPluginConfigSchema.catch({}),
@@ -30,7 +30,7 @@ export type AppSettings = z.infer<typeof appSettingsSchema>
  * corrupted config file can never brick startup. Same inferred type.
  */
 export const storedAppSettingsSchema = z.object({
-    libraryFolders: z.array(z.string()).optional().catch(undefined),
+    libraryFolders: z.string().array().optional().catch(undefined),
     libraryOnboardingSkipped: z.boolean().optional().catch(undefined),
     emailPluginConfig: emailPluginConfigSchema.catch({}),
 })
