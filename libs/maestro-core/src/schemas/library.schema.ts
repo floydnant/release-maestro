@@ -6,7 +6,7 @@ import type { MetadataErrorCode, MetadataScanUpdate, ScanResult } from './metada
 
 export const LibraryIpcChannel = {
     pickFolders: 'library:pick-folders',
-    validateRoots: 'library:validate-roots',
+    validateFolders: 'library:validate-folders',
     startScan: 'library:start-scan',
     cancelScan: 'library:cancel-scan',
     getScanStatus: 'library:get-scan-status',
@@ -18,24 +18,24 @@ export type LibraryIpcChannel = (typeof LibraryIpcChannel)[keyof typeof LibraryI
 export type LibraryScanTrigger = 'startup' | 'manual' | 'onboarding' | 'debug'
 
 // ---------------------------------------------------------------------------
-// Root validation
+// Folder validation
 // ---------------------------------------------------------------------------
 
-/** Per-root validation result, in the same order as the request paths. */
-export interface LibraryRootValidation {
+/** Per-folder validation result, in the same order as the request paths. */
+export interface LibraryFolderValidation {
     /** The path as configured/selected. */
     path: string
     /** `realpath`-canonicalized path (deterministically resolved when realpath fails). */
     canonicalPath: string
-    /** Whether the root exists, is a directory, and is readable. */
+    /** Whether the folder exists, is a directory, and is readable. */
     available: boolean
-    /** Canonical path of another root in the same set that already contains this one. */
+    /** Canonical path of another folder in the same set that already contains this one. */
     nestedUnder?: string
     /** Human-readable reason when `available` is false. */
     error?: string
 }
 
-export interface ValidateLibraryRootsRequest {
+export interface ValidateLibraryFoldersRequest {
     paths: string[]
 }
 
@@ -69,7 +69,8 @@ export interface LibraryScanTerminalResult {
     outcome: LibraryScanOutcome
     scanId: number
     trigger: LibraryScanTrigger
-    roots: string[]
+    /** The folders actually walked: canonical, deduped, reachable. */
+    scannedFolders: string[]
     startedAt: number
     finishedAt: number
     /** Files seen by discovery. */
@@ -79,11 +80,11 @@ export interface LibraryScanTerminalResult {
     unchanged: number
     missing: number
     /**
-     * Configured roots that could not be reached, so nothing under them was seen.
+     * Configured folders that could not be reached, so nothing under them was seen.
      * Not an error — their tracks are reconciled as missing like any other absent
      * file. Reported so the UI can explain a sudden jump in `missing`.
      */
-    unavailableRoots: string[]
+    unavailableFolders: string[]
     /** Deep metadata reads planned / attempted (attempted = succeeded + failed). */
     readTotal: number
     readsAttempted: number
@@ -129,10 +130,10 @@ export interface LibraryScanStatus {
     revision: number
     trigger: LibraryScanTrigger
     phase: LibraryScanPhase
-    /** The roots actually being scanned: canonical, deduped, reachable. */
-    roots: string[]
-    /** Configured roots that could not be reached; nothing under them will be seen. */
-    unavailableRoots: string[]
+    /** The folders actually being walked: canonical, deduped, reachable. */
+    scannedFolders: string[]
+    /** Configured folders that could not be reached; nothing under them will be seen. */
+    unavailableFolders: string[]
     startedAt: number
     finishedAt: number | null
     // discovery (prescan) phase
@@ -155,7 +156,7 @@ export interface LibraryScanStatus {
 /** Persisted record of the last successfully completed scan. */
 export interface LibraryLastScanInfo extends ScanResult {
     finishedAt: number
-    roots: string[]
+    scannedFolders: string[]
     normalizationIssues?: number
 }
 

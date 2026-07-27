@@ -1,18 +1,18 @@
 import { access, realpath, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
-import { LibraryRootValidation } from '@release-maestro/core'
+import { LibraryFolderValidation } from '@release-maestro/core'
 
 /**
- * Canonicalizes and validates library root folders.
+ * Canonicalizes and validates the configured library folders.
  *
  * Canonicalization uses `realpath` so symlinked/aliased selections of the same
- * directory collapse to one root; when `realpath` fails (path doesn't exist),
+ * directory collapse to one folder; when `realpath` fails (path doesn't exist),
  * the path is still resolved deterministically so results are stable. Validation
- * additionally checks that each root is a readable directory and flags roots
- * nested beneath another root in the same set (scanning both is redundant).
+ * additionally checks that each folder is a readable directory and flags folders
+ * nested beneath another folder in the same set (scanning both is redundant).
  */
-export class LibraryRootsService {
+export class LibraryFoldersService {
     /** Canonical form of a single path; deterministic even when the path doesn't exist. */
     async canonicalize(path: string): Promise<string> {
         return realpath(path).catch(() => resolve(path))
@@ -27,12 +27,12 @@ export class LibraryRootsService {
         return [...new Set(canonical)]
     }
 
-    /** Validate a set of roots. Results are returned in the same order as the input. */
-    async validate(paths: string[]): Promise<LibraryRootValidation[]> {
+    /** Validate a set of folders. Results are returned in the same order as the input. */
+    async validate(paths: string[]): Promise<LibraryFolderValidation[]> {
         const canonicalPaths = await Promise.all(paths.map(path => this.canonicalize(path)))
 
         return Promise.all(
-            paths.map(async (path, index): Promise<LibraryRootValidation> => {
+            paths.map(async (path, index): Promise<LibraryFolderValidation> => {
                 const canonicalPath = canonicalPaths[index] as string
                 const nestedUnder = canonicalPaths.find(
                     (other, otherIndex) =>

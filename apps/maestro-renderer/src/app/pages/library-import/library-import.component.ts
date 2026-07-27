@@ -1,7 +1,7 @@
 import { NgClass } from '@angular/common'
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core'
 import { Router, RouterModule } from '@angular/router'
-import { LibraryRootValidation, LibraryScanTerminalResult } from '@release-maestro/core'
+import { LibraryFolderValidation, LibraryScanTerminalResult } from '@release-maestro/core'
 import { ElectronService } from '../../core/services'
 import { LibraryService } from '../../core/services/library.service'
 import { FolderListComponent } from '../../shared/components/folder-list/folder-list.component'
@@ -60,7 +60,7 @@ export class LibraryImportComponent {
     readonly step = signal<ImportStep>('pick')
     readonly pendingFolders = signal<string[]>([])
     readonly startInFlight = signal(false)
-    readonly rootValidations = signal<LibraryRootValidation[]>([])
+    readonly folderValidations = signal<LibraryFolderValidation[]>([])
     /** Scan this page is following; a completed *older* scan must not flip us to "done". */
     private readonly watchedScanId = signal<number | null>(null)
     private validationToken = 0
@@ -82,12 +82,12 @@ export class LibraryImportComponent {
     })
 
     /**
-     * Roots the scan could not reach. Rare here — the picker blocks saving an
+     * Folders the scan could not reach. Rare here — the picker blocks saving an
      * unavailable folder — but a drive can still vanish mid-flow, and this page
      * also reports on scans it did not start.
      */
-    readonly unavailableRootsText = computed(() => {
-        const unavailable = this.library.scanStatus()?.terminal?.unavailableRoots ?? []
+    readonly unavailableFoldersText = computed(() => {
+        const unavailable = this.library.scanStatus()?.terminal?.unavailableFolders ?? []
         if (unavailable.length === 0) return null
         return `Could not reach ${unavailable.join(', ')} — tracks under ${
             unavailable.length === 1 ? 'it' : 'them'
@@ -113,11 +113,11 @@ export class LibraryImportComponent {
             const folders = this.pendingFolders()
             const token = ++this.validationToken
             if (folders.length === 0 || !this.electronService.isElectron) {
-                this.rootValidations.set([])
+                this.folderValidations.set([])
                 return
             }
-            void this.library.validateRoots(folders).then(validations => {
-                if (token === this.validationToken) this.rootValidations.set(validations)
+            void this.library.validateFolders(folders).then(validations => {
+                if (token === this.validationToken) this.folderValidations.set(validations)
             })
         })
     }

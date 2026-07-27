@@ -4,7 +4,7 @@ import {
     LibraryAlbumPreview,
     LibraryIpcChannel,
     LibraryLastScanInfo,
-    LibraryRootValidation,
+    LibraryFolderValidation,
     LibraryScanStatus,
     LibraryScanStatusEvent,
     StartLibraryScanRequest,
@@ -89,8 +89,8 @@ export class LibraryService {
         return this.electronService.ipcRenderer.invoke(LibraryIpcChannel.pickFolders)
     }
 
-    validateRoots(paths: string[]): Promise<LibraryRootValidation[]> {
-        return this.electronService.ipcRenderer.invoke(LibraryIpcChannel.validateRoots, { paths })
+    validateFolders(paths: string[]): Promise<LibraryFolderValidation[]> {
+        return this.electronService.ipcRenderer.invoke(LibraryIpcChannel.validateFolders, { paths })
     }
 
     /**

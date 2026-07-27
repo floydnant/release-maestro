@@ -11,7 +11,7 @@ const emailPluginConfigSchema = z
     .partial()
 
 const librarySettingsSchema = z.object({
-    /** Root folders of the user's music library. Absent/empty until onboarding/setup. */
+    /** The folders that make up the user's music library. Absent/empty until onboarding/setup. */
     folders: z.string().array().optional(),
     /** Set when the user explicitly skips library onboarding (keeps the nudge CTA instead). */
     onboardingSkipped: z.boolean().optional(),

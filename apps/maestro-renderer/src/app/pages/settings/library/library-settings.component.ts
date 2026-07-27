@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core'
-import { LibraryRootValidation, LibraryScanTerminalResult } from '@release-maestro/core'
+import { LibraryFolderValidation, LibraryScanTerminalResult } from '@release-maestro/core'
 import { ElectronService } from '../../../core/services'
 import { LibraryService } from '../../../core/services/library.service'
 import { FolderListComponent } from '../../../shared/components/folder-list/folder-list.component'
@@ -32,7 +32,7 @@ export class LibrarySettingsComponent {
     readonly folders = signal<string[]>([])
     private readonly savedFolders = signal<string[]>([])
     readonly saveInFlight = signal(false)
-    readonly rootValidations = signal<LibraryRootValidation[]>([])
+    readonly folderValidations = signal<LibraryFolderValidation[]>([])
     private validationToken = 0
 
     readonly isDirty = computed(() => {
@@ -45,11 +45,11 @@ export class LibrarySettingsComponent {
     readonly terminal = computed(() => this.library.scanStatus()?.terminal ?? null)
 
     /**
-     * Roots the last scan could not reach. Their tracks were reconciled as missing,
+     * Folders the last scan could not reach. Their tracks were reconciled as missing,
      * so the count is only explicable alongside this list.
      */
-    readonly unavailableRootsText = computed(() => {
-        const unavailable = this.terminal()?.unavailableRoots ?? []
+    readonly unavailableFoldersText = computed(() => {
+        const unavailable = this.terminal()?.unavailableFolders ?? []
         if (unavailable.length === 0) return null
         return `Could not reach ${unavailable.join(', ')} — tracks under ${
             unavailable.length === 1 ? 'it' : 'them'
@@ -102,11 +102,11 @@ export class LibrarySettingsComponent {
             const folders = this.folders()
             const token = ++this.validationToken
             if (folders.length === 0 || !this.electronService.isElectron) {
-                this.rootValidations.set([])
+                this.folderValidations.set([])
                 return
             }
-            void this.library.validateRoots(folders).then(validations => {
-                if (token === this.validationToken) this.rootValidations.set(validations)
+            void this.library.validateFolders(folders).then(validations => {
+                if (token === this.validationToken) this.folderValidations.set(validations)
             })
         })
     }

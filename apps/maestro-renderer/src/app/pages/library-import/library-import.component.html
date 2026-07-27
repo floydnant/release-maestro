@@ -17,7 +17,7 @@
                 <app-folder-list
                     class="mt-8 block"
                     [folders]="pendingFolders()"
-                    [validations]="rootValidations()"
+                    [validations]="folderValidations()"
                     (foldersDropped)="addPaths($event)"
                     (browse)="addFolders()"
                     (folderRemoved)="removeFolder($event)"
@@ -167,7 +167,7 @@
                     </div>
 
                     @if (step() === 'done') {
-                        @if (unavailableRootsText(); as unavailableText) {
+                        @if (unavailableFoldersText(); as unavailableText) {
                             <p
                                 class="type-body-sm mt-6 text-content-warning"
                                 aria-label="Unavailable folders"

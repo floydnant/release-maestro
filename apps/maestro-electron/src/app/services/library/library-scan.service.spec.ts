@@ -1,8 +1,8 @@
 import { Subject } from 'rxjs'
-import { LibraryRootValidation, LibraryScanUpdate } from '@release-maestro/core'
+import { LibraryFolderValidation, LibraryScanUpdate } from '@release-maestro/core'
 import { InMemoryStore } from '../../utils/persistent-store.util'
 import { SettingsBackendService } from '../settings.backend.service'
-import { LibraryRootsService } from './library-roots.service'
+import { LibraryFoldersService } from './library-folders.service'
 import { LibraryScanService, LibraryScanState } from './library-scan.service'
 import { LibraryBackendService } from './library.backend.service'
 
@@ -10,7 +10,7 @@ jest.mock('electron', () => ({
     BrowserWindow: { getAllWindows: () => [] },
 }))
 
-const availableRoot = (path: string): LibraryRootValidation => ({
+const availableFolder = (path: string): LibraryFolderValidation => ({
     path,
     canonicalPath: path,
     available: true,
@@ -19,7 +19,7 @@ const availableRoot = (path: string): LibraryRootValidation => ({
 describe('LibraryScanService', () => {
     let updates$: Subject<LibraryScanUpdate>
     let backend: { scan: jest.Mock }
-    let roots: { validate: jest.Mock }
+    let folders: { validate: jest.Mock }
     let settings: { getSettings: jest.Mock }
     let stateStore: InMemoryStore<LibraryScanState>
     let service: LibraryScanService
@@ -28,15 +28,15 @@ describe('LibraryScanService', () => {
         jest.useFakeTimers()
         updates$ = new Subject<LibraryScanUpdate>()
         backend = { scan: jest.fn(() => updates$.asObservable()) }
-        roots = {
-            validate: jest.fn((paths: string[]) => Promise.resolve(paths.map(availableRoot))),
+        folders = {
+            validate: jest.fn((paths: string[]) => Promise.resolve(paths.map(availableFolder))),
         }
         settings = { getSettings: jest.fn(() => ({ library: { folders: ['/music'] } })) }
         stateStore = new InMemoryStore<LibraryScanState>()
         service = new LibraryScanService(
             backend as unknown as LibraryBackendService,
             settings as unknown as SettingsBackendService,
-            roots as unknown as LibraryRootsService,
+            folders as unknown as LibraryFoldersService,
             stateStore,
         )
     })
@@ -45,20 +45,20 @@ describe('LibraryScanService', () => {
         jest.useRealTimers()
     })
 
-    it('stays idle for empty roots and never touches the pipeline', async () => {
+    it('stays idle when no folders are configured and never touches the pipeline', async () => {
         settings.getSettings.mockReturnValue({ library: { folders: [] } })
 
         const status = await service.startScan('startup')
 
         expect(status.phase).toBe('idle')
-        expect(roots.validate).not.toHaveBeenCalled()
+        expect(folders.validate).not.toHaveBeenCalled()
         expect(backend.scan).not.toHaveBeenCalled()
     })
 
-    it('scans the reachable roots and reports the unreachable ones', async () => {
+    it('scans the reachable folders and reports the unreachable ones', async () => {
         settings.getSettings.mockReturnValue({ library: { folders: ['/music', '/usb/drive'] } })
-        roots.validate.mockResolvedValue([
-            availableRoot('/music'),
+        folders.validate.mockResolvedValue([
+            availableFolder('/music'),
             { path: '/usb/drive', canonicalPath: '/usb/drive', available: false, error: 'not found' },
         ])
 
@@ -67,13 +67,13 @@ describe('LibraryScanService', () => {
         // The unplugged drive is dropped from the walk, not treated as fatal.
         expect(backend.scan).toHaveBeenCalledWith(['/music'], expect.anything())
         expect(status.phase).toBe('discovering')
-        expect(status.roots).toEqual(['/music'])
-        expect(status.unavailableRoots).toEqual(['/usb/drive'])
+        expect(status.scannedFolders).toEqual(['/music'])
+        expect(status.unavailableFolders).toEqual(['/usb/drive'])
     })
 
-    it('still scans when every root is unavailable, so the library reconciles to missing', async () => {
+    it('still scans when every folder is unavailable, so the library reconciles to missing', async () => {
         settings.getSettings.mockReturnValue({ library: { folders: ['/usb/drive'] } })
-        roots.validate.mockResolvedValue([
+        folders.validate.mockResolvedValue([
             { path: '/usb/drive', canonicalPath: '/usb/drive', available: false, error: 'not found' },
         ])
 
@@ -81,13 +81,13 @@ describe('LibraryScanService', () => {
 
         // An empty walk discovers nothing, which is what marks everything missing.
         expect(backend.scan).toHaveBeenCalledWith([], expect.anything())
-        expect(status.roots).toEqual([])
-        expect(status.unavailableRoots).toEqual(['/usb/drive'])
+        expect(status.scannedFolders).toEqual([])
+        expect(status.unavailableFolders).toEqual(['/usb/drive'])
     })
 
-    it('scans canonical roots and omits roots nested under another root', async () => {
+    it('scans canonical folders and omits folders nested under another folder', async () => {
         settings.getSettings.mockReturnValue({ library: { folders: ['/link', '/music/albums', '/music'] } })
-        roots.validate.mockResolvedValue([
+        folders.validate.mockResolvedValue([
             { path: '/link', canonicalPath: '/music', available: true },
             {
                 path: '/music/albums',
@@ -101,7 +101,7 @@ describe('LibraryScanService', () => {
         const status = await service.startScan('startup')
 
         expect(backend.scan).toHaveBeenCalledWith(['/music'], expect.anything())
-        expect(status.roots).toEqual(['/music'])
+        expect(status.scannedFolders).toEqual(['/music'])
     })
 
     it('concurrent starts attach to the active scan', async () => {

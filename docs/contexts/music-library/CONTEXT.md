@@ -10,26 +10,36 @@ in `metadata-engine` — which is why the glossary lives here rather than inside
 
 ## Language
 
-### Roots and setup
+### Folders and setup
 
-**Library root**:
+**Library folder**:
 One folder the user nominated as a top of their music collection. Stored canonicalized (`realpath`),
-so two selections of the same directory through different symlinks collapse to one root.
-_Avoid_: library path, directory, source
+so two selections of the same directory through different symlinks collapse to one.
+_Avoid_: root, library root, library path, directory, source
 
-**Nested root**:
-A root that lives inside another root in the same set. Detected and dropped before scanning, since
-scanning both is redundant.
+Say **folder** everywhere — UI copy, identifiers, docs. "Root" reads as scanner-implementer jargon
+and the app never shows the word to users. Where the tree-walking sense matters, the sentence can say
+so ("the top of the walk") without renaming the concept.
+
+**Configured folders** / **scanned folders**:
+Two genuinely different lists, so qualify which one you mean. _Configured_ is what the user picked and
+what `library.folders` persists. _Scanned_ is what a given scan actually walked, after
+canonicalization, dedup, dropping nested folders, and dropping unreachable ones — `status.scannedFolders`.
+A user with three configured folders can legitimately see a scan report one.
+
+**Nested folder**:
+A library folder that lives inside another one in the same set. Detected and dropped before scanning,
+since scanning both is redundant.
 
 **Library onboarding**:
-The first-run flow at `/import` that gates the app until the user either configures roots or skips.
+The first-run flow at `/import` that gates the app until the user either configures folders or skips.
 Skipping is remembered (`library.onboardingSkipped`) and replaces the gate with a sidebar nudge.
 _Avoid_: setup wizard, first-run
 
 ### Scanning
 
 **Scan**:
-One pass over the library roots that brings the song database in line with what is on disk. Exactly
+One pass over the library folders that brings the song database in line with what is on disk. Exactly
 one runs at a time, app-wide.
 
 **Trigger**:
@@ -37,8 +47,8 @@ Why a scan started — `startup`, `manual`, `onboarding`, or `debug`. Not cosmet
 `startup` scan differently from one the user asked for (see ADR 0002).
 
 **Discovery**:
-The first scan phase. Walks the roots and records a fingerprint per file, tallying each as new,
-changed, or unchanged. Called _prescan_ at the metadata-engine boundary.
+The first scan phase. Walks the library folders and records a fingerprint per file, tallying each as
+new, changed, or unchanged. Called _prescan_ at the metadata-engine boundary.
 _Avoid_: crawl, walk, indexing
 
 **Deep read**:
@@ -57,10 +67,9 @@ A song in the database whose file was not seen by the last complete discovery. `
 app can reach this file now", not "this file exists somewhere" — so tracks on an unplugged drive are
 missing. Missing songs are retained, not deleted, and come back on the next scan that reaches them.
 
-**Unavailable root**:
-A configured root the scan could not reach. Dropped from the walk; its tracks go missing. Reported on
-the scan status so the UI can explain the count — not an error (ADR 0003). Distinct from a root that
-fails _picker_ validation, which is refused at save time.
+**Unavailable folder**:
+A configured folder the scan could not reach. Dropped from the walk; its tracks go missing. Reported
+on the scan status (`unavailableFolders`) so the UI can explain the count — not an error (ADR 0003).
 
 **Terminal result**:
 The one-shot summary produced when a scan ends, carrying the outcome (`completed`, `cancelled`,

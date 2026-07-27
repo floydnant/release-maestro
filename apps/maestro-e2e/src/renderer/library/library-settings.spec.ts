@@ -7,7 +7,7 @@ const terminalResult = (overrides: Partial<LibraryScanTerminalResult> = {}): Lib
     outcome: 'completed',
     scanId: 1,
     trigger: 'startup',
-    roots: ['/music'],
+    scannedFolders: ['/music'],
     startedAt: Date.now() - 60_000,
     finishedAt: Date.now() - 30_000,
     discovered: 10,
@@ -15,7 +15,7 @@ const terminalResult = (overrides: Partial<LibraryScanTerminalResult> = {}): Lib
     changed: 0,
     unchanged: 8,
     missing: 0,
-    unavailableRoots: [],
+    unavailableFolders: [],
     readTotal: 2,
     readsAttempted: 2,
     imported: 1,
@@ -40,8 +40,8 @@ const scanStatus = (terminal: LibraryScanTerminalResult): LibraryScanStatus => (
     revision: 100,
     trigger: terminal.trigger,
     phase: terminal.outcome,
-    roots: terminal.roots,
-    unavailableRoots: terminal.unavailableRoots,
+    scannedFolders: terminal.scannedFolders,
+    unavailableFolders: terminal.unavailableFolders,
     startedAt: terminal.startedAt,
     finishedAt: terminal.finishedAt,
     discovered: terminal.discovered,
@@ -59,10 +59,10 @@ const scanStatus = (terminal: LibraryScanTerminalResult): LibraryScanStatus => (
 test.describe('library settings scenarios', () => {
     // Rescanning with a drive unplugged is how its tracks get marked missing, so an
     // unreachable folder is reported but must never disable the rescan (ADR 0003).
-    test('an unavailable root is reported without blocking a rescan', async ({ page }) => {
+    test('an unavailable folder is reported without blocking a rescan', async ({ page }) => {
         const scenario = scenarioBuilder()
             .settings({ library: { folders: ['/music', '/usb/library'] }, emailPluginConfig: {} })
-            .handler('library:validate-roots', {
+            .handler('library:validate-folders', {
                 kind: 'resolve',
                 value: [
                     { path: '/music', canonicalPath: '/music', available: true },
@@ -82,10 +82,10 @@ test.describe('library settings scenarios', () => {
         await expect(page.getByRole('button', { name: /Rescan now|Save and rescan/ })).toBeEnabled()
     })
 
-    test('a nested root is marked as skipped without blocking saves', async ({ page }) => {
+    test('a nested folder is marked as skipped without blocking saves', async ({ page }) => {
         const scenario = scenarioBuilder()
             .settings({ library: { folders: ['/music', '/music/albums'] }, emailPluginConfig: {} })
-            .handler('library:validate-roots', {
+            .handler('library:validate-folders', {
                 kind: 'resolve',
                 value: [
                     { path: '/music', canonicalPath: '/music', available: true },
@@ -168,7 +168,7 @@ test.describe('library settings scenarios', () => {
                         total: 10,
                         errors: 1,
                         finishedAt: Date.now() - 3_600_000,
-                        roots: ['/music'],
+                        scannedFolders: ['/music'],
                     },
                 },
             })
@@ -203,13 +203,13 @@ test.describe('library settings scenarios', () => {
         await expect(page.getByText('The metadata engine stopped responding')).toBeVisible()
     })
 
-    // An unreachable root is not a failure: the scan completes over what it could
+    // An unreachable folder is not a failure: the scan completes over what it could
     // reach and the rest reconciles to missing, so the UI has to explain the count.
-    test('an unreachable root completes the scan and explains the missing tracks', async ({ page }) => {
+    test('an unreachable folder completes the scan and explains the missing tracks', async ({ page }) => {
         const terminal = terminalResult({
             outcome: 'completed',
             missing: 42,
-            unavailableRoots: ['/usb/library'],
+            unavailableFolders: ['/usb/library'],
             failures: [],
             readFailureCount: 0,
         })

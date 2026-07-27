@@ -15,7 +15,7 @@ import { coverArtCacheDir, resolveMetadataEngineBinaryPath } from './app-env'
 import { DiContainer } from './utils/dependency-injection.util'
 import { LibraryBackendRepository } from './services/library/library.backend.repository'
 import { LibraryBackendService } from './services/library/library.backend.service'
-import { LibraryRootsService } from './services/library/library-roots.service'
+import { LibraryFoldersService } from './services/library/library-folders.service'
 import { LibraryScanService, LibraryScanState } from './services/library/library-scan.service'
 
 /** `conf` satisfies the store surface; the cast narrows its wider overloads. */
@@ -80,8 +80,8 @@ export const diContainer = new DiContainer({
                 ),
         },
         {
-            provide: LibraryRootsService,
-            useFactory: () => new LibraryRootsService(),
+            provide: LibraryFoldersService,
+            useFactory: () => new LibraryFoldersService(),
         },
         {
             provide: LibraryScanService,
@@ -89,7 +89,7 @@ export const diContainer = new DiContainer({
                 new LibraryScanService(
                     await di.get(LibraryBackendService),
                     await di.get(SettingsBackendService),
-                    await di.get(LibraryRootsService),
+                    await di.get(LibraryFoldersService),
                     confStore<LibraryScanState>(appPaths.data, 'library-state'),
                 ),
         },

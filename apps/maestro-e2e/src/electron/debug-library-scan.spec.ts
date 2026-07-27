@@ -133,9 +133,9 @@ test('scans a temp library and persists reconciliation state across scans', asyn
     await expect(metric(page, 'Raw scan summary')).toContainText('"unchanged": 1')
 })
 
-// ADR 0003: an unreachable root is not a scan failure. The tracks under it are
+// ADR 0003: an unreachable folder is not a scan failure. The tracks under it are
 // genuinely unavailable, so the scan completes and reconciles them to missing.
-test('a root that disappears completes the scan and marks its tracks missing', async ({}, testInfo) => {
+test('a folder that disappears completes the scan and marks its tracks missing', async ({}, testInfo) => {
     const { libraryDir } = await copyFixtureLibrary(testInfo)
 
     await page.getByLabel('Library scan paths').fill(libraryDir)

@@ -1,14 +1,14 @@
 <div class="max-w-2xl">
     <h2 class="type-section-title text-content-primary">Library folders</h2>
     <p class="type-body-sm mt-1 text-content-muted">
-        The root folders of your music collection. Saving changes runs a rescan; files under removed folders
-        stay in the database but are marked as no longer present.
+        The folders that make up your music collection. Saving changes runs a rescan; files under removed
+        folders stay in the database but are marked as no longer present.
     </p>
 
     <app-folder-list
         class="mt-4 block"
         [folders]="folders()"
-        [validations]="rootValidations()"
+        [validations]="folderValidations()"
         (foldersDropped)="addPaths($event)"
         (browse)="addFolders()"
         (folderRemoved)="removeFolder($event)"
@@ -46,7 +46,7 @@
         @if (terminal()?.error; as terminalError) {
             <p class="type-body-sm mt-1 text-content-danger">{{ terminalError.message }}</p>
         }
-        @if (unavailableRootsText(); as unavailableText) {
+        @if (unavailableFoldersText(); as unavailableText) {
             <p class="type-body-sm mt-1 text-content-warning" aria-label="Unavailable folders">
                 {{ unavailableText }}
             </p>

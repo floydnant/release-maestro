@@ -1,13 +1,13 @@
 import { NgClass } from '@angular/common'
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core'
-import { LibraryRootValidation } from '@release-maestro/core'
+import { LibraryFolderValidation } from '@release-maestro/core'
 import { ElectronService } from '../../../core/services'
 import { splitPathBaseName } from '../../utils/formatting.utils'
 import { IconComponent } from '../icon/icon.component'
 
 /**
- * Editable list of library root folders, doubling as a drop target for folders
- * dragged in from the OS. Shows the per-root validation results (unavailable /
+ * Editable list of library library folders, doubling as a drop target for folders
+ * dragged in from the OS. Shows the per-folder validation results (unavailable /
  * nested) inline. Purely presentational: the host owns the folder list and opens
  * the folder picker when {@link FolderListComponent.browse} is emitted.
  *
@@ -23,7 +23,7 @@ import { IconComponent } from '../icon/icon.component'
 })
 export class FolderListComponent {
     readonly folders = input.required<string[]>()
-    readonly validations = input<LibraryRootValidation[]>([])
+    readonly validations = input<LibraryFolderValidation[]>([])
     readonly useMinHeight = input<boolean>(true)
 
     /** Folders dropped onto the list (absolute paths; non-folder drops included). */
@@ -39,7 +39,7 @@ export class FolderListComponent {
     // Depth counter so dragenter/dragleave bubbling over children doesn't flicker.
     private dragDepth = 0
 
-    validationFor(folder: string): LibraryRootValidation | undefined {
+    validationFor(folder: string): LibraryFolderValidation | undefined {
         return this.validations().find(validation => validation.path === folder)
     }
 

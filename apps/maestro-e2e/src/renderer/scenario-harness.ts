@@ -134,7 +134,7 @@ const defaultScenario = (): RendererScenario => ({
             kind: 'resolve',
             value: { status: null, albums: [], lastScan: null },
         },
-        'library:validate-roots': { kind: 'resolve', value: [] },
+        'library:validate-folders': { kind: 'resolve', value: [] },
         'library:pick-folders': { kind: 'resolve', value: null },
     },
 })

@@ -17,7 +17,7 @@ const status = (
     revision,
     trigger: 'startup',
     phase: 'reading',
-    roots: ['/music'],
+    scannedFolders: ['/music'],
     startedAt: 1_000,
     finishedAt: null,
     discovered: 0,
@@ -96,7 +96,7 @@ describe('LibraryService snapshot/event ordering', () => {
         resolveSnapshot({
             status: status(1, 2),
             albums: [],
-            lastScan: { count: 1, total: 1, finishedAt: 500, roots: ['/music'] },
+            lastScan: { count: 1, total: 1, finishedAt: 500, scannedFolders: ['/music'] },
         })
         await service.synced
 

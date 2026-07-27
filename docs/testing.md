@@ -89,7 +89,7 @@ source fixture files. Keep large media fixtures intentional because they affect 
 
 Library scan tests need many distinctly-tagged audio files with distinct cover art. Committing them
 would mean megabytes of near-identical binaries in every checkout, so
-`apps/maestro-e2e/src/electron/tagged-library.fixture.ts` **generates** a temp library at test time by
+`apps/maestro-e2e/src/fixtures/tagged-library.fixture.ts` **generates** a temp library at test time by
 re-tagging the audio of the single committed MP3 fixture. Prefer extending that generator over adding
 binary fixtures.
 

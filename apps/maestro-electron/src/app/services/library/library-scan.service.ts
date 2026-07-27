@@ -15,7 +15,7 @@ import {
 import { BrowserWindow } from 'electron'
 import { PersistentStore } from '../../utils/persistent-store.util'
 import { SettingsBackendService } from '../settings.backend.service'
-import { LibraryRootsService } from './library-roots.service'
+import { LibraryFoldersService } from './library-folders.service'
 import { LibraryBackendService } from './library.backend.service'
 
 /** How often (at most) scan-status snapshots are pushed to the renderer. */
@@ -38,8 +38,8 @@ export interface LibraryScanState extends Record<string, unknown> {
  * race safely. Only the album cover previews for the import mosaic are
  * delta-shaped (`newAlbums`).
  *
- * Roots are validated here — the scan boundary — regardless of what the renderer
- * checked, but an unreachable root does not stop the scan: it is simply dropped
+ * Folders are validated here — the scan boundary — regardless of what the renderer
+ * checked, but an unreachable folder does not stop the scan: it is simply dropped
  * from the walk, and everything under it reconciles to missing like any other
  * file the scan did not see (see ADR 0003).
  */
@@ -56,7 +56,7 @@ export class LibraryScanService {
     constructor(
         private readonly library: LibraryBackendService,
         private readonly settings: SettingsBackendService,
-        private readonly roots: LibraryRootsService,
+        private readonly folders: LibraryFoldersService,
         /**
          * Main-owned scan state lives in its own conf file, and in the *data* dir
          * (not config): it's derived state that rides along with the database, not
@@ -81,28 +81,28 @@ export class LibraryScanService {
     async startScan(trigger: LibraryScanTrigger, paths?: string[]): Promise<LibraryScanStatus> {
         if (this.status && this.isScanning) return this.status
 
-        const configuredRoots = paths ?? this.settings.getSettings().library?.folders ?? []
-        const status = this.newStatus(trigger, configuredRoots)
+        const configuredFolders = paths ?? this.settings.getSettings().library?.folders ?? []
+        const status = this.newStatus(trigger, configuredFolders)
         this.status = status
-        if (configuredRoots.length === 0) {
+        if (configuredFolders.length === 0) {
             // Nothing configured: stay idle. Deliberately no scan and no
             // reconciliation — an empty selection must never mark songs missing.
             return status
         }
 
-        const validations = await this.roots.validate(configuredRoots)
+        const validations = await this.folders.validate(configuredFolders)
 
-        // Canonical roots, minus duplicates, roots nested under another root
-        // (scanning both would be redundant), and roots we cannot reach.
-        const effectiveRoots = validations
+        // Canonical folders, minus duplicates, folders nested under another folder
+        // (scanning both would be redundant), and folders we cannot reach.
+        const scannedFolders = validations
             .filter(validation => validation.available && validation.nestedUnder === undefined)
             .map(validation => validation.canonicalPath)
-        // Unreachable roots are reported, not fatal: the scan walks what it can and
-        // the rest reconciles to missing. `effectiveRoots` may legitimately be empty
+        // Unreachable folders are reported, not fatal: the scan walks what it can and
+        // the rest reconciles to missing. `scannedFolders` may legitimately be empty
         // — that scan discovers nothing and marks the whole library missing, which
         // is the honest answer when no configured folder is reachable.
-        status.roots = effectiveRoots
-        status.unavailableRoots = validations
+        status.scannedFolders = scannedFolders
+        status.unavailableFolders = validations
             .filter(validation => !validation.available)
             .map(validation => validation.path)
         this.touch(status)
@@ -119,7 +119,7 @@ export class LibraryScanService {
         let discoveryFailureCount = 0
         let readFailureCount = 0
 
-        this.library.scan(effectiveRoots, signal).subscribe({
+        this.library.scan(scannedFolders, signal).subscribe({
             next: update => {
                 switch (update.phase) {
                     case 'discovery':
@@ -173,7 +173,7 @@ export class LibraryScanService {
                             missing: update.missing,
                             errors: status.failedFiles,
                             finishedAt: status.finishedAt as number,
-                            roots: status.roots,
+                            scannedFolders: status.scannedFolders,
                             normalizationIssues: status.normalizationIssues,
                         })
                         break
@@ -236,14 +236,14 @@ export class LibraryScanService {
         }
     }
 
-    private newStatus(trigger: LibraryScanTrigger, roots: string[]): LibraryScanStatus {
+    private newStatus(trigger: LibraryScanTrigger, scannedFolders: string[]): LibraryScanStatus {
         return {
             scanId: ++this.scanIdCounter,
             revision: 0,
             trigger,
-            phase: roots.length === 0 ? 'idle' : 'discovering',
-            roots,
-            unavailableRoots: [],
+            phase: scannedFolders.length === 0 ? 'idle' : 'discovering',
+            scannedFolders,
+            unavailableFolders: [],
             startedAt: Date.now(),
             finishedAt: null,
             discovered: 0,
@@ -276,7 +276,7 @@ export class LibraryScanService {
             outcome,
             scanId: status.scanId,
             trigger: status.trigger,
-            roots: status.roots,
+            scannedFolders: status.scannedFolders,
             startedAt: status.startedAt,
             finishedAt: status.finishedAt,
             discovered: status.discovered,
@@ -284,7 +284,7 @@ export class LibraryScanService {
             changed: status.changed,
             unchanged: status.unchanged,
             missing: details.missing,
-            unavailableRoots: status.unavailableRoots,
+            unavailableFolders: status.unavailableFolders,
             readTotal: status.readTotal,
             readsAttempted: status.readDone,
             imported: status.imported,

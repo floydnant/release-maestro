@@ -2,12 +2,12 @@ import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs'
 import { realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { LibraryRootsService } from './library-roots.service'
+import { LibraryFoldersService } from './library-folders.service'
 
-describe('LibraryRootsService', () => {
-    const service = new LibraryRootsService()
+describe('LibraryFoldersService', () => {
+    const service = new LibraryFoldersService()
     // realpath the base dir up front: on macOS /tmp is itself a symlink to /private/tmp.
-    const base = realpathSync(mkdtempSync(join(tmpdir(), 'maestro-roots-')))
+    const base = realpathSync(mkdtempSync(join(tmpdir(), 'maestro-folders-')))
     const musicDir = join(base, 'music')
     const nestedDir = join(musicDir, 'albums')
     const otherDir = join(base, 'other')
@@ -21,7 +21,7 @@ describe('LibraryRootsService', () => {
         writeFileSync(filePath, 'x')
     })
 
-    it('canonicalizes symlinks so aliased selections collapse to one root', async () => {
+    it('canonicalizes symlinks so aliased selections collapse to one folder', async () => {
         const selection = await service.canonicalizeSelection([musicDir, linkToMusic, otherDir])
         expect(selection).toEqual([musicDir, otherDir])
     })
@@ -31,7 +31,7 @@ describe('LibraryRootsService', () => {
         expect(validations.map(validation => validation.path)).toEqual([otherDir, musicDir])
     })
 
-    it('detects roots nested beneath another selected root', async () => {
+    it('detects folders nested beneath another selected folder', async () => {
         const validations = await service.validate([musicDir, nestedDir, otherDir])
         expect(validations[0]).toMatchObject({ available: true })
         expect(validations[0]?.nestedUnder).toBeUndefined()
