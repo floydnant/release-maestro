@@ -49,9 +49,14 @@ make test-core
 make test-engine
 make e2e
 make e2e-renderer
+make typecheck-e2e
 make lint
 make format-check
 ```
+
+Playwright transpiles tests but does not perform semantic TypeScript checking. The `maestro-e2e:typecheck`
+target runs `tsc --noEmit` over both Electron and renderer E2E sources; CI invokes it through
+`make typecheck-e2e`.
 
 Run the narrowest relevant command first. If a change crosses project boundaries, add the affected
 project checks after the narrow check passes.

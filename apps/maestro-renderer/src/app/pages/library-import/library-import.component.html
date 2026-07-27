@@ -135,7 +135,10 @@
                             <p class="type-label-sm mt-1 text-content-muted">Discovered</p>
                         </div>
                         <div class="text-center">
-                            <p class="type-section-title font-mono text-content-primary">
+                            <p
+                                class="type-section-title font-mono text-content-primary"
+                                aria-label="Imported tracks"
+                            >
                                 {{ status.imported }}
                             </p>
                             <p class="type-label-sm mt-1 text-content-muted">Imported</p>
@@ -143,6 +146,7 @@
                         <div class="text-center">
                             <p
                                 class="type-section-title font-mono"
+                                aria-label="Failed files count"
                                 [class.text-content-danger]="status.failedFiles > 0"
                                 [class.text-content-primary]="status.failedFiles === 0"
                             >

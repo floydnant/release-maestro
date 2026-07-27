@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { _electron as electron, ElectronApplication, Page } from 'playwright'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { buildTaggedLibrary } from './tagged-library.fixture'
+import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
 
 const workspaceRoot = join(__dirname, '../../../..')
 const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
@@ -66,12 +66,12 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     // Scan finishes into the done step: the live stat tiles settle at their final
     // values (the "Imported" ticker lands on 6) and the mosaic is populated.
     await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
-    await expect(page.locator('.grid-cols-4 div.text-center').filter({ hasText: 'Imported' })).toContainText(
-        '6',
-    )
+    await expect(page.getByLabel('Imported tracks')).toHaveText('6')
     // 4 albums but only 3 distinct artworks (two share identical cover bytes) —
     // the content-addressed dedupe must collapse them to exactly 3 tiles.
-    await expect.poll(async () => page.locator('app-import-mosaic img').count(), { timeout: 10_000 }).toBe(3)
+    await expect
+        .poll(async () => page.getByTestId('import-mosaic').locator('img').count(), { timeout: 10_000 })
+        .toBe(3)
     await page.screenshot({ path: testInfo.outputPath('import-done.png') })
 
     await page.getByRole('button', { name: 'Take me to my library' }).click()
@@ -115,12 +115,8 @@ test('failed files surface in Library Settings, linked from onboarding', async (
 
     // The completion stat tiles count the import and the failure, and link to details.
     await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
-    await expect(page.locator('.grid-cols-4 div.text-center').filter({ hasText: 'Imported' })).toContainText(
-        '6',
-    )
-    await expect(page.locator('.grid-cols-4 div.text-center').filter({ hasText: 'Failed' })).toContainText(
-        '1',
-    )
+    await expect(page.getByLabel('Imported tracks')).toHaveText('6')
+    await expect(page.getByLabel('Failed files count')).toHaveText('1')
     await page.getByRole('link', { name: 'View failed files' }).click()
 
     await expect(page).toHaveURL(/\/settings\/library$/)

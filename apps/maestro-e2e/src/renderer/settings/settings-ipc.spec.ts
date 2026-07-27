@@ -5,7 +5,10 @@ import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
 test.describe('settings IPC scenarios', () => {
     test('loads and saves settings through configured IPC handlers', async ({ page }) => {
         const scenario = scenarioBuilder()
-            .settings({ emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Bandcamp Inbox' } } })
+            .settings({
+                library: { folders: ['/scenario/music'] },
+                emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Bandcamp Inbox' } },
+            })
             .handler('set-settings', { kind: 'resolve' })
             .build()
         const controller = await createRendererScenario(page, scenario, '/settings/apple-mail')
@@ -20,13 +23,19 @@ test.describe('settings IPC scenarios', () => {
             .poll(async () => controller.lastCall('set-settings'))
             .toMatchObject({
                 channel: 'set-settings',
-                payload: { emailPluginConfig: { APPLE_MAIL: { mailboxName: 'New Releases' } } },
+                payload: {
+                    library: { folders: ['/scenario/music'] },
+                    emailPluginConfig: { APPLE_MAIL: { mailboxName: 'New Releases' } },
+                },
             })
     })
 
     test('shows the save action only while settings have unsaved changes', async ({ page }) => {
         const scenario = scenarioBuilder()
-            .settings({ emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Bandcamp Inbox' } } })
+            .settings({
+                library: { folders: ['/scenario/music'] },
+                emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Bandcamp Inbox' } },
+            })
             .handler('set-settings', { kind: 'resolve' })
             .build()
         await createRendererScenario(page, scenario, '/settings/apple-mail')

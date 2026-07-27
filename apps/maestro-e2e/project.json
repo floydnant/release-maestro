@@ -25,6 +25,9 @@
         },
         "lint": {
             "executor": "@nx/eslint:lint"
+        },
+        "typecheck": {
+            "command": "tsc --noEmit -p apps/maestro-e2e/tsconfig.json"
         }
     }
 }

@@ -13,7 +13,7 @@ test.describe('renderer scenario IPC harness', () => {
                 kind: 'resolve',
                 value: { nested: [{ capturedAt: initialCapturedAt }] },
             })
-            .handler('metadata:scan', { kind: 'pending' })
+            .handler('metadata:write', { kind: 'pending' })
             .build()
         const controller = await createRendererScenario(page, scenario)
 
@@ -48,11 +48,11 @@ test.describe('renderer scenario IPC harness', () => {
             iso: updatedCapturedAt.toISOString(),
         })
 
-        const pendingResult = readCapturedAt('metadata:scan')
+        const pendingResult = readCapturedAt('metadata:write')
         await expect
-            .poll(async () => controller.lastCall('metadata:scan'))
-            .toMatchObject({ channel: 'metadata:scan' })
-        await controller.resolvePending('metadata:scan', {
+            .poll(async () => controller.lastCall('metadata:write'))
+            .toMatchObject({ channel: 'metadata:write' })
+        await controller.resolvePending('metadata:write', {
             nested: [{ capturedAt: pendingCapturedAt }],
         })
 

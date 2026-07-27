@@ -107,9 +107,12 @@ const buildId3Tag = (spec: TaggedTrackSpec): Buffer => {
 
 /** Strip an existing ID3v2 tag so the injected one is the only tag readers see. */
 const stripId3 = (data: Buffer): Buffer => {
-    if (data.subarray(0, 3).toString('latin1') !== 'ID3') return data
+    if (data.length < 10 || data.subarray(0, 3).toString('latin1') !== 'ID3') return data
     const size =
-        ((data[6] & 0x7f) << 21) | ((data[7] & 0x7f) << 14) | ((data[8] & 0x7f) << 7) | (data[9] & 0x7f)
+        ((data.readUInt8(6) & 0x7f) << 21) |
+        ((data.readUInt8(7) & 0x7f) << 14) |
+        ((data.readUInt8(8) & 0x7f) << 7) |
+        (data.readUInt8(9) & 0x7f)
     return data.subarray(10 + size)
 }
 

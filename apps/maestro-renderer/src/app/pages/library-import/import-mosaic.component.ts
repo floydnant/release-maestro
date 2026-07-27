@@ -48,6 +48,7 @@ const MAX_PENDING = 24
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
         class: 'block size-full overflow-hidden',
+        'data-testid': 'import-mosaic',
     },
     template: `
         <div
@@ -56,7 +57,7 @@ const MAX_PENDING = 24
             [style.grid-template-rows]="'repeat(' + rows() + ', minmax(0, 1fr))'"
         >
             @for (cell of cells(); track $index) {
-                <div class="mosaic-cell relative overflow-hidden rounded-md">
+                <div class="mosaic-cell relative overflow-hidden rounded-md" data-testid="import-mosaic-cell">
                     @if (cell) {
                         <!-- Tracking by revision recreates the nodes on replacement, restarting the animations. -->
                         @for (revisionCell of [cell]; track revisionCell.revision) {

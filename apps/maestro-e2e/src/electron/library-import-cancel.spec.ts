@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test'
 import { _electron as electron, ElectronApplication, Page } from 'playwright'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { buildTaggedLibrary, TaggedTrackSpec } from './tagged-library.fixture'
+import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
+import type { TaggedTrackSpec } from '../fixtures/tagged-library.fixture'
 
 const workspaceRoot = join(__dirname, '../../../..')
 const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
@@ -56,9 +57,10 @@ test('cancelling an import mid-scan self-heals via the startup rescan', async ({
 
     // The mosaic is DOM-capped to its (responsive) grid: at most 2 imgs per cell
     // (an entering cover plus the one it replaces), never one per scanned track.
-    const cellCount = await page.locator('app-import-mosaic .mosaic-cell').count()
+    const mosaic = page.getByTestId('import-mosaic')
+    const cellCount = await page.getByTestId('import-mosaic-cell').count()
     expect(cellCount).toBeGreaterThan(0)
-    expect(await page.locator('app-import-mosaic img').count()).toBeLessThanOrEqual(2 * cellCount)
+    expect(await mosaic.locator('img').count()).toBeLessThanOrEqual(2 * cellCount)
 
     // Cancel mid-read; if the scan won the race and completed, the cancel branch is moot.
     const cancelButton = page.getByRole('button', { name: 'Cancel import' })
@@ -74,10 +76,6 @@ test('cancelling an import mid-scan self-heals via the startup rescan', async ({
     app = await launch(appDataDir)
     page = await app.firstWindow()
     await expect(page).toHaveURL(/\/home$/)
-    await page
-        .getByText('Scanning library…')
-        .isVisible()
-        .then(visible => visible && page.screenshot({ path: testInfo.outputPath('startup-indicator.png') }))
     await page.getByRole('link', { name: 'Settings' }).click()
     await page.getByRole('link', { name: 'Library', exact: true }).click()
     await expect(page.getByText(/Last completed scan: .*1500 tracks/)).toBeVisible({

@@ -46,6 +46,10 @@ jobs:
         steps:
             - uses: actions/checkout@v7
             - uses: ./.github/actions/setup-node
+
+            - name: Type-check e2e tests
+              run: make typecheck-e2e
+
             - name: Install Playwright browsers
               run: npx playwright install --with-deps chromium
 
