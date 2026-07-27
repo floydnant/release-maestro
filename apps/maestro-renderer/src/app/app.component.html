@@ -40,7 +40,7 @@
             }
         </div>
 
-        @if (!isMacos) {
+        @if (isElectron && !isMacos) {
             <div class="title-bar__controls">
                 <button class="title-bar__button" type="button" title="Minimize" (click)="minimizeWindow()">
                     <app-icon name="octDash" size="14"></app-icon>
