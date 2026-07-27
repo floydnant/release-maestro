@@ -27,8 +27,10 @@ const TARGET_TILE_PX = 150
 const FILL_PER_TICK = 5
 /** Filled cells refreshed per tick once the wall is full — a lively, non-hectic shimmer. */
 const CHURN_PER_TICK = 3
-/** Upper bound on the queued backlog, so completion never triggers a catch-up burst. */
+/** Upper bound on the sampled backlog, so completion never triggers a catch-up burst. */
 const MAX_PENDING = 24
+/** Recent arrivals eligible for the backlog sample. Keeps displayed covers near the scan cursor. */
+const RECENT_RESULT_WINDOW = MAX_PENDING * 4
 
 /**
  * Full-bleed album-cover mosaic for the library import: covers pop in as tracks
@@ -36,8 +38,9 @@ const MAX_PENDING = 24
  *
  * The grid is responsive — columns/rows are derived from the host size so tiles
  * stay near {@link TARGET_TILE_PX} and cover the whole window at any aspect ratio.
- * Covers are queued and placed at a *constant* rate (independent of how far the
- * scan is ahead), so pacing never speeds up under a backlog nor bursts at the end.
+ * Covers are sampled from a moving window near the scan cursor and placed at a
+ * *constant* rate, so the wall follows the part of the library currently being
+ * scanned without speeding up under a backlog or bursting at the end.
  * Empty cells fill first ({@link FILL_PER_TICK}); once full the wall shimmers
  * gently ({@link CHURN_PER_TICK}). When `active` goes false (scan finished) the
  * wall finishes filling any gaps and then settles instead of churning forever.
@@ -146,14 +149,13 @@ export class ImportMosaicComponent {
     readonly fileUrl = fileUrl
 
     constructor() {
-        // Ingest newly arrived albums into a bounded backlog.
+        // Sample newly arrived albums into a moving backlog near the scan cursor.
         effect(() => {
             const albums = this.albums()
             if (albums.length < this.consumedCount) this.resetQueue()
             if (albums.length > this.consumedCount) {
-                this.pending.push(...albums.slice(this.consumedCount))
+                this.pending = sampleMovingBacklog(this.pending, albums.slice(this.consumedCount))
                 this.consumedCount = albums.length
-                if (this.pending.length > MAX_PENDING) this.pending = this.pending.slice(-MAX_PENDING)
             }
         })
 
@@ -237,15 +239,34 @@ export class ImportMosaicComponent {
 }
 
 /** Pick up to `count` distinct random elements from `items`. */
-const pickRandom = <T>(items: T[], count: number): T[] => {
+const pickRandom = <T>(items: T[], count: number, random = Math.random): T[] => {
     const pool = [...items]
     const picked: T[] = []
     for (let i = 0; i < count && pool.length > 0; i++) {
-        const index = Math.floor(Math.random() * pool.length)
+        const index = Math.floor(random() * pool.length)
         picked.push(pool[index] as T)
         pool.splice(index, 1)
     }
     return picked
+}
+
+/**
+ * Fold new scan results into a bounded sample of the recent result window.
+ *
+ * The newest result is always retained. The rest are sampled, rather than just
+ * queued FIFO, so a scan that runs far ahead moves the backlog—and therefore
+ * the wall—forward to roughly the scan's current cursor.
+ */
+export const sampleMovingBacklog = (
+    pending: LibraryAlbumPreview[],
+    arrived: LibraryAlbumPreview[],
+    random = Math.random,
+): LibraryAlbumPreview[] => {
+    const recent = [...pending, ...arrived].slice(-RECENT_RESULT_WINDOW)
+    if (recent.length <= MAX_PENDING) return recent
+
+    const latest = recent.at(-1) as LibraryAlbumPreview
+    return [...pickRandom(recent.slice(0, -1), MAX_PENDING - 1, random), latest]
 }
 
 const range = (length: number): number[] => Array.from({ length }, (_, index) => index)

@@ -9,8 +9,9 @@ stutters and then bursts at completion. Both surfaces therefore deliberately lag
   (`STARTUP_PHASE_MIN_DWELL_MS`, 1s) before advancing or hiding. Payload updates within one phase
   pass through live — only phase changes and hiding are held back. Manual rescans are shown in real
   time, because the user asked for them and is watching.
-- `ImportMosaicComponent` places covers at a constant cadence (`TICK_MS`) with a bounded backlog
-  (`MAX_PENDING`), so the wall builds at the same speed no matter how far ahead the scan is, and
+- `ImportMosaicComponent` places covers at a constant cadence (`TICK_MS`) from a bounded sample
+  (`MAX_PENDING`) of a moving recent-results window. The wall therefore builds at the same speed no
+  matter how far ahead the scan is, while the covers roughly follow the scan's current cursor and
   completion cannot trigger a catch-up burst.
 
 ## Consequences
