@@ -13,6 +13,10 @@ Also see `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md`
 
 Issues and PRDs live in Notion, not GitHub Issues. If a bundled skill says to create, fetch, comment on, or label a GitHub issue, apply that workflow to the Notion tracker described in `docs/agents/issue-tracker.md` instead.
 
+### Frontend
+
+Any user-facing change in `apps/maestro-renderer` MUST follow [.agents/skills/frontend-design/SKILL.md](.agents/skills/frontend-design/SKILL.md): design-system tokens and Tailwind first, accessibility built in, no bespoke visual direction.
+
 ### Validation loop
 
 ALWAYS run verifications after making changes to code. Use the Makefile targets as the source of truth, starting with the narrowest relevant check. See `.agents/skills/verification-loop/SKILL.md`.

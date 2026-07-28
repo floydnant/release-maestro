@@ -6,7 +6,7 @@ description: Playwright E2E readiness and test authoring guidance.
 # E2E Testing Guidelines:
 
 - for this repo's project-specific conventions, also read `docs/testing.md`
-- test user-visible behavior, not implementation details (no CSS/XPath-first selectors)
+- test user-visible behavior, not implementation details (no CSS/XPath-first selectors, no tailwind class selectors)
 - keep tests isolated with `beforeEach`; each test must run independently
 - prefer role/text locators, then `getByTestId` for explicit test contracts
 - add minimal, stable `testId` hooks for critical flows (navigation CTAs, form controls)
