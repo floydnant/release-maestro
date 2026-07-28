@@ -6,11 +6,23 @@ import { AppIpcRenderer, asAppIpcRenderer } from '@release-maestro/core'
 })
 export class ElectronService {
     ipcRenderer!: AppIpcRenderer
+    private webUtils: { getPathForFile(file: File): string } | undefined
 
     constructor() {
         if (this.isElectron) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            this.ipcRenderer = asAppIpcRenderer((window as any).require('electron').ipcRenderer)
+            const electron = (window as any).require('electron')
+            this.ipcRenderer = asAppIpcRenderer(electron.ipcRenderer)
+            this.webUtils = electron.webUtils
+        }
+    }
+
+    /** Absolute filesystem path of a dragged-and-dropped file/folder, or null. */
+    getPathForFile(file: File): string | null {
+        try {
+            return this.webUtils?.getPathForFile(file) || null
+        } catch {
+            return null
         }
     }
 
@@ -27,6 +39,11 @@ export class ElectronService {
 
     async openUrl(url: string) {
         await this.ipcRenderer.invoke('open-url', url)
+    }
+
+    /** Show a file or folder in the OS file manager (Finder / Explorer), selected. */
+    async revealInFileManager(path: string) {
+        await this.ipcRenderer.invoke('reveal-in-file-manager', path)
     }
 
     async minimizeWindow() {

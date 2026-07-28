@@ -1,5 +1,16 @@
-<div class="grid w-full grid-cols-[13rem_1fr] bg-background-canvas">
+<div class="grid size-full min-h-0 grid-cols-[13rem_1fr] bg-background-canvas">
     <div class="border-r border-border-subtle bg-background-surface p-4">
+        <p class="type-label-sm mb-3 text-content-muted">Music library</p>
+        <ul class="mb-4">
+            <li>
+                <a
+                    routerLink="library"
+                    routerLinkActive="active-link"
+                    class="btn-nkd-neutral block w-full text-left"
+                    >Library</a
+                >
+            </li>
+        </ul>
         <p class="type-label-sm mb-3 text-content-muted">Import sources</p>
         <ul class="">
             <li>
@@ -21,7 +32,7 @@
             </li>
         </ul>
     </div>
-    <div class="p-6">
+    <div class="min-h-0 min-w-0 overflow-y-auto p-6">
         <router-outlet></router-outlet>
     </div>
 </div>

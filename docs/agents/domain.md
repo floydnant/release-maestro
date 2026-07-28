@@ -4,16 +4,15 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- `CONTEXT-MAP.md` at the repo root, if it exists. It points at one `CONTEXT.md` per context.
-- `CONTEXT.md` files for the relevant context, using the map when present.
-- `docs/adr/` for system-wide architectural decisions.
-- `apps/*/docs/adr/` and `libs/*/docs/adr/` for context-specific decisions when they exist.
+- `CONTEXT-MAP.md` at the repo root. It points at one `CONTEXT.md` per context.
+- `CONTEXT.md` for the relevant context, using the map to find it.
+- `docs/adr/` for architectural decisions.
 
 If a file or directory does not exist, proceed silently.
 
-This repo currently has a root `CONTEXT.md` seed glossary. Add context-specific glossaries lazily if a project area develops its own vocabulary that would make the root glossary noisy.
+This repo has two contexts, both under `docs/contexts/`: the music library and the release feed. Pick the glossary matching what you are working on — the two share infrastructure but not vocabulary. Add further glossaries lazily if another area develops its own.
 
-If a context needs its own architectural decisions, keep them in that context's `docs/adr/` directory.
+Contexts are product boundaries, not Nx projects: each one spans the Electron main process, the Angular renderer, and the shared core lib. Do not look for a per-project `CONTEXT.md` or a per-project `docs/adr/` — decisions live in the single root `docs/adr/` for the same reason.
 
 For test-layer conventions, E2E isolation, fixture handling, and CI guidance, see `docs/testing.md`.
 

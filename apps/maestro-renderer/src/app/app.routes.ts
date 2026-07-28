@@ -1,5 +1,6 @@
 import { Route } from '@angular/router'
 import { webEnv } from '../environments/environment'
+import { libraryOnboardingGuard } from './core/guards/library-onboarding.guard'
 import { FeedComponent } from './pages/feed/feed.component'
 import { HomeComponent } from './pages/home/home.component'
 import { PageNotFoundComponent } from './pages/page-not-found/page-not-found.component'
@@ -26,15 +27,29 @@ export const appRoutes: Route[] = [
     {
         path: 'home',
         component: HomeComponent,
+        canActivate: [libraryOnboardingGuard],
     },
     {
         path: 'feed',
         component: FeedComponent,
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
+        path: 'import',
+        loadComponent: () =>
+            import('./pages/library-import/library-import.component').then(m => m.LibraryImportComponent),
     },
     {
         path: 'settings',
         component: SettingsComponent,
         children: [
+            {
+                path: 'library',
+                loadComponent: () =>
+                    import('./pages/settings/library/library-settings.component').then(
+                        m => m.LibrarySettingsComponent,
+                    ),
+            },
             {
                 path: 'debug',
                 loadComponent: () =>

@@ -1,0 +1,238 @@
+<div
+    class="relative size-full overflow-hidden"
+    [ngClass]="{
+        'bg-background-canvas': step() === 'pick',
+        'bg-black': step() !== 'pick',
+    }"
+>
+    @if (step() === 'pick') {
+        <div class="size-full overflow-y-auto">
+            <div class="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-8 py-16">
+                <h1 class="type-hero-title text-content-primary">Set up your music library</h1>
+                <p class="type-body-md mt-3 text-content-secondary">
+                    Choose the folders where your music lives. Release Maestro keeps them up to date from then
+                    on.
+                </p>
+
+                <app-folder-list
+                    class="mt-8 block"
+                    [folders]="pendingFolders()"
+                    [validations]="folderValidations()"
+                    (foldersDropped)="addPaths($event)"
+                    (browse)="addFolders()"
+                    (folderRemoved)="removeFolder($event)"
+                >
+                    <button
+                        type="button"
+                        class="add-folder-btn | flex w-full grow items-center justify-center gap-2 rounded-b-[10px] border-t border-border-subtle px-4 py-3 text-left text-content-secondary transition-colors hover:bg-action-quiet-hover hover:text-content-primary"
+                        aria-label="Add folders"
+                        (click)="addFolders()"
+                    >
+                        <app-icon name="octPlus" size="1rem"></app-icon>
+                        Add another folder
+                    </button>
+                </app-folder-list>
+
+                <div class="mt-8 flex items-center gap-3">
+                    <button class="btn-nkd-neutral text-content-muted" type="button" (click)="skip()">
+                        Skip for now
+                    </button>
+                    <span class="grow"></span>
+                    <button
+                        class="btn-primary"
+                        type="button"
+                        [disabled]="pendingFolders().length == 0 || startInFlight()"
+                        (click)="startImport()"
+                    >
+                        Continue
+                    </button>
+                </div>
+            </div>
+        </div>
+    } @else if (noFilesFound()) {
+        <div class="size-full overflow-y-auto">
+            <div class="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-8 py-16">
+                <h1 class="type-hero-title text-content-primary">No audio files found</h1>
+                <p class="type-body-md mt-3 text-content-secondary">
+                    We couldn't find any supported audio files in the selected folders. Pick the folder(s)
+                    that contain your music and try again.
+                </p>
+                <div class="mt-6">
+                    <button class="btn-primary" type="button" (click)="backToFolders()">
+                        Choose different folders
+                    </button>
+                </div>
+            </div>
+        </div>
+    } @else if (library.scanStatus(); as status) {
+        <!-- Shared "cover wall" experience for both the running scan and the success
+             screen. The mosaic and stat tiles stay mounted across the scanning → done
+             transition, so the live counters simply settle and the wall never remounts
+             (which used to cause an end-of-scan burst). Only the header and footer swap. -->
+        <app-import-mosaic
+            class="absolute inset-0"
+            [albums]="library.mosaicAlbums()"
+            [albumCount]="library.mosaicAlbumCount()"
+            [active]="library.isScanning()"
+        ></app-import-mosaic>
+        <div class="mosaic-veil pointer-events-none absolute inset-0"></div>
+
+        <div class="absolute inset-0 flex flex-col justify-center">
+            <!-- Full-width band behind the centered UI: solid black through the content,
+                fading out above and below so the cover wall shines around it. Its height
+                follows the content, so it always fits the UI instead of an arbitrary shape. -->
+            <div
+                class="content-band | mx-auto w-fit rounded-xl border border-border-subtle bg-black/70 px-10 py-16 shadow-lg backdrop-blur-md"
+            >
+                <div class="mx-auto w-full max-w-2xl px-8 text-center">
+                    @if (step() === 'done') {
+                        <p class="text-content-success">
+                            <app-icon
+                                name="octCheckCircleFill"
+                                color="content.success"
+                                size="2.5rem"
+                            ></app-icon>
+                        </p>
+                        <h1 class="type-hero-title mt-3 text-content-primary">Your library is ready</h1>
+                    } @else if (terminalBanner(); as terminal) {
+                        <h1 class="type-hero-title text-content-primary">
+                            @if (terminal.outcome === 'cancelled') {
+                                Import cancelled
+                            } @else {
+                                Import failed
+                            }
+                        </h1>
+                    } @else {
+                        <h1 class="type-hero-title text-content-primary">Importing your library</h1>
+                        <p
+                            class="type-body-md mt-2 flex items-center justify-center gap-2 text-content-secondary"
+                        >
+                            @if (status.phase === 'discovering') {
+                                <app-progress-ring
+                                    mode="spinning"
+                                    [diameter]="18"
+                                    [strokeWidth]="2.5"
+                                ></app-progress-ring>
+                                Discovering files… {{ status.discovered }} found so far
+                            } @else if (status.phase === 'reading') {
+                                Reading tracks…
+                                <span class="font-mono">{{ status.readDone }} / {{ status.readTotal }}</span>
+                            }
+                        </p>
+                    }
+
+                    @if (status.phase === 'reading') {
+                        <app-progress-bar
+                            class="mt-6 block"
+                            [segments]="progressSegments()"
+                        ></app-progress-bar>
+                    }
+
+                    <div class="mx-auto mt-6 grid max-w-xl grid-cols-4 gap-3">
+                        <div class="text-center">
+                            <p class="type-section-title font-mono text-content-primary">
+                                {{ status.discovered }}
+                            </p>
+                            <p class="type-label-sm mt-1 text-content-muted">Discovered</p>
+                        </div>
+                        <div class="text-center">
+                            <p
+                                class="type-section-title font-mono text-content-primary"
+                                aria-label="Imported tracks"
+                            >
+                                {{ status.imported }}
+                            </p>
+                            <p class="type-label-sm mt-1 text-content-muted">Imported</p>
+                        </div>
+                        <div class="text-center">
+                            <p
+                                class="type-section-title font-mono"
+                                aria-label="Failed files count"
+                                [class.text-content-danger]="status.failedFiles > 0"
+                                [class.text-content-primary]="status.failedFiles === 0"
+                            >
+                                {{ status.failedFiles }}
+                            </p>
+                            <p class="type-label-sm mt-1 text-content-muted">Failed</p>
+                        </div>
+                        <div class="text-center">
+                            <p
+                                class="type-section-title font-mono"
+                                [class.text-content-warning]="status.normalizationIssues > 0"
+                                [class.text-content-primary]="status.normalizationIssues === 0"
+                            >
+                                {{ status.normalizationIssues }}
+                            </p>
+                            <p class="type-label-sm mt-1 text-content-muted">With Issues</p>
+                        </div>
+                    </div>
+
+                    @if (step() === 'done') {
+                        @if (unavailableFoldersText(); as unavailableText) {
+                            <p
+                                class="type-body-sm mt-6 text-content-warning"
+                                aria-label="Unavailable folders"
+                            >
+                                {{ unavailableText }}
+                            </p>
+                        }
+                        <div class="mt-8 flex items-center justify-center gap-3">
+                            <button class="btn-nkd-neutral" type="button" (click)="backToFolders()">
+                                Change folders
+                            </button>
+                            <button class="btn-primary" type="button" (click)="finish()">
+                                Take me to my library
+                            </button>
+                        </div>
+                        @if (status.failedFiles > 0) {
+                            <p class="type-body-sm mt-4">
+                                <a class="text-content-action" routerLink="/settings/library"
+                                    >View failed files</a
+                                >
+                            </p>
+                        }
+                    } @else if (terminalBanner(); as terminal) {
+                        @if (terminal.outcome === 'cancelled') {
+                            <p class="type-body-md mt-6 text-content-primary">
+                                The next startup scan picks up where this one left off.
+                            </p>
+                        } @else {
+                            <p class="type-body-md mt-6 text-content-danger">
+                                <app-icon
+                                    name="octXCircleFill"
+                                    color="content.danger"
+                                    class="translate-y-px align-middle"
+                                ></app-icon>
+                                {{ terminal.error?.message || 'The import failed unexpectedly.' }}
+                            </p>
+                        }
+                        <div class="mt-4 flex items-center justify-center gap-3">
+                            <button class="btn-primary" type="button" (click)="retryScan()">
+                                Retry import
+                            </button>
+                            <button class="btn-neutral" type="button" (click)="backToFolders()">
+                                Change folders
+                            </button>
+                            <button class="btn-nkd-neutral" type="button" (click)="finish()">
+                                Continue anyway
+                            </button>
+                        </div>
+                        @if (status.failedFiles > 0) {
+                            <p class="type-body-sm mt-3">
+                                <a class="text-content-action" routerLink="/settings/library"
+                                    >View failed files</a
+                                >
+                            </p>
+                        }
+                    } @else {
+                        <div class="mt-6">
+                            <button class="btn-nkd-neutral text-content-muted" (click)="cancelScan()">
+                                Cancel import
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>

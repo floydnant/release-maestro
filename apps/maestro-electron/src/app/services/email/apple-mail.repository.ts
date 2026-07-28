@@ -52,7 +52,7 @@ export class AppleMailRepository implements EmailImporterPlugin {
     loadEmails(abortSignal: AbortSignal): Observable<EmailImportStreamPacket> {
         const result$ = new Subject<EmailImportStreamPacket>()
 
-        const mailboxName = this.settings.store.get('emailPluginConfig.APPLE_MAIL.mailboxName')
+        const mailboxName = this.settings.getSettings().emailPluginConfig?.APPLE_MAIL?.mailboxName
         if (!mailboxName) {
             result$.error(new Error('[AppleMailImporter] Mailbox name is not set in settings'))
             return result$

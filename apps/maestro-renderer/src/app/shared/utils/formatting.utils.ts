@@ -49,3 +49,11 @@ export const formatDateRelative = (date: Date, referenceDate: Date = new Date())
 
     return relativeTimeFormatter.format(roundedDifference, unit)
 }
+
+/** Split a filesystem path into the dimmable parent portion (incl. trailing separator) and the base name. */
+export const splitPathBaseName = (path: string): { parent: string; base: string } => {
+    const trimmed = path.replace(/[/\\]+$/, '')
+    const index = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
+    if (index < 0) return { parent: '', base: trimmed }
+    return { parent: trimmed.slice(0, index + 1), base: trimmed.slice(index + 1) }
+}

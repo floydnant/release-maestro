@@ -32,11 +32,15 @@ import {
     stableHash,
 } from './library-normalization'
 
+/**
+ * Change-detection tallies for one prescan batch. The deep-read queue is NOT
+ * derived from this — `listSongsNeedingMetadata` (fingerprint mismatch in the DB)
+ * is the sole source, which also makes interrupted scans resumable.
+ */
 export interface PrescanBatchComparison {
     unchanged: number
     changed: number
     new: number
-    needsMetadata: PrescanFileFact[]
 }
 
 const titleFromFileName = (fileName: string): string => fileName.replace(/\.[^.]+$/, '').trim() || fileName
@@ -62,7 +66,7 @@ export class LibraryBackendRepository {
 
     processPrescanBatch(facts: PrescanFileFact[], seenAt: Date): PrescanBatchComparison {
         if (facts.length == 0) {
-            return { unchanged: 0, changed: 0, new: 0, needsMetadata: [] }
+            return { unchanged: 0, changed: 0, new: 0 }
         }
 
         const existingSongs = this.database.db
@@ -83,7 +87,6 @@ export class LibraryBackendRepository {
             unchanged: 0,
             changed: 0,
             new: 0,
-            needsMetadata: [],
         }
 
         this.database.db.transaction(tx => {
@@ -110,7 +113,6 @@ export class LibraryBackendRepository {
                         })
                         .run()
                     comparison.new += 1
-                    comparison.needsMetadata.push(fact)
                     continue
                 }
 
@@ -120,7 +122,6 @@ export class LibraryBackendRepository {
                     comparison.unchanged += 1
                 } else {
                     comparison.changed += 1
-                    comparison.needsMetadata.push(fact)
                 }
             }
         })
@@ -185,7 +186,8 @@ export class LibraryBackendRepository {
         )
     }
 
-    ingestMetadata(metadata: SongMetadata, fact: PrescanFileFact, scannedAt: Date): void {
+    /** @returns the number of normalization issues left OPEN on the song after ingest. */
+    ingestMetadata(metadata: SongMetadata, fact: PrescanFileFact, scannedAt: Date): number {
         const db = this.database.db
         const rawArtist = metadata.artist
         const rawAlbumArtist = metadata.albumArtist
@@ -197,7 +199,7 @@ export class LibraryBackendRepository {
         const labelText = normalizeDisplayText(metadata.label)
         const externalRefs = extractExternalRefs(metadata.extraMetadata, metadata.comment)
 
-        db.transaction(tx => {
+        return db.transaction(tx => {
             const getOrCreateArtist = (name: string): string => {
                 const existing = tx
                     .select({ id: artistsTable.id, externalRefs: artistsTable.externalRefs })
@@ -549,9 +551,11 @@ export class LibraryBackendRepository {
                 existingIssues.map(issue => [issue.fingerprint, issue]),
             )
 
+            let openIssues = 0
             for (const issue of detectedIssues) {
                 const fingerprint = issueFingerprint(issue)
                 const existingIssue = existingIssuesByFingerprint.get(fingerprint)
+                if (!existingIssue || existingIssue.status != 'DISMISSED') openIssues += 1
                 if (existingIssue) {
                     tx.update(normalizationIssuesTable)
                         .set({
@@ -602,6 +606,8 @@ export class LibraryBackendRepository {
                     .where(eq(normalizationIssuesTable.id, existingIssue.id))
                     .run()
             }
+
+            return openIssues
         })
     }
 }

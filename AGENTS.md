@@ -4,7 +4,8 @@ Read [docs/agents/domain.md](docs/agents/domain.md), [docs/agents/issue-tracker.
 
 ### Domain docs
 
-This is a multi-context monorepo. See `docs/agents/domain.md`.
+This is a multi-context monorepo. See `docs/agents/domain.md`. Start from `CONTEXT-MAP.md` for the
+context glossaries and `docs/adr/` for decisions whose reasoning is not visible in the code.
 
 Also see `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md`
 

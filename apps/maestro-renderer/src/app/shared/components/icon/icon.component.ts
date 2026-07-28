@@ -3,6 +3,10 @@ import { NgIcon, provideIcons } from '@ng-icons/core'
 import {
     octCheckCircleFill,
     octDash,
+    octFileDirectory,
+    octFileDirectoryFill,
+    octFileDirectoryOpenFill,
+    octPlus,
     octScreenFull,
     octScreenNormal,
     octX,
@@ -15,6 +19,10 @@ import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.gene
 const icons = {
     octCheckCircleFill,
     octDash,
+    octFileDirectory,
+    octFileDirectoryFill,
+    octFileDirectoryOpenFill,
+    octPlus,
     octScreenFull,
     octScreenNormal,
     octX,

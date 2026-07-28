@@ -21,6 +21,8 @@ export type IpcCall = {
 
 export type ScenarioBehavior =
     | { kind: 'resolve'; value?: IpcPayload }
+    | { kind: 'set-settings' }
+    | { kind: 'patch-settings' }
     | { kind: 'reject'; message: string; userFacingMessage?: string }
     | { kind: 'pending' }
     | { kind: 'sequence'; steps: ScenarioBehavior[]; fallback?: ScenarioBehavior }
@@ -31,6 +33,7 @@ export type RendererScenario = {
 
 type ScenarioState = {
     handlers: Record<string, ScenarioBehavior>
+    settings: AppSettings
     calls: IpcCall[]
     nextCallId: number
     pending: Record<
@@ -112,8 +115,17 @@ const defaultScenario = (): RendererScenario => ({
         'window-close': { kind: 'resolve' },
         'get-app-version': { kind: 'resolve', value: '0.0.0-scenario' },
         'open-url': { kind: 'resolve' },
-        'get-settings': { kind: 'resolve', value: { emailPluginConfig: {} } satisfies AppSettings },
-        'set-settings': { kind: 'resolve' },
+        // A configured library keeps the onboarding route guard from redirecting
+        // scenario navigations to /import.
+        'get-settings': {
+            kind: 'resolve',
+            value: {
+                library: { folders: ['/scenario/music'] },
+                emailPluginConfig: {},
+            } satisfies AppSettings,
+        },
+        'set-settings': { kind: 'set-settings' },
+        'patch-settings': { kind: 'patch-settings' },
         'trigger-email-import': { kind: 'resolve' },
         'load-feed': { kind: 'resolve', value: [] },
         'has-feed': { kind: 'resolve', value: false },
@@ -121,7 +133,12 @@ const defaultScenario = (): RendererScenario => ({
         'metadata:ping': { kind: 'resolve', value: { ok: true } },
         'metadata:read': { kind: 'resolve', value: null },
         'metadata:write': { kind: 'resolve' },
-        'metadata:scan': { kind: 'resolve' },
+        'library:get-scan-status': {
+            kind: 'resolve',
+            value: { status: null, albums: [], lastScan: null },
+        },
+        'library:validate-folders': { kind: 'resolve', value: [] },
+        'library:pick-folders': { kind: 'resolve', value: null },
     },
 })
 
@@ -353,8 +370,13 @@ export const createRendererScenario = async (
                 JSON.parse(value, scenarioJsonReviver)
 
             const hydratedScenario = parseScenarioValue(serialization.scenario) as RendererScenario
+            const getSettingsBehavior = hydratedScenario.handlers['get-settings']
+            if (getSettingsBehavior?.kind !== 'resolve') {
+                throw new Error('Renderer scenarios require a resolving get-settings handler')
+            }
             const state: ScenarioState = {
                 handlers: hydratedScenario.handlers,
+                settings: getSettingsBehavior.value as AppSettings,
                 calls: [],
                 nextCallId: 1,
                 pending: {},
@@ -395,6 +417,14 @@ export const createRendererScenario = async (
                     const behavior = nextBehavior(channel)
                     if (behavior.kind === 'resolve') {
                         return Promise.resolve(behavior.value)
+                    }
+                    if (behavior.kind === 'set-settings') {
+                        state.settings = payload as AppSettings
+                        return Promise.resolve(state.settings)
+                    }
+                    if (behavior.kind === 'patch-settings') {
+                        state.settings = { ...state.settings, ...(payload as Partial<AppSettings>) }
+                        return Promise.resolve(state.settings)
                     }
                     if (behavior.kind === 'reject') {
                         const error = new Error(behavior.message)

@@ -274,9 +274,6 @@ export const MetadataIpcChannel = {
     ping: 'metadata:ping',
     read: 'metadata:read',
     write: 'metadata:write',
-    scan: 'metadata:scan',
-    scanProgress: 'metadata:scan-progress',
-    scanAbort: 'metadata:scan-abort',
 } as const
 
 export type MetadataIpcChannel = (typeof MetadataIpcChannel)[keyof typeof MetadataIpcChannel]
@@ -289,10 +286,6 @@ export interface ReadMetadataRequest {
 export interface WriteMetadataRequest {
     path: string
     update: SongMetadataUpdate
-}
-
-export interface ScanMetadataRequest {
-    paths: string[]
 }
 
 // The per-channel payload/result types above are wired into the app-wide typed IPC

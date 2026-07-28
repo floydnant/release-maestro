@@ -1,0 +1,107 @@
+<div class="max-w-2xl">
+    <h2 class="type-section-title text-content-primary">Library folders</h2>
+    <p class="type-body-sm mt-1 text-content-muted">
+        The folders that make up your music collection. Saving changes runs a rescan; files under removed
+        folders stay in the database but are marked as no longer present.
+    </p>
+
+    <app-folder-list
+        class="mt-4 block"
+        [folders]="folders()"
+        [validations]="folderValidations()"
+        (foldersDropped)="addPaths($event)"
+        (browse)="addFolders()"
+        (folderRemoved)="removeFolder($event)"
+        [useMinHeight]="false"
+    ></app-folder-list>
+
+    <div class="mt-4 flex items-center gap-3">
+        <button class="btn-neutral" type="button" (click)="addFolders()">Add folders…</button>
+        <button
+            class="btn-primary"
+            type="button"
+            [disabled]="saveInFlight() || library.isScanning() || folders().length === 0"
+            (click)="saveAndRescan()"
+        >
+            {{ isDirty() ? 'Save and rescan' : 'Rescan now' }}
+        </button>
+    </div>
+
+    <h2 class="type-section-title mt-8 text-content-primary">Scan status</h2>
+    @if (library.isScanning()) {
+        @if (library.scanStatus(); as scanStatus) {
+            <p class="type-body-sm mt-2 flex items-center gap-2 text-content-secondary">
+                <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
+                @if (scanStatus.phase === 'discovering') {
+                    Discovering files… {{ scanStatus.discovered }} found
+                } @else {
+                    Reading tracks… {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
+                }
+            </p>
+        }
+    } @else if (terminalSummaryText(); as summaryText) {
+        <p class="type-body-sm mt-2 text-content-secondary" aria-label="Latest scan result">
+            {{ summaryText }}
+        </p>
+        @if (terminal()?.error; as terminalError) {
+            <p class="type-body-sm mt-1 text-content-danger">{{ terminalError.message }}</p>
+        }
+        @if (unavailableFoldersText(); as unavailableText) {
+            <p class="type-body-sm mt-1 text-content-warning" aria-label="Unavailable folders">
+                {{ unavailableText }}
+            </p>
+        }
+    } @else if (lastScanText(); as lastScan) {
+        <p class="type-body-sm mt-2 text-content-secondary">Last scan: {{ lastScan }}</p>
+    } @else {
+        <p class="type-body-sm mt-2 text-content-muted">No scan has completed yet.</p>
+    }
+    @if (terminalSummaryText() && lastScanText(); as lastScan) {
+        <p class="type-body-sm mt-1 text-content-muted">Last completed scan: {{ lastScan }}</p>
+    }
+
+    @if (terminal(); as terminalResult) {
+        @if (terminalResult.failures.length > 0) {
+            <h2 class="type-section-title mt-8 text-content-primary">Failed files</h2>
+            <p class="type-body-sm mt-1 text-content-muted">
+                {{ terminalResult.discoveryFailureCount + terminalResult.readFailureCount }} file{{
+                    terminalResult.discoveryFailureCount + terminalResult.readFailureCount === 1 ? '' : 's'
+                }}
+                could not be imported.
+            </p>
+            <div class="panel mt-3 p-2" aria-label="Failed files">
+                @for (failure of terminalResult.failures; track failure.path) {
+                    <div class="rounded group flex items-center gap-3 px-3 py-2">
+                        <div class="min-w-0 grow select-text">
+                            <p class="type-body-sm mt-0.5 text-content-danger">
+                                {{ failure.message }}
+                            </p>
+                            <p class="type-body-sm flex min-w-0" [title]="failure.path">
+                                <span class="truncate text-content-muted">{{
+                                    folderParent(failure.path)
+                                }}</span
+                                ><span class="shrink-0 font-semibold text-content-primary">{{
+                                    folderName(failure.path)
+                                }}</span>
+                            </p>
+                        </div>
+                        <button
+                            class="btn-nkd-neutral shrink-0 text-content-muted hover:text-content-primary"
+                            type="button"
+                            [title]="revealLabel"
+                            [attr.aria-label]="revealLabel + ': ' + failure.path"
+                            (click)="revealFile(failure.path)"
+                        >
+                            <app-icon name="octFileDirectoryOpenFill" size="16"></app-icon>
+                        </button>
+                    </div>
+                }
+                @if (terminalResult.failuresTruncated) {
+                    <p class="type-body-sm px-3 py-2 text-content-muted">
+                        Only the first {{ terminalResult.failures.length }} failures are listed.
+                    </p>
+                }
+            </div>
+        }
+    }
+</div>

@@ -1,5 +1,10 @@
 import { Observable } from 'rxjs'
-import { MetadataPrescanUpdate, MetadataScanUpdate, PrescanFileFact } from '@release-maestro/core'
+import {
+    LibraryScanUpdate,
+    MetadataPrescanUpdate,
+    MetadataScanUpdate,
+    PrescanFileFact,
+} from '@release-maestro/core'
 import { MetadataBackendService } from '../metadata/metadata.backend.service'
 import { LibraryBackendRepository } from './library.backend.repository'
 
@@ -11,8 +16,8 @@ export class LibraryBackendService {
         private readonly metadata: MetadataBackendService,
     ) {}
 
-    scan(paths: string[], abortSignal?: AbortSignal): Observable<MetadataScanUpdate> {
-        return new Observable<MetadataScanUpdate>(subscriber => {
+    scan(paths: string[], abortSignal?: AbortSignal): Observable<LibraryScanUpdate> {
+        return new Observable<LibraryScanUpdate>(subscriber => {
             const run = async () => {
                 const scanStartedAt = this.repository.nextScanSeenAt()
                 let prescanCount = 0
@@ -21,6 +26,7 @@ export class LibraryBackendService {
                 let newCount = 0
                 let errors = 0
                 let prescanErrors = 0
+                let normalizationIssues = 0
 
                 await new Promise<void>((resolve, reject) => {
                     this.metadata.prescan(paths, abortSignal).subscribe({
@@ -33,6 +39,13 @@ export class LibraryBackendService {
                                 unchanged += comparison.unchanged
                                 changed += comparison.changed
                                 newCount += comparison.new
+                                subscriber.next({
+                                    phase: 'discovery',
+                                    discovered: unchanged + changed + newCount,
+                                    new: newCount,
+                                    changed,
+                                    unchanged,
+                                })
                             } else if (update.phase == 'completed') {
                                 prescanCount = update.count
                                 prescanErrors = update.errors
@@ -49,6 +62,11 @@ export class LibraryBackendService {
                     })
                 })
 
+                // Absent-file reconciliation only runs when it is provably safe:
+                //  - not cancelled (a cancelled discovery has not seen every file), and
+                //  - discovery had no errors (an unreadable subtree must not mark
+                //    its files as missing).
+                if (abortSignal?.aborted) return
                 const missing = prescanErrors == 0 ? this.repository.markNotSeenPresent(scanStartedAt) : 0
                 const metadataReadTotal = this.repository.countSongsNeedingMetadata()
                 let metadataReadDone = 0
@@ -77,9 +95,18 @@ export class LibraryBackendService {
                                     error: 'Prescan facts missing for metadata result',
                                 })
                             } else {
-                                this.repository.ingestMetadata(update.metadata, fact, new Date())
+                                const openIssues = this.repository.ingestMetadata(
+                                    update.metadata,
+                                    fact,
+                                    new Date(),
+                                )
                                 ingested += 1
                                 subscriber.next(update)
+                                if (openIssues > 0) {
+                                    // Count distinct tracks with issues, not the issues themselves.
+                                    normalizationIssues += 1
+                                    subscriber.next({ phase: 'normalization', normalizationIssues })
+                                }
                             }
                             metadataReadDone += 1
                             subscriber.next({

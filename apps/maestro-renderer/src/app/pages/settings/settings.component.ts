@@ -7,7 +7,7 @@ import { RouterModule } from '@angular/router'
     templateUrl: './settings.component.html',
     styles: `
         :host {
-            @apply flex w-full;
+            @apply flex h-full min-h-0 w-full;
         }
     `,
     changeDetection: ChangeDetectionStrategy.OnPush,

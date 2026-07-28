@@ -19,4 +19,12 @@ describe(AppComponent.name, () => {
         const app = fixture.debugElement.componentInstance
         expect(app).toBeTruthy()
     }))
+
+    it('does not render Electron window controls in browser mode', () => {
+        const fixture = TestBed.createComponent(AppComponent)
+
+        fixture.detectChanges()
+
+        expect(fixture.nativeElement.querySelector('.title-bar__controls')).toBeNull()
+    })
 })

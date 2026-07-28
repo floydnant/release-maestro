@@ -1,6 +1,14 @@
-# Release Maestro Context
+# Release Feed
 
 This glossary names the domain concepts agents should use when discussing product behavior, issues, tests, and plans. Keep it focused on domain language, not implementation details.
+
+Scoped to the **release feed** context — Bandcamp releases the user is tracking. For the user's local
+music collection see [music library](../music-library/CONTEXT.md); the two are coequal and do not
+share vocabulary. See [CONTEXT-MAP.md](../../../CONTEXT-MAP.md).
+
+This context is not one Nx project. It spans the email/feed backend services in `maestro-electron`,
+the feed pages in `maestro-renderer`, and its schemas in `maestro-core` — which is why the glossary
+lives here rather than inside any one project.
 
 ## Terms
 
