@@ -14,6 +14,13 @@ import { ElectronService } from './electron/electron.service'
 import { SettingsService } from '../settings/settings.service'
 
 /**
+ * Cap on retained mosaic previews. The mosaic only ever samples the recent tail,
+ * and the main process only replays a bounded tail, so holding a whole library's
+ * worth of covers here would buy nothing.
+ */
+const MOSAIC_ALBUM_LIMIT = 200
+
+/**
  * Renderer-side view of the main-process-owned library scan lifecycle.
  *
  * The main process broadcasts full status snapshots on `library:scan-status`
@@ -33,12 +40,18 @@ export class LibraryService {
     private readonly scanStatus_ = signal<LibraryScanStatus | null>(null)
     private readonly mosaicAlbums_ = signal<LibraryAlbumPreview[]>([])
     private readonly lastScan_ = signal<LibraryLastScanInfo | null>(null)
+    private readonly mosaicAlbumCount_ = signal(0)
     private seenCoverPaths = new Set<string>()
 
     /** Latest scan status snapshot (null until the first scan of this app session). */
     readonly scanStatus = this.scanStatus_.asReadonly()
-    /** Album cover previews of the current/last scan, in arrival order (for the mosaic). */
+    /**
+     * Album cover previews of the current/last scan, in arrival order — the most
+     * recent {@link MOSAIC_ALBUM_LIMIT} of them (for the mosaic).
+     */
     readonly mosaicAlbums = this.mosaicAlbums_.asReadonly()
+    /** Total previews received for the current scan; `mosaicAlbums` is its bounded tail. */
+    readonly mosaicAlbumCount = this.mosaicAlbumCount_.asReadonly()
     /** Persisted aggregate of the last completed scan. */
     readonly lastScan = this.lastScan_.asReadonly()
 
@@ -79,9 +92,10 @@ export class LibraryService {
         this.lastScan_.set(snapshot.lastScan)
         if (snapshot.status && this.applyStatus(snapshot.status)) {
             // The pulled snapshot is authoritative for this scan: reseed the mosaic
-            // from its cumulative album list (dedup state included).
+            // from its retained album tail (dedup state included).
             this.seenCoverPaths = new Set(snapshot.albums.map(album => album.coverPath))
             this.mosaicAlbums_.set(snapshot.albums)
+            this.mosaicAlbumCount_.set(snapshot.albums.length)
         }
     }
 
@@ -131,18 +145,24 @@ export class LibraryService {
     }
 
     /**
-     * Apply a status if it is not older than the current one. Returns whether it
-     * was applied. Moving to a *different* scan resets the mosaic exactly once.
+     * Apply a status if it is strictly newer than the current one. Returns whether
+     * it was applied. Moving to a *different* scan resets the mosaic exactly once.
+     *
+     * Re-applying an already-known `(scanId, revision)` is skipped rather than
+     * re-`set` with an equal-but-fresh object: `revision` covers every mutation, so
+     * an equal one carries no news, and writing it would wake every reader — an
+     * effect that pulls a snapshot would then loop on its own writes.
      */
     private applyStatus(incoming: LibraryScanStatus): boolean {
         const current = this.scanStatus_()
         if (current) {
             if (incoming.scanId < current.scanId) return false
-            if (incoming.scanId === current.scanId && incoming.revision < current.revision) return false
+            if (incoming.scanId === current.scanId && incoming.revision <= current.revision) return false
         }
         if (!current || current.scanId !== incoming.scanId) {
             this.seenCoverPaths = new Set()
             this.mosaicAlbums_.set([])
+            this.mosaicAlbumCount_.set(0)
         }
         this.scanStatus_.set(incoming)
         return true
@@ -156,9 +176,12 @@ export class LibraryService {
         const current = this.scanStatus_()
         if (!current || current.scanId !== statusEvent.status.scanId) return
         const additions = statusEvent.newAlbums.filter(album => !this.seenCoverPaths.has(album.coverPath))
-        if (additions.length > 0) {
-            for (const album of additions) this.seenCoverPaths.add(album.coverPath)
-            this.mosaicAlbums_.update(albums => [...albums, ...additions])
-        }
+        if (additions.length === 0) return
+        const retained = [...this.mosaicAlbums_(), ...additions].slice(-MOSAIC_ALBUM_LIMIT)
+        // Dedup tracks the retained tail: only that tail is ever replayed to us, so
+        // there is nothing older left to guard against — and the set stays bounded.
+        this.seenCoverPaths = new Set(retained.map(album => album.coverPath))
+        this.mosaicAlbums_.set(retained)
+        this.mosaicAlbumCount_.update(count => count + additions.length)
     }
 }

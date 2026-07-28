@@ -132,8 +132,14 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
     `,
 })
 export class ImportMosaicComponent {
-    /** Cumulative album previews in arrival order (append-only; shrinks only on a new scan). */
+    /** Most recent album previews in arrival order — a bounded tail of `albumCount` arrivals. */
     albums = input.required<LibraryAlbumPreview[]>()
+    /**
+     * Total previews that have arrived for the current scan. Grows monotonically
+     * within a scan (`albums` does not, being a bounded tail), so it — not the array
+     * length — is what tells new arrivals from a reset.
+     */
+    albumCount = input.required<number>()
     /** While false (scan reached a terminal state) the wall settles instead of churning. */
     active = input(true)
 
@@ -152,10 +158,14 @@ export class ImportMosaicComponent {
         // Sample newly arrived albums into a moving backlog near the scan cursor.
         effect(() => {
             const albums = this.albums()
-            if (albums.length < this.consumedCount) this.resetQueue()
-            if (albums.length > this.consumedCount) {
-                this.pending = sampleMovingBacklog(this.pending, albums.slice(this.consumedCount))
-                this.consumedCount = albums.length
+            const count = this.albumCount()
+            if (count < this.consumedCount) this.resetQueue()
+            if (count > this.consumedCount) {
+                // Arrivals that fell off the retained tail are simply skipped: the
+                // backlog samples the recent window anyway.
+                const arrived = albums.slice(-Math.min(count - this.consumedCount, albums.length))
+                this.pending = sampleMovingBacklog(this.pending, arrived)
+                this.consumedCount = count
             }
         })
 

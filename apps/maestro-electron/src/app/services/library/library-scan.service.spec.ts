@@ -104,12 +104,55 @@ describe('LibraryScanService', () => {
         expect(status.scannedFolders).toEqual(['/music'])
     })
 
-    it('concurrent starts attach to the active scan', async () => {
-        const first = await service.startScan('startup')
-        const second = await service.startScan('manual', ['/other'])
+    it('a background startup rescan attaches to the active scan', async () => {
+        const first = await service.startScan('manual', ['/music'])
+        const second = await service.startScan('startup')
 
         expect(second).toBe(first)
         expect(backend.scan).toHaveBeenCalledTimes(1)
+    })
+
+    it('a user-initiated scan takes over the running scan', async () => {
+        const running = await service.startScan('startup')
+        const runningSignal = backend.scan.mock.calls[0][1] as AbortSignal
+        const aborted = new Promise<void>(resolve => runningSignal.addEventListener('abort', () => resolve()))
+
+        const takeover = service.startScan('manual', ['/other'])
+        await aborted
+        // The real engine unwinds its stream once aborted; the restart gets a fresh one.
+        const abortedUpdates$ = updates$
+        updates$ = new Subject<LibraryScanUpdate>()
+        abortedUpdates$.complete()
+        const second = await takeover
+
+        expect(running.phase).toBe('cancelled')
+        expect(second.scanId).not.toBe(running.scanId)
+        expect(second.phase).toBe('discovering')
+        expect(backend.scan).toHaveBeenCalledTimes(2)
+        expect(backend.scan).toHaveBeenLastCalledWith(['/other'], expect.anything())
+    })
+
+    it('a cancel during folder validation is not lost', async () => {
+        let releaseValidation = (): void => undefined
+        const validationStarted = new Promise<void>(started => {
+            folders.validate.mockImplementation(
+                () =>
+                    new Promise(resolve => {
+                        releaseValidation = () => resolve([availableFolder('/music')])
+                        started()
+                    }),
+            )
+        })
+
+        const starting = service.startScan('manual', ['/music'])
+        await validationStarted
+        service.cancel()
+        releaseValidation()
+        const status = await starting
+
+        expect(status.phase).toBe('cancelled')
+        expect(status.terminal).toMatchObject({ outcome: 'cancelled', error: null })
+        expect(backend.scan).not.toHaveBeenCalled()
     })
 
     it('a completed scan produces a full terminal result and persists only the aggregate', async () => {

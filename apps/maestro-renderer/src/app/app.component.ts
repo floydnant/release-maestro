@@ -154,10 +154,14 @@ export class AppComponent {
         return (settings.library?.folders?.length ?? 0) === 0
     })
 
-    libraryScanSegments = computed((): ProgressBarSegment[] => {
+    /**
+     * Read progress of the sidebar indicator. Guarded: an up-to-date rescan reaches
+     * the reading phase with nothing to read, and `0/0` would render as NaN.
+     */
+    libraryScanPercent = computed(() => {
         const view = this.scanIndicator()
-        if (!view || view.readTotal === 0) return [{ percent: 0, color: 'content.success' }]
-        return [{ percent: (view.readDone / view.readTotal) * 100, color: 'content.success' }]
+        if (!view || view.readTotal === 0) return 0
+        return (view.readDone / view.readTotal) * 100
     })
 
     constructor() {

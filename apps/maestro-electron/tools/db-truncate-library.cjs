@@ -18,10 +18,9 @@ const appDataRoot = process.env.RELEASE_MAESTRO_APP_DATA_DIR
     : join(process.cwd(), '.app-data.dev')
 const dbPath = join(appDataRoot, 'data', 'mailbox-tool.db')
 const settingsPath = join(appDataRoot, 'config', 'settings.json')
-const libraryStatePaths = [
-    join(appDataRoot, 'data', 'library-state.json'),
-]
-const LIBRARY_SETTINGS_KEYS = ['libraryFolders', 'libraryOnboardingSkipped']
+const libraryStatePaths = [join(appDataRoot, 'data', 'library-state.json')]
+/** `library` holds the configured folders and the onboarding flag; the rest are pre-nesting keys. */
+const LIBRARY_SETTINGS_KEYS = ['library']
 
 const KEEP_PATTERNS = [/^sqlite_/, /^__drizzle/, /^feed_/]
 

@@ -130,14 +130,15 @@ export class LibraryImportComponent {
 
     private async initialize(): Promise<void> {
         await this.library.synced
-        if (this.library.isScanning()) {
-            this.watchedScanId.set(this.library.scanStatus()?.scanId ?? null)
-            this.step.set('scanning')
-            return
-        }
+        // The configured folders are loaded either way: "Change folders" must show
+        // the saved selection even when we resumed straight into a running scan.
         if (this.electronService.isElectron) {
             const settings = await this.electronService.ipcRenderer.invoke('get-settings')
             this.pendingFolders.set(settings.library?.folders ?? [])
+        }
+        if (this.library.isScanning()) {
+            this.watchedScanId.set(this.library.scanStatus()?.scanId ?? null)
+            this.step.set('scanning')
         }
     }
 

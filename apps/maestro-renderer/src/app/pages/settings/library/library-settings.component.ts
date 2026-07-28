@@ -34,6 +34,8 @@ export class LibrarySettingsComponent {
     readonly saveInFlight = signal(false)
     readonly folderValidations = signal<LibraryFolderValidation[]>([])
     private validationToken = 0
+    /** Scan whose completion already refreshed the last-scan panel. */
+    private refreshedScanId: number | null = null
 
     readonly isDirty = computed(() => {
         const folders = this.folders()
@@ -88,11 +90,14 @@ export class LibrarySettingsComponent {
     constructor() {
         void this.loadFolders()
 
-        // Refresh the last-scan panel when a running scan finishes.
+        // Refresh the last-scan panel when a scan finishes — once per scan, since the
+        // refresh itself feeds the signal this effect reads.
         effect(() => {
-            if (this.library.scanStatus()?.terminal?.outcome === 'completed') {
-                void this.library.refreshSnapshot()
-            }
+            const status = this.library.scanStatus()
+            if (status?.terminal?.outcome !== 'completed') return
+            if (this.refreshedScanId === status.scanId) return
+            this.refreshedScanId = status.scanId
+            void this.library.refreshSnapshot()
         })
 
         // Re-validate the staged folders whenever they change. Advisory only: an

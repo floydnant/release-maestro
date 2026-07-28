@@ -75,7 +75,7 @@ export default class App {
             const { diContainer } = await import('./di')
             const { LibraryScanService } = await import('./services/library/library-scan.service')
             const scanService = await diContainer.get(LibraryScanService)
-            scanService.startScan('startup')
+            await scanService.startScan('startup')
         })().catch(error => console.error('Failed to start library startup scan:', error))
     }
 

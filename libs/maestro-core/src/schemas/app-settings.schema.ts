@@ -34,8 +34,10 @@ export type AppSettings = z.infer<typeof appSettingsSchema>
  * invalid fields are dropped instead of failing the whole read, so an old or
  * corrupted config file can never brick startup. Same inferred type.
  *
- * Catches sit on the *leaves* as well as on `library` itself, so one corrupted
- * folder list cannot take its sibling settings down with it.
+ * Catches sit on the *leaves* as well as on the groups, so one corrupted value
+ * cannot take its siblings down with it. This matters beyond the read itself:
+ * whatever a read drops is what the next `patchSettings` writes back, so a
+ * whole-group catch would quietly destroy the rest of that group's settings.
  */
 export const storedAppSettingsSchema = z.object({
     library: z
@@ -45,5 +47,10 @@ export const storedAppSettingsSchema = z.object({
         })
         .prefault({})
         .catch({}),
-    emailPluginConfig: emailPluginConfigSchema.catch({}),
+    emailPluginConfig: z
+        .object({
+            APPLE_MAIL: z.object({ mailboxName: z.string().optional().catch(undefined) }).catch({}),
+        } satisfies Record<EmailVendor, z.ZodType>)
+        .partial()
+        .catch({}),
 })

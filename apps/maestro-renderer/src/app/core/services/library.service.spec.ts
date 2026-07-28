@@ -147,13 +147,29 @@ describe('LibraryService snapshot/event ordering', () => {
         expect(service.mosaicAlbums().map(a => a.coverPath)).toEqual(['/covers/a', '/covers/b'])
     })
 
-    it('applies same-revision snapshots (equal is not stale)', () => {
+    it('ignores a re-delivered status whose revision it already has', () => {
         const service = setup()
 
-        pushEvent({ status: status(1, 4), newAlbums: [] })
+        pushEvent({ status: status(1, 4, { readDone: 4 }), newAlbums: [] })
+        const applied = service.scanStatus()
         pushEvent({ status: status(1, 4, { readDone: 4 }), newAlbums: [] })
 
-        expect(service.scanStatus()?.readDone).toBe(4)
+        // Every mutation bumps `revision`, so an equal one carries no news. Writing
+        // it anyway would wake every reader — and an effect that pulls a snapshot on
+        // change would then loop on its own writes.
+        expect(service.scanStatus()).toBe(applied)
+    })
+
+    it('retains only the recent tail of album previews, but counts every arrival', () => {
+        const service = setup()
+        const arrivals = Array.from({ length: 250 }, (_, index) => album(`/covers/${index}`))
+
+        pushEvent({ status: status(1, 1), newAlbums: arrivals })
+
+        expect(service.mosaicAlbums()).toHaveLength(200)
+        expect(service.mosaicAlbums().at(0)?.coverPath).toBe('/covers/50')
+        expect(service.mosaicAlbums().at(-1)?.coverPath).toBe('/covers/249')
+        expect(service.mosaicAlbumCount()).toBe(250)
     })
 
     it('canonicalizes and deduplicates every folder source before persisting', async () => {

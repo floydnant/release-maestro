@@ -20,7 +20,11 @@ import { LibraryBackendService } from './library.backend.service'
 
 /** How often (at most) scan-status snapshots are pushed to the renderer. */
 const BROADCAST_INTERVAL_MS = 200
-/** Album previews retained for late-mounting UI reseeds (`get-scan-status`). */
+/**
+ * Album previews retained for late-mounting UI reseeds (`get-scan-status`). Only
+ * this bounded tail is kept — a full library's worth of previews must not be held
+ * in memory for the lifetime of the scan.
+ */
 const SNAPSHOT_ALBUM_LIMIT = 200
 /** Cap on per-file failure *details*; the failure counts always stay exact. */
 const FAILURE_DETAIL_LIMIT = 1_000
@@ -32,7 +36,8 @@ export interface LibraryScanState extends Record<string, unknown> {
 /**
  * Main-process owner of the library scan lifecycle.
  *
- * Exactly one scan runs at a time (`startScan` is idempotent while scanning).
+ * Exactly one scan runs at a time: a background startup rescan attaches to the
+ * scan in flight, while a user-initiated one takes over (see `startScan`).
  * Status is kept as a full snapshot and broadcast to all windows on a dirty-flag
  * throttle; `revision` orders snapshots within a scan so pushes and pulls can
  * race safely. Only the album cover previews for the import mosaic are
@@ -48,10 +53,17 @@ export class LibraryScanService {
     private abortController: AbortController | null = null
     private scanIdCounter = 0
 
-    private albums = new Map<string, LibraryAlbumPreview>()
+    /** Cover paths already emitted this scan. Paths only, so dedup stays cheap on huge libraries. */
+    private seenCoverPaths = new Set<string>()
+    /** Bounded tail of the most recent previews, kept for `getSnapshot` reseeds. */
+    private recentAlbums: LibraryAlbumPreview[] = []
     private pendingNewAlbums: LibraryAlbumPreview[] = []
     private dirty = false
     private broadcastTimer: NodeJS.Timeout | null = null
+    /** Resolves when the running scan reaches a terminal state; see `startScan`. */
+    private scanSettled: Promise<void> = Promise.resolve()
+    /** Serializes starts, so a takeover can never race a concurrent start into two live scans. */
+    private startChain: Promise<unknown> = Promise.resolve()
 
     constructor(
         private readonly library: LibraryBackendService,
@@ -74,12 +86,30 @@ export class LibraryScanService {
 
     /**
      * Start a scan of the configured library folders (or the explicit `paths` override).
-     * Idempotent: while a scan is running, returns the running scan's status instead
-     * of starting another — callers racing (startup vs. onboarding vs. debug) simply
-     * attach to the scan in flight.
+     *
+     * Starts are serialized: only one may be setting up at a time, so a takeover can
+     * never leave two scans running.
      */
-    async startScan(trigger: LibraryScanTrigger, paths?: string[]): Promise<LibraryScanStatus> {
-        if (this.status && this.isScanning) return this.status
+    startScan(trigger: LibraryScanTrigger, paths?: string[]): Promise<LibraryScanStatus> {
+        const started = this.startChain.then(() => this.startScanExclusive(trigger, paths))
+        this.startChain = started.catch(() => undefined)
+        return started
+    }
+
+    private async startScanExclusive(
+        trigger: LibraryScanTrigger,
+        paths?: string[],
+    ): Promise<LibraryScanStatus> {
+        if (this.status && this.isScanning) {
+            // The background startup rescan has no intent of its own: it attaches to
+            // whatever is already in flight rather than disturbing it.
+            if (trigger === 'startup') return this.status
+            // A user-initiated scan does: the folders it means to scan may have been
+            // saved a moment ago, which the running scan knows nothing about. Take
+            // over — cancel it and wait for it to unwind before starting fresh.
+            this.cancel()
+            await this.scanSettled
+        }
 
         const configuredFolders = paths ?? this.settings.getSettings().library?.folders ?? []
         const status = this.newStatus(trigger, configuredFolders)
@@ -90,7 +120,24 @@ export class LibraryScanService {
             return status
         }
 
+        // Assigned before the first await: `isScanning` already reports this scan, so
+        // a Cancel arriving during validation has to reach *this* scan's controller.
+        this.abortController = new AbortController()
+        const { signal } = this.abortController
+
         const validations = await this.folders.validate(configuredFolders)
+        if (signal.aborted) {
+            this.finishScan(status, 'cancelled', {
+                failures: [],
+                discoveryFailureCount: 0,
+                readFailureCount: 0,
+                missing: 0,
+                error: null,
+            })
+            // Nothing is broadcasting yet; push the terminal status out anyway.
+            this.finishBroadcasting()
+            return status
+        }
 
         // Canonical folders, minus duplicates, folders nested under another folder
         // (scanning both would be redundant), and folders we cannot reach.
@@ -107,11 +154,13 @@ export class LibraryScanService {
             .map(validation => validation.path)
         this.touch(status)
 
-        this.albums.clear()
+        this.seenCoverPaths.clear()
+        this.recentAlbums = []
         this.pendingNewAlbums = []
-        this.abortController = new AbortController()
-        const { signal } = this.abortController
         this.startBroadcasting()
+
+        let markSettled = (): void => undefined
+        this.scanSettled = new Promise<void>(resolve => (markSettled = resolve))
 
         /** Failures before the deep-read phase starts are discovery failures. */
         let failureStage: LibraryScanFailureStage = 'discovery'
@@ -201,6 +250,7 @@ export class LibraryScanService {
                             : null,
                 })
                 this.finishBroadcasting()
+                markSettled()
             },
             complete: () => {
                 // An aborted scan completes without a `completed` update.
@@ -218,6 +268,7 @@ export class LibraryScanService {
                     })
                 }
                 this.finishBroadcasting()
+                markSettled()
             },
         })
 
@@ -231,7 +282,7 @@ export class LibraryScanService {
     getSnapshot(): LibraryScanSnapshot {
         return {
             status: this.status,
-            albums: [...this.albums.values()].slice(-SNAPSHOT_ALBUM_LIMIT),
+            albums: [...this.recentAlbums],
             lastScan: this.stateStore.get('lastScan') ?? null,
         }
     }
@@ -313,13 +364,15 @@ export class LibraryScanService {
     }): void {
         if (!metadata.coverPath) return
         // The cover-art cache is content-addressed, so the path dedupes identical artwork.
-        if (this.albums.has(metadata.coverPath)) return
+        if (this.seenCoverPaths.has(metadata.coverPath)) return
+        this.seenCoverPaths.add(metadata.coverPath)
         const preview: LibraryAlbumPreview = {
             albumTitle: metadata.albumTitle,
             artist: metadata.albumArtist ?? metadata.artist,
             coverPath: metadata.coverPath,
         }
-        this.albums.set(metadata.coverPath, preview)
+        this.recentAlbums.push(preview)
+        if (this.recentAlbums.length > SNAPSHOT_ALBUM_LIMIT) this.recentAlbums.shift()
         this.pendingNewAlbums.push(preview)
     }
 

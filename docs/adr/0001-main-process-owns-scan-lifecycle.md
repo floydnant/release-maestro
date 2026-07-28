@@ -2,9 +2,12 @@
 
 Library scans outlive any window: they start at app launch before a window exists, and must survive
 navigation, reloads, and a second window opening. So `LibraryScanService` in the main process owns
-the scan — at most one at a time, with `startScan` idempotent while scanning so racing triggers
-(startup, onboarding, manual, debug) attach to the scan in flight instead of queueing another. The
-renderer holds no scan state of its own; `LibraryService` mirrors what it is told.
+the scan — at most one at a time. Racing triggers resolve by intent: the background `startup` rescan
+attaches to whatever is in flight, while a user-initiated trigger (`onboarding`, `manual`, `debug`)
+takes over — it may exist precisely because the folders just changed, which the running scan knows
+nothing about, so it cancels that scan and restarts once it has unwound. Starts are serialized so a
+takeover can never leave two scans live. The renderer holds no scan state of its own; `LibraryService`
+mirrors what it is told.
 
 ## Why full snapshots instead of deltas
 
@@ -15,7 +18,9 @@ the pushed stream and the pulled `library:get-scan-status` seed can race freely 
 never regresses to stale state.
 
 Only the mosaic album covers are delta-shaped (`newAlbums`), because they accumulate without bound;
-they are deduped by content-addressed cover path, which makes replays idempotent.
+they are deduped by content-addressed cover path, which makes replays idempotent. Both sides retain
+just a bounded tail of the previews — the mosaic samples the recent window near the scan cursor
+anyway, so a whole library's worth of covers would be dead weight in memory.
 
 ## Consequences
 
