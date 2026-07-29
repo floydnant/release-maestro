@@ -130,7 +130,7 @@ export const relevantExternalRefsMap = {
         ExternalRefKeys.BeatportReleaseId,
         ExternalRefKeys.BandcampReleaseId,
     ],
-    labels: [
+    recordLabels: [
         ExternalRefKeys.MusicBrainzLabelId,
         ExternalRefKeys.DiscogsLabelLink,
         ExternalRefKeys.BandcampLabelId,
@@ -153,7 +153,7 @@ export const detectNormalizationIssues = (metadata: SongMetadata): Normalization
     const albumArtist = normalizeDisplayText(metadata.albumArtist)
     const albumTitle = normalizeDisplayText(metadata.albumTitle)
     const genre = normalizeDisplayText(metadata.genre)
-    const label = normalizeDisplayText(metadata.label)
+    const recordLabel = normalizeDisplayText(metadata.label)
     const title = normalizeDisplayText(metadata.title)
     const issues: NormalizationIssue[] = []
 
@@ -178,7 +178,11 @@ export const detectNormalizationIssues = (metadata: SongMetadata): Normalization
             value: title,
         })
     }
-    if (artist && label && artist.localeCompare(label, undefined, { sensitivity: 'accent' }) == 0) {
+    if (
+        artist &&
+        recordLabel &&
+        artist.localeCompare(recordLabel, undefined, { sensitivity: 'accent' }) == 0
+    ) {
         issues.push({ type: 'ARTIST_EQUALS_LABEL', field: 'ARTIST', value: artist })
     }
     if (!genre) issues.push({ type: 'GENRE_MISSING', field: 'GENRE' })

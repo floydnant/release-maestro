@@ -8,6 +8,7 @@ import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
 import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
 import {
+    albumsTable,
     artistRawNameArtistsTable,
     artistRawNamesTable,
     artistsTable,
@@ -19,6 +20,7 @@ import {
     NormalizationIssueStatus,
     NormalizationIssueType,
     normalizationIssuesTable,
+    recordLabelsTable,
     songArtistsTable,
     songGenresTable,
     songsTable,
@@ -99,6 +101,8 @@ describe('LibraryBackendRepository', () => {
         const song = db.select().from(songsTable).get()
         const artists = db.select().from(artistsTable).all()
         const links = db.select().from(songArtistsTable).all()
+        const album = db.select().from(albumsTable).get()
+        const recordLabel = db.select().from(recordLabelsTable).get()
         const rawArtistName = db
             .select()
             .from(artistRawNamesTable)
@@ -112,12 +116,16 @@ describe('LibraryBackendRepository', () => {
 
         expect(song).toMatchObject({
             rawArtist: 'Alpha & Beta',
+            rawRecordLabel: 'Label',
             artistText: 'Alpha & Beta',
             title: 'Song title',
             present: true,
             coverPath: '/cache/cover.jpg',
+            recordLabelText: 'Label',
             externalRefs: { MUSICBRAINZ_RECORDING_ID: ['recording-1'] },
         })
+        expect(recordLabel).toMatchObject({ name: 'Label' })
+        expect(album?.recordLabelId).toBe(recordLabel?.id ?? null)
         expect(song?.lastSeenAt).toEqual(seenAt)
         expect(song?.lastScannedAt).toEqual(new Date('2026-06-15T10:05:00Z'))
         expect(song?.metadataHash).toHaveLength(64)

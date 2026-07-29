@@ -15,6 +15,13 @@
       "when": 1781647120363,
       "tag": "0001_library-song-scan-model",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785323515702,
+      "tag": "0002_mae-87-rename-label-schema-to-record-label",
+      "breakpoints": true
     }
   ]
 }
