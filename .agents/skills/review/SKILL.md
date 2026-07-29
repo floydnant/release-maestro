@@ -72,8 +72,8 @@ with the failure.
 
 ### 4. Identify the spec source
 
-Issues and PRDs live in **Notion**, not GitHub Issues — `#123`-style refs in this repo's commit
-subjects are pull requests. Look for the originating spec in this order:
+Issues and PRDs live in **Linear**, not GitHub Issues — `#123`-style refs in this repo's commit
+subjects are pull requests; Linear issues are `ABC-123`. Look for the originating spec in this order:
 
 1. Issue references in the commit messages or branch name — fetch via the workflow in
    `docs/agents/issue-tracker.md`.
@@ -92,6 +92,10 @@ Pass the sub-agent the files that actually exist here:
 - `docs/testing.md` — test-layer split, E2E conventions, fixture isolation.
 - `.agents/skills/frontend-design/SKILL.md` — required for any diff touching
   `apps/maestro-renderer` UI.
+- `.agents/skills/angular-patterns/SKILL.md` — signals as the state model, the signal/observable
+  bridge, componentization; required for any renderer TypeScript or template diff.
+- `.agents/skills/rxjs-streams/SKILL.md` — required for any diff touching an observable in **either**
+  process: operator choice, cancellation, subscription lifetime.
 - `.agents/skills/verification-loop/SKILL.md` — how changes are meant to be verified.
 - `eslint.config.*`, `tsconfig*.json`, `.prettierrc*` — machine-enforced; note them but don't
   re-check what step 3 already ran.
@@ -110,6 +114,10 @@ changes, using that skill's output format. Under 500 words."
 file and hunk where relevant — every place the diff violates a documented standard. Cite the standard
 (file plus the rule). Distinguish hard violations from judgement calls. Skip anything tooling
 enforces. Under 400 words." Include the step 5 file list.
+
+If the diff adds or changes an observable, a subscription, or a flattening operator, say so in the
+Regression brief as well — operator choice and subscription lifetime are behavioral, so they belong to
+that axis, not only to Standards.
 
 **Spec sub-agent** — brief: "Read the spec. Then read the diff. Report: (a) requirements the spec
 asked for that are missing or partial; (b) behavior in the diff that wasn't asked for (scope creep);

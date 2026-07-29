@@ -1,19 +1,21 @@
 ---
 name: to-issues
-description: Break a plan, spec, or PRD into independently-grabbable issues on the project issue tracker using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementation tickets, or break down work into issues.
+description: Break a plan, spec, or PRD into independently-grabbable Linear issues using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementation tickets, or break down work into issues.
 ---
 
 # To Issues
 
 Break a plan into independently-grabbable issues using vertical slices (tracer bullets).
 
-The issue tracker is Notion — see `docs/agents/issue-tracker.md` for the workflow and `docs/agents/triage-labels.md` for the triage role vocabulary.
+Issues go to Linear (team `MAE`) — see `docs/agents/issue-tracker.md`. Publish each slice to
+**Backlog** with a category label (`Bug`, `Feature`, `Improvement`, `Maintenance`) and the
+`Ready for Agent` label. The `/triage` skill defines the category boundaries.
 
 ## Process
 
 ### 1. Gather context
 
-Work from whatever is already in the conversation context. If the user passes an issue reference (issue number, URL, or path) as an argument, fetch it from the issue tracker and read its full body and comments.
+Work from whatever is already in the conversation context. If the user passes an issue reference (a `MAE-123` key, a Linear URL, or a file path) as an argument, fetch it and read its full description and comments.
 
 ### 2. Explore the codebase (optional)
 
@@ -49,16 +51,16 @@ Ask the user:
 
 Iterate until the user approves the breakdown.
 
-### 5. Publish the issues to the issue tracker
+### 5. Publish the issues to Linear
 
-For each approved slice, publish a new issue to the issue tracker. Use the issue body template below. These issues are considered ready for AFK agents, so publish them with the correct triage label unless instructed otherwise.
+For each approved slice, create a Linear issue in **Backlog** using the description template below. These slices are meant for AFK agents, so apply `Ready for Agent` alongside the category label unless instructed otherwise. They skip the Triage inbox.
 
 Publish issues in dependency order (blockers first) so you can reference real issue identifiers in the "Blocked by" field.
 
 <issue-template>
 ## Parent
 
-A reference to the parent issue on the issue tracker (if the source was an existing issue, otherwise omit this section).
+A Linear reference to the parent issue (if the source was an existing issue, otherwise omit this section).
 
 ## What to build
 

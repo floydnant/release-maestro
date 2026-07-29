@@ -1,21 +1,35 @@
-# Issue tracker: Notion
+# Issue tracker: Linear
 
-Issues and PRDs for this repo live in Notion.
+Issues and PRDs for this repo live in **Linear**, not GitHub Issues. A `#123` reference in a commit
+subject or branch name is a GitHub pull request; Linear issues are referenced by team-prefixed key
+(`ABC-123`).
 
-Canonical tracker page: https://www.notion.so/floyd-haremsa/Release-Maestro-33e753289378804196f0fcf76aee4471
+- Workspace: `https://linear.app/floyd-haremsa`
+- Team key: `MAE`
 
-Use the Notion MCP tools when they are available. Search or fetch this page first, then work with the task database or child pages under it. If the MCP cannot see task records beneath the page, say so clearly and ask the maintainer for access or the specific task URL.
+Use the Linear MCP tools when they are available. If the MCP is not connected or cannot see the team,
+say so plainly and ask the maintainer for access or for the specific issue URL — do not fall back to
+GitHub Issues.
 
 ## Conventions
 
-- Use the team's shared Notion task database or workspace area as the source of truth.
-- Track one work item per Notion page or database record.
-- Keep the title short and specific, matching the work item being discussed.
-- Put longer requirements, checklists, and discussion in the page body or related properties.
-- When a skill says "publish to the issue tracker", create or update the relevant Notion item.
-- When a skill says "fetch the relevant ticket", open the corresponding Notion page or database entry.
-- When a bundled skill mentions GitHub Issues, `gh issue`, issue numbers, or GitHub labels, translate that instruction to the Notion tracker unless the user explicitly asks for GitHub.
+- One work item per Linear issue. Keep the title short and specific.
+- Longer requirements, checklists, and discussion go in the issue description or comments, not the
+  title.
+- When a skill says "publish to the issue tracker", create or update the Linear issue.
+- When a skill says "fetch the relevant ticket", open the corresponding Linear issue and read its
+  description **and** comments — decisions often live in the comments.
+- When a bundled skill mentions GitHub Issues, `gh issue`, issue numbers, or GitHub labels, translate
+  it to Linear unless the user explicitly asks for GitHub.
+- PRDs are issues too, in the same team, distinguished by state and labels rather than by living
+  somewhere separate. If that changes, document the split here.
 
-## Notes
+## States and labels
 
-- If there are separate databases for bugs, PRDs, or implementation tasks, document the split here.
+Lifecycle is a Linear **workflow state** (Triage, Backlog, Todo, In Progress, Done, Canceled);
+category and agent-readiness are **labels**. The `/triage` skill
+([`.agents/skills/triage/SKILL.md`](../../.agents/skills/triage/SKILL.md)) is the source of truth for
+both inventories and the transitions between them.
+
+Do not invent new workflow states — they are workspace-level and affect every board. Labels are the
+cheaper thing to add if a distinction is genuinely missing.

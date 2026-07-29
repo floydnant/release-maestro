@@ -49,9 +49,9 @@ interface ThemeConfig {
 
 ## Prior requests
 
-- #42 — "Add dark mode support"
-- #87 — "Night theme for accessibility"
-- #134 — "Dark theme option"
+- MAE-42 — "Add dark mode support"
+- MAE-87 — "Night theme for accessibility"
+- MAE-134 — "Dark theme option"
 
 ```
 
@@ -85,14 +85,16 @@ The maintainer may:
 
 ## When to write to `.out-of-scope/`
 
-Only when an **enhancement** (not a bug) is rejected as `wontfix`. The flow:
+Only when a `Feature` or `Improvement` is moved to **Canceled** — a request for scope the project has
+decided against. Never for a `Bug` (that is a non-repro or a not-a-bug) and never for `Maintenance`
+(dropped internal work is not a scope decision anyone will re-propose). The flow:
 
 1. Maintainer decides a feature request is out of scope
 2. Check if a matching `.out-of-scope/` file already exists
 3. If yes: append the new issue to the "Prior requests" list
 4. If no: create a new file with the concept name, decision, reason, and first prior request
 5. Post a comment on the issue explaining the decision and mentioning the `.out-of-scope/` file
-6. Close the issue with the `wontfix` label
+6. Move the issue to **Canceled**
 
 ## Updating or removing out-of-scope files
 

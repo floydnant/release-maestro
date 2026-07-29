@@ -17,9 +17,10 @@ core lib. See [README.md](README.md) for the stack and project layout.
 
 ## Issue tracker
 
-Issues and PRDs live in **Notion**, not GitHub Issues — `#123` in a commit subject is a pull request.
+Issues and PRDs live in **Linear**, not GitHub Issues — `#123` in a commit subject is a pull
+request; Linear issues are `MAE-123`.
 See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) for the workflow and
-[docs/agents/triage-labels.md](docs/agents/triage-labels.md) for triage vocabulary.
+the `/triage` skill for the states and labels.
 
 ## Verification
 
@@ -35,12 +36,18 @@ ALWAYS verify after changing code, starting with the narrowest relevant check.
 
 Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verification-loop/SKILL.md).
 
-## Frontend
+## Code patterns
 
-Any user-facing change in `apps/maestro-renderer` MUST follow
-[.agents/skills/frontend-design/SKILL.md](.agents/skills/frontend-design/SKILL.md): design-system
-tokens and Tailwind first, accessibility built in, no bespoke visual direction. Never hand-edit a
-`*.generated.*` file — design tokens are generated from three source JSON files; see the skill.
+- [frontend-design](.agents/skills/frontend-design/SKILL.md) — how the UI looks. Required for any
+  user-facing change in `apps/maestro-renderer`: design-system tokens and Tailwind first,
+  accessibility built in, no bespoke visual direction. Never hand-edit a `*.generated.*` file; design
+  tokens are generated from three source JSON files.
+- [angular-patterns](.agents/skills/angular-patterns/SKILL.md) — how renderer code is built. Signals
+  hold state; bridge into a pipeline with `toSignal`/`toObservable`, never by subscribing to `set()` a
+  signal. Extract a component once a template block owns its own state.
+- [rxjs-streams](.agents/skills/rxjs-streams/SKILL.md) — asynchronous pipelines in **both** processes.
+  A stream is for work where time matters; plain `async`/`await` for one-shots. The flattening
+  operator is a behavioral choice — `exhaustMap` and `concatMap` are load-bearing here, see ADR 0001.
 
 ## Rules
 
@@ -51,6 +58,10 @@ tokens and Tailwind first, accessibility built in, no bespoke visual direction. 
 
 ## Skills
 
-`.agents/skills/` holds vendored skills tracked in `skills-lock.json` plus four repo-owned ones that
-are **not** in the lock and must survive a re-sync: `e2e-testing`, `frontend-design`, `regression`,
-`verification-loop`.
+`.agents/skills/` holds vendored skills tracked in `skills-lock.json` plus repo-owned ones that are
+**not** in the lock and must survive a re-sync:
+
+- Written here: `angular-patterns`, `e2e-testing`, `frontend-design`, `regression`, `rxjs-streams`,
+  `verification-loop`.
+- Rewritten from upstream for this repo's Linear tracker, so no longer syncable: `triage`,
+  `to-issues`, `to-prd`.

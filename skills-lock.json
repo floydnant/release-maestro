@@ -67,24 +67,6 @@
             "skillPath": "skills/productivity/teach/SKILL.md",
             "computedHash": "3f30a6d60bae008c64998acad52c593475b55fa8bafe920ebcd3ea7670c2a720"
         },
-        "to-issues": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/engineering/to-issues/SKILL.md",
-            "computedHash": "47f648f3414848ccfc62cb41d2828b7e575fb5e7cbd6c4bdf630c063b5dc5e82"
-        },
-        "to-prd": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/engineering/to-prd/SKILL.md",
-            "computedHash": "a6d6d475f1d01c201937fa0c306e55b7056b02023ad615bc92f57514e831dd31"
-        },
-        "triage": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/engineering/triage/SKILL.md",
-            "computedHash": "2b6efb6da12d92551772fcc04acf331f4e0e6f7bd9d4cb23ce0b301e0b128feb"
-        },
         "write-a-skill": {
             "source": "mattpocock/skills",
             "sourceType": "github",

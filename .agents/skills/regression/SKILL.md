@@ -29,6 +29,9 @@ Before judging behavior, load what the change is supposed to honor:
   even when every test passes.
 - The zod contracts in `libs/maestro-core/src/schemas/` for any data crossing the main/renderer or
   external boundary, such as settings or metadata-engine IPC. A diff that breaks the schema is a regression even when every test passes.
+- `.agents/skills/rxjs-streams/SKILL.md` and `.agents/skills/angular-patterns/SKILL.md` when the diff
+  touches an observable, a subscription, or renderer state. Operator choice and subscription lifetime
+  are behavior, so a violation there is a regression rather than a style note.
 
 ## 3. Behavioral regression review
 
@@ -50,6 +53,16 @@ For changed files, check:
   also read, computed values that no longer recompute because a dependency moved out of the reactive
   graph, stale state after navigation, in-flight async work resolving after teardown, and pending
   user actions dropped when an async operation completes.
+- **Stream semantics** — in either process. A changed flattening operator is a changed behavior:
+  `mergeMap` where `exhaustMap` belonged permits concurrent triggers (ADR 0001 allows exactly one scan
+  app-wide), and `switchMap` where `concatMap` belonged silently drops work that used to complete.
+  Also: a `Subject` that no longer completes, a subscription that lost its `takeUntilDestroyed`, a
+  `bufferCount`/batching change that breaks ordering, `materialize` removed from a stream that crosses
+  IPC so errors no longer survive the hop, and an `AbortSignal` no longer wired to tear down the
+  resource a stream owns. See `.agents/skills/rxjs-streams/SKILL.md`.
+- **Paradigm drift** — a `.subscribe()` added to `set()` a signal where `toSignal` was the pattern, or
+  a `computed` replaced by an `effect` that writes. Both work and both are regressions against
+  `.agents/skills/angular-patterns/SKILL.md`.
 - **Persistence** — schema changes without a matching migration (`make db-generate NAME=...`), and
   the `feed_*` versus library table boundary. `make db-truncate-library` deliberately preserves
   `feed_*`; a change that blurs the boundary breaks that guarantee.
