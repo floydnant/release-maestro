@@ -102,13 +102,13 @@ export const feedItemHistoryEntriesTable = sqliteTable('feed_item_history_entrie
 })
 
 export const recordLabelsTable = sqliteTable(
-    'labels',
+    'record_labels',
     {
         id: text('id').primaryKey(),
         name: text('name').notNull(),
         externalRefs: text('external_refs', { mode: 'json' }).$type<ExternalRefs>().notNull().default({}),
     },
-    table => [uniqueIndex('labels_name_key').on(table.name)],
+    table => [uniqueIndex('record_labels_name_key').on(table.name)],
 )
 
 export const artistsTable = sqliteTable(
@@ -143,7 +143,7 @@ export const albumsTable = sqliteTable(
         catalogNumber: text('catalog_number'),
         coverPath: text('cover_path'),
         externalRefs: text('external_refs', { mode: 'json' }).$type<ExternalRefs>().notNull().default({}),
-        recordLabelId: text('label_id').references(() => recordLabelsTable.id, {
+        recordLabelId: text('record_label_id').references(() => recordLabelsTable.id, {
             onDelete: 'set null',
             onUpdate: 'cascade',
         }),
@@ -151,7 +151,7 @@ export const albumsTable = sqliteTable(
     table => [
         uniqueIndex('albums_identity_key_key').on(table.identityKey),
         index('albums_title_idx').on(table.title),
-        index('albums_label_id_idx').on(table.recordLabelId),
+        index('albums_record_label_id_idx').on(table.recordLabelId),
     ],
 )
 
@@ -175,14 +175,14 @@ export const songsTable = sqliteTable(
         rawAlbumTitle: text('raw_album_title'),
         rawAlbumArtist: text('raw_album_artist'),
         rawGenre: text('raw_genre'),
-        rawRecordLabel: text('raw_label'),
+        rawRecordLabel: text('raw_record_label'),
 
         title: text('title').notNull(),
         artistText: text('artist_text'),
         albumTitle: text('album_title'),
         albumArtistText: text('album_artist_text'),
         genreText: text('genre_text'),
-        recordLabelText: text('label_text'),
+        recordLabelText: text('record_label_text'),
         catalogNumber: text('catalog_number'),
         year: integer('year'),
         trackNumber: integer('track_number'),
