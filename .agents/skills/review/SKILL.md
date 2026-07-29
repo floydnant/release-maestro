@@ -48,17 +48,23 @@ projects the diff touches, widen only as needed.
 **Use non-mutating targets.** Sub-agents are reading the working tree while these run, and the user
 may have uncommitted work in it — so `make format-check`, never `make format` or `make sure`.
 
-| Diff touches                              | Run                                                 |
-| ----------------------------------------- | --------------------------------------------------- |
-| anything                                  | `make format-check`, `make lint`, `make typecheck`   |
-| `apps/maestro-renderer`                   | `make test-renderer`                                 |
-| `apps/maestro-electron`                   | `make test-electron`                                 |
-| `libs/maestro-core`                       | `make test-core`                                     |
-| `apps/metadata-engine`                    | `make test-engine`                                   |
-| `apps/maestro-renderer/design-tokens`     | `make design-tokens-check`                           |
-| several projects, or unclear              | `make affected`                                      |
+Repo-wide gates go through `make`; single-project gates go direct to `nx`.
+
+| Diff touches                                 | Run                                               |
+| -------------------------------------------- | ------------------------------------------------- |
+| anything                                     | `make format-check`, `make lint`                  |
+| `apps/maestro-renderer`                      | `npx nx test maestro-renderer`                    |
+| `apps/maestro-electron`                      | `npx nx test maestro-electron`                    |
+| `libs/maestro-core`                          | `npx nx test maestro-core`                        |
+| `apps/metadata-engine`                       | `npx nx test metadata-engine`                     |
+| `apps/maestro-renderer/design-tokens`        | `npx nx run maestro-renderer:design-tokens-check` |
+| several projects, or unclear                 | `make affected`                                   |
 | a user journey (scan/import, feed, playback) | `make e2e` or `make e2e-renderer`                 |
-| build config, packaging, or deps          | `make build-prod`                                    |
+| build config, packaging, or deps             | `make build-prod`                                 |
+
+There is no repo-wide typecheck target. Type errors in renderer, electron, and core surface through
+`build` — run `npx nx build <project>` (or `make build`) when the diff changes types or contracts.
+The e2e suites type-check themselves as a task dependency.
 
 Report pass/fail with the command that produced it. Never claim green without having run it. If a
 gate fails, keep going — the sub-agents still produce useful findings — and lead the final report

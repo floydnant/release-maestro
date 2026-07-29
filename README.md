@@ -13,6 +13,7 @@ A desktop app for your music. Scan your local collection into a searchable libra
 | ---------- | ------------------------------------ |
 | Frontend   | Angular, Tailwind CSS, ng-primitives |
 | Backend    | Electron, Node.js                    |
+| Audio tags | Rust (metadata-engine sidecar)       |
 | Database   | SQLite (better-sqlite3), Drizzle ORM |
 | Validation | Zod                                  |
 | Scraping   | Cheerio, bandcamp-fetch              |
@@ -21,8 +22,9 @@ A desktop app for your music. Scan your local collection into a searchable libra
 
 ## Prerequisites
 
-- Node.js >= 22.12.0
+- Node.js >= 22.22.3 (see `.node-version`)
 - npm
+- A Rust toolchain — `apps/metadata-engine` is a Cargo crate built into a sidecar binary
 - macOS (required for Apple Mail email import; the app itself builds on all platforms)
 
 ## Getting Started
@@ -30,22 +32,33 @@ A desktop app for your music. Scan your local collection into a searchable libra
 ```bash
 npm i
 make dev
-
-# Verifications
-make format
-make lint
-make test
-make build
-make e2e
-make e2e-renderer
 ```
 
 This starts the Angular dev server and the Electron main process with hot reload.
 
 ## Commands
 
-Run `make help` for a list of commands to run. See [docs/testing.md](docs/testing.md) for testing
-strategy, E2E conventions, and fixture guidance.
+`make` is the repo-wide interface — run `make help` for the full list. It is what CI runs.
+
+```bash
+make sure          # format, lint, build, test across the repo
+make affected      # the same, scoped to what git says changed
+make format-check  # non-mutating formatting check
+make e2e           # full Electron E2E (type-checks itself first)
+make e2e-renderer  # renderer-only E2E (type-checks itself first)
+```
+
+For focused work on a single project, go straight to nx rather than through make — it schedules and
+caches per project better:
+
+```bash
+npx nx test maestro-renderer
+npx nx lint maestro-electron
+npx nx build maestro-core
+```
+
+There is no repo-wide typecheck target; `build` is the type gate for app code. See
+[docs/testing.md](docs/testing.md) for testing strategy, E2E conventions, and fixture guidance.
 
 ## Documentation
 
@@ -60,13 +73,16 @@ strategy, E2E conventions, and fixture guidance.
 apps/
   maestro-electron/    Electron main process (backend services, IPC API, database)
   maestro-renderer/    Angular frontend (feed UI, library import, audio player, settings)
-  maestro-e2e/          Renderer and full Electron E2E tests
-  metadata-engine/     Sidecar worker for reading/writing audio file metadata
+  maestro-e2e/         Renderer and full Electron E2E tests
+  metadata-engine/     Rust sidecar for reading/writing audio file metadata
 libs/
   maestro-core/        Shared library (Zod schemas, types, utilities)
 apple-scripts/         AppleScript for exporting emails from Apple Mail
 drizzle/               Database migrations
 docs/                  ADRs, context glossaries, testing guide
+fixtures/              Committed test fixtures (see docs/testing.md)
+scripts/, tools/       Repo maintenance scripts and Nx generators
+.agents/skills/        Agent skills (see AGENTS.md)
 ```
 
 Note that the project layout is not the product layout: both product contexts (music library, release
@@ -91,10 +107,10 @@ Produces platform-specific distributables in `dist/executables/`:
 
 Release Maestro uses SQLite with Drizzle ORM. Migrations live in `drizzle/` and are applied automatically on startup.
 
-To generate a new migration after changing the schema:
+To generate a new migration after changing the schema — the name is required:
 
 ```bash
-make db-generate
+make db-generate NAME=add_users_table
 ```
 
 Not all state lives in SQLite. User settings are a `conf` file in the app's **config** dir; library

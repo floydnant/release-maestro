@@ -162,5 +162,5 @@ make e2e-renderer
 If the change also touches renderer components or services, run:
 
 ```bash
-make test-renderer
+npx nx test maestro-renderer
 ```

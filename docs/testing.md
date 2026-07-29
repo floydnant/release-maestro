@@ -41,25 +41,41 @@ into it explicitly by overriding `get-settings`.
 
 ## Commands
 
+Repo-wide, through `make`:
+
 ```bash
 make test
-make test-renderer
-make test-electron
-make test-core
-make test-engine
 make e2e
 make e2e-renderer
-make typecheck-e2e
 make lint
 make format-check
+make sure          # format, lint, build, test
+make affected      # the above, scoped to what git says changed
 ```
 
-Playwright transpiles tests but does not perform semantic TypeScript checking. The `maestro-e2e:typecheck`
-target runs `tsc --noEmit` over both Electron and renderer E2E sources; CI invokes it through
-`make typecheck-e2e`.
+One project at a time, straight to nx:
+
+```bash
+npx nx test maestro-renderer
+npx nx test maestro-electron
+npx nx test maestro-core
+npx nx test metadata-engine
+npx nx run maestro-renderer:design-tokens-check
+```
 
 Run the narrowest relevant command first. If a change crosses project boundaries, add the affected
 project checks after the narrow check passes.
+
+### Type checking
+
+Playwright transpiles tests but does not perform semantic TypeScript checking, so `maestro-e2e`
+declares a `typecheck` target running `tsc --noEmit` over both Electron and renderer E2E sources.
+Both e2e targets `dependsOn` it, so it runs automatically before Playwright — in CI too. Run it
+alone with `make typecheck-e2e` when you want the check without the suite.
+
+No other project declares a typecheck target, so **`build` is the type gate for app code**: type
+errors in renderer, electron, and core surface through `npx nx build <project>`, `make build`, or
+`make sure`. Don't assume a green test run has checked types.
 
 ## E2E Conventions
 

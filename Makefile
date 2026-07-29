@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report typecheck typecheck-e2e lint format f format-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report typecheck-e2e lint format f format-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -83,9 +83,7 @@ e2e-show-report: ## Show the latest e2e test report
 	npx playwright show-report
 
 # Code Quality
-typecheck: ## Type-check all projects with a typecheck target
-	npx nx run-many -t typecheck
-typecheck-e2e: ## Type-check the end-to-end test suite
+typecheck-e2e: ## Type-check the end-to-end test suite (also runs automatically before e2e)
 	npx nx run maestro-e2e:typecheck
 lint: ## Lint all projects
 	npx nx run-many -t lint --output-style=stream --skipNxCache=$(SKIP_NX_CACHE)
@@ -97,10 +95,10 @@ f: format
 format-check: ## Check formatting
 	npx prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"
 
-sure: format ## Run all checks (format, lint, typecheck, test, build)
-	npx nx run-many -t lint,typecheck,build,test -c development --skipNxCache=$(SKIP_NX_CACHE)
+sure: format ## Run all checks (format, lint, build, test); build is the type gate for app code
+	npx nx run-many -t lint,build,test -c development --skipNxCache=$(SKIP_NX_CACHE)
 affected: ## Run checks only on affected projects based on git changes
-	npx nx affected -t build,lint,typecheck,test,e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
+	npx nx affected -t build,lint,test,e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
 
 # Database
 drizzleCommand = mkdir -p .app-data.dev/data && DATABASE_URL=file:./.app-data.dev/data/mailbox-tool.db ELECTRON_RUN_AS_NODE=1 npx electron ./node_modules/drizzle-kit/bin.cjs
