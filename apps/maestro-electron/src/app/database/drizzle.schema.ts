@@ -101,7 +101,7 @@ export const feedItemHistoryEntriesTable = sqliteTable('feed_item_history_entrie
         .references(() => feedItemsTable.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
 })
 
-export const labelsTable = sqliteTable(
+export const recordLabelsTable = sqliteTable(
     'labels',
     {
         id: text('id').primaryKey(),
@@ -143,7 +143,7 @@ export const albumsTable = sqliteTable(
         catalogNumber: text('catalog_number'),
         coverPath: text('cover_path'),
         externalRefs: text('external_refs', { mode: 'json' }).$type<ExternalRefs>().notNull().default({}),
-        labelId: text('label_id').references(() => labelsTable.id, {
+        recordLabelId: text('label_id').references(() => recordLabelsTable.id, {
             onDelete: 'set null',
             onUpdate: 'cascade',
         }),
@@ -151,7 +151,7 @@ export const albumsTable = sqliteTable(
     table => [
         uniqueIndex('albums_identity_key_key').on(table.identityKey),
         index('albums_title_idx').on(table.title),
-        index('albums_label_id_idx').on(table.labelId),
+        index('albums_label_id_idx').on(table.recordLabelId),
     ],
 )
 
@@ -175,14 +175,14 @@ export const songsTable = sqliteTable(
         rawAlbumTitle: text('raw_album_title'),
         rawAlbumArtist: text('raw_album_artist'),
         rawGenre: text('raw_genre'),
-        rawLabel: text('raw_label'),
+        rawRecordLabel: text('raw_label'),
 
         title: text('title').notNull(),
         artistText: text('artist_text'),
         albumTitle: text('album_title'),
         albumArtistText: text('album_artist_text'),
         genreText: text('genre_text'),
-        labelText: text('label_text'),
+        recordLabelText: text('label_text'),
         catalogNumber: text('catalog_number'),
         year: integer('year'),
         trackNumber: integer('track_number'),
@@ -399,4 +399,4 @@ export type DbSong = typeof songsTable.$inferSelect
 export type DbArtist = typeof artistsTable.$inferSelect
 export type DbAlbum = typeof albumsTable.$inferSelect
 export type DbGenre = typeof genresTable.$inferSelect
-export type DbLabel = typeof labelsTable.$inferSelect
+export type DbRecordLabel = typeof recordLabelsTable.$inferSelect

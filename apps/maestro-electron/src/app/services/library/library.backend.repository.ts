@@ -12,7 +12,7 @@ import {
     genreRawNameGenresTable,
     genreRawNamesTable,
     genresTable,
-    labelsTable,
+    recordLabelsTable,
     NormalizationIssue,
     normalizationIssuesTable,
     songArtistsTable,
@@ -196,7 +196,7 @@ export class LibraryBackendRepository {
         const albumArtistText = normalizeDisplayText(rawAlbumArtist)
         const albumTitle = normalizeDisplayText(metadata.albumTitle)
         const genreText = normalizeDisplayText(metadata.genre)
-        const labelText = normalizeDisplayText(metadata.label)
+        const recordLabelText = normalizeDisplayText(metadata.label)
         const externalRefs = extractExternalRefs(metadata.extraMetadata, metadata.comment)
 
         return db.transaction(tx => {
@@ -288,41 +288,41 @@ export class LibraryBackendRepository {
                 return [artistId]
             }
 
-            const getOrCreateLabel = (name: string | null): string | null => {
+            const getOrCreateRecordLabel = (name: string | null): string | null => {
                 if (!name) return null
                 const existingLabel = tx
-                    .select({ id: labelsTable.id, externalRefs: labelsTable.externalRefs })
-                    .from(labelsTable)
-                    .where(eq(labelsTable.name, name))
+                    .select({ id: recordLabelsTable.id, externalRefs: recordLabelsTable.externalRefs })
+                    .from(recordLabelsTable)
+                    .where(eq(recordLabelsTable.name, name))
                     .get()
                 if (existingLabel) {
-                    tx.update(labelsTable)
+                    tx.update(recordLabelsTable)
                         .set({
                             externalRefs: mergeExternalRefs([
                                 existingLabel.externalRefs,
-                                filterExternalRefs(externalRefs, relevantExternalRefsMap.labels),
+                                filterExternalRefs(externalRefs, relevantExternalRefsMap.recordLabels),
                             ]),
                         })
-                        .where(eq(labelsTable.id, existingLabel.id))
+                        .where(eq(recordLabelsTable.id, existingLabel.id))
                         .run()
 
                     return existingLabel.id
                 }
 
                 const id = randomUUID()
-                tx.insert(labelsTable)
+                tx.insert(recordLabelsTable)
                     .values({
                         id,
                         name,
-                        externalRefs: filterExternalRefs(externalRefs, relevantExternalRefsMap.labels),
+                        externalRefs: filterExternalRefs(externalRefs, relevantExternalRefsMap.recordLabels),
                     })
                     .onConflictDoNothing()
                     .run()
                 return (
                     tx
-                        .select({ id: labelsTable.id })
-                        .from(labelsTable)
-                        .where(eq(labelsTable.name, name))
+                        .select({ id: recordLabelsTable.id })
+                        .from(recordLabelsTable)
+                        .where(eq(recordLabelsTable.name, name))
                         .get()?.id ?? id
                 )
             }
@@ -400,7 +400,7 @@ export class LibraryBackendRepository {
             const songArtists = resolveArtists(rawArtist, artistText)
             const albumArtists = resolveArtists(rawAlbumArtist, albumArtistText)
             const songGenres = resolveGenres(rawGenre, genreText)
-            const labelId = getOrCreateLabel(labelText)
+            const recordLabelId = getOrCreateRecordLabel(recordLabelText)
             let albumId: string | null = null
 
             if (albumTitle) {
@@ -423,7 +423,7 @@ export class LibraryBackendRepository {
                         existingAlbum?.externalRefs,
                         filterExternalRefs(externalRefs, relevantExternalRefsMap.albums),
                     ]),
-                    labelId,
+                    recordLabelId,
                 } satisfies Omit<typeof albumsTable.$inferInsert, 'id'>
 
                 if (existingAlbum) {
@@ -476,13 +476,13 @@ export class LibraryBackendRepository {
                 rawAlbumTitle: metadata.albumTitle,
                 rawAlbumArtist,
                 rawGenre: metadata.genre,
-                rawLabel: metadata.label,
+                rawRecordLabel: metadata.label,
                 title: normalizeDisplayText(metadata.title) ?? titleFromFileName(metadata.fileName),
                 artistText,
                 albumTitle,
                 albumArtistText,
                 genreText,
-                labelText,
+                recordLabelText,
                 catalogNumber: normalizeDisplayText(metadata.catalogNumber),
                 year: metadata.year,
                 trackNumber: metadata.track,
