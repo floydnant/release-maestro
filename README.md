@@ -67,23 +67,19 @@ There is no repo-wide typecheck target; `build` is the type gate for app code. S
 - [docs/adr/](docs/adr/) — architectural decisions and the reasoning behind non-obvious ones
 - [docs/testing.md](docs/testing.md) — test layers, E2E conventions, fixtures
 
-## Project Structure
+## Projects
 
-```
-apps/
-  maestro-electron/    Electron main process (backend services, IPC API, database)
-  maestro-renderer/    Angular frontend (feed UI, library import, audio player, settings)
-  maestro-e2e/         Renderer and full Electron E2E tests
-  metadata-engine/     Rust sidecar for reading/writing audio file metadata
-libs/
-  maestro-core/        Shared library (Zod schemas, types, utilities)
-apple-scripts/         AppleScript for exporting emails from Apple Mail
-drizzle/               Database migrations
-docs/                  ADRs, context glossaries, testing guide
-fixtures/              Committed test fixtures (see docs/testing.md)
-scripts/, tools/       Repo maintenance scripts and Nx generators
-.agents/skills/        Agent skills (see AGENTS.md)
-```
+Five Nx projects, whose names are not self-explanatory:
+
+- **`maestro-electron`** — Electron main process: backend services, the IPC API, the database.
+- **`maestro-renderer`** — Angular frontend: feed UI, library import, audio player, settings.
+- **`maestro-core`** — shared Zod schemas and types. The contract for everything crossing the
+  main/renderer and metadata-engine boundaries.
+- **`metadata-engine`** — Rust sidecar that reads and writes audio file tags.
+- **`maestro-e2e`** — both E2E suites, renderer-only and full Electron.
+
+`apple-scripts/` holds the AppleScript that exports mail out of Apple Mail; `drizzle/` holds
+migrations. Each project's `project.json` is the source of truth for its boundaries and targets.
 
 Note that the project layout is not the product layout: both product contexts (music library, release
 feed) cut across `maestro-electron`, `maestro-renderer`, and `maestro-core`. See
