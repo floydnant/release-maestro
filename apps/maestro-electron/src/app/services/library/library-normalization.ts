@@ -178,7 +178,11 @@ export const detectNormalizationIssues = (metadata: SongMetadata): Normalization
             value: title,
         })
     }
-    if (artist && recordLabel && artist.localeCompare(recordLabel, undefined, { sensitivity: 'accent' }) == 0) {
+    if (
+        artist &&
+        recordLabel &&
+        artist.localeCompare(recordLabel, undefined, { sensitivity: 'accent' }) == 0
+    ) {
         issues.push({ type: 'ARTIST_EQUALS_LABEL', field: 'ARTIST', value: artist })
     }
     if (!genre) issues.push({ type: 'GENRE_MISSING', field: 'GENRE' })
