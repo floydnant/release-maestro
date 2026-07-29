@@ -280,6 +280,20 @@ const generatedFiles = () => {
 
 const normalizeLineEndings = value => value.replace(/\r\n/g, '\n')
 
+const designTokenReferencePattern = /var\((--(?:color|foundation|type)-[a-zA-Z0-9_-]+)/g
+
+const findUnknownTokenReferences = (source, knownTokens) => {
+    const violations = []
+
+    source.split('\n').forEach((line, index) => {
+        for (const match of line.matchAll(designTokenReferencePattern)) {
+            if (!knownTokens.has(match[1])) violations.push({ line: index + 1, token: match[1] })
+        }
+    })
+
+    return violations
+}
+
 const writeGenerated = () => {
     for (const [file, contents] of generatedFiles()) {
         fs.mkdirSync(path.dirname(file), { recursive: true })
@@ -354,6 +368,37 @@ const checkRawColorUsage = () => {
     }
 }
 
+const checkTokenReferences = () => {
+    const generatedCss = generatedFiles().find(([file]) => file === generatedCssPath)[1]
+    const knownTokens = new Set(
+        [...generatedCss.matchAll(/(--(?:color|foundation|type)-[a-zA-Z0-9_-]+)\s*:/g)].map(
+            match => match[1],
+        ),
+    )
+    const sourceRoot = path.join(projectRoot, 'src/app')
+    const violations = []
+
+    const visit = directory => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+            const file = path.join(directory, entry.name)
+            if (entry.isDirectory()) visit(file)
+            else if (/\.(?:html|css|ts)$/.test(entry.name) && !entry.name.endsWith('.spec.ts')) {
+                const references = findUnknownTokenReferences(fs.readFileSync(file, 'utf8'), knownTokens)
+                for (const reference of references) {
+                    violations.push(
+                        `${path.relative(projectRoot, file)}:${reference.line} ${reference.token}`,
+                    )
+                }
+            }
+        }
+    }
+
+    visit(sourceRoot)
+    if (violations.length) {
+        throw new Error(`Unknown design-token references found:\n${violations.join('\n')}`)
+    }
+}
+
 if (require.main === module) {
     const command = process.argv[2]
     if (command === 'generate') writeGenerated()
@@ -361,6 +406,7 @@ if (require.main === module) {
     else if (command === 'check') {
         checkGenerated()
         checkRawColorUsage()
+        checkTokenReferences()
     } else {
         console.error('Usage: node tools/design-tokens.cjs <generate|watch|check>')
         process.exitCode = 1
@@ -370,6 +416,7 @@ if (require.main === module) {
 module.exports = {
     contrastRatio,
     flatten,
+    findUnknownTokenReferences,
     generate,
     getPath,
     normalizeLineEndings,

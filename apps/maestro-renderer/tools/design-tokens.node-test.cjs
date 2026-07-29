@@ -1,6 +1,12 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
-const { flatten, generate, normalizeLineEndings, resolveValue } = require('./design-tokens.cjs')
+const {
+    findUnknownTokenReferences,
+    flatten,
+    generate,
+    normalizeLineEndings,
+    resolveValue,
+} = require('./design-tokens.cjs')
 
 const foundations = {
     color: {
@@ -44,4 +50,19 @@ test('rejects duplicate flattened paths', () => {
 
 test('normalizes Windows line endings for generated file checks', () => {
     assert.equal(normalizeLineEndings('alpha\r\nbeta\r\n'), 'alpha\nbeta\n')
+})
+
+test('reports mistyped design-token custom properties with their line numbers', () => {
+    const knownTokens = new Set(['--color-content-primary', '--foundation-spacing-2'])
+    const source = `.valid { color: var(--color-content-primary); }
+.invalid { padding: var(--foundation-spacing-3); color: var(--color-content-prmary); }`
+
+    assert.deepEqual(findUnknownTokenReferences(source, knownTokens), [
+        { line: 2, token: '--foundation-spacing-3' },
+        { line: 2, token: '--color-content-prmary' },
+    ])
+})
+
+test('ignores component-local custom properties', () => {
+    assert.deepEqual(findUnknownTokenReferences('color: var(--progress-color);', new Set()), [])
 })
