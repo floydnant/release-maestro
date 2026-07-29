@@ -63,5 +63,5 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
 
 - Written here: `angular-patterns`, `e2e-testing`, `frontend-design`, `regression`, `rxjs-streams`,
   `verification-loop`.
-- Rewritten from upstream for this repo's Linear tracker, so no longer syncable: `triage`,
+- Rewritten from upstream for this repo's workflows, so no longer syncable: `review`, `triage`,
   `to-issues`, `to-prd`.

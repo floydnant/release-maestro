@@ -87,6 +87,7 @@ subjects are pull requests; Linear issues are `ABC-123`. Look for the originatin
 Pass the sub-agent the files that actually exist here:
 
 - `AGENTS.md` — rules, validation loop, issue tracker.
+- `docs/agents/domain.md` — repository-specific context layout, vocabulary, and naming overrides.
 - `CONTEXT-MAP.md` and the relevant `docs/contexts/*/CONTEXT.md` — vocabulary and boundaries.
 - `docs/adr/` — architectural decisions are standards.
 - `docs/testing.md` — test-layer split, E2E conventions, fixture isolation.
