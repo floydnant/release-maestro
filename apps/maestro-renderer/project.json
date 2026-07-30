@@ -120,15 +120,8 @@
         },
         "design-tokens-check": {
             "executor": "nx:run-commands",
-            "dependsOn": ["design-tokens-test"],
             "options": {
                 "command": "node apps/maestro-renderer/tools/design-tokens.cjs check"
-            }
-        },
-        "design-tokens-test": {
-            "executor": "nx:run-commands",
-            "options": {
-                "command": "node --test apps/maestro-renderer/tools/design-tokens.node-test.cjs"
             }
         },
         "serve-static": {

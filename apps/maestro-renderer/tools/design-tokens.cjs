@@ -47,7 +47,8 @@ const resolveValue = (value, foundations, stack = []) => {
     return resolveValue(getPath(foundations, tokenPath), foundations, [...stack, tokenPath])
 }
 
-const cssName = tokenPath => tokenPath.replaceAll('.', '-').replaceAll('lineHeight', 'line-height')
+const cssName = tokenPath =>
+    tokenPath.replaceAll('.', '-').replaceAll('lineHeight', 'line-height').replaceAll('letterSpacing', 'letter-spacing')
 const camelName = tokenPath => tokenPath.replace(/[.-]([a-z0-9])/g, (_, character) => character.toUpperCase())
 
 const hexToRgb = value => {
@@ -280,6 +281,56 @@ const generatedFiles = () => {
 
 const normalizeLineEndings = value => value.replace(/\r\n/g, '\n')
 
+const extractDesignTokenDeclarations = css => {
+    const declarations = new Set()
+    const declarationPattern = /(--(?:color|foundation|type)-[a-zA-Z0-9-]+)\s*:/g
+    for (const match of css.matchAll(declarationPattern)) declarations.add(match[1])
+    return declarations
+}
+
+const validateDesignTokenReferences = (files, declarations) => {
+    const violations = []
+    const referencePattern = /var\(\s*(--(?:color|foundation|type)-[a-zA-Z0-9-]+)/g
+
+    for (const { filePath, contents } of files) {
+        contents.split('\n').forEach((line, index) => {
+            for (const match of line.matchAll(referencePattern)) {
+                const token = match[1]
+                if (!declarations.has(token)) {
+                    violations.push({ filePath, line: index + 1, token })
+                }
+            }
+        })
+    }
+
+    return violations
+}
+
+const rendererSourceFiles = () => {
+    const files = []
+    const sourceRoot = path.join(projectRoot, 'src')
+
+    const visit = directory => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+            const file = path.join(directory, entry.name)
+            if (entry.isDirectory()) visit(file)
+            else if (
+                /\.(?:html|css|ts)$/.test(entry.name) &&
+                !entry.name.endsWith('.spec.ts') &&
+                !entry.name.includes('.generated.')
+            ) {
+                files.push({
+                    filePath: path.relative(projectRoot, file),
+                    contents: fs.readFileSync(file, 'utf8'),
+                })
+            }
+        }
+    }
+
+    visit(sourceRoot)
+    return files
+}
+
 const writeGenerated = () => {
     for (const [file, contents] of generatedFiles()) {
         fs.mkdirSync(path.dirname(file), { recursive: true })
@@ -313,13 +364,27 @@ const watchGenerated = () => {
 }
 
 const checkGenerated = () => {
-    for (const [file, expected] of generatedFiles()) {
+    const generated = generatedFiles()
+    for (const [file, expected] of generated) {
         if (
             !fs.existsSync(file) ||
             normalizeLineEndings(fs.readFileSync(file, 'utf8')) !== normalizeLineEndings(expected)
         ) {
             throw new Error(`Generated design tokens are stale: ${path.relative(projectRoot, file)}`)
         }
+    }
+}
+
+const checkDesignTokenReferences = () => {
+    const generatedCss = generatedFiles().find(([file]) => file === generatedCssPath)?.[1]
+    const declarations = extractDesignTokenDeclarations(generatedCss ?? '')
+    const violations = validateDesignTokenReferences(rendererSourceFiles(), declarations)
+    if (violations.length) {
+        throw new Error(
+            `Unknown generated design token references found:\n${violations
+                .map(({ filePath, line, token }) => `${filePath}:${line} ${token}`)
+                .join('\n')}`,
+        )
     }
 }
 
@@ -360,6 +425,7 @@ if (require.main === module) {
     else if (command === 'watch') watchGenerated()
     else if (command === 'check') {
         checkGenerated()
+        checkDesignTokenReferences()
         checkRawColorUsage()
     } else {
         console.error('Usage: node tools/design-tokens.cjs <generate|watch|check>')
@@ -369,9 +435,11 @@ if (require.main === module) {
 
 module.exports = {
     contrastRatio,
+    extractDesignTokenDeclarations,
     flatten,
     generate,
     getPath,
     normalizeLineEndings,
     resolveValue,
+    validateDesignTokenReferences,
 }

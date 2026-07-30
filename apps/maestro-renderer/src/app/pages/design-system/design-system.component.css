@@ -26,7 +26,7 @@
     overflow: hidden;
     border-radius: var(--foundation-radius-lg);
     background: var(--color-background-elevated);
-    box-shadow: var(--shadow-elevation-low);
+    box-shadow: var(--foundation-shadow-md);
 }
 
 .swatch__color {
