@@ -1,12 +1,31 @@
 import nx from '@nx/eslint-plugin'
 import tailwind from 'eslint-plugin-tailwindcss'
 import { defineConfig } from 'eslint/config'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const workspaceRoot = dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url)
+const tailwindAngular = require('./tools/eslint/tailwindcss-angular/index.cjs')
 const tailwindConfig = join(workspaceRoot, 'apps/maestro-renderer/tailwind.config.js')
 const tailwindRules = tailwind.configs['flat/recommended'].find(config => config.rules)?.rules ?? {}
+
+// PROTOTYPE (MAE-105): classes that exist but are not discoverable from Tailwind
+// or from a CSS selector — see docs/prototypes/mae-105-eslint-plugin-tailwindcss.md
+const classnameWhitelist = [
+    // Tailwind plugin utilities registered via addUtilities()
+    'glass',
+    'child-focus-ring',
+    'wrap-nicely',
+]
+
+// Authored CSS that the rule reads to learn non-Tailwind class names.
+const cssFiles = [
+    'apps/maestro-renderer/src/styles.css',
+    'apps/maestro-renderer/src/styles/**/*.css',
+    'apps/maestro-renderer/src/app/**/*.css',
+]
 
 export default defineConfig([
     ...nx.configs['flat/base'],
@@ -109,17 +128,22 @@ export default defineConfig([
     },
     {
         files: ['**/*.html', '**/*.ts'],
-        plugins: { tailwindcss: tailwind },
+        plugins: { tailwindcss: tailwind, 'tailwindcss-angular': tailwindAngular },
         settings: {
             tailwindcss: {
                 config: tailwindConfig,
+                cssFiles,
+                whitelist: classnameWhitelist,
             },
         },
         rules: {
             ...tailwindRules,
             // Class ordering is owned by prettier-plugin-tailwindcss to avoid conflicts
             'tailwindcss/classnames-order': 'off',
+            // Superseded by the Angular-aware wrapper below, which understands the
+            // `descriptor | utilities` convention and dynamic class bindings.
             'tailwindcss/no-custom-classname': 'off',
+            'tailwindcss-angular/no-custom-classname': 'error',
         },
     },
 ])

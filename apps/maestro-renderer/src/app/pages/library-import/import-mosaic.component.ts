@@ -60,19 +60,22 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
             [style.grid-template-rows]="'repeat(' + rows() + ', minmax(0, 1fr))'"
         >
             @for (cell of cells(); track $index) {
-                <div class="mosaic-cell relative overflow-hidden rounded-md" data-testid="import-mosaic-cell">
+                <div
+                    class="mosaic-cell | relative overflow-hidden rounded-md"
+                    data-testid="import-mosaic-cell"
+                >
                     @if (cell) {
                         <!-- Tracking by revision recreates the nodes on replacement, restarting the animations. -->
                         @for (revisionCell of [cell]; track revisionCell.revision) {
                             @if (revisionCell.previous; as previous) {
                                 <img
-                                    class="mosaic-tile mosaic-tile--leave"
+                                    class="mosaic-tile mosaic-tile--leave |"
                                     [src]="fileUrl(previous.coverPath)"
                                     alt=""
                                 />
                             }
                             <img
-                                class="mosaic-tile mosaic-tile--enter"
+                                class="mosaic-tile mosaic-tile--enter |"
                                 [src]="fileUrl(revisionCell.current.coverPath)"
                                 [title]="tileTitle(revisionCell.current)"
                                 alt=""

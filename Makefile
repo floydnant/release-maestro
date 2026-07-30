@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report typecheck-e2e lint format f format-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report typecheck-e2e lint prototype-classname-test format f format-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -87,6 +87,8 @@ typecheck-e2e: ## Type-check the end-to-end test suite (also runs automatically 
 	npx nx run maestro-e2e:typecheck
 lint: ## Lint all projects
 	npx nx run-many -t lint --output-style=stream --skipNxCache=$(SKIP_NX_CACHE)
+prototype-classname-test: ## PROTOTYPE (MAE-105) Run the class-validation acceptance corpus
+	node tools/eslint/tailwindcss-angular/no-custom-classname.node-test.cjs
 format: ## Format all files
 	npx prettier --write "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"
 	@echo ""
