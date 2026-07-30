@@ -9,7 +9,7 @@
     <div class="progress-bar | flex h-1.5 grow rounded-full bg-border-subtle transition-colors">
         @for (segment of segments(); track $index) {
             <div
-                class="progress-segment | rounded h-full"
+                class="progress-segment | h-full rounded-sm"
                 [class.rounded-l-full]="$first"
                 [class.rounded-r-full]="$last"
                 [style.width]="segment.percent + '%'"

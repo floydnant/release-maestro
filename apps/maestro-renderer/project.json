@@ -87,7 +87,7 @@
         },
         "lint": {
             "executor": "@nx/eslint:lint",
-            "dependsOn": ["design-tokens-check"],
+            "dependsOn": ["design-tokens-check", "eslint-rules-test"],
             "options": {
                 "lintFilePatterns": [
                     "apps/maestro-renderer/tailwind.config.js",
@@ -129,6 +129,12 @@
             "executor": "nx:run-commands",
             "options": {
                 "command": "node --test apps/maestro-renderer/tools/design-tokens.node-test.cjs"
+            }
+        },
+        "eslint-rules-test": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "node --test apps/maestro-renderer/tools/eslint-plugin-design-system/plugin.node-test.cjs"
             }
         },
         "serve-static": {

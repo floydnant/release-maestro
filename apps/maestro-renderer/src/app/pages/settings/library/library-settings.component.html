@@ -71,7 +71,7 @@
             </p>
             <div class="panel mt-3 p-2" aria-label="Failed files">
                 @for (failure of terminalResult.failures; track failure.path) {
-                    <div class="rounded group flex items-center gap-3 px-3 py-2">
+                    <div class="group flex items-center gap-3 rounded-sm px-3 py-2">
                         <div class="min-w-0 grow select-text">
                             <p class="type-body-sm mt-0.5 text-content-danger">
                                 {{ failure.message }}
