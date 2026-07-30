@@ -21,14 +21,21 @@ description: Verification loop using repository make targets.
   wrapper here: nx schedules and caches per project better, and the target name is the same one the
   project config declares.
 - Never use `npm run` scripts. `package.json` intentionally has almost none.
+- The `Makefile` is authoritative for repo-wide commands. Use
+  `npx nx show project <project> --web false` to inspect the effective targets of one project,
+  including inferred targets.
 
 ## Commands
 
-- `make sure` — format, then lint, build, and test across the repo. **Mutates formatting.**
+- `make sure` — format, then lint, build, unit-test, and run renderer E2E across the repo.
+  **Mutates formatting.**
 - `make format-check` — non-mutating formatting check, for review and CI-style verification.
-- `make affected` — build, lint, test, and both e2e suites, scoped to what git says changed.
-- `make e2e` / `make e2e-renderer` — Electron and renderer-only E2E. Both type-check themselves
-  first via `maestro-e2e:typecheck`.
+- `make affected` — build, lint, unit tests, and both E2E suites, scoped to what git says changed;
+  does not check or mutate formatting.
+- `make e2e-renderer` — renderer-only E2E and part of `make sure`.
+- `make e2e` — full Electron E2E. Run intentionally when the changed journey needs it: the suite
+  repeatedly opens and closes the desktop app, so it is deliberately excluded from `make sure`.
+  Both E2E suites type-check themselves first via `maestro-e2e:typecheck`.
 - `make build-prod` — catches production-only build issues.
 - **Type errors in app code surface through `build`**, not through a typecheck target. Only
   `maestro-e2e` declares `typecheck`, and its e2e targets depend on it, so `make build` /

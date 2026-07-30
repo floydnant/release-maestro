@@ -17,9 +17,10 @@ One folder the user nominated as a top of their music collection. Stored canonic
 so two selections of the same directory through different symlinks collapse to one.
 _Avoid_: root, library root, library path, directory, source
 
-Say **folder** everywhere — UI copy, identifiers, docs. "Root" reads as scanner-implementer jargon
-and the app never shows the word to users. Where the tree-walking sense matters, the sentence can say
-so ("the top of the walk") without renaming the concept.
+When naming this product concept, say **folder** in product UI, identifiers, and docs. "Root" reads
+as scanner-implementer jargon and the app never shows the word to users. `path` and `directory`
+remain correct for literal filesystem representations and low-level filesystem operations; do not
+rename those merely to satisfy the product-language rule.
 
 **Configured folders** / **scanned folders**:
 Two genuinely different lists, so qualify which one you mean. _Configured_ is what the user picked and

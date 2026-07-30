@@ -23,10 +23,10 @@ context.
 
 ## Relationships
 
-- **Shared infrastructure, separate models.** Both contexts live in the same SQLite database and both
-  read audio tags through the metadata-engine sidecar, but they do not share tables: `feed_*` tables
-  belong to the release feed, the song/scan tables to the library. `make db-truncate-library`
-  deliberately preserves `feed_*` for this reason.
+- **Shared infrastructure, separate models.** Both contexts live in the same SQLite database, but only
+  the music library reads audio tags through the metadata-engine sidecar. They do not share tables:
+  `feed_*` tables belong to the release feed, the song/scan tables to the library.
+  `make db-truncate-library` deliberately preserves `feed_*` for this reason.
 - **No coupling yet.** Nothing currently matches a library song to a feed release. If that link is
   built, it needs its own vocabulary and probably its own ADR — do not assume either context's terms
   carry over.

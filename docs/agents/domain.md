@@ -7,10 +7,13 @@ How to consume this repo's domain documentation. The docs themselves are:
 - `docs/contexts/*/CONTEXT.md` — one glossary per context.
 - [`docs/adr/`](../adr/) — decisions whose reasoning is not visible in the code.
 - [`docs/testing.md`](../testing.md) — test layers, E2E conventions, fixtures.
-- [`README.md`](../../README.md) — project structure and stack. Per-project `project.json` files are
-  the source of truth for project boundaries and targets.
+- [`README.md`](../../README.md) — project structure and stack. Per-project `project.json` files
+  declare explicit configuration; use `npx nx show project <project> --web false` for the effective
+  target inventory, including inferred targets.
 
 Read the map and the glossary for the context you are working in before exploring the code.
+
+Repository-specific guidance here overrides generic context-file rules in vendored skills.
 
 ## Use the glossary's vocabulary
 
@@ -19,6 +22,11 @@ drift to synonyms the project explicitly avoids — the glossaries list them.
 
 If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language
 the project doesn't use, or there's a real gap to capture.
+
+The glossaries may include a small implementation anchor — a route, schema field, protocol name, or
+representative code location — when it makes the meaning operationally unambiguous or helps an agent
+land in the right code. Keep the definition about domain meaning; broader implementation design,
+workflows, and inventories belong in code, ADRs, or focused technical documentation.
 
 ## Flag ADR conflicts
 
@@ -34,3 +42,5 @@ silently overriding it.
   per-project `CONTEXT.md` or a per-project `docs/adr/`. See `CONTEXT-MAP.md` for why.
 - New glossaries are added lazily, under `docs/contexts/<context>/CONTEXT.md`, only when an area
   develops vocabulary of its own.
+- A generic skill that says `CONTEXT.md` must contain no implementation details should follow the
+  limited-anchor rule above instead.

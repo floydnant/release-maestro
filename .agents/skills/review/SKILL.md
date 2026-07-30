@@ -50,17 +50,21 @@ may have uncommitted work in it — so `make format-check`, never `make format` 
 
 Repo-wide gates go through `make`; single-project gates go direct to `nx`.
 
-| Diff touches                                 | Run                                               |
-| -------------------------------------------- | ------------------------------------------------- |
-| anything                                     | `make format-check`, `make lint`                  |
-| `apps/maestro-renderer`                      | `npx nx test maestro-renderer`                    |
-| `apps/maestro-electron`                      | `npx nx test maestro-electron`                    |
-| `libs/maestro-core`                          | `npx nx test maestro-core`                        |
-| `apps/metadata-engine`                       | `npx nx test metadata-engine`                     |
-| `apps/maestro-renderer/design-tokens`        | `npx nx run maestro-renderer:design-tokens-check` |
-| several projects, or unclear                 | `make affected`                                   |
-| a user journey (scan/import, feed, playback) | `make e2e` or `make e2e-renderer`                 |
-| build config, packaging, or deps             | `make build-prod`                                 |
+| Diff touches                                        | Run                                               |
+| --------------------------------------------------- | ------------------------------------------------- |
+| anything                                            | `make format-check`, `make lint`                  |
+| `apps/maestro-renderer`                             | `npx nx test maestro-renderer`                    |
+| `apps/maestro-electron`                             | `npx nx test maestro-electron`                    |
+| `libs/maestro-core`                                 | `npx nx test maestro-core`                        |
+| `apps/metadata-engine`                              | `npx nx test metadata-engine`                     |
+| `apps/maestro-renderer/design-tokens`               | `npx nx run maestro-renderer:design-tokens-check` |
+| several projects and full-app coverage is warranted | `make affected`                                   |
+| a user journey (scan/import, feed, playback)        | `make e2e` or `make e2e-renderer`                 |
+| build config, packaging, or deps                    | `make build-prod`                                 |
+
+`make affected` includes full Electron E2E, which repeatedly opens and closes the desktop app. Do
+not use it merely as a convenient multi-project unit-test command; select the affected Nx project
+targets directly unless full-app coverage is intentional.
 
 There is no repo-wide typecheck target. Type errors in renderer, electron, and core surface through
 `build` — run `npx nx build <project>` (or `make build`) when the diff changes types or contracts.
@@ -103,8 +107,9 @@ Pass the sub-agent the files that actually exist here:
 
 ### 6. Spawn the three sub-agents in parallel
 
-Send a single message with three `Agent` tool calls, all `general-purpose`. Each gets the diff
-commands from step 2 and the commit list.
+Use the available parallel delegation capability to start three general-purpose sub-agents. If the
+runtime cannot delegate, run the axes sequentially with separate working notes so their findings stay
+independent. Each gets the diff commands from step 2 and the commit list.
 
 **Regression sub-agent** — brief: "Follow `.agents/skills/regression/SKILL.md`. Do not run any
 commands; the verification gates are already being run for you. Report behavioral regressions,

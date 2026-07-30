@@ -23,20 +23,19 @@ The file should be written in a relaxed, readable style — more like a short de
 ````markdown
 # Dark Mode
 
-This project does not support dark mode or user-facing theming.
+Example project Atlas does not support user-facing theming.
 
 ## Why this is out of scope
 
-The rendering pipeline assumes a single color palette defined in
+Atlas's rendering pipeline assumes a single color palette defined in
 `ThemeConfig`. Supporting multiple themes would require:
 
 - A theme context provider wrapping the entire component tree
 - Per-component theme-aware style resolution
 - A persistence layer for user theme preferences
 
-This is a significant architectural change that doesn't align with the
-project's focus on content authoring. Theming is a concern for downstream
-consumers who embed or redistribute the output.
+This is a significant architectural change that doesn't align with Atlas's
+focus on static publishing. Theming is a concern for downstream consumers.
 
 ```ts
 // The current ThemeConfig interface is not designed for runtime switching:
@@ -49,9 +48,9 @@ interface ThemeConfig {
 
 ## Prior requests
 
-- MAE-42 — "Add dark mode support"
-- MAE-87 — "Night theme for accessibility"
-- MAE-134 — "Dark theme option"
+- ATLAS-42 — "Add dark mode support"
+- ATLAS-87 — "Night theme for accessibility"
+- ATLAS-134 — "Dark theme option"
 
 ```
 

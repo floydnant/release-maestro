@@ -3,17 +3,28 @@
 Nx monorepo: Electron main process, Angular renderer, a Rust metadata-engine sidecar, and a shared
 core lib. See [README.md](README.md) for the stack and project layout.
 
-## Read before you work
+## What to read
 
-- [CONTEXT-MAP.md](CONTEXT-MAP.md) — the two product contexts and their glossaries. Contexts are
-  product boundaries, not Nx projects; each spans several projects.
-- [docs/adr/](docs/adr/) — decisions whose reasoning is not visible in the code. An ADR is a standing
-  constraint; flag conflicts rather than overriding them. When a required change conflicts with an ADR,
-  stop and report the specific ADR file and the conflict to the user; do not implement the change until
-  the conflict is resolved.
-- [docs/agents/domain.md](docs/agents/domain.md) — how to use the above, including naming overrides
-  for skills that expect different conventions.
-- [docs/testing.md](docs/testing.md) — test-layer split, E2E conventions, fixture isolation.
+Load guidance for the task at hand; do not load every document by default.
+
+| Work                                | Read                                                                                         |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| Product behavior or domain language | [CONTEXT-MAP.md](CONTEXT-MAP.md), then the relevant context glossary                         |
+| Architectural behavior              | [ADR index](docs/adr/README.md), then only relevant ADRs                                     |
+| Tests or verification               | [docs/testing.md](docs/testing.md) and the verification skill                                |
+| Renderer TypeScript or templates    | `angular-patterns`; add `frontend-design` for user-facing UI                                 |
+| Async pipelines in either process   | `rxjs-streams`                                                                               |
+| Linear issues or PRDs               | [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) and the relevant workflow skill |
+
+[docs/agents/domain.md](docs/agents/domain.md) explains the context layout and repository-specific
+overrides for generic skills.
+
+Authority, from highest to lowest: this file and ADRs; repository-owned guidance in `docs/agents/`
+and repo-owned skills; vendored skills; examples. More specific guidance wins within the same level.
+Generic examples are never evidence about this repository.
+
+An ADR is a standing constraint. When a required change conflicts with one, stop and report the
+specific ADR and conflict; do not implement the change until it is resolved.
 
 ## Issue tracker
 
@@ -25,11 +36,19 @@ the `/triage` skill for the states and labels.
 ## Verification
 
 ALWAYS verify after changing code, starting with the narrowest relevant check.
+The `Makefile` is authoritative for repo-wide commands; `npx nx show project <project> --web false`
+is authoritative for the effective targets of one project. Command examples in docs and skills are
+intentional convenience summaries.
 
 - **`make` for repo-wide checks** — `make sure`, `make affected`, `make test`, `make lint`,
   `make format-check`, `make build-prod`, `db-*`, packaging.
 - **`nx` for single-project checks** — `npx nx test maestro-renderer`, `npx nx build maestro-core`.
   Prefer it over a make wrapper for focused work; nx schedules and caches per project better.
+- `make sure` formats, lints, builds, unit-tests, and runs renderer E2E. It mutates formatting.
+  Full Electron E2E is intentionally separate (`make e2e`) because it repeatedly opens the app;
+  run it when the changed user journey warrants the disruption.
+- `make affected` runs build, lint, unit tests, and both E2E targets for affected projects. It does
+  not check or mutate formatting.
 - Never use `npm run` scripts.
 - There is no repo-wide typecheck target. `build` is the type gate for app code; the e2e suites
   type-check themselves as a task dependency.
@@ -65,3 +84,8 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
   `verification-loop`.
 - Rewritten from upstream for this repo's workflows, so no longer syncable: `review`, `triage`,
   `to-issues`, `to-prd`.
+
+Vendored skills are generic. Apply this repository's rules when they mention a different task runner,
+context layout, or tool name. In particular, prototype commands go through Make/Nx rather than a new
+`package.json` script, and references to an “Agent tool” mean the available parallel delegation
+capability; if none exists, do the work locally.

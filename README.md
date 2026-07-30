@@ -41,12 +41,16 @@ This starts the Angular dev server and the Electron main process with hot reload
 `make` is the repo-wide interface — run `make help` for the full list. It is what CI runs.
 
 ```bash
-make sure          # format, lint, build, test across the repo
-make affected      # the same, scoped to what git says changed
+make sure          # format, lint, build, unit test, renderer E2E
+make affected      # build, lint, unit/E2E tests for affected projects; no formatting
 make format-check  # non-mutating formatting check
-make e2e           # full Electron E2E (type-checks itself first)
+make e2e           # opt-in full Electron E2E; repeatedly opens the desktop app
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
 ```
+
+`make sure` mutates formatting. Full Electron E2E is deliberately not part of it because repeatedly
+opening and closing Electron interrupts the developer's desktop session; run `make e2e`
+intentionally when a changed user journey needs full-app coverage.
 
 For focused work on a single project, go straight to nx rather than through make — it schedules and
 caches per project better:
@@ -79,7 +83,9 @@ Five Nx projects, whose names are not self-explanatory:
 - **`maestro-e2e`** — both E2E suites, renderer-only and full Electron.
 
 `apple-scripts/` holds the AppleScript that exports mail out of Apple Mail; `drizzle/` holds
-migrations. Each project's `project.json` is the source of truth for its boundaries and targets.
+migrations. A project's `project.json` declares its explicit configuration, but Nx can infer
+additional targets. Use `npx nx show project <project> --web false` for the effective project and
+target inventory.
 
 Note that the project layout is not the product layout: both product contexts (music library, release
 feed) cut across `maestro-electron`, `maestro-renderer`, and `maestro-core`. See

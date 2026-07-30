@@ -95,8 +95,8 @@ f: format
 format-check: ## Check formatting
 	npx prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"
 
-sure: format ## Run all checks (format, lint, build, test); build is the type gate for app code
-	npx nx run-many -t lint,build,test -c development --skipNxCache=$(SKIP_NX_CACHE)
+sure: format ## Format, lint, build, unit test, and renderer E2E; build is the app type gate
+	npx nx run-many -t build,lint,test,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
 affected: ## Run checks only on affected projects based on git changes
 	npx nx affected -t build,lint,test,e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
 
@@ -128,6 +128,6 @@ version: ## Generate changelog and update version
 
 # Help
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 .DEFAULT_GOAL := help

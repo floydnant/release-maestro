@@ -39,8 +39,9 @@ mutation the stream was chosen to avoid, and drops the automatic teardown `toSig
 
 ## Componentization
 
-Page components here run large — the feed page is over 400 lines of TypeScript against 340 of
-template, while `shared/components/` holds only four components. Default to extracting.
+Some page components are deliberately substantial, but page-specific components live beside their
+page and shared components are promoted only after a second consumer appears. Default to extracting
+when a block has a clear state or behavior boundary.
 
 **Extract when any of these is true:**
 
@@ -63,7 +64,7 @@ when a second consumer actually appears, not in anticipation of one.
 
 **How it is written.**
 
-- `ChangeDetectionStrategy.OnPush` always. All 15 components use it; keep it that way.
+- `ChangeDetectionStrategy.OnPush` always.
 - Signal inputs and outputs, not the `@Input()` / `@Output()` decorators.
   `shared/components/progress-ring/progress-ring.component.ts` still uses decorators and is the
   outlier, not a second valid pattern.

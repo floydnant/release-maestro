@@ -21,7 +21,7 @@ _Avoid_: mail provider, email client, plugin
 
 **Mailbox**:
 The one named Apple Mail mailbox the export reads from (`mailboxName`). Exactly one is configured
-today; the schema anticipates a list.
+today. Multiple mailboxes are a noted future possibility, but are not represented in the schema.
 
 **Export**:
 The AppleScript pass that pulls messages out of Apple Mail (`apple-scripts/export-emails.applescript`).

@@ -8,8 +8,9 @@ description: Break a plan, spec, or PRD into independently-grabbable Linear issu
 Break a plan into independently-grabbable issues using vertical slices (tracer bullets).
 
 Issues go to Linear (team `MAE`) — see `docs/agents/issue-tracker.md`. Publish each slice to
-**Backlog** with a category label (`Bug`, `Feature`, `Improvement`, `Maintenance`) and the
-`Ready for Agent` label. The `/triage` skill defines the category boundaries.
+**Backlog** with a category label (`Bug`, `Feature`, `Improvement`, `Maintenance`). AFK slices get
+`Ready for Agent`; HITL slices get `Ready for Human`. The `/triage` skill defines the category and
+readiness boundaries.
 
 ## Process
 
@@ -53,7 +54,9 @@ Iterate until the user approves the breakdown.
 
 ### 5. Publish the issues to Linear
 
-For each approved slice, create a Linear issue in **Backlog** using the description template below. These slices are meant for AFK agents, so apply `Ready for Agent` alongside the category label unless instructed otherwise. They skip the Triage inbox.
+For each approved slice, create a Linear issue in **Backlog** using the description template below.
+Apply `Ready for Agent` to AFK slices and `Ready for Human` to HITL slices alongside the category
+label unless instructed otherwise. They skip the Triage inbox.
 
 Publish issues in dependency order (blockers first) so you can reference real issue identifiers in the "Blocked by" field.
 

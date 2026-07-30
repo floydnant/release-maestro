@@ -87,8 +87,8 @@ the meaning of the data, not just the control flow.
   `ipcRenderer.on` listener that outlives its component fires forever and stacks up on re-entry.
 - In the main process, complete the `Subject` you created. A `Subject` that never completes is a leak
   with a long fuse.
-- **Manual `.subscribe()` needs a reason.** There are two in the entire renderer. Prefer landing a
-  stream in state — see angular-patterns for `toSignal`/`toObservable` — over subscribing to assign.
+- **Manual `.subscribe()` needs a reason.** Prefer landing a stream in state — see angular-patterns
+  for `toSignal`/`toObservable` — over subscribing to assign.
 
 ## Testing streams
 

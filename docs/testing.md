@@ -49,9 +49,14 @@ make e2e
 make e2e-renderer
 make lint
 make format-check
-make sure          # format, lint, build, test
-make affected      # the above, scoped to what git says changed
+make sure          # format, lint, build, unit test, renderer E2E
+make affected      # build, lint, unit/E2E tests for affected projects; no formatting
 ```
+
+`make sure` mutates formatting. Full Electron E2E (`make e2e`) is intentionally separate because it
+repeatedly opens and closes the desktop app; run it when the changed user journey needs the real
+Electron, IPC, filesystem, database, or sidecar integration. `make affected` includes it when the
+affected-project graph selects the E2E project.
 
 One project at a time, straight to nx:
 
@@ -101,19 +106,7 @@ Electron E2E tests should isolate both filesystem inputs and app state:
 Reusable test fixtures live in `fixtures/`. Tests may copy from that directory, but should not mutate
 source fixture files. Keep large media fixtures intentional because they affect checkout and CI time.
 
-### Generated media over committed media
-
-Library scan tests need many distinctly-tagged audio files with distinct cover art. Committing them
-would mean megabytes of near-identical binaries in every checkout, so
-`apps/maestro-e2e/src/fixtures/tagged-library.fixture.ts` **generates** a temp library at test time by
-re-tagging the audio of the single committed MP3 fixture. Prefer extending that generator over adding
-binary fixtures.
-
-Two details there are load-bearing and easy to break:
-
-- Cover art is deduped by content hash, so identical images collapse to one album preview. The
-  generator appends salt bytes after each PNG's `IEND` chunk — invisible to decoders, but enough to
-  make otherwise-identical covers hash differently. Two albums deliberately share a salt so the dedup
-  path stays covered.
-- The default library is shaped for assertions (6 tracks, 4 albums, 3 distinct artworks). Changing
-  those counts will break tests that assert on them rather than just the tests you are editing.
+Library scan E2E generates distinctly tagged media from the small committed fixture instead of
+committing many near-identical binaries. Prefer extending
+`apps/maestro-e2e/src/fixtures/tagged-library.fixture.ts` over adding binary fixtures; its local
+comments and dependent assertions document the load-bearing dataset shape and cover-art dedup setup.
