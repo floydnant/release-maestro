@@ -32,6 +32,12 @@ jobs:
             - name: Check lint
               run: make lint
 
+            # PROTOTYPE (MAE-107): the class scanner runs on the normal verification path, but at
+            # warning severity while the renderer still carries pre-existing findings. Flipping it to
+            # enforcement is a one-word change to `make class-scan`.
+            - name: Scan class surfaces (prototype, report-only)
+              run: make class-scan-report
+
     test:
         runs-on: ubuntu-latest
         steps:

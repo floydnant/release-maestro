@@ -138,6 +138,13 @@
                 "command": "node apps/maestro-renderer/tools/class-scan.cjs scan"
             }
         },
+        "class-scan-report": {
+            "executor": "nx:run-commands",
+            "dependsOn": ["class-scan-test"],
+            "options": {
+                "command": "node apps/maestro-renderer/tools/class-scan.cjs scan --severity=warn"
+            }
+        },
         "class-scan-test": {
             "executor": "nx:run-commands",
             "options": {
