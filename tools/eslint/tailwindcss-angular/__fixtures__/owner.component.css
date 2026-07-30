@@ -1,0 +1,4 @@
+/* PROTOTYPE (MAE-105) corpus fixture: CSS owned by `owner.component`. */
+.owner-scoped-thing {
+    display: block;
+}

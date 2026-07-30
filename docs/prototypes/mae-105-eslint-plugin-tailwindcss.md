@@ -5,91 +5,143 @@ architecture proposal. Delete or absorb once MAE-100 picks a winner.
 
 ## Question
 
-Can `eslint-plugin-tailwindcss` — configured, plus the smallest possible extension — reject a class
-name that does not exist, across the class surfaces this renderer actually uses?
+Can `eslint-plugin-tailwindcss` — configured, plus the smallest extension that exposes the real
+boundary — deliver MAE-100's closed-world class contract for Angular templates?
 
-The motivating failure: `class="type-code-sl"` type-checks, builds, renders, and silently produces
-no CSS. Nothing in the repository catches it today.
+The motivating failure: `class="type-code-sl"` type-checks, builds, renders, and silently produces no
+CSS. Nothing in the repository catches it today.
 
 ## What was built
 
-Three moving parts, in increasing order of intrusiveness:
-
 1. **Turned the upstream rule on.** `tailwindcss/no-custom-classname` was already installed and
    explicitly set to `off` in [eslint.config.mjs](/eslint.config.mjs).
-2. **Told it where the non-Tailwind classes live.** `settings.tailwindcss.cssFiles` points at
-   `styles.css`, the generated token CSS, and component CSS, so authored selectors (`.btn`,
-   `.badge`, `.title-bar`) are recognised without a hand-maintained allowlist. A three-entry
-   `whitelist` covers the utilities registered through `addUtilities()` in
-   [tailwind.config.js](/apps/maestro-renderer/tailwind.config.js), which Tailwind cannot enumerate.
+2. **Pointed it at the global authorities.** `settings.tailwindcss.cssFiles` covers `styles.css` and
+   the generated token CSS — the genuinely global stylesheets — so authored primitives (`.btn`,
+   `.badge`, `.panel`) are recognised. **There is no whitelist and no ignore pattern:** Tailwind's own
+   API already enumerates the `addUtilities()` output (`glass`, `child-focus-ring`, `wrap-nicely`),
+   which an earlier iteration had wrongly hand-listed.
 3. **Wrapped it for Angular.**
-   [tools/eslint/tailwindcss-angular/no-custom-classname.cjs](/tools/eslint/tailwindcss-angular/no-custom-classname.cjs)
-   delegates to the upstream rule and adds only two things: the `descriptor | utilities` convention,
-   and dynamic class surfaces. It extracts class lists from the Angular AST and feeds them back into
-   the _upstream_ rule as synthetic `class` attributes, so validation logic is never reimplemented.
-   The wrapper is ~180 lines, most of it AST extraction.
+   [no-custom-classname.cjs](/tools/eslint/tailwindcss-angular/no-custom-classname.cjs) keeps the
+   upstream rule as the _validation engine_ — it never re-decides what a valid class is — and adds
+   only what upstream cannot express:
+    - the `descriptor | utilities` convention, including malformed pipe syntax;
+    - Angular class-producing surfaces (`[class]`, `[class.foo]`, `[ngClass]`, `[attr.class]`,
+      `routerLinkActive`, `host: { class }`);
+    - rejection of unresolved dynamic construction;
+    - bare design-token variables inside arbitrary values;
+    - scope-aware authored CSS ([component-css.cjs](/tools/eslint/tailwindcss-angular/component-css.cjs));
+    - exact per-token locations and nearest-name suggestions
+      ([nearest-name.cjs](/tools/eslint/tailwindcss-angular/nearest-name.cjs)).
 
-Upstream already visits `TextAttribute`, so static `class="…"` in Angular templates worked out of
-the box. `@angular-eslint`'s inline-template processor means `template:` strings in `.ts` files are
-covered for free.
+The wrapper feeds extracted class names back into the _upstream_ rule as synthetic `class`
+attributes, so Tailwind's `generateRules` stays the single source of truth for what exists.
+
+### Scope-awareness, and how it is done
+
+MAE-100 requires that "a selector owned by one Angular component must not make that class valid in an
+unrelated component". Upstream's `cssFiles` is a single global pool and cannot express this. So
+`cssFiles` was narrowed to global stylesheets only, and the wrapper resolves the _owning_ component's
+classes per linted file — its `styleUrl(s)` files **and** its inline `styles:` literals — then filters
+upstream's reports through that set. This also closes the inline-`styles:` false positive that the
+first iteration had.
+
+The report-filtering hook is a delegating context object (`Object.create(context, { report })`); a
+`Proxy` trips ESLint 9's frozen-property invariant.
 
 ## Acceptance corpus
 
 Run with `make prototype-classname-test`. Source:
 [no-custom-classname.node-test.cjs](/tools/eslint/tailwindcss-angular/no-custom-classname.node-test.cjs).
+Case ids follow MAE-100's shared corpus.
 
-| #   | Case                                                     | Result               |
-| --- | -------------------------------------------------------- | -------------------- |
-| C1  | core Tailwind utility accepted                           | pass                 |
-| C2  | unknown static class rejected (`type-code-sl`)           | pass                 |
-| C3  | generated design-token utility accepted                  | pass                 |
-| C4  | authored global class accepted (`btn`, `badge`, `panel`) | pass                 |
-| C5  | component-scoped CSS class accepted (`title-bar`)        | pass                 |
-| C6  | descriptor before the pipe exempt                        | pass                 |
-| C7  | descriptor-only class list (`favicon \|`)                | pass                 |
-| C8  | arbitrary values accepted                                | pass                 |
-| C9  | built-in and repo-defined variants accepted              | pass                 |
-| C10 | `addUtilities()` utilities accepted                      | pass (via whitelist) |
-| C11 | valid `[class.x]` binding accepted                       | pass                 |
-| C12 | valid `[ngClass]` object keys accepted                   | pass                 |
-| C13 | valid `[class]` literal accepted                         | pass                 |
-| C14 | valid `routerLinkActive` accepted                        | pass                 |
-| C15 | `[ngClass]="'type-' + token"` produces no false positive | pass                 |
-| C16 | complete literal in a concatenation validated            | pass                 |
-| C17 | non-class attributes ignored                             | pass                 |
-| C18 | conditional binding branches validated                   | pass                 |
-| C19 | array binding validated                                  | pass                 |
-| C20 | class list inside `@if` control flow validated           | pass                 |
-| C21 | utility removed from the theme rejected (`py-14`)        | pass                 |
-| C22 | unknown class after the pipe rejected                    | pass                 |
-| C23 | unknown `[class.x]` rejected                             | pass                 |
-| C24 | unknown `[ngClass]` key rejected                         | pass                 |
-| C25 | unknown `[class]` literal rejected                       | pass                 |
-| C26 | unknown `routerLinkActive` rejected                      | pass                 |
-| C27 | unknown complete literal in a concatenation rejected     | pass                 |
-| C28 | valid `host: { class: … }` metadata accepted             | pass                 |
-| C29 | unrelated `{ class: … }` object not treated as classes   | pass                 |
-| C30 | unknown host-metadata class rejected                     | pass                 |
-| C31 | unknown `[attr.class]` literal rejected                  | pass                 |
-| C32 | `@HostBinding('class.foo')`                              | **unsupported**      |
-| C33 | `el.classList.add('foo')` and other imperative mutation  | **unsupported**      |
+### Reject, or explicitly report unsupported
 
-Additional surfaces probed by hand against the real renderer, then removed:
+| #   | MAE-100 case                                    | Result                                        |
+| --- | ----------------------------------------------- | --------------------------------------------- |
+| R1  | unknown generated class `type-code-sl`          | **pass** — rejected, suggests `type-code-sm`  |
+| R2  | unknown ordinary utility `fleex`                | **pass** — rejected, suggests `flex`          |
+| R2b | unknown class with no clear candidate           | **pass** — rejected, no suggestion invented   |
+| R3  | authored class absent from owner and global CSS | **pass**                                      |
+| R3b | another component's scoped class does not leak  | **pass** — scope-aware                        |
+| R4  | empty descriptor before the pipe                | **pass**                                      |
+| R4b | multiple descriptors before the pipe            | **pass**                                      |
+| R4c | more than one pipe                              | **pass**                                      |
+| R4d | pipe glued to a class (`\|flex`)                | **pass**                                      |
+| R4e | malformed pipe inside an `[ngClass]` key        | **pass**                                      |
+| R5  | unresolved construction `'type-' + token`       | **pass** — rejected                           |
+| R5b | fully opaque `[class]` binding                  | **pass** — rejected                           |
+| R5c | opaque `[ngClass]` expression                   | **pass** — rejected                           |
+| R6  | bare design token in a Tailwind arbitrary value | **pass**                                      |
+| R6b | bare foundation token in an arbitrary value     | **pass**                                      |
+| R6c | bare design token in product **CSS** files      | **unsupported** — ESLint does not lint `.css` |
 
-| Surface                                           | Result                                                                |
-| ------------------------------------------------- | --------------------------------------------------------------------- |
-| inline `template:` in a `.ts` component           | covered (via `@angular-eslint` inline-template processor)             |
-| class defined only in an inline `styles:` literal | **false positive** — `cssFiles` globs files, not TS strings           |
-| `@apply` inside `.css`                            | **unsupported** — `.css` is not linted and the plugin has no CSS rule |
-| class name assembled entirely at runtime          | **unsupported** by design; stays silent rather than guessing          |
+### Accept
+
+| #   | MAE-100 case                                          | Result                                  |
+| --- | ----------------------------------------------------- | --------------------------------------- |
+| A1  | valid utilities, modifiers, variants                  | **pass**                                |
+| A2  | valid arbitrary layout values                         | **pass**                                |
+| A3  | generated typography classes (`type-code-sm`)         | **pass**                                |
+| A4  | real global authored classes                          | **pass**                                |
+| A5  | classes from the owning component's scoped CSS        | **pass**                                |
+| A5b | classes from the owning component's inline `styles:`  | **pass**                                |
+| A6  | static class list, no descriptor, no pipe             | **pass**                                |
+| A7  | exactly one optional descriptor before `\|`           | **pass**                                |
+| A8  | statically enumerable conditional classes in bindings | **pass**                                |
+| A9  | typed/generated API for dynamic token selection       | **unsupported** — see below             |
+| A10 | component-local custom properties                     | **pass** — `--progress-color` untouched |
+
+### Angular class-producing surfaces
+
+| #   | Surface                                        | Result                                 |
+| --- | ---------------------------------------------- | -------------------------------------- |
+| S1  | literal `class`, incl. multi-line lists        | **pass** — exact token location        |
+| S2  | `[class.foo]`                                  | **pass** — located on the key          |
+| S3  | resolvable `[class]`, incl. `[attr.class]`     | **pass**                               |
+| S4  | resolvable `[ngClass]`, enumerable object keys | **pass** — quoted and bare keys        |
+| S5  | `routerLinkActive`, static and bound           | **pass**                               |
+| S6  | component host classes (`host: { class }`)     | **pass**, incl. non-literal rejection  |
+| U1  | `@HostBinding('class.foo')`                    | **unsupported** — silently unchecked   |
+| U2  | `el.classList.add('foo')`, `renderer.addClass` | **unsupported** — silently unchecked   |
+| U3  | class names assembled in component TypeScript  | **unsupported** — silently unchecked   |
+| U4  | `@apply` typos inside `.css`                   | **unsupported** — `.css` is not linted |
+
+**A9 is the honest failure.** MAE-100 wants typed/generated APIs accepted for legitimate dynamic
+token selection, but a lint rule cannot distinguish `typographyClass(token)` from any other call. The
+approach therefore falls back to MAE-100's other sanctioned escape hatch — a narrow, explained
+suppression — verified on the real renderer (three sites, below). If MAE-100 wants type-level
+acceptance, that has to come from the type system, not from this rule.
+
+## Diagnostics
+
+- **Exact token.** Invalid classes are underlined at the class itself, not at the attribute —
+  including inside multi-line class lists, `[ngClass]` keys, `[class.foo]` keys, and concatenation
+  operands. Asserted with `column`/`endColumn` in the corpus.
+- **Nearest name.** `type-code-sl` → `type-code-sm`, `fleex` → `flex`, `items-centre` →
+  `items-center`. Candidates come from Tailwind's `getClassList()` plus the CSS authorities; a tie or
+  a distance over 3 yields **no** suggestion rather than a guess.
+- **No automatic correction.** The candidate is offered as an ESLint _suggestion_, which is never
+  applied by `--fix`. The corpus asserts exactly one suggestion per suggested error.
+- **Editor.** The rule lives in the flat config, so VS Code underlines as you type; no separate scan
+  or command. Severity stays configurable through ordinary lint config, so MAE-100 can run it at
+  `warn` before enforcing.
+- **Unresolved construction** is reported on the _owning element's_ opening line, because an HTML
+  comment cannot live inside a tag — reporting deeper inside a multi-line binding would leave nowhere
+  to write `eslint-disable-next-line`.
 
 ## What it found in the real repository
 
-Enabling the rule on the untouched renderer produced **18 errors in 8 files, no false-positive
-flood**. Two distinct populations:
+Running the final rule against the renderer as it was **before** this branch: **21 errors in 8
+files**, no false-positive flood.
 
-**True positives — classes that exist in the source and emit no CSS.** Verified independently by
-asking Tailwind directly (`generateRules`) — all five produce zero rules, because
+| Population                                        | Count | Disposition                    |
+| ------------------------------------------------- | ----- | ------------------------------ |
+| classes that exist in source and emit no CSS      | 5     | removed (see below)            |
+| semantic descriptors not yet migrated to the pipe | 8     | moved left of `\|`             |
+| bare design-token variables in arbitrary values   | 5     | rewritten to `theme(...)`      |
+| unresolved dynamic class construction             | 3     | narrow, explained suppressions |
+
+**Dead classes.** Verified independently with `generateRules` — all five produce zero rules, because
 `tailwind.config.js` _replaces_ `theme.spacing` and `theme.opacity` with design tokens instead of
 extending them.
 
@@ -101,67 +153,68 @@ extending them.
 | `min-h-36`   | debug page textarea                     | `min-h-[9rem]`                         |
 | `max-h-44`   | debug page                              | `max-h-[11rem]`                        |
 
-This branch **removes** them rather than substituting values: they render as nothing today, so
-deletion is behaviour-preserving. Restoring the lost intent is a design decision, not a lint fix —
-the table above is the hand-off.
+They render as nothing today, so deletion is behaviour-preserving. Restoring the lost intent is a
+design decision, not a lint fix — the table is the hand-off.
 
-**Convention gaps — semantic descriptors not yet migrated to the pipe.** `app-shell`,
-`settings-item`, `track-control`, `track-seeker`, `favicon`, `progress-bg`, `mosaic-cell`,
-`mosaic-tile`, `mosaic-tile--enter`, `mosaic-tile--leave`, `mosaic-veil`. All were moved to the left
-of a `|`, which is what MAE-104 already asks for. None of them had CSS anywhere except the
-`mosaic-*` family, which is styled from an inline `styles:` literal.
+**Bare design tokens.** Five arbitrary values in `folder-list.component.html` reached for
+`var(--color-…)` directly. Rewritten to `bg-[color-mix(in_srgb,theme(colors.status.info-background)_50%,transparent)]`
+and friends. The built stylesheet is byte-identical in effect — `theme()` resolves to the same
+`var(--color-…)` — but the path is now validated by Tailwind, so a misspelled token fails the build.
+
+**Descriptors.** `mosaic-tile`, `mosaic-tile--enter/--leave` and `mosaic-veil` turned out to be _real_
+component-scoped CSS classes rather than annotations; scope-awareness now accepts them where they are
+declared, so they were moved back to the validated half of the class list.
+
+**False positives found: none.** Every finding was a real defect, a real convention gap, or a real
+token bypass.
 
 ## Cost
 
-Measured on this machine, renderer only (`apps/maestro-renderer/src/**/*.{ts,html}`, 3 runs each):
+Renderer only (`apps/maestro-renderer/src/**/*.{ts,html}`, 3 runs each, this machine):
 
 | Run                                 | Time                  |
 | ----------------------------------- | --------------------- |
-| `npx eslint` with the rule off      | 4.47s / 3.51s / 3.58s |
-| `npx eslint` with the rule on       | 3.89s / 3.73s / 3.75s |
-| `npx nx lint maestro-renderer` cold | 7.9s                  |
-| `npx nx lint maestro-renderer` warm | 5.2s                  |
+| `npx eslint` with the rule off      | 3.41s / 3.36s / 3.43s |
+| `npx eslint` with the rule on       | 4.46s / 3.74s / 3.94s |
+| `npx nx lint maestro-renderer` cold | 7.21s                 |
+| `npx nx lint maestro-renderer` warm | 0.59s (Nx cache hit)  |
 
-The rule's own cost is inside the measurement noise. The Tailwind context is built once per lint
-process; `cssFiles` are re-read at most every `cssFilesRefreshRate` (5s default).
+≈0.5s, ~15% over the lint baseline. The Tailwind context and the suggestion candidate list are built
+once per lint process; `cssFiles` are re-read at most every `cssFilesRefreshRate` (5s default);
+per-component CSS is cached on the same 5s window. Nx caches the whole target, so a warm CI or
+editor-adjacent run pays nothing.
 
 ## Honest assessment
 
 **What this approach buys**
 
-- Editor feedback for free. The rule is in the flat config, so VS Code underlines the bad class as
-  you type — no separate scan, no separate command, no CI-only failure.
-- Validation logic is not ours. Tailwind's own `generateRules` decides what exists, through
-  `tailwind-api-utils`. Arbitrary values, variants, prefixes, and plugin-generated utilities are
-  handled by the plugin, not by a regex we maintain.
-- No duplicate allowlist. Everything the rule accepts comes from either the Tailwind config or an
-  actual CSS selector. The three whitelist entries are the only hand-maintained names, and they exist
-  because `addUtilities()` output is not enumerable.
-- Small blast radius. Config change plus one wrapper file; the upstream rule remains the engine.
+- Editor feedback for free — it is an ESLint rule in the flat config, nothing else to run.
+- Validation logic is not ours. Tailwind's `generateRules` decides what exists. Arbitrary values,
+  variants, prefixes and plugin utilities are handled upstream, not by a regex we maintain.
+- No duplicate authority: no whitelist, no ignore pattern. Everything accepted comes from the Tailwind
+  config, a global stylesheet, or the owning component's own CSS.
+- Small blast radius: a config change plus three small files, with the upstream rule still the engine.
 
 **What it costs**
 
-- **The pipe convention stops being optional.** The rule cannot distinguish a semantic descriptor
-  from a typo, so every descriptor must sit left of a `|` — including descriptor-only lists, which
-  become `class="favicon |"`. That trailing pipe is ugly and has to be accepted as a rule of the
-  house before this approach can ship.
-- **`cssFiles` leaks scope.** A class defined in one component's CSS is accepted in every other
-  component's template, even though view encapsulation means it will not apply there. The rule
-  validates _existence somewhere_, not _reachability here_.
-- **Inline `styles:` are invisible.** `cssFiles` globs files; classes defined in a component's
-  `styles:` template literal are false positives. Either those components move their CSS to a file,
-  or their classes become descriptors, or the wrapper grows a TS-string CSS scan — the third option
-  is where "minimal extension" stops being minimal.
+- **The pipe convention stops being optional.** The rule cannot tell a semantic descriptor from a
+  typo, so every descriptor must sit left of a `|` — including descriptor-only lists, which become
+  `class="favicon |"`. That trailing pipe has to be accepted as a rule of the house.
 - **Imperative class names are out of reach.** `@HostBinding('class.x')`, `classList.add`,
-  `renderer.addClass`, and fully computed strings are silently unchecked. That silence is
-  deliberate — false positives on dynamic code would be worse — but it is a coverage hole, not a
-  pass.
-- **Upstream dependency risk.** The wrapper reaches into
-  `eslint-plugin-tailwindcss/lib/rules/no-custom-classname`, a deep import with no stability
-  guarantee. The plugin is also on 3.18.3 with a pending 4.x bump (PR #100), and 4.x targets Tailwind
-  4 — the wrapper would need re-validating on that upgrade.
-- **CSS is not covered at all.** A typo in `@apply` in `styles.css` still slips through. Whatever
-  MAE-100 chooses, that gap needs a separate answer.
+  `renderer.addClass` and fully computed TypeScript strings are silently unchecked (U1–U3). Silence is
+  deliberate, but it is a coverage hole, not a pass.
+- **No typed-API acceptance (A9).** Legitimate dynamic token selection needs a suppression, not
+  recognition.
+- **CSS is not covered (R6c, U4).** `@apply` typos and bare tokens inside `.css` still slip through.
+  Whatever MAE-100 chooses, that gap needs a separate answer — probably the stylelint/scan half of the
+  problem.
+- **Upstream dependency risk.** The wrapper deep-imports
+  `eslint-plugin-tailwindcss/lib/rules/no-custom-classname` and shadows `context.report`, neither of
+  which is a stable API. The plugin is on 3.18.3 with a pending 4.x bump (PR #100) that targets
+  Tailwind 4; the wrapper would need re-validating there.
+- **Scope-awareness is heuristic.** The owning component's CSS is found by sibling filename,
+  `styleUrl(s)` strings, and a hand-rolled scan of `styles:` literals — not by the TypeScript type
+  checker. It is right for this codebase's conventions and would need hardening before shipping.
 
 ## Reproduce
 
@@ -169,11 +222,3 @@ process; `cssFiles` are re-read at most every `cssFilesRefreshRate` (5s default)
 make prototype-classname-test          # acceptance corpus
 npx nx lint maestro-renderer           # rule running for real
 ```
-
-## Caveat on provenance
-
-This session had no access to Linear (no MCP, web fetch is auth-walled), so MAE-100's literal shared
-corpus could not be read. The corpus above was reconstructed from the invariants recorded in the
-prototype hand-off plus the class surfaces that actually occur in this renderer. Case _numbering_
-will not line up with MAE-100's; the cases themselves should be checked against it before the
-comparison is scored.

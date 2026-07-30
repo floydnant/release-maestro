@@ -70,6 +70,7 @@
                 @for (token of typographyVariants; track token) {
                     <div class="border-b border-border-subtle pb-4">
                         <code class="type-code-sm text-content-muted">type-{{ token }}</code>
+                        <!-- eslint-disable-next-line tailwindcss-angular/no-custom-classname -- the specimen enumerates every generated typography token by design -->
                         <p class="mt-2" [ngClass]="'type-' + token">Music discovery for working collectors</p>
                     </div>
                 }

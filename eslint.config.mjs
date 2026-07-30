@@ -11,21 +11,11 @@ const tailwindAngular = require('./tools/eslint/tailwindcss-angular/index.cjs')
 const tailwindConfig = join(workspaceRoot, 'apps/maestro-renderer/tailwind.config.js')
 const tailwindRules = tailwind.configs['flat/recommended'].find(config => config.rules)?.rules ?? {}
 
-// PROTOTYPE (MAE-105): classes that exist but are not discoverable from Tailwind
-// or from a CSS selector — see docs/prototypes/mae-105-eslint-plugin-tailwindcss.md
-const classnameWhitelist = [
-    // Tailwind plugin utilities registered via addUtilities()
-    'glass',
-    'child-focus-ring',
-    'wrap-nicely',
-]
-
 // Authored CSS that the rule reads to learn non-Tailwind class names.
-const cssFiles = [
-    'apps/maestro-renderer/src/styles.css',
-    'apps/maestro-renderer/src/styles/**/*.css',
-    'apps/maestro-renderer/src/app/**/*.css',
-]
+// PROTOTYPE (MAE-105): genuinely *global* stylesheets only. Component-scoped
+// CSS is resolved per file by the rule, so one component's selector cannot make
+// a class valid in an unrelated component.
+const cssFiles = ['apps/maestro-renderer/src/styles.css', 'apps/maestro-renderer/src/styles/**/*.css']
 
 export default defineConfig([
     ...nx.configs['flat/base'],
@@ -133,7 +123,6 @@ export default defineConfig([
             tailwindcss: {
                 config: tailwindConfig,
                 cssFiles,
-                whitelist: classnameWhitelist,
             },
         },
         rules: {

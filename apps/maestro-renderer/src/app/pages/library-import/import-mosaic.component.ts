@@ -69,13 +69,13 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
                         @for (revisionCell of [cell]; track revisionCell.revision) {
                             @if (revisionCell.previous; as previous) {
                                 <img
-                                    class="mosaic-tile mosaic-tile--leave |"
+                                    class="mosaic-tile mosaic-tile--leave"
                                     [src]="fileUrl(previous.coverPath)"
                                     alt=""
                                 />
                             }
                             <img
-                                class="mosaic-tile mosaic-tile--enter |"
+                                class="mosaic-tile mosaic-tile--enter"
                                 [src]="fileUrl(revisionCell.current.coverPath)"
                                 [title]="tileTitle(revisionCell.current)"
                                 alt=""
