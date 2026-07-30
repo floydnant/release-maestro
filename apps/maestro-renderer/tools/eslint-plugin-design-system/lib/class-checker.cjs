@@ -4,7 +4,8 @@
  */
 const path = require('node:path')
 const { classesFromCssFile, componentClassesForTemplate } = require('./css-classes.cjs')
-const { isTailwindClass } = require('./tailwind-authority.cjs')
+const { suggestClassName } = require('./suggest.cjs')
+const { isTailwindClass, tailwindClassList, themePathExists } = require('./tailwind-authority.cjs')
 
 const DEFAULT_TAILWIND_CONFIG = 'apps/maestro-renderer/tailwind.config.js'
 const DEFAULT_GLOBAL_STYLESHEETS = ['apps/maestro-renderer/src/styles.css']
@@ -26,10 +27,21 @@ function createClassChecker(options = {}, { cwd = process.cwd(), filePath } = {}
 
     const localClasses = filePath ? componentClassesForTemplate(filePath) : new Set()
 
-    return className =>
+    const isValid = className =>
         globalClasses.has(className) ||
         localClasses.has(className) ||
         isTailwindClass(tailwindConfig, className)
+
+    /**
+     * Suggestions come from the same authorities that decide validity, so a suggested name is always
+     * a name that would pass. Reported, never applied — MAE-100 rules out automatic correction.
+     */
+    const suggest = className =>
+        suggestClassName(className, [...localClasses, ...globalClasses, ...tailwindClassList(tailwindConfig)])
+
+    const isThemePath = themePath => themePathExists(tailwindConfig, themePath)
+
+    return { isThemePath, isValid, suggest }
 }
 
 const sharedSchema = {

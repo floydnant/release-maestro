@@ -10,6 +10,11 @@
         </div>
 
         <div class="flex flex-col items-start gap-2 sm:items-end">
+            <!--
+                eslint-disable-next-line design-system/valid-template-classnames --
+                `workerHealthClass()` returns one of four fixed literals in the component; the class
+                vocabulary is closed but lives in TypeScript, out of this rule's reach.
+            -->
             <span [class]="'badge border ' + workerHealthClass()">
                 Metadata worker {{ workerHealthText() }}
             </span>
@@ -279,6 +284,12 @@
                             <span class="truncate font-mono text-content-muted">
                                 #{{ entry.status.scanId }} {{ entry.status.trigger }}
                             </span>
+                            <!--
+                                eslint-disable design-system/valid-template-classnames --
+                                `scanPhaseClass()` switches over `LibraryScanPhase` and returns one
+                                of five fixed literals; the vocabulary is closed but lives in
+                                TypeScript, out of this rule's reach.
+                            -->
                             <span
                                 [class]="
                                     'rounded-full border px-2 py-0.5 text-center font-mono ' +
@@ -287,6 +298,7 @@
                             >
                                 {{ entry.status.phase }}
                             </span>
+                            <!-- eslint-enable design-system/valid-template-classnames -->
                             <span
                                 class="truncate font-mono text-content-secondary"
                                 [title]="logEntryDetail(entry.status)"

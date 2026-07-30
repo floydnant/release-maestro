@@ -5,12 +5,18 @@
  * alone.
  */
 const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
-const { tokenizeClassList } = require('../lib/class-list.cjs')
+const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
 const { collectClassStrings } = require('../lib/expression-classes.cjs')
 
 /** `BindingType.Class`, i.e. `[class.foo]`. */
 const CLASS_BINDING = 2
 const CLASS_ATTRIBUTES = new Set(['class', 'ngClass', 'routerLinkActive'])
+
+const malformedMessageIds = {
+    emptyDescriptor: 'emptyDescriptor',
+    multipleDescriptors: 'multipleDescriptors',
+    multiplePipes: 'multiplePipes',
+}
 
 module.exports = {
     meta: {
@@ -22,16 +28,28 @@ module.exports = {
         messages: {
             unknownClass:
                 '`{{className}}` produces no CSS: Tailwind generates nothing for it and no stylesheet declares it.',
+            unknownClassWithSuggestion:
+                '`{{className}}` produces no CSS: Tailwind generates nothing for it and no stylesheet declares it. Did you mean `{{suggestion}}`?',
             dynamicClassList: 'This class list is computed at runtime and cannot be validated statically.',
             partialClass:
                 '`{{className}}` is concatenated with a runtime value and cannot be validated statically.',
+            emptyDescriptor: 'A `|` needs a semantic descriptor before it, or no pipe at all.',
+            multipleDescriptors: 'A class list carries at most one semantic descriptor before the `|`.',
+            multiplePipes: 'A class list carries at most one `|` separating the descriptor from styling.',
+            bareTokenVariable:
+                '`{{variable}}` is a design token: reach it through `theme(...)` rather than a bare `var()`.',
+            unknownThemePath: '`{{themePath}}` is not a path in the Tailwind theme.',
         },
     },
 
     create(context) {
         const options = context.options[0] ?? {}
+        const reportDynamic = options.reportDynamic ?? true
         const sourceCode = context.sourceCode ?? context.getSourceCode()
-        const isKnownClass = createClassChecker(options, { cwd: context.cwd, filePath: context.filename })
+        const { isThemePath, isValid, suggest } = createClassChecker(options, {
+            cwd: context.cwd,
+            filePath: context.filename,
+        })
 
         const locFor = (start, end) => {
             try {
@@ -42,23 +60,56 @@ module.exports = {
         }
 
         const reportUnknown = (className, loc) => {
-            if (isKnownClass(className)) return
-            context.report({ messageId: 'unknownClass', data: { className }, loc })
+            if (isValid(className)) return
+
+            const suggestion = suggest(className)
+            context.report({
+                messageId: suggestion ? 'unknownClassWithSuggestion' : 'unknownClass',
+                data: { className, suggestion },
+                loc,
+            })
         }
 
         const checkClassList = (value, { offset, truncatedStart, truncatedEnd, fallbackLoc }) => {
-            for (const token of tokenizeClassList(value, {
+            const positioned = offset !== null && offset !== undefined
+            const { tokens, malformed } = tokenizeClassList(value, {
                 offset: offset ?? 0,
                 truncatedStart,
                 truncatedEnd,
-            })) {
+            })
+
+            if (malformed) {
+                context.report({
+                    messageId: malformedMessageIds[malformed.reason],
+                    loc: positioned ? locFor(malformed.start, malformed.end) : fallbackLoc,
+                })
+            }
+
+            for (const token of tokens) {
+                const loc = positioned ? locFor(token.start, token.end) : fallbackLoc
+
+                // A descriptor is not styling, but an arbitrary value hiding in one still is.
+                for (const bare of bareTokenVariables(token)) {
+                    context.report({
+                        messageId: 'bareTokenVariable',
+                        data: { variable: bare.variable },
+                        loc: positioned ? locFor(bare.start, bare.end) : fallbackLoc,
+                    })
+                }
+
+                for (const reference of themeReferences(token)) {
+                    if (isThemePath(reference.path)) continue
+                    context.report({
+                        messageId: 'unknownThemePath',
+                        data: { themePath: reference.path },
+                        loc: positioned ? locFor(reference.start, reference.end) : fallbackLoc,
+                    })
+                }
+
                 if (token.kind === 'descriptor' || token.kind === 'interpolated') continue
 
-                const loc =
-                    offset === null || offset === undefined ? fallbackLoc : locFor(token.start, token.end)
-
                 if (token.kind === 'partial') {
-                    if (options.reportDynamic) {
+                    if (reportDynamic) {
                         context.report({ messageId: 'partialClass', data: { className: token.name }, loc })
                     }
                     continue
@@ -81,7 +132,7 @@ module.exports = {
                 })
             }
 
-            if (dynamic && options.reportDynamic) {
+            if (dynamic && reportDynamic) {
                 context.report({ messageId: 'dynamicClassList', loc: fallbackLoc })
             }
         }

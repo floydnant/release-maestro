@@ -1,6 +1,7 @@
 /**
- * Shared acceptance corpus for the MAE-106 prototype. Every class surface the renderer actually uses
- * appears here once, so the recorded pass/fail/unsupported evidence is reproducible.
+ * Shared acceptance corpus for the MAE-106 prototype, tracking the corpus MAE-100 defines. Every
+ * class surface the renderer actually uses appears here once, so the recorded pass/fail/unsupported
+ * evidence is reproducible.
  *
  * Run with: node --test apps/maestro-renderer/tools/eslint-plugin-design-system/plugin.node-test.cjs
  */
@@ -16,6 +17,13 @@ const FIXTURE_TEMPLATE = path.join(__dirname, 'fixtures/specimen.component.html'
 const FIXTURE_COMPONENT = path.join(__dirname, 'fixtures/specimen.component.ts')
 
 const unknown = className => ({ messageId: 'unknownClass', data: { className } })
+const didYouMean = (className, suggestion) => ({
+    messageId: 'unknownClassWithSuggestion',
+    data: { className, suggestion },
+})
+
+/** The unsupported cases are noisy by default; silencing them isolates the case under test. */
+const quiet = [{ reportDynamic: false }]
 
 const templateTester = new RuleTester({
     languageOptions: { parser: templateParser },
@@ -36,18 +44,27 @@ templateTester.run('valid-template-classnames', templateRule, {
         { filename: FIXTURE_TEMPLATE, code: '<div class="glass wrap-nicely child-focus-ring"></div>' },
         { filename: FIXTURE_TEMPLATE, code: '<div class="group peer group/row"></div>' },
 
+        // A design token reached through the theme, and a component-local custom property left alone.
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div class="bg-[color-mix(in_srgb,theme(colors.background.surface)_40%,transparent)]"></div>',
+        },
+        { filename: FIXTURE_TEMPLATE, code: '<div class="w-[var(--progress-width)]"></div>' },
+        { filename: FIXTURE_TEMPLATE, code: '<div class="bg-[theme(colors.status.info-background)]"></div>' },
+
         // Authored classes: global stylesheet, generated token stylesheet, component styles.
         { filename: FIXTURE_TEMPLATE, code: '<div class="btn-nkd-neutral badge panel"></div>' },
         { filename: FIXTURE_TEMPLATE, code: '<div class="type-body-sm type-code-sm"></div>' },
         { filename: FIXTURE_TEMPLATE, code: '<div class="scoped-only nested-scoped inline-scoped"></div>' },
 
-        // The `descriptor | utilities` pipe convention.
+        // The `descriptor | utilities` pipe convention: zero or one descriptor.
+        { filename: FIXTURE_TEMPLATE, code: '<div class="flex items-center"></div>' },
         {
             filename: FIXTURE_TEMPLATE,
             code: '<div class="title-bar__drag-region | flex items-center"></div>',
         },
 
-        // Dynamic surfaces.
+        // Dynamic surfaces whose classes are statically enumerable.
         { filename: FIXTURE_TEMPLATE, code: '<div [class.rounded-l-full]="$first"></div>' },
         { filename: FIXTURE_TEMPLATE, code: '<div [ngClass]="{ \'ml-52\': isMacos }"></div>' },
         { filename: FIXTURE_TEMPLATE, code: '<div [ngClass]="{ \'opacity-30 blur-sm\': hidden }"></div>' },
@@ -55,23 +72,28 @@ templateTester.run('valid-template-classnames', templateRule, {
         { filename: FIXTURE_TEMPLATE, code: '<a routerLinkActive="active-link"></a>' },
         { filename: FIXTURE_TEMPLATE, code: '<div ngClass="flex gap-2"></div>' },
 
-        // Unsupported by design: the class list only exists at runtime, so nothing is asserted.
-        { filename: FIXTURE_TEMPLATE, code: '<div [class]="workerHealthClass()"></div>' },
-        { filename: FIXTURE_TEMPLATE, code: '<div [ngClass]="classMap"></div>' },
-        { filename: FIXTURE_TEMPLATE, code: '<div class="{{ dynamicClass }}"></div>' },
-        // Only the fragment touching the runtime value is skipped; `badge` and `border` are checked.
-        { filename: FIXTURE_TEMPLATE, code: '<div [class]="\'badge border \' + workerHealthClass()"></div>' },
-        { filename: FIXTURE_TEMPLATE, code: '<div [ngClass]="\'type-\' + token"></div>' },
-
         // Non-class attributes and bindings are untouched.
         { filename: FIXTURE_TEMPLATE, code: '<div [style.width]="w" [attr.role]="r" title="flex"></div>' },
+
+        // Severity and reporting stay configurable so a prototype can report before it enforces.
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div [class]="workerHealthClass()"></div>',
+            options: quiet,
+        },
     ],
 
     invalid: [
+        // --- unknown static styling classes, with a nearest-name suggestion where unambiguous ---
         {
             filename: FIXTURE_TEMPLATE,
             code: '<p class="type-code-sl"></p>',
-            errors: [unknown('type-code-sl')],
+            errors: [didYouMean('type-code-sl', 'type-code-sm')],
+        },
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div class="fleex"></div>',
+            errors: [didYouMean('fleex', 'flex')],
         },
         {
             filename: FIXTURE_TEMPLATE,
@@ -85,9 +107,56 @@ templateTester.run('valid-template-classnames', templateRule, {
             errors: [unknown('bg-nonsense')],
         },
         {
+            // A component-scoped class is only known inside its own component.
+            filename: path.join(__dirname, 'fixtures/other.component.html'),
+            code: '<div class="scoped-only"></div>',
+            errors: [unknown('scoped-only')],
+        },
+
+        // --- malformed pipe syntax ---
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div class="| flex"></div>',
+            errors: [{ messageId: 'emptyDescriptor' }],
+        },
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div class="sidebar rail | flex"></div>',
+            errors: [{ messageId: 'multipleDescriptors' }],
+        },
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div class="sidebar | flex | hidden"></div>',
+            errors: [{ messageId: 'multiplePipes' }],
+        },
+
+        // --- bare design-token variables hiding inside a structurally valid arbitrary value ---
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div class="bg-[color-mix(in_srgb,var(--color-background-surface)_40%,transparent)]"></div>',
+            errors: [{ messageId: 'bareTokenVariable', data: { variable: '--color-background-surface' } }],
+        },
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div class="text-[var(--foundation-color-neutral-500)]"></div>',
+            errors: [
+                { messageId: 'bareTokenVariable', data: { variable: '--foundation-color-neutral-500' } },
+            ],
+        },
+
+        {
+            // Tailwind resolves theme paths only at compile time, so this would otherwise be a
+            // build error rather than an editor diagnostic.
+            filename: FIXTURE_TEMPLATE,
+            code: '<div class="bg-[theme(colors.status.info.background)]"></div>',
+            errors: [{ messageId: 'unknownThemePath', data: { themePath: 'colors.status.info.background' } }],
+        },
+
+        // --- the same checks across every dynamic surface ---
+        {
             filename: FIXTURE_TEMPLATE,
             code: '<div [class.rounded-nope]="$first"></div>',
-            errors: [unknown('rounded-nope')],
+            errors: [didYouMean('rounded-nope', 'rounded-none')],
         },
         {
             filename: FIXTURE_TEMPLATE,
@@ -96,37 +165,44 @@ templateTester.run('valid-template-classnames', templateRule, {
         },
         {
             filename: FIXTURE_TEMPLATE,
-            code: '<div [class]="\'badge borderx \' + workerHealthClass()"></div>',
-            errors: [unknown('borderx')],
+            code: "<div [class]=\"cond ? 'flex' : 'hiddenn'\"></div>",
+            errors: [didYouMean('hiddenn', 'hidden')],
         },
         {
             filename: FIXTURE_TEMPLATE,
             code: '<a routerLinkActive="active-linkk"></a>',
-            errors: [unknown('active-linkk')],
+            errors: [didYouMean('active-linkk', 'active-link')],
         },
+
+        // --- unresolved construction is reported as an explicit unsupported case, not accepted ---
         {
-            // A component-scoped class is only known inside its own component.
-            filename: path.join(__dirname, 'fixtures/other.component.html'),
-            code: '<div class="scoped-only"></div>',
-            errors: [unknown('scoped-only')],
-        },
-        {
-            filename: FIXTURE_TEMPLATE,
-            code: "<div [class]=\"cond ? 'flex' : 'hiddenn'\"></div>",
-            errors: [unknown('hiddenn')],
-        },
-        {
-            // `reportDynamic` makes the unsupported cases visible instead of silent.
             filename: FIXTURE_TEMPLATE,
             code: '<div [class]="workerHealthClass()"></div>',
-            options: [{ reportDynamic: true }],
             errors: [{ messageId: 'dynamicClassList' }],
         },
         {
             filename: FIXTURE_TEMPLATE,
-            code: '<div [class]="\'badge border\' + workerHealthClass()"></div>',
-            options: [{ reportDynamic: true }],
-            errors: [{ messageId: 'dynamicClassList' }, { messageId: 'partialClass', data: { className: 'border' } }],
+            code: '<div [ngClass]="classMap"></div>',
+            errors: [{ messageId: 'dynamicClassList' }],
+        },
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div [ngClass]="\'type-\' + token"></div>',
+            errors: [
+                { messageId: 'dynamicClassList' },
+                { messageId: 'partialClass', data: { className: 'type-' } },
+            ],
+        },
+        {
+            // The known fragment is still validated; only the fragment touching the runtime value is not.
+            filename: FIXTURE_TEMPLATE,
+            code: '<div [class]="\'badge borderx \' + workerHealthClass()"></div>',
+            errors: [{ messageId: 'dynamicClassList' }, unknown('borderx')],
+        },
+        {
+            filename: FIXTURE_TEMPLATE,
+            code: '<div class="{{ dynamicClass }}"></div>',
+            errors: [{ messageId: 'dynamicClassList' }],
         },
     ],
 })
@@ -157,7 +233,17 @@ typescriptTester.run('valid-host-classnames', hostRule, {
         {
             filename: FIXTURE_COMPONENT,
             code: "@Directive({ host: { class: 'block sizee-full' } }) class D {}",
-            errors: [unknown('sizee-full')],
+            errors: [didYouMean('sizee-full', 'size-full')],
+        },
+        {
+            filename: FIXTURE_COMPONENT,
+            code: "@Component({ host: { class: 'a b | block' } }) class C {}",
+            errors: [{ messageId: 'multipleDescriptors' }],
+        },
+        {
+            filename: FIXTURE_COMPONENT,
+            code: "@Component({ host: { class: 'text-[var(--color-content-muted)]' } }) class C {}",
+            errors: [{ messageId: 'bareTokenVariable', data: { variable: '--color-content-muted' } }],
         },
     ],
 })

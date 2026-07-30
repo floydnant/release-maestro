@@ -7,9 +7,9 @@
     @if (folders().length === 0) {
         <button
             type="button"
-            class="dropzone | flex h-[130px] w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-default bg-[color-mix(in_srgb,var(--color-background-surface)_40%,transparent)] px-8 py-12 text-center transition-colors hover:border-border-strong hover:bg-background-surface"
+            class="dropzone | flex h-[130px] w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-default bg-[color-mix(in_srgb,theme(colors.background.surface)_40%,transparent)] px-8 py-12 text-center transition-colors hover:border-border-strong hover:bg-background-surface"
             [ngClass]="{
-                'dropzone-active | border-border-focus bg-[color-mix(in_srgb,var(--color-status-info-background)_50%,transparent)] hover:border-border-focus hover:bg-[color-mix(in_srgb,var(--color-status-info-background)_50%,transparent)]':
+                'dropzone-active | border-border-focus bg-[color-mix(in_srgb,theme(colors.status.info-background)_50%,transparent)] hover:border-border-focus hover:bg-[color-mix(in_srgb,theme(colors.status.info-background)_50%,transparent)]':
                     isDragging(),
             }"
             aria-label="Add folders"
@@ -23,7 +23,7 @@
         <div
             class="panel | relative flex flex-col transition-colors"
             [ngClass]="{
-                'dropzone-active | border-border-focus bg-[color-mix(in_srgb,var(--color-status-info-background)_40%,transparent)]':
+                'dropzone-active | border-border-focus bg-[color-mix(in_srgb,theme(colors.status.info-background)_40%,transparent)]':
                     isDragging(),
                 'min-h-[130px]': useMinHeight(),
             }"
@@ -75,7 +75,7 @@
 
             @if (isDragging()) {
                 <div
-                    class="dropzone-overlay | pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-[color-mix(in_srgb,var(--color-status-info-background)_70%,transparent)] text-content-info backdrop-blur-sm"
+                    class="dropzone-overlay | pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-[color-mix(in_srgb,theme(colors.status.info-background)_70%,transparent)] text-content-info backdrop-blur-sm"
                 >
                     <app-icon name="octFileDirectoryFill" size="1.25rem"></app-icon>
                     <span class="type-body-md font-semibold">Drop to add</span>
