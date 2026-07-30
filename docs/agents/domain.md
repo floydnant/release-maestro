@@ -44,3 +44,8 @@ silently overriding it.
   develops vocabulary of its own.
 - A generic skill that says `CONTEXT.md` must contain no implementation details should follow the
   limited-anchor rule above instead.
+- `ADR-FORMAT.md` (bundled with `/grill-with-docs`, also cited by
+  `/improve-codebase-architecture`) owns the ADR format and the test for when one is warranted.
+  Two things it does not know about this repo: `docs/adr/` already exists, so ignore its instruction
+  to create the directory lazily; and a new ADR also needs a row in the index table in
+  [`docs/adr/README.md`](../adr/README.md), including its context.

@@ -22,7 +22,7 @@ They may include context about the purpose, the audience, or technical constrain
   pointing at foundations), and `design-tokens/contrast-pairs.json` (the pairs whose contrast is
   asserted). Everything named `*.generated.*` — `design-tokens/tailwind.generated.json`,
   `src/styles/design-tokens.generated.css`, `src/app/shared/design-tokens.generated.ts`, and the
-  electron copy — is written by `apps/maestro-renderer/tools/design-tokens.cjs`. Regenerate with `make design-tokens`; the renderer's build, test, and serve targets already depend on `design-tokens-check`, so a stale or
+  electron copy — is written by `apps/maestro-renderer/tools/design-tokens.cjs`. Regenerate with `make design-tokens`; the renderer's build, lint, and test targets already depend on `design-tokens-check`, so a stale or
   contrast-failing token set fails those runs.
 - Use Tailwind utility classes by default, including the project's configured semantic tokens,
   variants, and arbitrary values when needed.

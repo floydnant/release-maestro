@@ -7,6 +7,11 @@ tooling.
 Agent-facing repo instructions live in `AGENTS.md` and `docs/agents/`. Those docs point here for
 testing conventions; update this guide when test strategy changes.
 
+The [`e2e-testing`](../.agents/skills/e2e-testing/SKILL.md) skill carries the Playwright authoring
+habits that sit on top of this guide — assertion style, test isolation, what belongs in a spec. This
+document owns the decisions: the layer split, the locator ladder, and fixture isolation. Where the
+two differ, this document wins.
+
 ## Test Layers
 
 - Unit tests cover renderer components, Electron backend services, core schemas, and metadata-engine

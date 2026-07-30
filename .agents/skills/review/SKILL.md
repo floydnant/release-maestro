@@ -77,7 +77,7 @@ with the failure.
 ### 4. Identify the spec source
 
 Issues and PRDs live in **Linear**, not GitHub Issues — `#123`-style refs in this repo's commit
-subjects are pull requests; Linear issues are `ABC-123`. Look for the originating spec in this order:
+subjects are pull requests; Linear issues are `MAE-123`. Look for the originating spec in this order:
 
 1. Issue references in the commit messages or branch name — fetch via the workflow in
    `docs/agents/issue-tracker.md`.
@@ -111,10 +111,11 @@ Use the available parallel delegation capability to start three general-purpose 
 runtime cannot delegate, run the axes sequentially with separate working notes so their findings stay
 independent. Each gets the diff commands from step 2 and the commit list.
 
-**Regression sub-agent** — brief: "Follow `.agents/skills/regression/SKILL.md`. Do not run any
-commands; the verification gates are already being run for you. Report behavioral regressions,
-correctness defects in the changed logic, bundled/unrelated changes, and intentional behavior
-changes, using that skill's output format. Under 500 words."
+**Regression sub-agent** — brief: "Follow `.agents/skills/regression/SKILL.md`. Read-only git
+inspection is expected; do not run verification commands — no builds, tests, linters, or formatters.
+The gates are already being run for you, against the working tree you are reading. Report behavioral
+regressions, correctness defects in the changed logic, bundled/unrelated changes, and intentional
+behavior changes, using that skill's output format. Under 500 words."
 
 **Standards sub-agent** — brief: "Read the standards docs listed. Then read the diff. Report — per
 file and hunk where relevant — every place the diff violates a documented standard. Cite the standard

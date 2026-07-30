@@ -3,7 +3,8 @@ name: regression
 description: >-
     Behavioral regression and correctness review of a diff: what used to work and now
     doesn't, what changed that nobody asked to change, and logic defects the tests
-    don't catch. Analysis only — it runs no commands. Use when the user asks to check
+    don't catch. Reads the working tree and its git history, but runs no verification
+    commands — no builds, tests, linters, or formatters. Use when the user asks to check
     for regressions, or as the Regression axis of /review.
 ---
 

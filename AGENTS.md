@@ -19,10 +19,6 @@ Load guidance for the task at hand; do not load every document by default.
 [docs/agents/domain.md](docs/agents/domain.md) explains the context layout and repository-specific
 overrides for generic skills.
 
-Authority, from highest to lowest: this file and ADRs; repository-owned guidance in `docs/agents/`
-and repo-owned skills; vendored skills; examples. More specific guidance wins within the same level.
-Generic examples are never evidence about this repository.
-
 An ADR is a standing constraint. When a required change conflicts with one, stop and report the
 specific ADR and conflict; do not implement the change until it is resolved.
 
@@ -43,15 +39,13 @@ intentional convenience summaries.
 - **`make` for repo-wide checks** — `make sure`, `make affected`, `make test`, `make lint`,
   `make format-check`, `make build-prod`, `db-*`, packaging.
 - **`nx` for single-project checks** — `npx nx test maestro-renderer`, `npx nx build maestro-core`.
-  Prefer it over a make wrapper for focused work; nx schedules and caches per project better.
+  Prefer it over a make wrapper for focused work.
 - `make sure` formats, lints, builds, unit-tests, and runs renderer E2E. It mutates formatting.
   Full Electron E2E is intentionally separate (`make e2e`) because it repeatedly opens the app;
   run it when the changed user journey warrants the disruption.
 - `make affected` runs build, lint, unit tests, and both E2E targets for affected projects. It does
   not check or mutate formatting.
 - Never use `npm run` scripts.
-- There is no repo-wide typecheck target. `build` is the type gate for app code; the e2e suites
-  type-check themselves as a task dependency.
 
 Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verification-loop/SKILL.md).
 
@@ -75,15 +69,28 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
 - Tests: prefer shared fixture files for reusable fixtures; keep fixtures inline only when clearly
   one-off to that spec
 
+## Keeping the docs true
+
+These documents are only worth loading if they still describe the repository. Update them as part of
+the change that invalidates them, not afterwards.
+
+- **A domain concept the glossary doesn't have** — add it to the relevant
+  `docs/contexts/*/CONTEXT.md` in the same change that introduces it. A term you had to invent to
+  name your work is exactly what the glossary is for. Renaming or retiring a concept means editing
+  the existing entry, including its _Avoid_ list.
+- **A decision that is hard to reverse, surprising without context, and the result of a real
+  trade-off** — offer an ADR ([docs/adr/README.md](docs/adr/README.md)). All three must hold; most
+  decisions fail at least one and need no ADR.
+- **A changed command, target, or verification story** — the `Makefile` is the source of truth, but
+  the summaries in this file, [README.md](README.md), [docs/testing.md](docs/testing.md), and
+  `verification-loop` restate it. Grep for the old command name and fix every copy.
+- **A new or moved code path cited by a skill** — skills name concrete files as worked examples. If
+  you move or delete one, update the skill that points at it.
+
 ## Skills
 
 `.agents/skills/` holds vendored skills tracked in `skills-lock.json` plus repo-owned ones that are
-**not** in the lock and must survive a re-sync:
-
-- Written here: `angular-patterns`, `e2e-testing`, `frontend-design`, `regression`, `rxjs-streams`,
-  `verification-loop`.
-- Rewritten from upstream for this repo's workflows, so no longer syncable: `review`, `triage`,
-  `to-issues`, `to-prd`.
+not in the lock and must survive a re-sync.
 
 Vendored skills are generic. Apply this repository's rules when they mention a different task runner,
 context layout, or tool name. In particular, prototype commands go through Make/Nx rather than a new
