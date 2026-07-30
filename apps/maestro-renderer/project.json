@@ -131,6 +131,19 @@
                 "command": "node --test apps/maestro-renderer/tools/design-tokens.node-test.cjs"
             }
         },
+        "class-scan": {
+            "executor": "nx:run-commands",
+            "dependsOn": ["class-scan-test"],
+            "options": {
+                "command": "node apps/maestro-renderer/tools/class-scan.cjs scan"
+            }
+        },
+        "class-scan-test": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "node --test apps/maestro-renderer/tools/class-scan.node-test.cjs"
+            }
+        },
         "serve-static": {
             "continuous": true,
             "executor": "@nx/web:file-server",

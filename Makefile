@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report typecheck-e2e lint format f format-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: class-scan dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report typecheck-e2e lint format f format-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -72,6 +72,8 @@ design-tokens-watch: ## Regenerate renderer design-token artifacts when token fi
 	npx nx run maestro-renderer:design-tokens-watch
 design-tokens-check: ## Test and verify renderer design-token artifacts
 	npx nx run maestro-renderer:design-tokens-check
+class-scan: ## PROTOTYPE (MAE-107) Scan renderer templates for classes neither Tailwind nor project CSS defines
+	npx nx run maestro-renderer:class-scan
 test-engine: ## Run metadata-engine (Rust) tests
 	npx nx test metadata-engine
 
