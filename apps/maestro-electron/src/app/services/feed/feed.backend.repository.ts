@@ -5,8 +5,11 @@ import { feedItemHistoryEntriesTable, feedItemsTable } from '../../database/driz
 
 /**
  * The time after which a feed item should be shown again if it was marked as snoozed.
+ *
+ * Deliberately shorter than a day: the UI promises "show again tomorrow", and a full 24h would push
+ * the item past the same time next day, so a user with a routine would keep missing it.
  */
-const FEED_ITEM_SNOOZE_TIME_MS = 1000 * 60 * 60 * 24 * 16
+const FEED_ITEM_SNOOZE_TIME_MS = 1000 * 60 * 60 * 16
 
 /**
  * Don't create view history entries for feed items that were viewed in the last 3 minutes.

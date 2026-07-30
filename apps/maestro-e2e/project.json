@@ -7,7 +7,7 @@
     "// targets": "to see all targets run: nx show project maestro-e2e --web",
     "targets": {
         "e2e": {
-            "dependsOn": ["maestro-electron:build"],
+            "dependsOn": ["typecheck", "maestro-electron:build"],
             "command": "playwright test -c apps/maestro-e2e/playwright.electron.config.ts",
             "configurations": {
                 "ui": {
@@ -16,6 +16,7 @@
             }
         },
         "e2e-renderer": {
+            "dependsOn": ["typecheck"],
             "command": "playwright test -c apps/maestro-e2e/playwright.renderer.config.ts",
             "configurations": {
                 "ui": {
@@ -27,6 +28,7 @@
             "executor": "@nx/eslint:lint"
         },
         "typecheck": {
+            "cache": true,
             "command": "tsc --noEmit -p apps/maestro-e2e/tsconfig.json"
         }
     }

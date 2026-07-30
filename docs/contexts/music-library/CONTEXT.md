@@ -17,9 +17,10 @@ One folder the user nominated as a top of their music collection. Stored canonic
 so two selections of the same directory through different symlinks collapse to one.
 _Avoid_: root, library root, library path, directory, source
 
-Say **folder** everywhere — UI copy, identifiers, docs. "Root" reads as scanner-implementer jargon
-and the app never shows the word to users. Where the tree-walking sense matters, the sentence can say
-so ("the top of the walk") without renaming the concept.
+When naming this product concept, say **folder** in product UI, identifiers, and docs. "Root" reads
+as scanner-implementer jargon and the app never shows the word to users. `path` and `directory`
+remain correct for literal filesystem representations and low-level filesystem operations; do not
+rename those merely to satisfy the product-language rule.
 
 **Configured folders** / **scanned folders**:
 Two genuinely different lists, so qualify which one you mean. _Configured_ is what the user picked and
@@ -88,3 +89,21 @@ _Avoid_: tag error, validation error — those mean read failures
 **Album preview**:
 A deduped album cover streamed to the renderer during a scan for the import mosaic. Keyed by cover
 path, which works as a dedup key because the cover cache is content-addressed.
+
+### Catalog
+
+The catalog entities — song, album, artist — carry no ambiguity and are not listed here. One does.
+
+**Record label**:
+The company that released a record: Warp, Ninja Tune, Hyperdub. Always **two words**, never "label"
+on its own. Bare "label" reads as a tag or a UI caption without context, which is why the concept was
+renamed — `record_labels` as a table, `recordLabelId` on an album, `recordLabelText` and
+`rawRecordLabel` on a song.
+_Avoid_: label, imprint, publisher
+
+The audio tag itself is still called `label`, because that is its name in the file format and in the
+metadata-engine contract (`metadata.label`, `ItemKey::Label`). Read it as `label` at that boundary and
+call it a **record label** everywhere upstream — the same split as _discovery_, which is _prescan_ at
+the metadata-engine boundary.
+
+Nothing in the triage or Linear sense of "label" belongs to this context.

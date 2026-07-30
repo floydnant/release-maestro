@@ -47,9 +47,7 @@ jobs:
             - uses: actions/checkout@v7
             - uses: ./.github/actions/setup-node
 
-            - name: Type-check e2e tests
-              run: make typecheck-e2e
-
+            # The e2e targets depend on maestro-e2e:typecheck, so tsc runs before Playwright does.
             - name: Install Playwright browsers
               run: npx playwright install --with-deps chromium
 

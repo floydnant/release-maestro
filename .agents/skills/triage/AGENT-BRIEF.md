@@ -1,12 +1,12 @@
 # Writing Agent Briefs
 
-An agent brief is a structured note posted on an issue when it moves to `ready-for-agent`. It is the authoritative specification that an AFK agent will work from. The original issue body and discussion are context — the agent brief is the contract.
+An agent brief is a structured note posted on an issue when it moves to `Ready for Agent`. It is the authoritative specification that an AFK agent will work from. The original issue body and discussion are context — the agent brief is the contract.
 
 ## Principles
 
 ### Durability over precision
 
-The issue may sit in `ready-for-agent` for days or weeks. The codebase will change in the meantime. Write the brief so it stays useful even as files are renamed, moved, or refactored.
+The issue may sit in `Ready for Agent` for days or weeks. The codebase will change in the meantime. Write the brief so it stays useful even as files are renamed, moved, or refactored.
 
 - **Do** describe interfaces, types, and behavioral contracts
 - **Do** name specific types, function signatures, or config shapes that the agent should look for or modify
@@ -27,7 +27,7 @@ Describe **what** the system should do, not **how** to implement it. The agent w
 
 The agent needs to know when it's done. Every agent brief must have concrete, testable acceptance criteria. Each criterion should be independently verifiable.
 
-- **Good:** "Filtering the issue tracker to `needs-triage` returns issues that have been through initial classification"
+- **Good:** "Filtering Linear to state Triage returns only issues nobody has evaluated yet"
 - **Bad:** "Triage should work correctly"
 
 ### Explicit scope boundaries
@@ -39,12 +39,12 @@ State what is out of scope. This prevents the agent from gold-plating or making 
 ```markdown
 ## Agent Brief
 
-**Category:** bug / enhancement
+**Category:** Bug / Feature / Improvement / Maintenance
 **Summary:** one-line description of what needs to happen
 
 **Current behavior:**
 Describe what happens now. For bugs, this is the broken behavior.
-For enhancements, this is the status quo the feature builds on.
+For improvements, this is the status quo the feature builds on.
 
 **Desired behavior:**
 Describe what should happen after the agent's work is complete.
@@ -108,17 +108,17 @@ and append "..." to indicate truncation.
 - Multi-line description support
 ```
 
-### Good agent brief (enhancement)
+### Good agent brief (improvement)
 
 ```markdown
 ## Agent Brief
 
-**Category:** enhancement
+**Category:** improvement
 **Summary:** Add `.out-of-scope/` directory support for tracking rejected feature requests
 
 **Current behavior:**
-When a feature request is rejected, the issue is closed with a `wontfix` label
-and a comment. There is no persistent record of the decision or reasoning.
+When a feature request is rejected, the issue is moved to Canceled with a
+comment. There is no persistent record of the decision or reasoning.
 Future similar requests require the maintainer to recall or search for the
 prior discussion.
 
@@ -138,8 +138,8 @@ checked for matches.
 
 **Acceptance criteria:**
 
-- [ ] Closing a feature as wontfix creates/updates a file in `.out-of-scope/`
-- [ ] The file includes the decision, reasoning, and link to the closed issue
+- [ ] Canceling a `Feature` or `Improvement` creates/updates a file in `.out-of-scope/`
+- [ ] The file includes the decision, reasoning, and link to the canceled issue
 - [ ] If a matching `.out-of-scope/` file already exists, the new issue is
       appended to its "Prior requests" list rather than creating a duplicate
 - [ ] During triage, existing `.out-of-scope/` files are checked and surfaced
@@ -149,7 +149,7 @@ checked for matches.
 
 - Automated matching (human confirms the match)
 - Reopening previously rejected features
-- Bug reports (only enhancement rejections go to `.out-of-scope/`)
+- Bug reports (only improvement rejections go to `.out-of-scope/`)
 ```
 
 ### Bad agent brief

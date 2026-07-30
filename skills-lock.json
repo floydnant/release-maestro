@@ -7,12 +7,6 @@
             "skillPath": "skills/productivity/caveman/SKILL.md",
             "computedHash": "934433479903febc585bf6deb5f0cebc63137e3f86b7babe0aab1ecb94d6d7a4"
         },
-        "design-an-interface": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/deprecated/design-an-interface/SKILL.md",
-            "computedHash": "885b05367fb1cf61a1e27e0d50f14d2502a05c1fa276c6e9ea050ce6a90e7095"
-        },
         "diagnose": {
             "source": "mattpocock/skills",
             "sourceType": "github",
@@ -55,30 +49,6 @@
             "skillPath": "skills/engineering/prototype/SKILL.md",
             "computedHash": "e4d0c8f8cb3fc096ee99405a15491da466545cf4a3694bee5a0c9db2fa621a43"
         },
-        "qa": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/deprecated/qa/SKILL.md",
-            "computedHash": "13898f35bc3e5a02155bce41a475d8bef46649c6403a8934dd2fe412f799fd1e"
-        },
-        "request-refactor-plan": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/deprecated/request-refactor-plan/SKILL.md",
-            "computedHash": "658c4687896bc943d35c3d5d999eafe04d09eccb2acc6fe86fc4deadb4d42084"
-        },
-        "review": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/in-progress/review/SKILL.md",
-            "computedHash": "4a2b10bb81e568516c52018e73b8255a02066024257d7c907fa65826d62bc8dd"
-        },
-        "setup-matt-pocock-skills": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/engineering/setup-matt-pocock-skills/SKILL.md",
-            "computedHash": "0164a8b1ef998abca426056c6ed8a7716a9d4692fc6daa5378f68381a6dafd24"
-        },
         "tdd": {
             "source": "mattpocock/skills",
             "sourceType": "github",
@@ -90,30 +60,6 @@
             "sourceType": "github",
             "skillPath": "skills/productivity/teach/SKILL.md",
             "computedHash": "3f30a6d60bae008c64998acad52c593475b55fa8bafe920ebcd3ea7670c2a720"
-        },
-        "to-issues": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/engineering/to-issues/SKILL.md",
-            "computedHash": "47f648f3414848ccfc62cb41d2828b7e575fb5e7cbd6c4bdf630c063b5dc5e82"
-        },
-        "to-prd": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/engineering/to-prd/SKILL.md",
-            "computedHash": "a6d6d475f1d01c201937fa0c306e55b7056b02023ad615bc92f57514e831dd31"
-        },
-        "triage": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/engineering/triage/SKILL.md",
-            "computedHash": "2b6efb6da12d92551772fcc04acf331f4e0e6f7bd9d4cb23ce0b301e0b128feb"
-        },
-        "ubiquitous-language": {
-            "source": "mattpocock/skills",
-            "sourceType": "github",
-            "skillPath": "skills/deprecated/ubiquitous-language/SKILL.md",
-            "computedHash": "c8968b02b83c365bc81d85cc17fb4c8854b80f5b6dece322164fff5b00142231"
         },
         "write-a-skill": {
             "source": "mattpocock/skills",

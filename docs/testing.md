@@ -7,6 +7,11 @@ tooling.
 Agent-facing repo instructions live in `AGENTS.md` and `docs/agents/`. Those docs point here for
 testing conventions; update this guide when test strategy changes.
 
+The [`e2e-testing`](../.agents/skills/e2e-testing/SKILL.md) skill carries the Playwright authoring
+habits that sit on top of this guide — assertion style, test isolation, what belongs in a spec. This
+document owns the decisions: the layer split, the locator ladder, and fixture isolation. Where the
+two differ, this document wins.
+
 ## Test Layers
 
 - Unit tests cover renderer components, Electron backend services, core schemas, and metadata-engine
@@ -41,25 +46,46 @@ into it explicitly by overriding `get-settings`.
 
 ## Commands
 
+Repo-wide, through `make`:
+
 ```bash
 make test
-make test-renderer
-make test-electron
-make test-core
-make test-engine
 make e2e
 make e2e-renderer
-make typecheck-e2e
 make lint
 make format-check
+make sure          # format, lint, build, unit test, renderer E2E
+make affected      # build, lint, unit/E2E tests for affected projects; no formatting
 ```
 
-Playwright transpiles tests but does not perform semantic TypeScript checking. The `maestro-e2e:typecheck`
-target runs `tsc --noEmit` over both Electron and renderer E2E sources; CI invokes it through
-`make typecheck-e2e`.
+`make sure` mutates formatting. Full Electron E2E (`make e2e`) is intentionally separate because it
+repeatedly opens and closes the desktop app; run it when the changed user journey needs the real
+Electron, IPC, filesystem, database, or sidecar integration. `make affected` includes it when the
+affected-project graph selects the E2E project.
+
+One project at a time, straight to nx:
+
+```bash
+npx nx test maestro-renderer
+npx nx test maestro-electron
+npx nx test maestro-core
+npx nx test metadata-engine
+npx nx run maestro-renderer:design-tokens-check
+```
 
 Run the narrowest relevant command first. If a change crosses project boundaries, add the affected
 project checks after the narrow check passes.
+
+### Type checking
+
+Playwright transpiles tests but does not perform semantic TypeScript checking, so `maestro-e2e`
+declares a `typecheck` target running `tsc --noEmit` over both Electron and renderer E2E sources.
+Both e2e targets `dependsOn` it, so it runs automatically before Playwright — in CI too. Run it
+alone with `make typecheck-e2e` when you want the check without the suite.
+
+No other project declares a typecheck target, so **`build` is the type gate for app code**: type
+errors in renderer, electron, and core surface through `npx nx build <project>`, `make build`, or
+`make sure`. Don't assume a green test run has checked types.
 
 ## E2E Conventions
 
@@ -85,19 +111,7 @@ Electron E2E tests should isolate both filesystem inputs and app state:
 Reusable test fixtures live in `fixtures/`. Tests may copy from that directory, but should not mutate
 source fixture files. Keep large media fixtures intentional because they affect checkout and CI time.
 
-### Generated media over committed media
-
-Library scan tests need many distinctly-tagged audio files with distinct cover art. Committing them
-would mean megabytes of near-identical binaries in every checkout, so
-`apps/maestro-e2e/src/fixtures/tagged-library.fixture.ts` **generates** a temp library at test time by
-re-tagging the audio of the single committed MP3 fixture. Prefer extending that generator over adding
-binary fixtures.
-
-Two details there are load-bearing and easy to break:
-
-- Cover art is deduped by content hash, so identical images collapse to one album preview. The
-  generator appends salt bytes after each PNG's `IEND` chunk — invisible to decoders, but enough to
-  make otherwise-identical covers hash differently. Two albums deliberately share a salt so the dedup
-  path stays covered.
-- The default library is shaped for assertions (6 tracks, 4 albums, 3 distinct artworks). Changing
-  those counts will break tests that assert on them rather than just the tests you are editing.
+Library scan E2E generates distinctly tagged media from the small committed fixture instead of
+committing many near-identical binaries. Prefer extending
+`apps/maestro-e2e/src/fixtures/tagged-library.fixture.ts` over adding binary fixtures; its local
+comments and dependent assertions document the load-bearing dataset shape and cover-art dedup setup.
