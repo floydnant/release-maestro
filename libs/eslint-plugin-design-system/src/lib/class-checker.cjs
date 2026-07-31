@@ -7,7 +7,6 @@
  */
 const path = require('node:path')
 const { classesFromCssFile, componentClassesForTemplate } = require('./css-classes.cjs')
-const { isTypedTokenApi } = require('./generated-token-api.cjs')
 const { suggestClassName } = require('./suggest.cjs')
 const { isTailwindClass, tailwindClassList, themePathExists } = require('./tailwind-authority.cjs')
 
@@ -16,8 +15,6 @@ const { isTailwindClass, tailwindClassList, themePathExists } = require('./tailw
  * @property {string} tailwindConfig path to the Tailwind config that defines the utility surface
  * @property {string[]} [globalStylesheets] stylesheets whose classes are valid everywhere; their
  *   relative `@import`s are followed
- * @property {string} [generatedTokenApi] a generated module whose exports may root an otherwise
- *   unresolvable class expression; omit to switch that acceptance off
  * @property {boolean} [reportDynamic] whether to report class lists that cannot be resolved
  *   statically. Defaults to true; turning it off is for narrowing a test, not for production use.
  */
@@ -38,10 +35,6 @@ function resolveFromRoot(target, root) {
 function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
     const tailwindConfig = resolveFromRoot(options.tailwindConfig, cwd)
     const globalStylesheets = (options.globalStylesheets ?? []).map(sheet => resolveFromRoot(sheet, cwd))
-    const generatedTokenApi = options.generatedTokenApi
-        ? resolveFromRoot(options.generatedTokenApi, cwd)
-        : null
-
     /** @type {Set<string>} */
     const globalClasses = new Set()
     for (const sheet of globalStylesheets) {
@@ -73,17 +66,7 @@ function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
     /** @param {string} themePath */
     const isThemePath = themePath => themePathExists(tailwindConfig, themePath)
 
-    /**
-     * A class expression the rule cannot enumerate is still acceptable when it is rooted in the
-     * generated token API — the TypeScript union there is the authority, so re-checking it here
-     * would only duplicate it.
-     *
-     * @param {AngularExpression} node
-     */
-    const isTypedApiExpression = node =>
-        generatedTokenApi !== null && isTypedTokenApi(node, generatedTokenApi)
-
-    return { isThemePath, isTypedApiExpression, isValid, suggest }
+    return { isThemePath, isValid, suggest }
 }
 
 const sharedSchema = {
@@ -93,7 +76,6 @@ const sharedSchema = {
     properties: {
         tailwindConfig: { type: 'string' },
         globalStylesheets: { type: 'array', items: { type: 'string' } },
-        generatedTokenApi: { type: 'string' },
         reportDynamic: { type: 'boolean' },
     },
 }

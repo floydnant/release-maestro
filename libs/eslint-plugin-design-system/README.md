@@ -28,13 +28,11 @@ const designSystem = createRequire(import.meta.url)('../../libs/eslint-plugin-de
 const classValidationOptions = {
     tailwindConfig: join(projectRoot, 'tailwind.config.js'),
     globalStylesheets: [join(projectRoot, 'src/styles.css')],
-    generatedTokenApi: join(projectRoot, 'src/app/shared/design-tokens.generated.ts'),
 }
 ```
 
-`tailwindConfig` is required; the other two are optional, and omitting `generatedTokenApi` simply
-switches the typed-API acceptance off. The relative path is because the workspace does not use npm
-workspaces — a published consumer would write the package name.
+`tailwindConfig` is required, `globalStylesheets` optional. The relative path is because the
+workspace does not use npm workspaces — a published consumer would write the package name.
 
 Registration is per-project on purpose: the renderer's authorities are the renderer's, so putting
 this at the workspace root would lint `maestro-electron` against a design system it does not use.
@@ -115,17 +113,20 @@ Statically enumerable bindings are validated like any other class list: `[class.
 object keys, `[class]` conditionals and concatenations. What cannot be enumerated is reported as
 `dynamicClassList` rather than quietly accepted — moving a class into a binding is not a bypass.
 
-One exception, from MAE-100's corpus: an expression **rooted in an export of
-`src/app/shared/design-tokens.generated.ts`** is accepted, because the generated signature's
-TypeScript union already decides which token names are legal. The check is on the _root_ identifier
-of the call or property chain and nothing more, so it does not see through a component method that
-wraps the generated call.
+**There is no exemption for typed or generated APIs.** An earlier version accepted any expression
+whose root identifier matched an export of a configured generated module. That was not a type-based
+check: it read export _names_ out of a file, never resolved the template's member to that export,
+and never established that the call returns class names — so a same-named component helper, or any
+chain hanging off an accepted root, sailed through. It also had no real consumer, since the
+generated token module exports values (`semanticColor` returns a `var(...)` string) rather than
+class names. A check that cannot fail is worse than no check, so it is gone.
 
-Everything else uses a narrow `eslint-disable-next-line` with a reason. Three sites in the renderer
-do — `'type-' + token` in the design-system specimen and two closed-vocabulary helpers in
-`debug.component.html`. Note that `eslint-disable-next-line` is line-based and Prettier's attribute
-wrapping can move the reported line away from the comment; a multi-line binding needs a
-`eslint-disable` / `eslint-enable` pair around the element instead.
+The supported answer for a genuinely closed vocabulary the rule cannot see is a narrow
+`eslint-disable-next-line` with a reason. Three sites in the renderer have one — `'type-' + token`
+in the design-system specimen and two closed-vocabulary helpers in `debug.component.html`. Note
+that `eslint-disable-next-line` is line-based and Prettier's attribute wrapping can move the
+reported line away from the comment; a multi-line binding needs a `eslint-disable` /
+`eslint-enable` pair around the element instead.
 
 ## Tests
 

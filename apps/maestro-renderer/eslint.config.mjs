@@ -21,7 +21,6 @@ const designSystem = createRequire(import.meta.url)(
 const classValidationOptions = {
     tailwindConfig: join(projectRoot, 'tailwind.config.js'),
     globalStylesheets: [join(projectRoot, 'src/styles.css')],
-    generatedTokenApi: join(projectRoot, 'src/app/shared/design-tokens.generated.ts'),
 }
 
 export default [

@@ -36,7 +36,7 @@ module.exports = {
         const options = context.options[0] ?? {}
         const reportDynamic = options.reportDynamic ?? true
         const sourceCode = context.sourceCode ?? context.getSourceCode()
-        const { isThemePath, isTypedApiExpression, isValid, suggest } = createClassChecker(options, {
+        const { isThemePath, isValid, suggest } = createClassChecker(options, {
             cwd: context.cwd,
             filePath: context.filename,
         })
@@ -138,10 +138,6 @@ module.exports = {
         /** @param {AngularBoundAttribute} node */
         const checkExpression = node => {
             const fallbackLoc = locFor(node.sourceSpan.start.offset, node.sourceSpan.end.offset)
-
-            // MAE-100 accepts typed/generated APIs for dynamic token selection. The generated
-            // module's TypeScript union already constrains what the expression can produce.
-            if (isTypedApiExpression(node.value)) return
 
             const { strings, dynamic } = collectClassStrings(node.value)
 

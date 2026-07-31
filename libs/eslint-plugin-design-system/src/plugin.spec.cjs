@@ -27,7 +27,6 @@ const FIXTURES = path.join(__dirname, 'fixtures')
 
 const FIXTURE_TEMPLATE = path.join(FIXTURES, 'specimen.component.html')
 const FIXTURE_COMPONENT = path.join(FIXTURES, 'specimen.component.ts')
-const FIXTURE_TOKEN_API = path.join(FIXTURES, 'design-tokens.generated.fixture.ts')
 
 const TAILWIND_CONFIG = path.join(FIXTURES, 'tailwind.config.cjs')
 
@@ -38,15 +37,11 @@ const TAILWIND_CONFIG = path.join(FIXTURES, 'tailwind.config.cjs')
 const authorities = {
     tailwindConfig: TAILWIND_CONFIG,
     globalStylesheets: [path.join(FIXTURES, 'global.css')],
-    generatedTokenApi: FIXTURE_TOKEN_API,
 }
 
 const settings = [authorities]
 /** The unsupported cases are noisy by default; silencing them isolates the case under test. */
 const quiet = [{ ...authorities, reportDynamic: false }]
-/** Drops the typed-API authority, so a generated-module root stops being special. */
-const { generatedTokenApi: _omitted, ...withoutTokenApiAuthorities } = authorities
-const withoutTokenApi = [withoutTokenApiAuthorities]
 
 /** @param {string} className */
 const unknown = className => ({ messageId: 'unknownClass', data: { className } })
@@ -177,11 +172,6 @@ templateTester.run('valid-template-classnames', templateRule, {
         template('A8 [class] conditional', "<div [class]=\"cond ? 'flex' : 'hidden'\"></div>"),
         template('A8 routerLinkActive', '<a routerLinkActive="active-link"></a>'),
         template('A8 static ngClass', '<div ngClass="flex gap-2"></div>'),
-        template('A9 typed generated API', '<div [class]="typographyClass(variant())"></div>'),
-        template(
-            'A9 typed generated API behind a property chain',
-            '<div [ngClass]="typographyVariantIdentifiers[index]"></div>',
-        ),
         template('A10 component-local custom property', '<div class="w-[var(--progress-width)]"></div>'),
 
         template('non-class attributes are untouched', '<div [style.width]="w" title="flex"></div>'),
@@ -281,16 +271,17 @@ templateTester.run('valid-template-classnames', templateRule, {
             errors: [{ messageId: 'dynamicClassList' }],
         }),
         template(
-            'R5 a call rooted outside the generated module is still unresolvable',
-            '<div [class]="componentHelper(variant())"></div>',
+            // No expression is trusted for its shape. A call that looks like a generated token API
+            // is as unresolvable as any other call — the plugin cannot prove what it returns, and
+            // an exemption keyed on the *name* of the thing being called proves nothing at all.
+            'R5 a call that looks like a generated token API',
+            '<div [class]="typographyClass(variant())"></div>',
             { errors: [{ messageId: 'dynamicClassList' }] },
         ),
         template(
-            // Proves A9 is the typed-API check doing the work rather than the expression happening
-            // to be resolvable: drop the authority and the very same call is reported.
-            'R5 the same call without a generated-module authority',
-            '<div [class]="typographyClass(variant())"></div>',
-            { options: withoutTokenApi, errors: [{ messageId: 'dynamicClassList' }] },
+            'R5 a property chain rooted in a generated module',
+            '<div [ngClass]="typographyVariantIdentifiers[index]"></div>',
+            { errors: [{ messageId: 'dynamicClassList' }] },
         ),
 
         // --- D1: the descriptor reading, offered only where a descriptor could have gone ---

@@ -38,7 +38,7 @@ const CLASS_MESSAGES = {
  * there is nothing to fix in the class list itself.
  */
 const TEMPLATE_MESSAGES = {
-    dynamicClassList: 'Runtime-built class list — use a generated token API, or suppress with a reason.',
+    dynamicClassList: 'Runtime-built class list — enumerate the classes, or suppress with a reason.',
     partialClass:
         '`{{className}}` is glued to a runtime value — suppress with a reason if the vocabulary is closed.',
 }
