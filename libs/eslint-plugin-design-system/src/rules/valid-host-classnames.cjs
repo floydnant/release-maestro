@@ -3,6 +3,7 @@
  * sees, so it gets the same existence check from the TypeScript side.
  */
 const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
+const { CLASS_MESSAGES, describeUnknownClass } = require('../lib/diagnostics.cjs')
 const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
 
 const HOST_DECORATORS = new Set(['Component', 'Directive'])
@@ -30,18 +31,7 @@ module.exports = {
             description: 'Every styling class in component host metadata must resolve to CSS',
         },
         schema: [sharedSchema],
-        messages: {
-            unknownClass:
-                '`{{className}}` produces no CSS: Tailwind generates nothing for it and no stylesheet declares it.',
-            unknownClassWithSuggestion:
-                '`{{className}}` produces no CSS: Tailwind generates nothing for it and no stylesheet declares it. Did you mean `{{suggestion}}`?',
-            emptyDescriptor: 'A `|` needs a semantic descriptor before it, or no pipe at all.',
-            multipleDescriptors: 'A class list carries at most one semantic descriptor before the `|`.',
-            multiplePipes: 'A class list carries at most one `|` separating the descriptor from styling.',
-            bareTokenVariable:
-                '`{{variable}}` is a design token: reach it through `theme(...)` rather than a bare `var()`.',
-            unknownThemePath: '`{{themePath}}` is not a path in the Tailwind theme.',
-        },
+        messages: CLASS_MESSAGES,
     },
 
     create(context) {
@@ -110,17 +100,10 @@ module.exports = {
 
                     if (token.kind !== 'styling' || isValid(token.name)) continue
 
-                    const suggestion = suggest(token.name)
-                    const loc = locFor(token.start, token.end)
-                    context.report(
-                        suggestion
-                            ? {
-                                  messageId: 'unknownClassWithSuggestion',
-                                  data: { className: token.name, suggestion },
-                                  loc,
-                              }
-                            : { messageId: 'unknownClass', data: { className: token.name }, loc },
-                    )
+                    context.report({
+                        ...describeUnknownClass(token.name, suggest(token.name)),
+                        loc: locFor(token.start, token.end),
+                    })
                 }
             },
         }

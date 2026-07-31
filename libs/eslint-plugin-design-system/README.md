@@ -78,21 +78,36 @@ Three further checks ride along on the same tokens:
   rule resolves the path against the same config, so `theme(colors.status.info.background)` is
   rejected in favour of `theme(colors.status.info-background)`.
 
-## Suggestions: two kinds of "nearest"
+## Diagnostics: two kinds of "nearest", two kinds of wrong
 
 Edit distance is right for typos and actively wrong for scale values, which is what the prototype
 comparison surfaced. `max-h-72` is one edit from `max-h-32` and four scale steps away from it; the
 value a human reaches for is `max-h-64`. So scale proximity is tried first and edit distance is the
-fallback:
+fallback.
 
-| Unknown        | Suggested      | Why                                             |
-| -------------- | -------------- | ----------------------------------------------- |
-| `max-h-72`     | `max-h-64`     | nearest value in the utility's own scale        |
-| `py-14`        | `py-12`        | tie between 12 and 16 goes to the smaller value |
-| `rounded`      | `rounded-sm`   | bare utility → the scale's first real step      |
-| `fleex`        | `flex`         | edit distance                                   |
-| `type-code-sl` | `type-code-sm` | edit distance                                   |
-| `bg-nonsense`  | —              | no candidate is close enough to be one guess    |
+The message follows the same split, because the two failures are not the same mistake. `fleex` is a
+misspelling. `rounded` and `max-h-72` are **real Tailwind names** that emit nothing here, and
+calling those "unknown" sends the reader to the Tailwind docs to discover that the name is fine.
+
+| Unknown       | Message                                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `fleex`       | ``Unknown class `fleex` — did you mean `flex`?``                                              |
+| `bg-nonsense` | ``Unknown class `bg-nonsense`.``                                                              |
+| `max-h-72`    | `` `max-h-72` is off the `max-h` scale — did you mean `max-h-64`? ``                          |
+| `py-14`       | `` `py-14` is off the `py` scale — did you mean `py-12`? `` (a tie goes to the smaller value) |
+| `rounded`     | ``Bare `rounded` emits no CSS — did you mean `rounded-sm`?``                                  |
+
+Every message names its own failure and stops. The two findings with nothing to fix in the class
+list itself are the exception, and say what to do instead:
+
+```
+Runtime-built class list — use a generated token API, or suppress with a reason.
+`type-` is glued to a runtime value — suppress with a reason if the vocabulary is closed.
+```
+
+All wording lives in [`src/lib/diagnostics.cjs`](src/lib/diagnostics.cjs), shared by both rules —
+two rules reporting the same mistake in drifting words is worse than no wording at all. The rendered
+text is asserted verbatim in the corpus, not just the message ids.
 
 ## Dynamic class lists
 

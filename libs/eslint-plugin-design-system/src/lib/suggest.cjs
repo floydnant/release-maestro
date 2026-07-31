@@ -122,18 +122,29 @@ function firstScaleStep(prefix, candidates) {
 }
 
 /**
+ * @typedef {object} Suggestion
+ * @property {string} name the class to offer instead
+ * @property {'offScale'|'bareUtility'|'spelling'} kind which of the two mistakes this was — the
+ *   diagnostic says something different for each, because they are different mistakes
+ * @property {string} [scale] the utility prefix whose scale was missed, for `offScale`
+ */
+
+/**
  * @param {string} unknown the class that failed validation
  * @param {Iterable<string>} candidates every class name that would have been accepted
- * @returns {string|null} the single closest name, or null when the match is weak or ambiguous
+ * @returns {Suggestion|null} the single closest name, or null when the match is weak or ambiguous
  */
 function suggestClassName(unknown, candidates) {
     const pool = Array.isArray(candidates) ? candidates : [...candidates]
 
     const scaled = SCALE_UTILITY.exec(unknown)
-    const byScale = scaled
-        ? nearestScaleValue(scaled[1], Number(scaled[2]), pool)
-        : firstScaleStep(unknown, pool)
-    if (byScale) return byScale
+    if (scaled) {
+        const onScale = nearestScaleValue(scaled[1], Number(scaled[2]), pool)
+        if (onScale) return { name: onScale, kind: 'offScale', scale: scaled[1] }
+    } else {
+        const firstStep = firstScaleStep(unknown, pool)
+        if (firstStep) return { name: firstStep, kind: 'bareUtility' }
+    }
 
     const limit = Math.min(MAX_DISTANCE, Math.max(1, Math.floor(unknown.length / 3)))
 
@@ -157,7 +168,7 @@ function suggestClassName(unknown, candidates) {
         }
     }
 
-    return ambiguous ? null : best
+    return ambiguous || best === null ? null : { name: best, kind: 'spelling' }
 }
 
 module.exports = { suggestClassName }

@@ -5,6 +5,7 @@
  * alone.
  */
 const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
+const { CLASS_MESSAGES, describeUnknownClass, TEMPLATE_MESSAGES } = require('../lib/diagnostics.cjs')
 const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
 const { collectClassStrings } = require('../lib/expression-classes.cjs')
 
@@ -26,21 +27,7 @@ module.exports = {
             description: 'Every styling class in an Angular template must resolve to CSS',
         },
         schema: [sharedSchema],
-        messages: {
-            unknownClass:
-                '`{{className}}` produces no CSS: Tailwind generates nothing for it and no stylesheet declares it.',
-            unknownClassWithSuggestion:
-                '`{{className}}` produces no CSS: Tailwind generates nothing for it and no stylesheet declares it. Did you mean `{{suggestion}}`?',
-            dynamicClassList: 'This class list is computed at runtime and cannot be validated statically.',
-            partialClass:
-                '`{{className}}` is concatenated with a runtime value and cannot be validated statically.',
-            emptyDescriptor: 'A `|` needs a semantic descriptor before it, or no pipe at all.',
-            multipleDescriptors: 'A class list carries at most one semantic descriptor before the `|`.',
-            multiplePipes: 'A class list carries at most one `|` separating the descriptor from styling.',
-            bareTokenVariable:
-                '`{{variable}}` is a design token: reach it through `theme(...)` rather than a bare `var()`.',
-            unknownThemePath: '`{{themePath}}` is not a path in the Tailwind theme.',
-        },
+        messages: { ...CLASS_MESSAGES, ...TEMPLATE_MESSAGES },
     },
 
     create(context) {
@@ -80,12 +67,7 @@ module.exports = {
         const reportUnknown = (className, loc) => {
             if (isValid(className)) return
 
-            const suggestion = suggest(className)
-            context.report(
-                suggestion
-                    ? { messageId: 'unknownClassWithSuggestion', data: { className, suggestion }, loc }
-                    : { messageId: 'unknownClass', data: { className }, loc },
-            )
+            context.report({ ...describeUnknownClass(className, suggest(className)), loc })
         }
 
         /**

@@ -61,7 +61,7 @@ function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
      * a name that would pass. Reported, never applied — automatic correction is out of scope.
      *
      * @param {string} className
-     * @returns {string|null}
+     * @returns {import('./suggest.cjs').Suggestion|null}
      */
     const suggest = className =>
         suggestClassName(className, [

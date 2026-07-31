@@ -52,11 +52,37 @@ const withoutTokenApi = [withoutTokenApiAuthorities]
 const unknown = className => ({ messageId: 'unknownClass', data: { className } })
 
 /**
+ * A misspelling: the name is near a real one.
+ *
  * @param {string} className
  * @param {string} suggestion
  */
 const didYouMean = (className, suggestion) => ({
     messageId: 'unknownClassWithSuggestion',
+    data: { className, suggestion },
+})
+
+/**
+ * A real utility carrying a value this project's scale does not define. Not a misspelling, and the
+ * diagnostic must not call it one.
+ *
+ * @param {string} className
+ * @param {string} scale
+ * @param {string} suggestion
+ */
+const offScale = (className, scale, suggestion) => ({
+    messageId: 'offScaleValue',
+    data: { className, scale, suggestion },
+})
+
+/**
+ * A real utility with no bare form, because the scale replacing Tailwind's has no `DEFAULT` key.
+ *
+ * @param {string} className
+ * @param {string} suggestion
+ */
+const bareUtility = (className, suggestion) => ({
+    messageId: 'bareUtility',
     data: { className, suggestion },
 })
 
@@ -254,13 +280,13 @@ templateTester.run('valid-template-classnames', templateRule, {
 
         // --- R7/S1: the two cases the prototype comparison produced ---
         template('R7 bare utility whose scale has no DEFAULT key', '<div class="rounded"></div>', {
-            errors: [didYouMean('rounded', 'rounded-sm')],
+            errors: [bareUtility('rounded', 'rounded-sm')],
         }),
         template('R7 bare shadow', '<div class="shadow"></div>', {
-            errors: [didYouMean('shadow', 'shadow-sm')],
+            errors: [bareUtility('shadow', 'shadow-sm')],
         }),
         template('S1 scale proximity beats edit distance', '<div class="max-h-72"></div>', {
-            errors: [didYouMean('max-h-72', 'max-h-64')],
+            errors: [offScale('max-h-72', 'max-h', 'max-h-64')],
         }),
 
         // --- the same checks across every dynamic surface ---
@@ -321,7 +347,7 @@ typescriptTester.run('valid-host-classnames', hostRule, {
             { errors: [{ messageId: 'bareTokenVariable', data: { variable: '--color-content-muted' } }] },
         ),
         host('R7 bare utility in host metadata', "@Component({ host: { class: 'rounded' } }) class C {}", {
-            errors: [didYouMean('rounded', 'rounded-sm')],
+            errors: [bareUtility('rounded', 'rounded-sm')],
         }),
     ],
 })
@@ -333,22 +359,37 @@ describe('S1 nearest-value suggestions in the utility’s own scale', () => {
 
     // The values a human reached for when fixing these exact classes in the renderer.
     it.each([
-        ['max-h-72', 'max-h-64'],
-        ['max-h-44', 'max-h-52'],
-        ['min-h-36', 'min-h-32'],
-        ['py-14', 'py-12'],
-        ['opacity-80', 'opacity-70'],
+        ['max-h-72', 'max-h-64', 'max-h'],
+        ['max-h-44', 'max-h-52', 'max-h'],
+        ['min-h-36', 'min-h-32', 'min-h'],
+        ['py-14', 'py-12', 'py'],
+        ['opacity-80', 'opacity-70', 'opacity'],
+    ])('suggests %s → %s, off the %s scale', (unknownClass, expected, scale) => {
+        expect(suggestClassName(unknownClass, candidates)).toEqual({
+            name: expected,
+            kind: 'offScale',
+            scale,
+        })
+    })
+
+    it.each([
         ['rounded', 'rounded-sm'],
         ['shadow', 'shadow-sm'],
-    ])('suggests %s → %s', (unknownClass, expected) => {
-        expect(suggestClassName(unknownClass, candidates)).toBe(expected)
+    ])('suggests the first real step for bare %s → %s', (unknownClass, expected) => {
+        expect(suggestClassName(unknownClass, candidates)).toEqual({
+            name: expected,
+            kind: 'bareUtility',
+        })
     })
 
     it.each([
         ['fleex', 'flex'],
         ['type-code-sl', 'type-code-sm'],
     ])('still uses edit distance for typos: %s → %s', (unknownClass, expected) => {
-        expect(suggestClassName(unknownClass, [...candidates, 'type-code-sm'])).toBe(expected)
+        expect(suggestClassName(unknownClass, [...candidates, 'type-code-sm'])).toEqual({
+            name: expected,
+            kind: 'spelling',
+        })
     })
 
     it('offers nothing when no candidate is close', () => {
@@ -386,25 +427,20 @@ describe('the committed specimen fixture', () => {
             ],
         }).lintFiles([FIXTURE_TEMPLATE])
 
-    it('reports exactly the specimen’s planted defects, each with the scale-aware suggestion', async () => {
+    /**
+     * The rendered text, not just the message id: what a developer reads is the product here, and a
+     * message that quietly grows a clause or starts calling a real utility "unknown" is a
+     * regression the id-level assertions above cannot see.
+     */
+    it('reports exactly the specimen’s planted defects, in the words it means to use', async () => {
         const [result] = await lintFixture()
 
-        expect(
-            result.messages.map(message => `${message.line}:${message.column} ${message.message}`),
-        ).toEqual([
-            expect.stringContaining('`type-code-sl` produces no CSS'),
-            expect.stringContaining('`rounded` produces no CSS'),
-            expect.stringContaining('`shadow` produces no CSS'),
-            expect.stringContaining('`max-h-72` produces no CSS'),
-            expect.stringContaining('`py-14` produces no CSS'),
-        ])
-
-        expect(result.messages.map(message => message.message.match(/Did you mean `(.+?)`/)?.[1])).toEqual([
-            'type-code-sm',
-            'rounded-sm',
-            'shadow-sm',
-            'max-h-64',
-            'py-12',
+        expect(result.messages.map(message => message.message)).toEqual([
+            'Unknown class `type-code-sl` — did you mean `type-code-sm`?',
+            'Bare `rounded` emits no CSS — did you mean `rounded-sm`?',
+            'Bare `shadow` emits no CSS — did you mean `shadow-sm`?',
+            '`max-h-72` is off the `max-h` scale — did you mean `max-h-64`?',
+            '`py-14` is off the `py` scale — did you mean `py-12`?',
         ])
     })
 
