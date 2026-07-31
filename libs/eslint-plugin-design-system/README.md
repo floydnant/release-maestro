@@ -18,7 +18,7 @@ packaging question rather than a rewrite.
 | Rule                                      | Surface                                                                                                                                                             |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `design-system/valid-template-classnames` | `class`, `ngClass`, `routerLinkActive`, `[class]`, `[ngClass]`, `[class.foo]`, in `.html` files and in inline templates (via the Angular inline-template processor) |
-| `design-system/valid-host-classnames`     | `@Component`/`@Directive` `host: { class: '…' }`                                                                                                                    |
+| `design-system/valid-host-classnames`     | `@Component`/`@Directive` `host: { class: '…' }` and `host: { '[class.foo]': … }`                                                                                   |
 
 Both are registered at `error` in `apps/maestro-renderer/eslint.config.mjs`:
 

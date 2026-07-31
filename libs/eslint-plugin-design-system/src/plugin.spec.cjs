@@ -355,7 +355,13 @@ typescriptTester.run('valid-host-classnames', hostRule, {
             'non-class host metadata is untouched',
             "@Component({ host: { 'data-testid': 'x' } }) class C {}",
         ),
-        host('non-literal host class', '@Component({ host: { class: someExpression } }) class C {}'),
+        host(
+            'A8 statically enumerable host class binding',
+            "@Component({ host: { '[class.rounded-l-full]': 'isFirst' } }) class C {}",
+        ),
+        host('reporting stays configurable', '@Component({ host: { class: expr } }) class C {}', {
+            options: quiet,
+        }),
     ],
     invalid: [
         host(
@@ -383,6 +389,28 @@ typescriptTester.run('valid-host-classnames', hostRule, {
         host('R7 bare utility in host metadata', "@Component({ host: { class: 'rounded' } }) class C {}", {
             errors: [bareUtility('rounded', 'rounded-sm')],
         }),
+        host(
+            // The decorator's `[class.foo]`: the condition is dynamic, the class name never is.
+            'R2 unknown class in a host class binding',
+            "@Component({ host: { '[class.fleex]': 'isActive' } }) class C {}",
+            { errors: [didYouMean('fleex', 'flex')] },
+        ),
+        host(
+            'R2 host class binding on a directive',
+            "@Directive({ host: { '[class.sizee-full]': 'x' } }) class D {}",
+            { errors: [didYouMean('sizee-full', 'size-full')] },
+        ),
+        host(
+            // Checked alongside the literal list rather than instead of it.
+            'R2 a host class binding beside a literal class list',
+            "@Component({ host: { '[class.fleex]': 'x', class: 'inline-flex nope-class' } }) class C {}",
+            { errors: [didYouMean('fleex', 'flex'), unknown('nope-class')] },
+        ),
+        host(
+            'R5 a host class list built at runtime',
+            '@Component({ host: { class: buildClasses() } }) class C {}',
+            { errors: [{ messageId: 'dynamicClassList' }] },
+        ),
         host(
             'D1 host metadata carries descriptors too',
             "@Component({ host: { class: 'progress-ring inline-block' } }) class C {}",

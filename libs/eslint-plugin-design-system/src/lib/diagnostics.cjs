@@ -34,11 +34,18 @@ const CLASS_MESSAGES = {
 }
 
 /**
- * Template-only, and the only two findings where the reader's next question is "so what do I do" —
- * there is nothing to fix in the class list itself.
+ * The findings where the reader's next question is "so what do I do", because there is nothing to
+ * fix in the class list itself.
  */
-const TEMPLATE_MESSAGES = {
+const DYNAMIC_MESSAGE = {
     dynamicClassList: 'Runtime-built class list — enumerate the classes, or suppress with a reason.',
+}
+
+/** `host: { class: someExpression }` is the decorator's version of `[class]`. */
+const HOST_MESSAGES = { ...DYNAMIC_MESSAGE }
+
+const TEMPLATE_MESSAGES = {
+    ...DYNAMIC_MESSAGE,
     partialClass:
         '`{{className}}` is glued to a runtime value — suppress with a reason if the vocabulary is closed.',
 }
@@ -81,4 +88,4 @@ function describeUnknownClass(className, suggestion, { inDescriptorPosition = fa
         : { messageId: 'unknownClassWithSuggestion', data: { className, suggestion: suggestion.name } }
 }
 
-module.exports = { CLASS_MESSAGES, describeUnknownClass, TEMPLATE_MESSAGES }
+module.exports = { CLASS_MESSAGES, describeUnknownClass, HOST_MESSAGES, TEMPLATE_MESSAGES }
