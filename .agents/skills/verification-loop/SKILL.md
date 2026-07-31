@@ -35,11 +35,14 @@ description: Verification loop using repository make targets.
 - `make e2e-renderer` — renderer-only E2E and part of `make sure`.
 - `make e2e` — full Electron E2E. Run intentionally when the changed journey needs it: the suite
   repeatedly opens and closes the desktop app, so it is deliberately excluded from `make sure`.
-  Both E2E suites type-check themselves first via `maestro-e2e:typecheck`.
+  Both E2E suites type-check themselves first via their project's `typecheck` target.
 - `make build-prod` — catches production-only build issues.
-- **Type errors in app code surface through `build`**, not through a typecheck target. Only
-  `maestro-e2e` declares `typecheck`, and its e2e targets depend on it, so `make build` /
-  `make sure` / `npx nx build <project>` is the type gate for renderer, electron, and core.
+- **A project's type gate is its `build`, unless it has no build.** Projects that compile — the
+  renderer, electron, core — are type-checked by `npx nx build <project>`, `make build`, or
+  `make sure`; a green test run has not checked their types. Projects with nothing to compile
+  declare a `typecheck` target instead, wired into a target that always runs, so it is covered by
+  `make lint` or `make sure` without being asked for. `npx nx show project <project> --web false`
+  lists what a given project actually has.
 - See `docs/testing.md` for the test-layer split and E2E isolation conventions.
 
 ## Reading the results
