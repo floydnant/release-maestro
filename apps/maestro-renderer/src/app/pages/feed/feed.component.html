@@ -79,7 +79,7 @@
                                         @if (track.streamUrl) {
                                             <button
                                                 type="button"
-                                                class="track-control grid size-6 shrink-0 place-items-center rounded-sm text-content-secondary transition-colors"
+                                                class="track-control | grid size-6 shrink-0 place-items-center rounded-sm text-content-secondary transition-colors"
                                                 [ngClass]="{
                                                     'hover:bg-action-quiet-hover hover:text-content-primary':
                                                         isCurrentTrack(track.streamUrl),
@@ -104,7 +104,7 @@
                                             </button>
                                             <button
                                                 type="button"
-                                                class="track-seeker relative flex min-w-0 grow items-center justify-between gap-2 rounded-sm py-1 text-left text-content-primary"
+                                                class="track-seeker | relative flex min-w-0 grow items-center justify-between gap-2 rounded-sm py-1 text-left text-content-primary"
                                                 [attr.aria-label]="'Seek within ' + track.title"
                                                 (mousedown)="$event.preventDefault()"
                                                 (click)="seekTrack($event, track.streamUrl)"
@@ -230,7 +230,7 @@
                                                 [title]="link.url"
                                             >
                                                 <img
-                                                    class="favicon"
+                                                    class="favicon |"
                                                     [src]="link.favicon"
                                                     alt="Favicon for {{ link.title }}"
                                                     width="16"

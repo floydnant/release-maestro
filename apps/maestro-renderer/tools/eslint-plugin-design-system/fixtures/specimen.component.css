@@ -1,0 +1,7 @@
+.scoped-only {
+    display: contents;
+}
+
+:host(.host-scoped) .nested-scoped {
+    color: red;
+}

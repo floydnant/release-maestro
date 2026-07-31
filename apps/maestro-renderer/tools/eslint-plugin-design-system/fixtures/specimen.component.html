@@ -1,0 +1,23 @@
+<!--
+    Corpus fixture, not application code. The `type-code-sl` specimen used to exist only as an
+    uncommitted edit to the design-system page, so the case it proves kept disappearing between
+    sessions; MAE-100 asks for it to live here instead. `plugin.spec.cjs` lints this file from disk,
+    which is also what exercises the file-backed authorities — the component's own stylesheet, its
+    inline `styles:` block, and the template-to-component mapping.
+-->
+<p class="type-code-sl">A generated typography class that does not exist.</p>
+<p class="type-code-sm">The one that does.</p>
+
+<!-- The Tailwind config replaces these scales with token scales that have no DEFAULT key, so the
+     bare utilities below emit no CSS at all. -->
+<div class="rounded"></div>
+<div class="shadow"></div>
+
+<!-- Off-scale values: near in spelling to something small, near in magnitude to the right answer. -->
+<div class="max-h-72"></div>
+<div class="py-14"></div>
+
+<!-- Accepted: a descriptor, this component's own scoped classes, and real utilities. -->
+<div class="specimen-root | flex items-center gap-3">
+    <span class="scoped-only nested-scoped inline-scoped"></span>
+</div>

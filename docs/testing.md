@@ -71,7 +71,14 @@ npx nx test maestro-electron
 npx nx test maestro-core
 npx nx test metadata-engine
 npx nx run maestro-renderer:design-tokens-check
+npx nx run maestro-renderer:tooling-test
 ```
+
+`tooling-test` is the design-system tooling suite — the token generator and the class-validation
+ESLint plugin's acceptance corpus. It is Jest like everything else, but on its own
+`apps/maestro-renderer/tools/jest.config.cjs` in the Node environment rather than the renderer's
+jsdom/Angular one. `design-tokens-check` depends on it and `lint` depends on that, so it runs as
+part of `make lint`, `make sure`, and CI without being listed separately.
 
 Run the narrowest relevant command first. If a change crosses project boundaries, add the affected
 project checks after the narrow check passes.

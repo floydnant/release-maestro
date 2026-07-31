@@ -120,15 +120,16 @@
         },
         "design-tokens-check": {
             "executor": "nx:run-commands",
-            "dependsOn": ["design-tokens-test"],
+            "dependsOn": ["tooling-test"],
             "options": {
                 "command": "node apps/maestro-renderer/tools/design-tokens.cjs check"
             }
         },
-        "design-tokens-test": {
-            "executor": "nx:run-commands",
+        "tooling-test": {
+            "executor": "@nx/jest:jest",
+            "outputs": ["{workspaceRoot}/coverage/{projectRoot}/tools"],
             "options": {
-                "command": "node --test apps/maestro-renderer/tools/design-tokens.node-test.cjs"
+                "jestConfig": "apps/maestro-renderer/tools/jest.config.cjs"
             }
         },
         "serve-static": {
