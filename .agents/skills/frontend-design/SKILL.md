@@ -44,10 +44,15 @@ CSS-style name, then a `|`, then the styling classes.
 </div>
 ```
 
-The descriptor is annotation. Nothing styles it and nothing should: it exists so the template can be
-read and grepped. One per list at most, standing alone it keeps its pipe (`class="favicon |"`), and
-inside `[ngClass]` it goes in the object _key_:
-`[ngClass]="{ 'dropzone-active | border-border-focus': isDragging() }"`.
+The descriptor is annotation: it exists so the template can be read and grepped. One per list at
+most, standing alone it keeps its pipe (`class="favicon |"`), and inside `[ngClass]` it goes in the
+object _key_: `[ngClass]="{ 'dropzone-active | border-border-focus': isDragging() }"`.
+
+Writing a CSS rule for a descriptor is almost always a signal, not a design: either the class is
+shared vocabulary and belongs right of the pipe, or the rule is a stylesheet that wants to be
+Tailwind. Take the exception deliberately when the CSS is genuinely out of Tailwind's reach — a
+parent-state descendant selector feeding a per-element custom property, say — and know the cost: a
+descriptor is never validated, so a typo in one is silent.
 
 **Whether an element earns a name is the judgement call, and nothing checks it for you.** Landmarks
 do — a feed entry, a play button, a drop zone. Wrappers, spacers and pure layout elements do not;

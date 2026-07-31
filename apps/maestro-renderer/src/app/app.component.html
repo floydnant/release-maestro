@@ -1,7 +1,7 @@
 <div class="app-shell | flex h-screen flex-col overflow-hidden bg-background-canvas">
     <header class="title-bar" [class.title-bar--overlay]="isImportRoute()">
         <div
-            class="title-bar__drag-region | flex items-center justify-start"
+            class="title-bar__drag-region | flex min-w-0 flex-1 items-center justify-start"
             [ngClass]="{ 'ml-52': isMacos }"
         >
             @if (scanIndicator(); as scan) {

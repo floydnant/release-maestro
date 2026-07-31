@@ -33,13 +33,6 @@
     background: transparent;
 }
 
-.title-bar__drag-region {
-    display: flex;
-    min-width: 0;
-    flex: 1;
-    align-items: center;
-}
-
 .title-bar__controls {
     display: flex;
     -webkit-app-region: no-drag;
