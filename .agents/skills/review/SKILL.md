@@ -39,6 +39,10 @@ Pass the exact commands to the sub-agents rather than pasting a huge diff into t
 them to attribute each finding to committed or uncommitted work so the user knows what a rebase would
 and wouldn't carry.
 
+Documentation changes are part of the review corpus. If `git diff` includes docs (for example
+`AGENTS.md`, `docs/**`, or `.agents/skills/**`), include them in the same review pass — never skip
+them as "non-code".
+
 ### 3. Run the verification gates
 
 Review owns the automated checks; the Regression sub-agent does not run them. Follow
@@ -105,6 +109,9 @@ Pass the sub-agent the files that actually exist here:
 - `eslint.config.*`, `tsconfig*.json`, `.prettierrc*` — machine-enforced; note them but don't
   re-check what step 3 already ran.
 
+When the diff touches documentation, Standards must also check that those docs stay true to the code
+and workflows, per `AGENTS.md` ("Keeping the docs true").
+
 ### 6. Spawn the three sub-agents in parallel
 
 Use the available parallel delegation capability to start three general-purpose sub-agents. If the
@@ -120,7 +127,8 @@ behavior changes, using that skill's output format. Under 500 words."
 **Standards sub-agent** — brief: "Read the standards docs listed. Then read the diff. Report — per
 file and hunk where relevant — every place the diff violates a documented standard. Cite the standard
 (file plus the rule). Distinguish hard violations from judgement calls. Skip anything tooling
-enforces. Under 400 words." Include the step 5 file list.
+enforces. If docs changed, review those doc hunks for accuracy/completeness against the current code
+and commands. Under 400 words." Include the step 5 file list.
 
 If the diff adds or changes an observable, a subscription, or a flattening operator, say so in the
 Regression brief as well — operator choice and subscription lifetime are behavioral, so they belong to
