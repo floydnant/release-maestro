@@ -35,8 +35,28 @@ declare module 'tailwindcss/lib/lib/generateRules' {
     export function generateRules(candidates: string[], context: TailwindContext): unknown[]
 }
 
-/** Everything the Angular compiler exports, as bundled by `@angular-eslint`. */
-type NgCompiler = typeof import('@angular-eslint/bundled-angular-compiler')
+/**
+ * Everything the Angular compiler exports.
+ *
+ * `@angular/compiler` rather than `@angular-eslint/bundled-angular-compiler`, which is where the
+ * runtime nodes actually come from: the bundled package is `export * from '@angular/compiler'`, so
+ * the declarations are identical, and only `@angular/compiler` is a declared top-level dependency.
+ * The bundled one is hoisted by npm on some installs and nested under its dependents on others —
+ * resolving it from here worked locally and not in CI, which is not a thing to leave to luck.
+ */
+type NgCompiler = typeof import('@angular/compiler')
+
+/**
+ * That import failing is a silent failure worth understanding, because it has already happened
+ * once. `skipLibCheck` suppresses the "cannot find module" error *inside this file*, the types
+ * below all degrade, and the only symptom is a lone `implicitly has an 'any' type` on the first
+ * inferred callback parameter in `lib/expression-classes.cjs` — a file with nothing wrong with it.
+ *
+ * There is no type-level canary for it: an unresolved module produces TypeScript's error type,
+ * which is assignable to everything and is not detected by the usual `0 extends 1 & T` test for
+ * `any`. So the check is a runtime one in the corpus, asserting that the package these types name
+ * is resolvable from this library — which is the property that actually broke.
+ */
 
 /** A compiler node as the parser hands it on: its own shape, with `type` replaced by the class name. */
 type Stamped<TNode, TName extends string> = Omit<TNode, 'type'> & { type: TName }

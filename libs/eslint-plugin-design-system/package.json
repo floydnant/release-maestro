@@ -15,6 +15,6 @@
         "typescript": "*"
     },
     "devDependencies": {
-        "@angular-eslint/bundled-angular-compiler": "*"
+        "@angular/compiler": "*"
     }
 }

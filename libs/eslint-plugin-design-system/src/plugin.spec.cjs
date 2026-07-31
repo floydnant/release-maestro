@@ -445,6 +445,21 @@ describe('S1 nearest-value suggestions in the utility’s own scale', () => {
     })
 })
 
+// --- the types point at something that is actually installed -------------------------------------
+
+describe('the Angular compiler types', () => {
+    /**
+     * `types.d.ts` derives the AST shapes from this package. It was previously
+     * `@angular-eslint/bundled-angular-compiler`, which npm hoists on some installs and nests under
+     * its dependents on others — so the types resolved on a developer machine and not on a clean
+     * `npm ci`, and `skipLibCheck` turned that into one baffling error in an unrelated file.
+     * `@angular/compiler` is a declared top-level dependency, and this asserts it stays reachable.
+     */
+    it('name a package resolvable from this library', () => {
+        expect(() => require.resolve('@angular/compiler')).not.toThrow()
+    })
+})
+
 // --- component metadata is read from the AST, not guessed at -------------------------------------
 
 describe('component metadata resolution', () => {

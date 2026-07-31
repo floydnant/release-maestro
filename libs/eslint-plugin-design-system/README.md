@@ -174,7 +174,7 @@ worth knowing why each one is there:
   `__originalType`. The compiler's declarations therefore describe the shape _before_ the rewrite,
   and the parser's own exported node type is `{ [key: string]: any; type: any }`. So `Stamped<T, N>`
   expresses exactly that difference and every field still comes from
-  `@angular-eslint/bundled-angular-compiler`; a rename in Angular fails this build rather than
+  `@angular/compiler`; a rename in Angular fails this build rather than
   passing silently.
 
 That derivation is not academic. It is what caught the `[ngClass]` object-spread crash: Angular's
