@@ -16,8 +16,17 @@ const THEME_REFERENCE = /theme\(\s*([^)]+?)\s*\)/g
 
 /**
  * @typedef {'descriptor'|'styling'|'partial'|'interpolated'} ClassTokenKind
- * @typedef {{ name: string, start: number, end: number, kind: ClassTokenKind }} ClassToken
  * @typedef {'emptyDescriptor'|'multipleDescriptors'|'multiplePipes'} MalformedReason
+ *
+ * @typedef {object} ClassToken
+ * @property {string} name
+ * @property {number} start
+ * @property {number} end
+ * @property {ClassTokenKind} kind
+ * @property {boolean} inDescriptorPosition whether this token sits exactly where a descriptor would
+ *   have gone — first in a list that has no pipe at all. It says nothing about intent, which is the
+ *   point: the shape of a bare word cannot distinguish a descriptor from a typo, so a diagnostic
+ *   here can offer the reading but must not assert it.
  */
 
 /**
@@ -52,7 +61,7 @@ function tokenizeClassList(value, { offset = 0, truncatedStart = false, truncate
 
     const tokens = raw
         .filter(token => token.name !== DESCRIPTOR_SEPARATOR)
-        .map(token => {
+        .map((token, index) => {
             const isDescriptor = separatorIndex !== -1 && raw.indexOf(token) < separatorIndex
             const isPartial =
                 (truncatedStart && token.localStart === 0) ||
@@ -65,7 +74,13 @@ function tokenizeClassList(value, { offset = 0, truncatedStart = false, truncate
             else if (isInterpolated) kind = 'interpolated'
             else if (isPartial) kind = 'partial'
 
-            return { name: token.name, start: token.start, end: token.end, kind }
+            return {
+                name: token.name,
+                start: token.start,
+                end: token.end,
+                kind,
+                inDescriptorPosition: separatorIndex === -1 && index === 0 && !truncatedStart,
+            }
         })
 
     return { tokens, malformed }

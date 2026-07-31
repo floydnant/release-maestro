@@ -101,7 +101,9 @@ module.exports = {
                     if (token.kind !== 'styling' || isValid(token.name)) continue
 
                     context.report({
-                        ...describeUnknownClass(token.name, suggest(token.name)),
+                        ...describeUnknownClass(token.name, suggest(token.name), {
+                            inDescriptorPosition: token.inDescriptorPosition,
+                        }),
                         loc: locFor(token.start, token.end),
                     })
                 }

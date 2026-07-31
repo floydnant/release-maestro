@@ -11,7 +11,9 @@ const { collectClassStrings } = require('../lib/expression-classes.cjs')
 
 /** `BindingType.Class`, i.e. `[class.foo]`. */
 const CLASS_BINDING = 2
-const CLASS_ATTRIBUTES = new Set(['class', 'ngClass', 'routerLinkActive'])
+/** Names classes to apply on a route match — a list of styling, never a place to name an element. */
+const ROUTER_LINK_ACTIVE = 'routerLinkActive'
+const CLASS_ATTRIBUTES = new Set(['class', 'ngClass', ROUTER_LINK_ACTIVE])
 
 const malformedMessageIds = {
     emptyDescriptor: 'emptyDescriptor',
@@ -63,19 +65,26 @@ module.exports = {
         /**
          * @param {string} className
          * @param {import('eslint').AST.SourceLocation} loc
+         * @param {{ inDescriptorPosition?: boolean }} [placement]
          */
-        const reportUnknown = (className, loc) => {
+        const reportUnknown = (className, loc, placement) => {
             if (isValid(className)) return
 
-            context.report({ ...describeUnknownClass(className, suggest(className)), loc })
+            context.report({ ...describeUnknownClass(className, suggest(className), placement), loc })
         }
 
         /**
          * @param {string} value
          * @param {{ offset?: number|null, truncatedStart?: boolean, truncatedEnd?: boolean,
-         *           fallbackLoc: import('eslint').AST.SourceLocation }} placement
+         *           fallbackLoc: import('eslint').AST.SourceLocation,
+         *           descriptorsApply?: boolean }} placement
+         *   `descriptorsApply` is false for surfaces where the convention has no meaning, so the
+         *   diagnostic does not ask "descriptor?" somewhere a descriptor could never belong.
          */
-        const checkClassList = (value, { offset, truncatedStart, truncatedEnd, fallbackLoc }) => {
+        const checkClassList = (
+            value,
+            { offset, truncatedStart, truncatedEnd, fallbackLoc, descriptorsApply = true },
+        ) => {
             const positioned = offset !== null && offset !== undefined
             const { tokens, malformed } = tokenizeClassList(value, {
                 offset: offset ?? 0,
@@ -120,7 +129,9 @@ module.exports = {
                     continue
                 }
 
-                reportUnknown(token.name, loc)
+                reportUnknown(token.name, loc, {
+                    inDescriptorPosition: descriptorsApply && token.inDescriptorPosition,
+                })
             }
         }
 
@@ -140,6 +151,7 @@ module.exports = {
                     truncatedStart: literal.truncatedStart,
                     truncatedEnd: literal.truncatedEnd,
                     fallbackLoc,
+                    descriptorsApply: node.name !== ROUTER_LINK_ACTIVE,
                 })
             }
 
@@ -156,6 +168,7 @@ module.exports = {
                 checkClassList(node.value, {
                     offset: node.valueSpan.start.offset,
                     fallbackLoc: locFor(node.sourceSpan.start.offset, node.sourceSpan.end.offset),
+                    descriptorsApply: node.name !== ROUTER_LINK_ACTIVE,
                 })
             },
 

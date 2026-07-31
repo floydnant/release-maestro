@@ -66,6 +66,9 @@ literal `class`, `[class]`, `[class.foo]`, `[ngClass]`, `routerLinkActive`, and 
 
 Two consequences worth internalising, because the failure mode is silence rather than breakage:
 
+- **A missing pipe reads as a typo.** A descriptor without its `|` is just an unknown class, and
+  the rule says so — asking whether you meant a descriptor, since it cannot tell. That question is
+  the most common finding in practice, so if you see it, check the pipe before the spelling.
 - **A class that generates no CSS is an error, not a no-op.** The Tailwind config _replaces_ the
   `spacing`, `borderRadius`, `boxShadow` and `opacity` scales with token scales that have no
   `DEFAULT` key, so a bare `rounded` or `shadow` — and any off-scale value like `max-h-72` — emits

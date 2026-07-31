@@ -63,6 +63,21 @@ const didYouMean = (className, suggestion) => ({
 })
 
 /**
+ * A misspelling in the one position a descriptor could also have occupied — first in a pipe-less
+ * list. The rule cannot tell the two apart, so it offers both readings as a question.
+ *
+ * @param {string} className
+ * @param {string} [suggestion]
+ */
+const orDescriptor = (className, suggestion) =>
+    suggestion
+        ? {
+              messageId: 'unknownClassOrDescriptorWithSuggestion',
+              data: { className, suggestion },
+          }
+        : { messageId: 'unknownClassOrDescriptor', data: { className } }
+
+/**
  * A real utility carrying a value this project's scale does not define. Not a misspelling, and the
  * diagnostic must not call it one.
  *
@@ -177,10 +192,10 @@ templateTester.run('valid-template-classnames', templateRule, {
 
     invalid: [
         template('R1 unknown generated class', '<p class="type-code-sl"></p>', {
-            errors: [didYouMean('type-code-sl', 'type-code-sm')],
+            errors: [orDescriptor('type-code-sl', 'type-code-sm')],
         }),
         template('R2 unknown ordinary utility', '<div class="fleex"></div>', {
-            errors: [didYouMean('fleex', 'flex')],
+            errors: [orDescriptor('fleex', 'flex')],
         }),
         template('R2 unknown utility with no clear candidate', '<div class="flex bg-nonsense"></div>', {
             errors: [unknown('bg-nonsense')],
@@ -197,7 +212,7 @@ templateTester.run('valid-template-classnames', templateRule, {
             filename: path.join(FIXTURES, 'other.component.html'),
             options: settings,
             code: '<div class="scoped-only"></div>',
-            errors: [unknown('scoped-only')],
+            errors: [orDescriptor('scoped-only')],
         },
         template('R4 empty descriptor', '<div class="| flex"></div>', {
             errors: [{ messageId: 'emptyDescriptor' }],
@@ -248,7 +263,7 @@ templateTester.run('valid-template-classnames', templateRule, {
             // are still validated — `fleex` below — so the spread costs nothing but its own name.
             'R5 object spread among [ngClass] keys',
             '<div [ngClass]="{ ...base, \'fleex\': cond }"></div>',
-            { errors: [{ messageId: 'dynamicClassList' }, didYouMean('fleex', 'flex')] },
+            { errors: [{ messageId: 'dynamicClassList' }, orDescriptor('fleex', 'flex')] },
         ),
         template('R5 runtime-built prefix', '<div [ngClass]="\'type-\' + token"></div>', {
             errors: [
@@ -278,6 +293,34 @@ templateTester.run('valid-template-classnames', templateRule, {
             { options: withoutTokenApi, errors: [{ messageId: 'dynamicClassList' }] },
         ),
 
+        // --- D1: the descriptor reading, offered only where a descriptor could have gone ---
+        template(
+            'D1 a descriptor that forgot its pipe',
+            '<div class="mosaic-cell relative overflow-hidden"></div>',
+            { errors: [orDescriptor('mosaic-cell')] },
+        ),
+        template(
+            'D1 not offered once the list already has a descriptor',
+            '<div class="sidebar | oops-class"></div>',
+            { errors: [unknown('oops-class')] },
+        ),
+        template('D1 not offered away from the first position', '<div class="flex oops-class"></div>', {
+            errors: [unknown('oops-class')],
+        }),
+        template(
+            // A descriptor on `routerLinkActive` could never be right — it names classes to apply,
+            // not the element.
+            'D1 not offered on routerLinkActive',
+            '<a routerLinkActive="oops-class"></a>',
+            { errors: [unknown('oops-class')] },
+        ),
+        template(
+            // `rounded` is a real utility name, so "did you invent this?" is the wrong question.
+            'D1 never displaces the bare-utility verdict',
+            '<div class="rounded flex"></div>',
+            { errors: [bareUtility('rounded', 'rounded-sm')] },
+        ),
+
         // --- R7/S1: the two cases the prototype comparison produced ---
         template('R7 bare utility whose scale has no DEFAULT key', '<div class="rounded"></div>', {
             errors: [bareUtility('rounded', 'rounded-sm')],
@@ -297,7 +340,7 @@ templateTester.run('valid-template-classnames', templateRule, {
             errors: [unknown('oops-class')],
         }),
         template('R2 across [class] conditionals', "<div [class]=\"cond ? 'flex' : 'hiddenn'\"></div>", {
-            errors: [didYouMean('hiddenn', 'hidden')],
+            errors: [orDescriptor('hiddenn', 'hidden')],
         }),
         template('R2 across routerLinkActive', '<a routerLinkActive="active-linkk"></a>', {
             errors: [didYouMean('active-linkk', 'active-link')],
@@ -349,6 +392,11 @@ typescriptTester.run('valid-host-classnames', hostRule, {
         host('R7 bare utility in host metadata', "@Component({ host: { class: 'rounded' } }) class C {}", {
             errors: [bareUtility('rounded', 'rounded-sm')],
         }),
+        host(
+            'D1 host metadata carries descriptors too',
+            "@Component({ host: { class: 'progress-ring inline-block' } }) class C {}",
+            { errors: [orDescriptor('progress-ring')] },
+        ),
     ],
 })
 
@@ -436,7 +484,7 @@ describe('the committed specimen fixture', () => {
         const [result] = await lintFixture()
 
         expect(result.messages.map(message => message.message)).toEqual([
-            'Unknown class `type-code-sl` — did you mean `type-code-sm`?',
+            'Unknown class `type-code-sl` — did you mean `type-code-sm`, or a descriptor missing its `|`?',
             'Bare `rounded` emits no CSS — did you mean `rounded-sm`?',
             'Bare `shadow` emits no CSS — did you mean `shadow-sm`?',
             '`max-h-72` is off the `max-h` scale — did you mean `max-h-64`?',
