@@ -44,48 +44,18 @@ CSS-style name, then a `|`, then the styling classes.
 </div>
 ```
 
-The descriptor is annotation. Nothing styles it, and you should not add a CSS rule for it — its
-whole job is to make the template readable and greppable.
+The descriptor is annotation. Nothing styles it and nothing should: it exists so the template can be
+read and grepped. One per list at most, standing alone it keeps its pipe (`class="favicon |"`), and
+inside `[ngClass]` it goes in the object _key_:
+`[ngClass]="{ 'dropzone-active | border-border-focus': isDragging() }"`.
 
-- **Zero or one descriptor per class list, and at most one pipe.** `a b | flex` and
-  `a | flex | hidden` are both malformed.
-- **Omit it when the element is not a landmark.** Wrappers, spacers, filler and pure layout
-  elements do not earn a name; with no descriptor there is no pipe either, and the whole list is
-  styling.
-- **A descriptor-only list keeps the trailing pipe**: `class="favicon |"`. It reads awkwardly and it
-  is deliberate — nothing about the shape of a bare word distinguishes a descriptor from a typo, so
-  the pipe is the only signal tooling can trust.
-- **The pipe is a class-list convention, not a class-name one.** It has no meaning inside
-  `[class.foo]`, and inside `[ngClass]` it belongs in the object _key_:
-  `[ngClass]="{ 'dropzone-active | border-border-focus': isDragging() }"`.
+**Whether an element earns a name is the judgement call, and nothing checks it for you.** Landmarks
+do — a feed entry, a play button, a drop zone. Wrappers, spacers and pure layout elements do not;
+with no descriptor there is no pipe either, and the whole list is styling.
 
-This gives the invariant the tooling enforces: **every class on an element is a design token or a
-utility class, unless it sits before the pipe.** `design-system/valid-template-classnames` and
-`design-system/valid-host-classnames` check it as errors on `nx lint maestro-renderer`, across
-literal `class`, `[class]`, `[class.foo]`, `[ngClass]`, `routerLinkActive`, and `host: { class }`.
-
-Two consequences worth internalising, because the failure mode is silence rather than breakage:
-
-- **A missing pipe reads as a typo.** A descriptor without its `|` is just an unknown class, and
-  the rule says so — asking whether you meant a descriptor, since it cannot tell. That question is
-  the most common finding in practice, so if you see it, check the pipe before the spelling.
-- **A class that generates no CSS is an error, not a no-op.** The Tailwind config _replaces_ the
-  `spacing`, `borderRadius`, `boxShadow` and `opacity` scales with token scales that have no
-  `DEFAULT` key, so a bare `rounded` or `shadow` — and any off-scale value like `max-h-72` — emits
-  nothing at all. The rule suggests the nearest value _in that utility's scale_.
-- **Reach design tokens through `theme(...)`, never a bare `var()`.** Inside an arbitrary value,
-  write `bg-[color-mix(in_srgb,theme(colors.status.info-background)_50%,transparent)]`, not
-  `var(--color-status-info-background)`. A structurally valid utility must not hide an unchecked
-  token reference. Component-local custom properties such as `--progress-width` are not design
-  tokens and stay as they are.
-
-When a class list genuinely cannot be validated statically — a closed vocabulary that lives in
-TypeScript, say — use a narrow `eslint-disable-next-line` with an explanation of why. Never a
-file-level disable or a configured ignore pattern.
-
-Layer discipline is a convention rather than a check: product code consumes **semantic** tokens
+Layer discipline is unchecked too: product code consumes **semantic** tokens
 (`bg-background-surface`, `text-content-muted`). Foundation tokens belong to token infrastructure,
-to shared primitives where there is an explicit reason, and to the design-system specimen.
+to shared primitives where there is a stated reason, and to the design-system specimen.
 
 ## Build accessibility in
 

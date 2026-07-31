@@ -55,8 +55,7 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
   user-facing change in `apps/maestro-renderer`: design-system tokens and Tailwind first,
   accessibility built in, no bespoke visual direction. Never hand-edit a `*.generated.*` file; design
   tokens are generated from three source JSON files. Class lists are written
-  `descriptor | utilities`; every class right of the pipe must resolve to real CSS, and
-  `nx lint maestro-renderer` fails when one does not.
+  `descriptor | utilities` — a semantic name for the element, then the styling.
 - [angular-patterns](.agents/skills/angular-patterns/SKILL.md) — how renderer code is built. Signals
   hold state; bridge into a pipeline with `toSignal`/`toObservable`, never by subscribing to `set()` a
   signal. Extract a component once a template block owns its own state.
