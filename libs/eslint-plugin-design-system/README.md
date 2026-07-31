@@ -145,8 +145,26 @@ run and to the editor's language server immediately. Publishing later means emit
 from the same JSDoc (`tsc --emitDeclarationOnly`), which is a packaging step rather than a
 development one.
 
-[`src/types.d.ts`](src/types.d.ts) carries the two things with no types of their own: Tailwind's
-internal `lib/lib/*` entry points, and the Angular template AST nodes the rule visitors receive.
+[`src/types.d.ts`](src/types.d.ts) covers the two surfaces that cannot simply be imported, and it is
+worth knowing why each one is there:
+
+- **Tailwind's internals genuinely ship no types.** `tailwindcss` declares a handful of top-level
+  entry points and nothing under `lib/`. `lib/lib/generateRules` and `lib/lib/setupContextUtils` are
+  internal and unavoidable — asking Tailwind's own resolver whether a class emits CSS is the design,
+  and no public API answers that question. Those two are hand-declared.
+- **The Angular AST types exist, and are derived rather than restated.** What cannot be imported is
+  the shape ESLint actually sees: `@angular-eslint/template-parser` rewrites the AST in
+  `preprocessNode` before walking it, stamping `type = node.constructor.name` on every node and
+  displacing Angular's own `type` — `TmplAstBoundAttribute.type` is a numeric `BindingType` — into
+  `__originalType`. The compiler's declarations therefore describe the shape _before_ the rewrite,
+  and the parser's own exported node type is `{ [key: string]: any; type: any }`. So `Stamped<T, N>`
+  expresses exactly that difference and every field still comes from
+  `@angular-eslint/bundled-angular-compiler`; a rename in Angular fails this build rather than
+  passing silently.
+
+That derivation is not academic. It is what caught the `[ngClass]` object-spread crash: Angular's
+`LiteralMapKey` is a union and the `spread` member carries no `key`, which a hand-written node shape
+had quietly papered over.
 
 ## Known limits
 

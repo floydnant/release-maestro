@@ -1,12 +1,22 @@
 /**
- * Types for the surfaces that have none of their own.
+ * Types for the two surfaces that cannot simply be imported.
  *
- * Two kinds live here. Tailwind's `lib/lib/*` entry points are internal and ship no declarations —
- * they are the price of asking Tailwind itself whether a class emits CSS, which is the whole design.
- * The Angular template AST is the other: `@angular-eslint/template-parser` hands the rule visitor
- * compiler nodes, and only the handful of fields the rules actually touch are described here.
- * A narrow hand-written shape is deliberate — it fails when a field is renamed under us, which a
- * blanket `any` would not.
+ * **Tailwind.** `tailwindcss` ships declarations for a handful of top-level entry points
+ * (`resolveConfig`, `plugin`, …) and none at all under `lib/`. `lib/lib/generateRules` and
+ * `lib/lib/setupContextUtils` are internal, untyped, and unavoidable: asking Tailwind's own resolver
+ * whether a class emits CSS is the whole design, and there is no public API that answers it.
+ *
+ * **The Angular AST.** Here the classes *are* importable, so everything below is derived from them
+ * rather than restated — a field renamed in Angular fails this build. What cannot be imported is the
+ * shape ESLint sees, because `@angular-eslint/template-parser` rewrites the AST before walking it:
+ * `preprocessNode` stamps `type = node.constructor.name` on every node, and where Angular already
+ * used `type` for something else — `TmplAstBoundAttribute.type` is a numeric `BindingType` — it
+ * moves the original to `__originalType` and overwrites it. So the compiler's declarations describe
+ * the shape *before* that rewrite, and the parser's own exported node type is
+ * `{ [key: string]: any; type: any }`. `Stamped` is exactly the difference between the two.
+ *
+ * Angular types are referenced with inline `import(...)` rather than a top-level `import type`,
+ * which would turn this file into a module and take the declarations below out of global scope.
  */
 
 declare module 'tailwindcss/lib/lib/setupContextUtils' {
@@ -25,65 +35,53 @@ declare module 'tailwindcss/lib/lib/generateRules' {
     export function generateRules(candidates: string[], context: TailwindContext): unknown[]
 }
 
-/** A character range in the source file, as the Angular compiler reports it. */
-interface AngularSpan {
-    start: number
-    end: number
-}
+/** Everything the Angular compiler exports, as bundled by `@angular-eslint`. */
+type NgCompiler = typeof import('@angular-eslint/bundled-angular-compiler')
 
-interface AngularParseSpan {
-    start: { offset: number }
-    end: { offset: number }
-}
+/** A compiler node as the parser hands it on: its own shape, with `type` replaced by the class name. */
+type Stamped<TNode, TName extends string> = Omit<TNode, 'type'> & { type: TName }
 
 /**
- * An expression-AST node, as the template parser hands it to a rule visitor.
+ * An expression node the rules walk.
  *
- * Deliberately one open shape with optional members rather than a union discriminated on `type`.
- * A union would be more precise on paper, but the node vocabulary is the Angular compiler's and it
- * is open-ended — anything the rules do not recognise is treated as unresolvable and reported, so a
- * union would need a `{ type: string }` catch-all, and that catch-all defeats narrowing on every
- * other member. This shape still buys the thing that actually matters: a misspelled field or a
- * misspelled `type` string is a compile error rather than a silently undefined read.
+ * Open rather than a union discriminated on `type`, because the vocabulary is the Angular
+ * compiler's and the rules recognise only part of it — anything else is unresolvable and reported,
+ * which a closed union cannot express without a `{ type: string }` catch-all that would defeat
+ * narrowing on every other member. The members still come from the real classes, so this is a view
+ * of the AST rather than a second description of it.
  */
 interface AngularExpression {
+    /** `constructor.name` of the compiler class the parser stamped on. */
     type: string
+    span?: InstanceType<NgCompiler['AST']>['span']
+    sourceSpan?: InstanceType<NgCompiler['AST']>['sourceSpan']
     /** `ASTWithSource` */
     ast?: AngularExpression
     /** `LiteralPrimitive` */
-    value?: unknown
-    sourceSpan?: AngularSpan
+    value?: InstanceType<NgCompiler['LiteralPrimitive']>['value']
     /** `Binary` */
-    operation?: string
+    operation?: InstanceType<NgCompiler['Binary']>['operation']
     left?: AngularExpression
     right?: AngularExpression
     /** `Conditional` */
     trueExp?: AngularExpression
     falseExp?: AngularExpression
-    /** `LiteralMap` */
-    keys?: { key: string; quoted?: boolean; sourceSpan?: AngularSpan }[]
+    /** `LiteralMap` — the entries are a union; only the `property` kind carries a `key`. */
+    keys?: InstanceType<NgCompiler['LiteralMap']>['keys']
     /** `LiteralArray` */
     expressions?: AngularExpression[]
     /** `PropertyRead`, `SafePropertyRead` */
-    name?: string
+    name?: InstanceType<NgCompiler['PropertyRead']>['name']
     /** `Call`, `SafeCall`, `KeyedRead`, `SafeKeyedRead`, and the property reads */
     receiver?: AngularExpression
 }
 
 /** `<div class="…">` — a static attribute. */
-interface AngularTextAttribute {
-    name: string
-    value: string
-    valueSpan?: AngularParseSpan
-    sourceSpan: AngularParseSpan
-}
+type AngularTextAttribute = Stamped<InstanceType<NgCompiler['TmplAstTextAttribute']>, 'TextAttribute'>
 
 /** `<div [class]="…">`, `[ngClass]`, `[class.foo]`. */
-interface AngularBoundAttribute {
-    name: string
+type AngularBoundAttribute = Stamped<InstanceType<NgCompiler['TmplAstBoundAttribute']>, 'BoundAttribute'> & {
+    /** Angular's own numeric `type`, displaced by the parser's stamp. `2` is `[class.foo]`. */
+    __originalType?: NgCompiler['BindingType'][keyof NgCompiler['BindingType']]
     value: AngularExpression
-    keySpan: AngularParseSpan
-    sourceSpan: AngularParseSpan
-    /** The parser's original `BindingType`; `2` is `[class.foo]`. */
-    __originalType?: number
 }

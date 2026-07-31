@@ -66,6 +66,13 @@ function collectClassStrings(root) {
 
             case 'LiteralMap':
                 node.keys?.forEach(key => {
+                    // `{ ...base, 'flex': cond }` — a spread contributes keys that only exist at
+                    // runtime, and unlike a written-out key it carries no name to validate.
+                    if (key.kind === 'spread') {
+                        dynamic = true
+                        return
+                    }
+
                     strings.push({
                         value: key.key,
                         offset: key.sourceSpan ? key.sourceSpan.start + (key.quoted ? 1 : 0) : null,

@@ -6,11 +6,15 @@
     "main": "./src/index.cjs",
     "types": "./src/index.d.cts",
     "peerDependencies": {
+        "@angular-eslint/template-parser": ">=19",
         "eslint": ">=9",
         "tailwindcss": "^3"
     },
     "dependencies": {
         "postcss": "*",
         "typescript": "*"
+    },
+    "devDependencies": {
+        "@angular-eslint/bundled-angular-compiler": "*"
     }
 }

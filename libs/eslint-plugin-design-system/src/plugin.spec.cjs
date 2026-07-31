@@ -129,7 +129,10 @@ templateTester.run('valid-template-classnames', templateRule, {
         ),
         template('A8 [class.foo]', '<div [class.rounded-l-full]="$first"></div>'),
         template('A8 [ngClass] object keys', '<div [ngClass]="{ \'ml-52\': isMacos }"></div>'),
-        template('A8 [ngClass] multi-class key', '<div [ngClass]="{ \'opacity-30 blur-sm\': hidden }"></div>'),
+        template(
+            'A8 [ngClass] multi-class key',
+            '<div [ngClass]="{ \'opacity-30 blur-sm\': hidden }"></div>',
+        ),
         template('A8 [class] conditional', "<div [class]=\"cond ? 'flex' : 'hidden'\"></div>"),
         template('A8 routerLinkActive', '<a routerLinkActive="active-link"></a>'),
         template('A8 static ngClass', '<div ngClass="flex gap-2"></div>'),
@@ -156,9 +159,13 @@ templateTester.run('valid-template-classnames', templateRule, {
         template('R2 unknown utility with no clear candidate', '<div class="flex bg-nonsense"></div>', {
             errors: [unknown('bg-nonsense')],
         }),
-        template('R2 descriptors are exempt, styling classes are not', '<div class="sidebar | fleex"></div>', {
-            errors: [didYouMean('fleex', 'flex')],
-        }),
+        template(
+            'R2 descriptors are exempt, styling classes are not',
+            '<div class="sidebar | fleex"></div>',
+            {
+                errors: [didYouMean('fleex', 'flex')],
+            },
+        ),
         {
             name: 'R3 component-scoped class outside its own component',
             filename: path.join(FIXTURES, 'other.component.html'),
@@ -172,7 +179,7 @@ templateTester.run('valid-template-classnames', templateRule, {
         template('R4 multiple descriptors', '<div class="sidebar rail | flex"></div>', {
             errors: [{ messageId: 'multipleDescriptors' }],
         }),
-        template('R4 multiple pipes', '<div class="sidebar | flex | hidden"></div>', {
+        template('R4 multiple pipes', '<div class="sidebar | flex | bg-slate-600"></div>', {
             errors: [{ messageId: 'multiplePipes' }],
         }),
         template(
@@ -184,17 +191,25 @@ templateTester.run('valid-template-classnames', templateRule, {
                 ],
             },
         ),
-        template('R6 bare foundation token', '<div class="text-[var(--foundation-color-neutral-500)]"></div>', {
-            errors: [
-                { messageId: 'bareTokenVariable', data: { variable: '--foundation-color-neutral-500' } },
-            ],
-        }),
+        template(
+            'R6 bare foundation token',
+            '<div class="text-[var(--foundation-color-neutral-500)]"></div>',
+            {
+                errors: [
+                    { messageId: 'bareTokenVariable', data: { variable: '--foundation-color-neutral-500' } },
+                ],
+            },
+        ),
         template(
             // Tailwind resolves theme paths only at compile time, so this would otherwise be a build
             // error rather than an editor diagnostic.
             'R6 misspelled theme path',
             '<div class="bg-[theme(colors.status.info.background)]"></div>',
-            { errors: [{ messageId: 'unknownThemePath', data: { themePath: 'colors.status.info.background' } }] },
+            {
+                errors: [
+                    { messageId: 'unknownThemePath', data: { themePath: 'colors.status.info.background' } },
+                ],
+            },
         ),
         template('R5 unresolvable call', '<div [class]="workerHealthClass()"></div>', {
             errors: [{ messageId: 'dynamicClassList' }],
@@ -202,6 +217,13 @@ templateTester.run('valid-template-classnames', templateRule, {
         template('R5 unresolvable map reference', '<div [ngClass]="classMap"></div>', {
             errors: [{ messageId: 'dynamicClassList' }],
         }),
+        template(
+            // A spread contributes keys that exist only at runtime. The written-out keys beside it
+            // are still validated — `fleex` below — so the spread costs nothing but its own name.
+            'R5 object spread among [ngClass] keys',
+            '<div [ngClass]="{ ...base, \'fleex\': cond }"></div>',
+            { errors: [{ messageId: 'dynamicClassList' }, didYouMean('fleex', 'flex')] },
+        ),
         template('R5 runtime-built prefix', '<div [ngClass]="\'type-\' + token"></div>', {
             errors: [
                 { messageId: 'dynamicClassList' },
@@ -265,17 +287,31 @@ typescriptTester.run('valid-host-classnames', hostRule, {
             'A5 host classes, including the component’s own scoped CSS',
             "@Component({ host: { class: 'inline-flex items-center scoped-only' } }) class C {}",
         ),
-        host('A7 host descriptor', "@Component({ host: { class: 'progress-ring | inline-block' } }) class C {}"),
-        host('non-class host metadata is untouched', "@Component({ host: { 'data-testid': 'x' } }) class C {}"),
+        host(
+            'A7 host descriptor',
+            "@Component({ host: { class: 'progress-ring | inline-block' } }) class C {}",
+        ),
+        host(
+            'non-class host metadata is untouched',
+            "@Component({ host: { 'data-testid': 'x' } }) class C {}",
+        ),
         host('non-literal host class', '@Component({ host: { class: someExpression } }) class C {}'),
     ],
     invalid: [
-        host('R2 unknown host class', "@Component({ host: { class: 'inline-flex nope-class' } }) class C {}", {
-            errors: [unknown('nope-class')],
-        }),
-        host('R2 unknown host class on a directive', "@Directive({ host: { class: 'block sizee-full' } }) class D {}", {
-            errors: [didYouMean('sizee-full', 'size-full')],
-        }),
+        host(
+            'R2 unknown host class',
+            "@Component({ host: { class: 'inline-flex nope-class' } }) class C {}",
+            {
+                errors: [unknown('nope-class')],
+            },
+        ),
+        host(
+            'R2 unknown host class on a directive',
+            "@Directive({ host: { class: 'block sizee-full' } }) class D {}",
+            {
+                errors: [didYouMean('sizee-full', 'size-full')],
+            },
+        ),
         host('R4 multiple host descriptors', "@Component({ host: { class: 'a b | block' } }) class C {}", {
             errors: [{ messageId: 'multipleDescriptors' }],
         }),
