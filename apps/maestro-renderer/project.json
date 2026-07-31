@@ -10,6 +10,8 @@
         }
     },
     "tags": [],
+    "//": "The lint config loads eslint-plugin-design-system by relative path, which Nx's graph builder does not read. Without this edge, a plugin-only change marks nothing affected here.",
+    "implicitDependencies": ["eslint-plugin-design-system"],
     "targets": {
         "build": {
             "executor": "@angular/build:application",
@@ -88,6 +90,8 @@
         "lint": {
             "executor": "@nx/eslint:lint",
             "dependsOn": ["design-tokens-check"],
+            "//": "`^default` puts the plugin's sources in the cache key. The workspace `lint` inputs cover only this project, so editing a rule would otherwise replay a stale cached result.",
+            "inputs": ["default", "^default", "{workspaceRoot}/eslint.config.mjs"],
             "options": {
                 "lintFilePatterns": [
                     "apps/maestro-renderer/tailwind.config.js",
