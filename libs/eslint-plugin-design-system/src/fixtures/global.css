@@ -1,0 +1,21 @@
+/*
+ * The "global stylesheet" authority: classes valid in every template regardless of Tailwind.
+ * Stands in for a design system's shared primitives.
+ */
+@import './generated-tokens.css';
+
+.btn-nkd-neutral {
+    background: none;
+}
+
+.badge {
+    display: inline-flex;
+}
+
+.panel {
+    border: 1px solid;
+}
+
+.active-link {
+    font-weight: 600;
+}

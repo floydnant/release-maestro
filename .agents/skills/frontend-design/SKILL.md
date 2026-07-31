@@ -32,6 +32,36 @@ They may include context about the purpose, the audience, or technical constrain
 - If the system is genuinely missing something the design needs, extend the system — add or adjust a
   token and use it — rather than hardcoding a one-off value in a component. Say so when you do.
 
+## Write class lists as `descriptor | utilities`
+
+A long utility list tells you what an element looks like and nothing about what it _is_. So an
+element that marks a landmark in the markup carries a **semantic descriptor**: an ordinary
+CSS-style name, then a `|`, then the styling classes.
+
+```html
+<div class="feed-entry | flex items-center gap-3 p-4">
+    <button class="track-play-btn | grid size-6 place-items-center rounded-sm"></button>
+</div>
+```
+
+The descriptor is annotation: it exists so the template can be read and grepped. One per list at
+most, standing alone it keeps its pipe (`class="favicon |"`), and inside `[ngClass]` it goes in the
+object _key_: `[ngClass]="{ 'dropzone-active | border-border-focus': isDragging() }"`.
+
+Writing a CSS rule for a descriptor is almost always a signal, not a design: either the class is
+shared vocabulary and belongs right of the pipe, or the rule is a stylesheet that wants to be
+Tailwind. Take the exception deliberately when the CSS is genuinely out of Tailwind's reach — a
+parent-state descendant selector feeding a per-element custom property, say — and know the cost: a
+descriptor is never validated, so a typo in one is silent.
+
+**Whether an element earns a name is the judgement call, and nothing checks it for you.** Landmarks
+do — a feed entry, a play button, a drop zone. Wrappers, spacers and pure layout elements do not;
+with no descriptor there is no pipe either, and the whole list is styling.
+
+Layer discipline is unchecked too: product code consumes **semantic** tokens
+(`bg-background-surface`, `text-content-muted`). Foundation tokens belong to token infrastructure,
+to shared primitives where there is a stated reason, and to the design-system specimen.
+
 ## Build accessibility in
 
 Accessibility is part of the implementation contract, not a later audit. Every UI change must:

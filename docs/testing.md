@@ -71,6 +71,7 @@ npx nx test maestro-electron
 npx nx test maestro-core
 npx nx test metadata-engine
 npx nx run maestro-renderer:design-tokens-check
+npx nx test eslint-plugin-design-system
 ```
 
 Run the narrowest relevant command first. If a change crosses project boundaries, add the affected
@@ -78,14 +79,18 @@ project checks after the narrow check passes.
 
 ### Type checking
 
-Playwright transpiles tests but does not perform semantic TypeScript checking, so `maestro-e2e`
-declares a `typecheck` target running `tsc --noEmit` over both Electron and renderer E2E sources.
-Both e2e targets `dependsOn` it, so it runs automatically before Playwright — in CI too. Run it
-alone with `make typecheck-e2e` when you want the check without the suite.
+**A project's type gate is its `build`.** Type errors in the renderer, electron, and core surface
+through `npx nx build <project>`, `make build`, or `make sure`. Don't assume a green test run has
+checked types — Jest and Playwright transpile without checking.
 
-No other project declares a typecheck target, so **`build` is the type gate for app code**: type
-errors in renderer, electron, and core surface through `npx nx build <project>`, `make build`, or
-`make sure`. Don't assume a green test run has checked types.
+**A project with nothing to compile declares a `typecheck` target instead**, running `tsc --noEmit`,
+and wires it into a target that runs anyway so nobody has to remember it. `maestro-e2e` does this
+because Playwright transpiles specs without semantic checking; both its e2e targets `dependsOn` it,
+and `make typecheck-e2e` runs it alone. Libraries that ship no build output do the same through
+their `lint`.
+
+`npx nx show project <project> --web false` is authoritative for which targets a project actually
+has; this list is a summary and the Makefile is the public interface.
 
 ## E2E Conventions
 
