@@ -1,0 +1,23 @@
+{
+    // No build step on purpose: ESLint loads `src/*.cjs` directly, so a rule edit applies to the
+    // next lint with nothing in between. TypeScript is used as a checker only — `nx typecheck
+    // eslint-plugin-design-system`, which `lint` depends on. Types come from JSDoc, and `.d.cts`
+    // output is a publish-time concern (`--emitDeclarationOnly`), not a develop-time one.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "allowJs": true,
+        "checkJs": true,
+        "noEmit": true,
+        "module": "node16",
+        "moduleResolution": "node16",
+        "types": ["node", "jest"],
+        // The sources are CommonJS scripts, not ES modules under a bundler.
+        "esModuleInterop": true,
+        "resolveJsonModule": true,
+        // Regex captures and scale lookups are indexed access on purpose; the code guards them where
+        // it matters and the alternative is a non-null assertion on nearly every match.
+        "noUncheckedIndexedAccess": false
+    },
+    "include": ["src/**/*.cjs", "src/**/*.ts"],
+    "exclude": ["src/fixtures/**"]
+}

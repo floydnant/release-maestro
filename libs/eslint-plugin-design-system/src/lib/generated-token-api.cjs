@@ -15,11 +15,15 @@ const fs = require('node:fs')
 const path = require('node:path')
 const ts = require('typescript')
 
-const DEFAULT_GENERATED_TOKEN_API = 'apps/maestro-renderer/src/app/shared/design-tokens.generated.ts'
-
+/** @type {Map<string, { mtimeMs: number, names: Set<string> }>} */
 const exportCache = new Map()
 
-/** Every value the generated module exports, read from the TypeScript AST rather than by regex. */
+/**
+ * Every value the generated module exports, read from the TypeScript AST rather than by regex.
+ *
+ * @param {string} generatedFile
+ * @returns {Set<string>}
+ */
 function generatedApiNames(generatedFile) {
     const resolved = path.resolve(generatedFile)
 
@@ -40,8 +44,11 @@ function generatedApiNames(generatedFile) {
         true,
     )
 
+    /** @type {Set<string>} */
     const names = new Set()
     for (const statement of source.statements) {
+        // `getModifiers` is typed for the nodes that can carry them; a top-level statement need not.
+        if (!ts.canHaveModifiers(statement)) continue
         const exported = ts
             .getModifiers(statement)
             ?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)
@@ -63,8 +70,12 @@ function generatedApiNames(generatedFile) {
 /**
  * The identifier an Angular expression is rooted in, or null when it is not a simple chain.
  * `semanticColor(segment.color)` roots in `semanticColor`; `a() + b()` roots in nothing.
+ *
+ * @param {AngularExpression|undefined} node
+ * @returns {string|null}
  */
 function rootIdentifier(node) {
+    /** @type {AngularExpression|undefined} */
     let current = node
 
     while (current) {
@@ -83,7 +94,9 @@ function rootIdentifier(node) {
             case 'PropertyRead':
             case 'SafePropertyRead': {
                 const receiver = current.receiver?.type
-                if (receiver === 'ImplicitReceiver' || receiver === 'ThisReceiver') return current.name
+                if (receiver === 'ImplicitReceiver' || receiver === 'ThisReceiver') {
+                    return current.name ?? null
+                }
                 current = current.receiver
                 break
             }
@@ -95,10 +108,15 @@ function rootIdentifier(node) {
     return null
 }
 
-/** Whether an otherwise unresolvable class expression goes through the generated token API. */
+/**
+ * Whether an otherwise unresolvable class expression goes through the generated token API.
+ *
+ * @param {AngularExpression} node
+ * @param {string} generatedFile
+ */
 function isTypedTokenApi(node, generatedFile) {
     const root = rootIdentifier(node)
     return root !== null && generatedApiNames(generatedFile).has(root)
 }
 
-module.exports = { DEFAULT_GENERATED_TOKEN_API, generatedApiNames, isTypedTokenApi, rootIdentifier }
+module.exports = { generatedApiNames, isTypedTokenApi, rootIdentifier }

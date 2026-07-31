@@ -3,18 +3,34 @@
  * `[class]` strings, concatenations, conditionals — and flags the parts that only exist at runtime.
  */
 
+/** @param {AngularExpression|undefined} node */
 function isStringLiteral(node) {
     return node?.type === 'LiteralPrimitive' && typeof node.value === 'string'
 }
 
 /**
- * @returns {{ strings: { value: string, offset: number|null, truncatedStart: boolean, truncatedEnd: boolean }[],
- *             dynamic: boolean }}
+ * @typedef {object} ClassString
+ * @property {string} value
+ * @property {number|null} offset where the string contents start in the file, or null when the
+ *   parser gave no span and the diagnostic has to fall back to the whole binding
+ * @property {boolean} truncatedStart
+ * @property {boolean} truncatedEnd
+ */
+
+/**
+ * @param {AngularExpression} root
+ * @returns {{ strings: ClassString[], dynamic: boolean }}
  */
 function collectClassStrings(root) {
+    /** @type {ClassString[]} */
     const strings = []
     let dynamic = false
 
+    /**
+     * @param {AngularExpression|undefined} node
+     * @param {boolean} truncatedStart
+     * @param {boolean} truncatedEnd
+     */
     const visit = (node, truncatedStart, truncatedEnd) => {
         if (!node || typeof node !== 'object') return
 

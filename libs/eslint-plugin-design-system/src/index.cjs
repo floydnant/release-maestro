@@ -8,6 +8,7 @@
 const validTemplateClassnames = require('./rules/valid-template-classnames.cjs')
 const validHostClassnames = require('./rules/valid-host-classnames.cjs')
 
+/** @type {import('eslint').ESLint.Plugin} */
 module.exports = {
     meta: { name: 'eslint-plugin-design-system' },
     rules: {

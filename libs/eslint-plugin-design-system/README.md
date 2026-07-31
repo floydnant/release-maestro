@@ -5,8 +5,13 @@ silent no-op.
 
 Selected in [MAE-100](https://linear.app/floyd-haremsa/issue/MAE-100) out of three prototypes. The
 convention it enforces is documented for humans and agents in
-[`frontend-design`](../../../../.agents/skills/frontend-design/SKILL.md); this file is about how the
-rules work and where they stop.
+[`frontend-design`](../../.agents/skills/frontend-design/SKILL.md); this file is about how the rules
+work and where they stop.
+
+The library knows nothing about Release Maestro's design system, or any other. Every authority — the
+Tailwind config, the global stylesheets, the generated token module — arrives as a rule option, which
+is what makes it a library rather than a folder of scripts, and what would make publishing it a
+packaging question rather than a rewrite.
 
 ## The two rules
 
@@ -15,9 +20,24 @@ rules work and where they stop.
 | `design-system/valid-template-classnames` | `class`, `ngClass`, `routerLinkActive`, `[class]`, `[ngClass]`, `[class.foo]`, in `.html` files and in inline templates (via the Angular inline-template processor) |
 | `design-system/valid-host-classnames`     | `@Component`/`@Directive` `host: { class: '…' }`                                                                                                                    |
 
-Both are registered at `error` in `apps/maestro-renderer/eslint.config.mjs` — scoped to this
-project, because the authorities they check against are this project's Tailwind config and
-stylesheets.
+Both are registered at `error` in `apps/maestro-renderer/eslint.config.mjs`:
+
+```js
+const designSystem = createRequire(import.meta.url)('../../libs/eslint-plugin-design-system/src/index.cjs')
+
+const classValidationOptions = {
+    tailwindConfig: join(projectRoot, 'tailwind.config.js'),
+    globalStylesheets: [join(projectRoot, 'src/styles.css')],
+    generatedTokenApi: join(projectRoot, 'src/app/shared/design-tokens.generated.ts'),
+}
+```
+
+`tailwindConfig` is required; the other two are optional, and omitting `generatedTokenApi` simply
+switches the typed-API acceptance off. The relative path is because the workspace does not use npm
+workspaces — a published consumer would write the package name.
+
+Registration is per-project on purpose: the renderer's authorities are the renderer's, so putting
+this at the workspace root would lint `maestro-electron` against a design system it does not use.
 
 ## What makes a class known
 
@@ -99,12 +119,34 @@ corpus case by case (`R*` = reject, `A*` = accept, plus `R7`/`S1` from the compa
 under Jest in the Node environment:
 
 ```bash
-npx nx run maestro-renderer:tooling-test
+npx nx test eslint-plugin-design-system
 ```
 
-[`fixtures/specimen.component.html`](fixtures/specimen.component.html) is a committed file the spec
-lints from disk, so the file-backed authorities — component stylesheet, inline `styles:`, the
-template-to-component mapping — are exercised for real rather than through synthetic snippets.
+Every authority the corpus runs against is a fixture in [`src/fixtures/`](src/fixtures) — including
+its own Tailwind config, which mirrors the _shape_ that makes the rules necessary (replaced scales
+with no `DEFAULT` key) without borrowing the renderer's actual token values. A library whose tests
+fail because another project changed is not standalone.
+
+[`src/fixtures/specimen.component.html`](src/fixtures/specimen.component.html) is a committed file
+the spec lints from disk, so the file-backed authorities — component stylesheet, inline `styles:`,
+the template-to-component mapping — are exercised for real rather than through synthetic snippets.
+
+## Types without a build step
+
+The sources are `.cjs` with JSDoc types, checked by `tsc --noEmit`:
+
+```bash
+npx nx run eslint-plugin-design-system:typecheck
+```
+
+`lint` depends on it, so type errors fail `make lint`, `make sure`, and CI. There is deliberately no
+compile step: ESLint requires `src/*.cjs` directly, so editing a rule applies to the very next lint
+run and to the editor's language server immediately. Publishing later means emitting declarations
+from the same JSDoc (`tsc --emitDeclarationOnly`), which is a packaging step rather than a
+development one.
+
+[`src/types.d.ts`](src/types.d.ts) carries the two things with no types of their own: Tailwind's
+internal `lib/lib/*` entry points, and the Angular template AST nodes the rule visitors receive.
 
 ## Known limits
 

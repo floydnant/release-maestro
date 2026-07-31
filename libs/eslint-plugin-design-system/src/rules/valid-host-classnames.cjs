@@ -7,8 +7,14 @@ const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../l
 
 const HOST_DECORATORS = new Set(['Component', 'Directive'])
 
+/**
+ * @param {import('estree').ObjectExpression} objectExpression
+ * @param {string} name
+ * @returns {import('estree').Property | undefined}
+ */
 function propertyNamed(objectExpression, name) {
     return objectExpression.properties?.find(
+        /** @returns {property is import('estree').Property} */
         property =>
             property.type === 'Property' &&
             ((property.key.type === 'Identifier' && property.key.name === name) ||
@@ -16,6 +22,7 @@ function propertyNamed(objectExpression, name) {
     )
 }
 
+/** @type {import('eslint').Rule.RuleModule} */
 module.exports = {
     meta: {
         type: 'problem',
@@ -45,6 +52,10 @@ module.exports = {
             filePath: context.filename,
         })
 
+        /**
+         * @param {number} start
+         * @param {number} end
+         */
         const locFor = (start, end) => ({
             start: sourceCode.getLocFromIndex(start),
             end: sourceCode.getLocFromIndex(end),
@@ -63,6 +74,9 @@ module.exports = {
                 const classProperty = propertyNamed(host.value, 'class')
                 const classValue = classProperty?.value
                 if (classValue?.type !== 'Literal' || typeof classValue.value !== 'string') return
+                // `range` is optional in the ESTree types; the TypeScript parser always fills it,
+                // and without it there is no position to underline.
+                if (!classValue.range) return
 
                 // +1 to step past the opening quote of the literal.
                 const valueStart = classValue.range[0] + 1
@@ -97,11 +111,16 @@ module.exports = {
                     if (token.kind !== 'styling' || isValid(token.name)) continue
 
                     const suggestion = suggest(token.name)
-                    context.report({
-                        messageId: suggestion ? 'unknownClassWithSuggestion' : 'unknownClass',
-                        data: { className: token.name, suggestion },
-                        loc: locFor(token.start, token.end),
-                    })
+                    const loc = locFor(token.start, token.end)
+                    context.report(
+                        suggestion
+                            ? {
+                                  messageId: 'unknownClassWithSuggestion',
+                                  data: { className: token.name, suggestion },
+                                  loc,
+                              }
+                            : { messageId: 'unknownClass', data: { className: token.name }, loc },
+                    )
                 }
             },
         }

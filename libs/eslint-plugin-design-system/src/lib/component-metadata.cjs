@@ -12,8 +12,15 @@ const ts = require('typescript')
 
 const DECORATORS = new Set(['Component', 'Directive'])
 
+/** @typedef {{ styleUrls: string[], inlineStyles: string[], templateUrls: string[] }} ComponentMetadata */
+
+/** @type {Map<string, { mtimeMs: number, metadata: ComponentMetadata }>} */
 const metadataCache = new Map()
 
+/**
+ * @param {ts.Node | undefined} node
+ * @returns {string|null}
+ */
 function stringLiteralValue(node) {
     if (!node) return null
     if (ts.isStringLiteralLike(node)) return node.text
@@ -21,14 +28,25 @@ function stringLiteralValue(node) {
     return null
 }
 
+/**
+ * @param {ts.Node | null | undefined} node
+ * @returns {string[]}
+ */
 function stringLiteralValues(node) {
     if (!node) return []
     const single = stringLiteralValue(node)
     if (single !== null) return [single]
     if (!ts.isArrayLiteralExpression(node)) return []
-    return node.elements.map(stringLiteralValue).filter(value => value !== null)
+    return node.elements
+        .map(stringLiteralValue)
+        .filter(/** @returns {value is string} */ value => value !== null)
 }
 
+/**
+ * @param {ts.ObjectLiteralExpression} metadata
+ * @param {string} name
+ * @returns {ts.Expression | null}
+ */
 function propertyValue(metadata, name) {
     for (const property of metadata.properties) {
         if (!ts.isPropertyAssignment(property)) continue
@@ -43,8 +61,9 @@ function propertyValue(metadata, name) {
 }
 
 /**
- * @returns {{ styleUrls: string[], inlineStyles: string[], templateUrls: string[] }} the styling
- *   surfaces every `@Component`/`@Directive` in the file declares, paths left relative to the file.
+ * @param {string} tsPath
+ * @returns {ComponentMetadata} the styling surfaces every `@Component`/`@Directive` in the file
+ *   declares, paths left relative to the file.
  */
 function readComponentMetadata(tsPath) {
     let stat
@@ -64,8 +83,10 @@ function readComponentMetadata(tsPath) {
         true,
     )
 
+    /** @type {ComponentMetadata} */
     const metadata = { styleUrls: [], inlineStyles: [], templateUrls: [] }
 
+    /** @param {ts.Node} node */
     const visit = node => {
         if (ts.isClassDeclaration(node)) {
             for (const decorator of ts.getDecorators(node) ?? []) {

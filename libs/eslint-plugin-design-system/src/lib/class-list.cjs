@@ -15,14 +15,18 @@ const BARE_TOKEN_VARIABLE = /var\(\s*(--(?:color|foundation|type)-[\w-]*)/g
 const THEME_REFERENCE = /theme\(\s*([^)]+?)\s*\)/g
 
 /**
+ * @typedef {'descriptor'|'styling'|'partial'|'interpolated'} ClassTokenKind
+ * @typedef {{ name: string, start: number, end: number, kind: ClassTokenKind }} ClassToken
+ * @typedef {'emptyDescriptor'|'multipleDescriptors'|'multiplePipes'} MalformedReason
+ */
+
+/**
  * @param {string} value raw attribute value or string-literal contents
  * @param {{ offset?: number, truncatedStart?: boolean, truncatedEnd?: boolean }} context
  *   `offset` is where `value` starts in the file; the truncated flags mark a string that is
  *   concatenated with a runtime expression, so the tokens at that edge are partial.
- * @returns {{ tokens: { name: string, start: number, end: number,
- *                       kind: 'descriptor'|'styling'|'partial'|'interpolated' }[],
- *             malformed: { reason: 'emptyDescriptor'|'multipleDescriptors'|'multiplePipes',
- *                          start: number, end: number } | null }}
+ * @returns {{ tokens: ClassToken[],
+ *             malformed: { reason: MalformedReason, start: number, end: number } | null }}
  */
 function tokenizeClassList(value, { offset = 0, truncatedStart = false, truncatedEnd = false } = {}) {
     const raw = [...value.matchAll(/\S+/g)].map(match => ({
@@ -36,6 +40,7 @@ function tokenizeClassList(value, { offset = 0, truncatedStart = false, truncate
     const separators = raw.filter(token => token.name === DESCRIPTOR_SEPARATOR)
     const separatorIndex = raw.findIndex(token => token.name === DESCRIPTOR_SEPARATOR)
 
+    /** @type {{ reason: MalformedReason, start: number, end: number } | null } */
     let malformed = null
     if (separators.length > 1) {
         malformed = { reason: 'multiplePipes', start: separators[1].start, end: separators[1].end }
@@ -54,6 +59,7 @@ function tokenizeClassList(value, { offset = 0, truncatedStart = false, truncate
                 (truncatedEnd && token.localEnd === value.length)
             const isInterpolated = token.name.includes('{{') || token.name.includes('}}')
 
+            /** @type {ClassTokenKind} */
             let kind = 'styling'
             if (isDescriptor) kind = 'descriptor'
             else if (isInterpolated) kind = 'interpolated'
@@ -70,6 +76,8 @@ function tokenizeClassList(value, { offset = 0, truncatedStart = false, truncate
  * arbitrary value, where a structurally valid outer utility would otherwise hide an unchecked token
  * reference. Component-local custom properties (`--progress-color`) are not design tokens and are
  * intentionally not matched.
+ *
+ * @param {ClassToken} token
  */
 function bareTokenVariables(token) {
     return [...token.name.matchAll(BARE_TOKEN_VARIABLE)].map(match => ({
@@ -79,7 +87,11 @@ function bareTokenVariables(token) {
     }))
 }
 
-/** Theme lookups inside a class token, with the position of the path itself for exact underlining. */
+/**
+ * Theme lookups inside a class token, with the position of the path itself for exact underlining.
+ *
+ * @param {ClassToken} token
+ */
 function themeReferences(token) {
     return [...token.name.matchAll(THEME_REFERENCE)].map(match => ({
         path: match[1],

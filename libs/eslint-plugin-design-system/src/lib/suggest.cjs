@@ -20,15 +20,23 @@ const SCALE_UTILITY = /^(.*[^-])-(\d+(?:\.\d+)?)$/
 
 /** One scale step, e.g. the `sm` of `rounded-sm`. Multi-segment names such as `success-glow` and
  *  directional prefixes such as `rounded-l-sm` are deliberately not one step. */
+/** @param {string} prefix */
 const singleStepOf = prefix => new RegExp(`^${escapeForRegExp(prefix)}-([^-]+)$`)
 
 /** Scale steps that a bare utility never means: `rounded` is not `rounded-none`. */
 const EMPTY_STEPS = new Set(['none', '0', 'px'])
 
+/** @param {string} value */
 function escapeForRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/**
+ * @param {string} a
+ * @param {string} b
+ * @param {number} limit anything beyond this is abandoned early; the caller only wants near matches
+ * @returns {number} the distance, or `limit + 1` when it is provably greater
+ */
 function editDistance(a, b, limit) {
     if (Math.abs(a.length - b.length) > limit) return limit + 1
 
@@ -55,10 +63,16 @@ function editDistance(a, b, limit) {
  * The value the author asked for is off this utility's scale — offer the closest value that is on
  * it. Ties go to the smaller value, because the alternative is silently proposing more space than
  * was written (`py-14` → `py-12`, not `py-16`).
+ *
+ * @param {string} prefix
+ * @param {number} value
+ * @param {string[]} candidates
+ * @returns {string|null}
  */
 function nearestScaleValue(prefix, value, candidates) {
     const step = singleStepOf(prefix)
 
+    /** @type {string|null} */
     let best = null
     let bestDistance = Infinity
     let bestValue = Infinity
@@ -83,11 +97,16 @@ function nearestScaleValue(prefix, value, candidates) {
  * A bare `rounded` or `shadow` reads as a real utility but emits nothing: this project's Tailwind
  * config *replaces* those scales with token scales that have no `DEFAULT` key. The bare form asks
  * for the modest default, which in a scale starting at `none` is its first real step.
+ *
+ * @param {string} prefix
+ * @param {string[]} candidates
+ * @returns {string|null}
  */
 function firstScaleStep(prefix, candidates) {
     const step = singleStepOf(prefix)
 
     let seen = 0
+    /** @type {string|null} */
     let first = null
 
     for (const candidate of candidates) {
@@ -118,6 +137,7 @@ function suggestClassName(unknown, candidates) {
 
     const limit = Math.min(MAX_DISTANCE, Math.max(1, Math.floor(unknown.length / 3)))
 
+    /** @type {string|null} */
     let best = null
     let bestDistance = limit + 1
     let ambiguous = false

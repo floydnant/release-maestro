@@ -18,6 +18,7 @@ const malformedMessageIds = {
     multiplePipes: 'multiplePipes',
 }
 
+/** @type {import('eslint').Rule.RuleModule} */
 module.exports = {
     meta: {
         type: 'problem',
@@ -51,25 +52,47 @@ module.exports = {
             filePath: context.filename,
         })
 
+        /**
+         * An index the parser reported but the source map cannot place is not a reason to lose the
+         * diagnostic — the finding is still real, it just loses its underline.
+         *
+         * @type {import('eslint').AST.SourceLocation}
+         */
+        const WHOLE_FILE = { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } }
+
+        /**
+         * @param {number} start
+         * @param {number} end
+         * @returns {import('eslint').AST.SourceLocation}
+         */
         const locFor = (start, end) => {
             try {
                 return { start: sourceCode.getLocFromIndex(start), end: sourceCode.getLocFromIndex(end) }
             } catch {
-                return undefined
+                return WHOLE_FILE
             }
         }
 
+        /**
+         * @param {string} className
+         * @param {import('eslint').AST.SourceLocation} loc
+         */
         const reportUnknown = (className, loc) => {
             if (isValid(className)) return
 
             const suggestion = suggest(className)
-            context.report({
-                messageId: suggestion ? 'unknownClassWithSuggestion' : 'unknownClass',
-                data: { className, suggestion },
-                loc,
-            })
+            context.report(
+                suggestion
+                    ? { messageId: 'unknownClassWithSuggestion', data: { className, suggestion }, loc }
+                    : { messageId: 'unknownClass', data: { className }, loc },
+            )
         }
 
+        /**
+         * @param {string} value
+         * @param {{ offset?: number|null, truncatedStart?: boolean, truncatedEnd?: boolean,
+         *           fallbackLoc: import('eslint').AST.SourceLocation }} placement
+         */
         const checkClassList = (value, { offset, truncatedStart, truncatedEnd, fallbackLoc }) => {
             const positioned = offset !== null && offset !== undefined
             const { tokens, malformed } = tokenizeClassList(value, {
@@ -119,6 +142,7 @@ module.exports = {
             }
         }
 
+        /** @param {AngularBoundAttribute} node */
         const checkExpression = node => {
             const fallbackLoc = locFor(node.sourceSpan.start.offset, node.sourceSpan.end.offset)
 
@@ -143,6 +167,7 @@ module.exports = {
         }
 
         return {
+            /** @param {AngularTextAttribute} node */
             TextAttribute(node) {
                 if (!CLASS_ATTRIBUTES.has(node.name) || !node.valueSpan) return
 
@@ -152,6 +177,7 @@ module.exports = {
                 })
             },
 
+            /** @param {AngularBoundAttribute} node */
             BoundAttribute(node) {
                 if (node.__originalType === CLASS_BINDING) {
                     reportUnknown(node.name, locFor(node.keySpan.start.offset, node.keySpan.end.offset))

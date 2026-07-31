@@ -1,0 +1,11 @@
+/*
+ * Reached only through the `@import` in `global.css`, which is the point: a design system's
+ * generated classes normally arrive that way, and the rule has to follow the import to find them.
+ */
+.type-body-sm {
+    font-size: 0.875rem;
+}
+
+.type-code-sm {
+    font-family: monospace;
+}

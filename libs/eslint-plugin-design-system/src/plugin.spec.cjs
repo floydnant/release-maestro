@@ -6,7 +6,10 @@
  * comparison rather than the original spec — `R7` (a bare utility whose scale has no `DEFAULT` key)
  * and `S1` (suggest the nearest value *in the scale*, not the nearest spelling).
  *
- * Run with `npx nx run maestro-renderer:tooling-test`.
+ * Every authority is a fixture inside this library — see `fixtures/tailwind.config.cjs` for why the
+ * renderer's own config is deliberately not used here.
+ *
+ * Run with `npx nx test eslint-plugin-design-system`.
  */
 const path = require('node:path')
 const { ESLint, RuleTester } = require('eslint')
@@ -20,14 +23,13 @@ const { suggestClassName } = require('./lib/suggest.cjs')
 const { readComponentMetadata } = require('./lib/component-metadata.cjs')
 const { tailwindClassList } = require('./lib/tailwind-authority.cjs')
 
-const RENDERER = path.resolve(__dirname, '../..')
 const FIXTURES = path.join(__dirname, 'fixtures')
 
 const FIXTURE_TEMPLATE = path.join(FIXTURES, 'specimen.component.html')
 const FIXTURE_COMPONENT = path.join(FIXTURES, 'specimen.component.ts')
 const FIXTURE_TOKEN_API = path.join(FIXTURES, 'design-tokens.generated.fixture.ts')
 
-const TAILWIND_CONFIG = path.join(RENDERER, 'tailwind.config.js')
+const TAILWIND_CONFIG = path.join(FIXTURES, 'tailwind.config.cjs')
 
 /**
  * The authorities are addressed absolutely so the corpus does not depend on the directory Jest
@@ -35,35 +37,61 @@ const TAILWIND_CONFIG = path.join(RENDERER, 'tailwind.config.js')
  */
 const authorities = {
     tailwindConfig: TAILWIND_CONFIG,
-    globalStylesheets: [path.join(RENDERER, 'src/styles.css')],
-    generatedTokenApi: path.join(RENDERER, 'src/app/shared/design-tokens.generated.ts'),
+    globalStylesheets: [path.join(FIXTURES, 'global.css')],
+    generatedTokenApi: FIXTURE_TOKEN_API,
 }
 
 const settings = [authorities]
 /** The unsupported cases are noisy by default; silencing them isolates the case under test. */
 const quiet = [{ ...authorities, reportDynamic: false }]
-/** Points the typed-API authority at the fixture module — see its header for why. */
-const withFixtureTokenApi = [{ ...authorities, generatedTokenApi: FIXTURE_TOKEN_API }]
+/** Drops the typed-API authority, so a generated-module root stops being special. */
+const { generatedTokenApi: _omitted, ...withoutTokenApiAuthorities } = authorities
+const withoutTokenApi = [withoutTokenApiAuthorities]
 
+/** @param {string} className */
 const unknown = className => ({ messageId: 'unknownClass', data: { className } })
+
+/**
+ * @param {string} className
+ * @param {string} suggestion
+ */
 const didYouMean = (className, suggestion) => ({
     messageId: 'unknownClassWithSuggestion',
     data: { className, suggestion },
 })
 
-const template = (name, code, extra = {}) => ({
+/**
+ * A named case against the template fixture. `extra` is intersected into the result rather than
+ * widened away, so a case that passes `errors` is an invalid case and one that does not is a valid
+ * case — which is exactly what `RuleTester`'s two buckets require.
+ *
+ * @template {object} T
+ * @param {string} name
+ * @param {string} code
+ * @param {T} [extra]
+ * @returns {{ name: string, filename: string, options: unknown[], code: string } & T}
+ */
+const template = (name, code, extra) => ({
     name,
     filename: FIXTURE_TEMPLATE,
     options: settings,
     code,
-    ...extra,
+    .../** @type {T} */ (extra ?? {}),
 })
-const host = (name, code, extra = {}) => ({
+
+/**
+ * @template {object} T
+ * @param {string} name
+ * @param {string} code
+ * @param {T} [extra]
+ * @returns {{ name: string, filename: string, options: unknown[], code: string } & T}
+ */
+const host = (name, code, extra) => ({
     name,
     filename: FIXTURE_COMPONENT,
     options: settings,
     code,
-    ...extra,
+    .../** @type {T} */ (extra ?? {}),
 })
 
 // --- the two ESLint rules against the corpus -----------------------------------------------------
@@ -105,13 +133,10 @@ templateTester.run('valid-template-classnames', templateRule, {
         template('A8 [class] conditional', "<div [class]=\"cond ? 'flex' : 'hidden'\"></div>"),
         template('A8 routerLinkActive', '<a routerLinkActive="active-link"></a>'),
         template('A8 static ngClass', '<div ngClass="flex gap-2"></div>'),
-        template('A9 typed generated API', '<div [class]="typographyClass(variant())"></div>', {
-            options: withFixtureTokenApi,
-        }),
+        template('A9 typed generated API', '<div [class]="typographyClass(variant())"></div>'),
         template(
             'A9 typed generated API behind a property chain',
             '<div [ngClass]="typographyVariantIdentifiers[index]"></div>',
-            { options: withFixtureTokenApi },
         ),
         template('A10 component-local custom property', '<div class="w-[var(--progress-width)]"></div>'),
 
@@ -195,7 +220,14 @@ templateTester.run('valid-template-classnames', templateRule, {
         template(
             'R5 a call rooted outside the generated module is still unresolvable',
             '<div [class]="componentHelper(variant())"></div>',
-            { options: withFixtureTokenApi, errors: [{ messageId: 'dynamicClassList' }] },
+            { errors: [{ messageId: 'dynamicClassList' }] },
+        ),
+        template(
+            // Proves A9 is the typed-API check doing the work rather than the expression happening
+            // to be resolvable: drop the authority and the very same call is reported.
+            'R5 the same call without a generated-module authority',
+            '<div [class]="typographyClass(variant())"></div>',
+            { options: withoutTokenApi, errors: [{ messageId: 'dynamicClassList' }] },
         ),
 
         // --- R7/S1: the two cases the prototype comparison produced ---
@@ -306,7 +338,7 @@ describe('the committed specimen fixture', () => {
     /** Lints the fixture the way the renderer's own config does, rather than through RuleTester. */
     const lintFixture = () =>
         new ESLint({
-            cwd: RENDERER,
+            cwd: __dirname,
             overrideConfigFile: true,
             overrideConfig: [
                 {
@@ -344,6 +376,6 @@ describe('the committed specimen fixture', () => {
         const [result] = await lintFixture()
         const [first] = result.messages
 
-        expect(first.endColumn - first.column).toBe('type-code-sl'.length)
+        expect((first.endColumn ?? 0) - first.column).toBe('type-code-sl'.length)
     })
 })

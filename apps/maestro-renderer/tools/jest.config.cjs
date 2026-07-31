@@ -1,8 +1,8 @@
 /**
- * Design-system tooling tests: the token generator and the class-validation ESLint plugin.
+ * The design-token generator's tests.
  *
  * Separate from `apps/maestro-renderer/jest.config.ts` on purpose. That project runs the Angular
- * renderer's specs through `jest-preset-angular` in jsdom; these are plain CommonJS scripts that run
+ * renderer's specs through `jest-preset-angular` in jsdom; this is a plain CommonJS script that runs
  * in Node and must not pay for an Angular transform. Both are Jest, so there is one test runner in
  * the repository — MAE-100 leaves no `node:test` in design-system tooling.
  */

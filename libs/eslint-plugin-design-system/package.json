@@ -1,0 +1,16 @@
+{
+    "name": "@release-maestro/eslint-plugin-design-system",
+    "version": "0.0.1",
+    "private": true,
+    "type": "commonjs",
+    "main": "./src/index.cjs",
+    "types": "./src/index.d.cts",
+    "peerDependencies": {
+        "eslint": ">=9",
+        "tailwindcss": "^3"
+    },
+    "dependencies": {
+        "postcss": "*",
+        "typescript": "*"
+    }
+}

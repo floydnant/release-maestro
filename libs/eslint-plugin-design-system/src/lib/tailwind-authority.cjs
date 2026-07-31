@@ -11,8 +11,15 @@ const resolveConfig = require('tailwindcss/resolveConfig')
 /** Marker classes Tailwind reads as variant targets; they legitimately emit no CSS of their own. */
 const VARIANT_MARKERS = /^(group|peer)(\/[^\s/]+)?$/
 
+/** @typedef {import('tailwindcss/lib/lib/setupContextUtils').TailwindContext} TailwindContext */
+
+/** @type {Map<string, TailwindContext>} */
 const contextCache = new Map()
 
+/**
+ * @param {string} configPath
+ * @returns {TailwindContext}
+ */
 function getTailwindContext(configPath) {
     let context = contextCache.get(configPath)
     if (!context) {
@@ -22,6 +29,11 @@ function getTailwindContext(configPath) {
     return context
 }
 
+/**
+ * @param {string} configPath
+ * @param {string} className
+ * @returns {boolean}
+ */
 function isTailwindClass(configPath, className) {
     if (VARIANT_MARKERS.test(className)) return true
 
@@ -32,9 +44,13 @@ function isTailwindClass(configPath, className) {
     }
 }
 
+/** @type {Map<string, string[]>} */
 const classListCache = new Map()
+
+/** @type {Map<string, ReturnType<typeof resolveConfig>>} */
 const resolvedConfigCache = new Map()
 
+/** @param {string} configPath */
 function getResolvedConfig(configPath) {
     let config = resolvedConfigCache.get(configPath)
     if (!config) {
@@ -48,6 +64,10 @@ function getResolvedConfig(configPath) {
  * Whether `theme(colors.status.info-background)` names something real. Tailwind resolves these only
  * when the stylesheet is compiled, so `generateRules` accepts a misspelled path and the mistake
  * surfaces as a build error instead of an editor diagnostic — this closes that gap.
+ *
+ * @param {string} configPath
+ * @param {string} themePath
+ * @returns {boolean}
  */
 function themePathExists(configPath, themePath) {
     const segments = themePath
@@ -58,24 +78,29 @@ function themePathExists(configPath, themePath) {
 
     if (segments.length === 0) return false
 
+    /** @type {unknown} */
     let node = getResolvedConfig(configPath).theme
     for (const segment of segments) {
         if (node === null || typeof node !== 'object' || !(segment in node)) return false
-        node = node[segment]
+        node = /** @type {Record<string, unknown>} */ (node)[segment]
     }
+    // A leaf is the value itself; stopping on a branch means the path names a group, not a token.
     return typeof node !== 'object' || Array.isArray(node)
 }
 
 /**
  * Every class Tailwind can name for this config — the candidate pool for "did you mean …?".
  * Arbitrary values are unbounded and so are absent, which only costs us suggestions, not validation.
+ *
+ * @param {string} configPath
+ * @returns {string[]}
  */
 function tailwindClassList(configPath) {
     let list = classListCache.get(configPath)
     if (!list) {
         list = getTailwindContext(configPath)
             .getClassList()
-            .filter(entry => typeof entry === 'string')
+            .filter(/** @returns {entry is string} */ entry => typeof entry === 'string')
         classListCache.set(configPath, list)
     }
     return list
