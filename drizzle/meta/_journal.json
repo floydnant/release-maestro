@@ -22,6 +22,13 @@
       "when": 1785323515702,
       "tag": "0002_mae-87-rename-label-schema-to-record-label",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785628184305,
+      "tag": "0003_mae-118-browse-sort-indexes",
+      "breakpoints": true
     }
   ]
 }
