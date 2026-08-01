@@ -92,7 +92,57 @@ path, which works as a dedup key because the cover cache is content-addressed.
 
 ### Catalog
 
-The catalog entities — song, album, artist — carry no ambiguity and are not listed here. One does.
+**Song** (code) / **track** (user-facing copy):
+One audio file in the collection. The concept is identical in both registers; only the word changes.
+Say **song** in code, identifiers, schemas, tables and docs — `songs`, `songId`, `SongTable`,
+`SongQuery`. Say **track** in anything a user reads — "1,204 tracks", a "Tracks" tab, "no tracks
+match".
+
+"Track" is ambiguous — a track on a record, a track in a DAW, a position in a tracklist — while
+"song" universally names one thing. So code takes the unambiguous word and the UI takes the one users
+actually say. The same register split as _record label_ and as _discovery_, which is _prescan_ at the
+metadata-engine boundary.
+_Avoid_: `track` in any identifier; file, item, entry as synonyms for song
+
+**Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on a
+release, not a song. Do not "correct" it to `songNumber`.
+
+**Album** (code) / **release** (user-facing copy):
+A group of songs issued together. Code says **album** — `albums`, `albumId`, `albumArtists`; copy says
+**release** — a "Releases" tab, "12 releases". The register split exists because a release is not
+always an album: it may equally be an EP, a single or a compilation. The library does not distinguish
+these yet; a `releaseType` attribute is expected later. Until it exists, do not call a release an
+album in copy.
+_Avoid_: record, LP, disc
+
+The release feed has a **release** too, and it is the same real-world concept modelled twice — see
+[CONTEXT-MAP](../../../CONTEXT-MAP.md). The library's is _inferred_ from tags on files the user owns;
+the feed's is _announced_ by Bandcamp and not necessarily owned. Neither model converts to the other,
+so never pass one where the other is expected.
+
+**Artist credit**:
+How one song names the artists behind it, in the tag's own phrasing. An ordered list of segments —
+each an artist, the name they are credited as here, and the phrase that joins it to the next
+(`" & "`, `" feat. "`, `" vs. "`). Concatenating the segments in order reproduces the credit exactly
+as tagged, which is why the UI can show `Burial & Four Tet` verbatim while still linking each name to
+its own artist.
+
+A credit belongs to the **raw name**, not to the song: `artist_raw_names` is keyed by the raw tag
+string, so resolving one string resolves it for every song ever tagged that way. `song_artists` is a
+materialized projection of that resolution — anything that edits a raw-name resolution must
+re-project `song_artists` for every song carrying that raw name. A rescan is not required.
+_Avoid_: artist string, artist field, credit line
+
+Today every credit has exactly one segment spanning the whole string, because ingest does not split
+raw names on its own — splitting is a user-confirmed act (`confirmedByUser`). So `Burial & Four Tet`
+is currently one artist entity. Treat the single segment as the degenerate case, not as the model.
+
+**Appears on**:
+The albums an artist has songs on without being an album artist of them — compilations, VA releases,
+guest features, DJ mixes. Defined by exclusion, so it is strictly disjoint from that artist's own
+releases; the two together account for every album the artist touches. An artist's own album never
+shows up here.
+_Avoid_: featured on, guest appearances, other releases
 
 **Record label**:
 The company that released a record: Warp, Ninja Tune, Hyperdub. Always **two words**, never "label"
@@ -107,3 +157,5 @@ call it a **record label** everywhere upstream — the same split as _discovery_
 the metadata-engine boundary.
 
 Nothing in the triage or Linear sense of "label" belongs to this context.
+
+Artist and genre carry no ambiguity as entities and are not listed here.
