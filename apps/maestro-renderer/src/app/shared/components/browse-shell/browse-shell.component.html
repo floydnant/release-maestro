@@ -52,7 +52,7 @@
                 {{ chip.name }}
                 <button
                     type="button"
-                    class="rounded-full p-0.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
+                    class="flex items-center rounded-full p-0.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
                     [attr.aria-label]="'Remove ' + chip.kindLabel + ' filter ' + chip.name"
                     (click)="chipRemove.emit(chip)"
                 >
