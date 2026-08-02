@@ -2,7 +2,6 @@
     [state]="shellState()"
     [filters]="filterState()"
     (searchChange)="onSearch($event)"
-    (presenceChange)="onPresence($event)"
     (chipRemove)="onChipRemove($event)"
     (clearFilters)="onClearFilters()"
     (retry)="onRetry()"
@@ -15,5 +14,6 @@
         (selectionChange)="onSelectionChange($event)"
         (viewportChange)="onViewportChange($event)"
         (entityFilter)="onEntityFilter($event)"
+        (filterMissing)="onFilterMissing()"
     ></app-song-table>
 </app-browse-shell>

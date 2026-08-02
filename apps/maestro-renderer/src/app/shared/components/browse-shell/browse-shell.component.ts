@@ -1,7 +1,7 @@
 import { DecimalPipe } from '@angular/common'
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { RouterLink } from '@angular/router'
-import { SongPresence, type CatalogEntityRef } from '@release-maestro/core'
+import { type CatalogEntityRef } from '@release-maestro/core'
 import type { BrowseStatus } from '../../browse/browse-query'
 import { IconComponent } from '../icon/icon.component'
 
@@ -39,7 +39,6 @@ export interface BrowseShellState {
 
 export interface BrowseFilterState {
     search: string
-    presence: SongPresence
     chips: BrowseFilterChip[]
 }
 
@@ -55,16 +54,9 @@ export class BrowseShellComponent {
     filters = input.required<BrowseFilterState>()
 
     searchChange = output<string>()
-    presenceChange = output<SongPresence>()
     chipRemove = output<BrowseFilterChip>()
     clearFilters = output<void>()
     retry = output<void>()
-
-    protected readonly presences = [
-        { value: SongPresence.any, label: 'All' },
-        { value: SongPresence.present, label: 'Available' },
-        { value: SongPresence.missing, label: 'Missing' },
-    ] as const
 
     /**
      * A first load, as opposed to a refetch underneath rows that are already on
@@ -76,7 +68,7 @@ export class BrowseShellComponent {
 
     protected hasFilters = computed(() => {
         const filters = this.filters()
-        return filters.chips.length > 0 || !!filters.search || filters.presence != SongPresence.any
+        return filters.chips.length > 0 || !!filters.search
     })
 
     /**

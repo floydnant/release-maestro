@@ -42,6 +42,7 @@ type SongSeed = {
     duration?: number | null
     createdAt?: Date | null
     present?: boolean
+    coverPath?: string | null
 }
 
 describe('LibraryBrowseRepository', () => {
@@ -71,6 +72,7 @@ describe('LibraryBrowseRepository', () => {
                 bpm: seed.bpm ?? null,
                 musicalKey: seed.musicalKey ?? null,
                 duration: seed.duration ?? null,
+                coverPath: seed.coverPath ?? null,
             })
             .run()
     }
@@ -390,6 +392,43 @@ describe('LibraryBrowseRepository', () => {
             })
 
             expect(description.artists).toEqual([{ id: 'artist-burial', name: 'Burial' }])
+        })
+    })
+
+    describe('cover art', () => {
+        beforeEach(() => {
+            db.insert(albumsTable)
+                .values({
+                    id: 'album-untrue',
+                    identityKey: 'untrue',
+                    title: 'Untrue',
+                    coverPath: '/covers/untrue.png',
+                })
+                .run()
+        })
+
+        it("prefers the song's own artwork", () => {
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', coverPath: '/covers/song.png' })
+
+            const result = repository.querySongs({ query: query(), window: { offset: 0, limit: 10 } })
+
+            expect(result.rows[0]?.coverPath).toBe('/covers/song.png')
+        })
+
+        it("falls back to the album's, because a track with no embedded art still has a release", () => {
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', coverPath: null })
+
+            const result = repository.querySongs({ query: query(), window: { offset: 0, limit: 10 } })
+
+            expect(result.rows[0]?.coverPath).toBe('/covers/untrue.png')
+        })
+
+        it('reports no artwork rather than an empty string when neither has any', () => {
+            seedSong({ id: 'a', title: 'Archangel', coverPath: null })
+
+            const result = repository.querySongs({ query: query(), window: { offset: 0, limit: 10 } })
+
+            expect(result.rows[0]?.coverPath).toBeNull()
         })
     })
 })

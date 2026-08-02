@@ -19,6 +19,9 @@
         <span class="w-8 shrink-0 border-b border-border-subtle" role="columnheader">
             <span class="sr-only">Availability</span>
         </span>
+        <span class="w-8 shrink-0 border-b border-border-subtle" role="columnheader">
+            <span class="sr-only">Cover art</span>
+        </span>
 
         <app-song-table-heading
             class="min-w-32 flex-1"
@@ -98,8 +101,12 @@
     <!-- A spacer as tall as the whole result set gives the scrollbar its range; only
          the loaded window is ever in the DOM, translated to where it belongs. -->
     <div class="song-table__canvas | relative w-max min-w-full" [style.height.px]="canvasHeight()">
+        <!-- `w-max min-w-full` rather than `inset-x-0`: the rows are the only thing
+             that knows how wide the table really is, and pinning them to the canvas
+             would stop a selected row's highlight at the viewport edge whenever the
+             table is scrolled sideways. -->
         <div
-            class="song-table__window | absolute inset-x-0"
+            class="song-table__window | absolute left-0 top-0 w-max min-w-full"
             [style.transform]="'translateY(' + windowTop() + 'px)'"
         >
             @for (row of rows(); track row.id; let rowIndex = $index) {
@@ -123,13 +130,31 @@
                 >
                     <span class="flex w-8 shrink-0 items-center justify-center" role="gridcell">
                         @if (!row.present) {
-                            <app-icon
-                                name="octUnlink"
-                                size="14"
-                                color="content.warning"
-                                title="Missing — this file is no longer where the library saw it"
-                            ></app-icon>
-                            <span class="sr-only">Missing</span>
+                            <button
+                                type="button"
+                                class="grid size-6 place-items-center rounded-sm hover:bg-action-quiet-hover"
+                                aria-label="Missing — show only missing tracks"
+                                title="Missing — this file is no longer where the library saw it. Show only missing tracks."
+                                (click)="onMissingBadge($event)"
+                            >
+                                <app-icon name="octUnlink" size="14" color="content.warning"></app-icon>
+                            </button>
+                        }
+                    </span>
+
+                    <span
+                        class="song-table__cover | flex w-8 shrink-0 items-center justify-center"
+                        role="gridcell"
+                    >
+                        @if (row.coverPath) {
+                            <img
+                                class="size-6 rounded-sm object-cover"
+                                alt=""
+                                loading="lazy"
+                                [src]="fileUrl(row.coverPath)"
+                            />
+                        } @else {
+                            <span class="size-6 rounded-sm bg-background-elevated"></span>
                         }
                     </span>
 
@@ -146,7 +171,7 @@
                             @for (segment of row.artistCredit; track segment.artistId; let last = $last) {
                                 <button
                                     type="button"
-                                    class="rounded-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                                    class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                                     (click)="onArtistSegment($event, segment)"
                                 >
                                     {{ segment.creditedAs }}
@@ -164,7 +189,7 @@
                         @if (row.albumId && row.albumTitle) {
                             <button
                                 type="button"
-                                class="max-w-full truncate rounded-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                                class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                                 (click)="onEntity($event, 'album', row.albumId, row.albumTitle)"
                             >
                                 {{ row.albumTitle }}
@@ -179,7 +204,7 @@
                             @for (genre of row.genres; track genre.id; let last = $last) {
                                 <button
                                     type="button"
-                                    class="rounded-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                                    class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                                     (click)="onEntity($event, 'genre', genre.id, genre.name)"
                                 >
                                     {{ genre.name }}
@@ -217,7 +242,7 @@
                         @if (row.recordLabelId && row.recordLabelText) {
                             <button
                                 type="button"
-                                class="max-w-full truncate rounded-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                                class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                                 (click)="
                                     onEntity($event, 'recordLabel', row.recordLabelId, row.recordLabelText)
                                 "

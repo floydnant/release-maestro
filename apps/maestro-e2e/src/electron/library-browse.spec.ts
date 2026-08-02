@@ -103,6 +103,12 @@ test('a scanned library is browsable, sortable and filterable end to end', async
     await expect(dawn).toContainText('2019')
     await expect(dawn).toContainText('120')
     await expect(dawn).toContainText('8A')
+    // Cover art comes from the content-addressed cache the scan populated, so this
+    // also proves the path survives all the way to an img the renderer can load.
+    await expect(dawn.locator('img')).toHaveAttribute('src', /^file:\/\/.+/)
+    await expect
+        .poll(async () => dawn.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
+        .toBeGreaterThan(0)
     await page.screenshot({ path: testInfo.outputPath('tracks-list.png') })
 
     // A two-name credit is one artist entity today (MAE-97 owns splitting), and the
@@ -214,18 +220,16 @@ test('tracks whose files went away stay listed, marked, and can be scoped to', a
     )
     await page.screenshot({ path: testInfo.outputPath('tracks-missing.png') })
 
-    await page.getByRole('button', { name: 'Missing' }).click()
+    // The badge on a missing row is the entry point to the availability filter — it
+    // exists exactly when there is something to filter for.
+    await page.getByRole('button', { name: 'Missing — show only missing tracks' }).first().click()
     await expect(
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '2 tracks' }),
     ).toBeVisible()
     await expect.poll(rowTitles).toEqual(expect.arrayContaining(['Tide', 'Gleam']))
 
-    await page.getByRole('button', { name: 'Available' }).click()
-    await expect(
-        page.getByRole('status', { name: 'Result count' }).filter({ hasText: '4 tracks' }),
-    ).toBeVisible()
-
-    await page.getByRole('button', { name: 'All' }).click()
+    // Removing the chip is the only way back out, and it restores the full list.
+    await page.getByRole('button', { name: 'Remove Availability filter Missing' }).click()
     await expect(
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '6 tracks' }),
     ).toBeVisible()

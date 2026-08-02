@@ -171,6 +171,12 @@ export interface SongRow {
     /** `false` once a scan could not find the file. Rendered dimmed and marked. */
     present: boolean
     title: string
+    /**
+     * Absolute filesystem path to cached cover art, rendered through a `file://` URL.
+     * The song's own artwork when it has any, otherwise its album's — a track tagged
+     * without embedded art still belongs to a release that has some.
+     */
+    coverPath: string | null
     /** The credit exactly as tagged; `null` when the file carries no artist tag. */
     artistText: string | null
     artistCredit: ArtistCreditSegment[]

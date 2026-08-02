@@ -65,7 +65,55 @@ test.describe('rendering a window', () => {
 
         const missingRow = rowByTitle(page, 'Void')
         await expect(missingRow).toHaveAttribute('aria-label', /missing/i)
-        await expect(missingRow.getByText('Missing')).toBeAttached()
+        // The badge is an icon, so its accessible name is what carries the meaning.
+        await expect(missingRow.getByRole('button', { name: /^Missing/ })).toBeVisible()
+        await expect(rowByTitle(page, 'Dawn').getByRole('button', { name: /^Missing/ })).toHaveCount(0)
+    })
+
+    test('shows cover art at the start of a row that has any', async ({ page }) => {
+        const withCover = createSongRow({ coverPath: '/scenario/covers/daybreak.png' })
+        await openTracks(page, scenarioBuilder().songs([withCover]).build())
+
+        const cover = rowByTitle(page, 'Dawn').locator('img')
+        await expect(cover).toHaveAttribute('src', 'file:///scenario/covers/daybreak.png')
+        // Decorative: the title beside it already names the row.
+        await expect(cover).toHaveAttribute('alt', '')
+    })
+
+    test('holds the cover column open when a track has no art, so rows stay aligned', async ({ page }) => {
+        await openTracks(page, scenarioBuilder().songs([createSongRow()]).build())
+
+        await expect(rowByTitle(page, 'Dawn').locator('img')).toHaveCount(0)
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+    })
+
+    test('ellipsises an overlong genre rather than cutting it off mid-letter', async ({ page }) => {
+        const longGenre = createSongRow({
+            id: 'song-long',
+            title: 'Sprawling',
+            genres: [{ id: 'g1', name: 'Deep Progressive Melodic Organic House' }],
+        })
+        await openTracks(page, scenarioBuilder().songs([longGenre]).build())
+
+        // The ellipsis has to live on the link itself. A cell-level `truncate` cannot
+        // produce one, because Chrome refuses `display: inline` on a `<button>` and
+        // `text-overflow` has nothing to trim when the overflowing child is atomic —
+        // which is why the value used to be clipped mid-letter with no ellipsis.
+        const genreLink = page.getByRole('button', { name: 'Deep Progressive Melodic Organic House' })
+
+        await expect(genreLink).toHaveCSS('text-overflow', 'ellipsis')
+        const { scrollWidth, clientWidth } = await genreLink.evaluate(link => ({
+            scrollWidth: link.scrollWidth,
+            clientWidth: link.clientWidth,
+        }))
+        expect(scrollWidth).toBeGreaterThan(clientWidth)
+
+        // And it stays inside its column rather than widening the table.
+        const cellWidth = await rowByTitle(page, 'Sprawling')
+            .getByRole('gridcell')
+            .filter({ hasText: 'Deep Progressive' })
+            .evaluate(cell => cell.clientWidth)
+        expect(clientWidth).toBeLessThanOrEqual(cellWidth)
     })
 
     test('shows a dash where a tag is absent instead of an empty cell', async ({ page }) => {
@@ -160,6 +208,19 @@ test.describe('search', () => {
         await expect(page).toHaveURL(/q=dusk/)
     })
 
+    test('clears the search from its own on-theme button', async ({ page }) => {
+        const controller = await openTracks(page)
+        const search = page.getByRole('searchbox', { name: 'Search tracks' })
+
+        await expect(page.getByRole('button', { name: 'Clear search' })).toBeHidden()
+        await search.fill('dusk')
+
+        await page.getByRole('button', { name: 'Clear search' }).click()
+
+        await expect(search).toHaveValue('')
+        await expect.poll(() => lastQuery(controller)).toMatchObject({ query: { search: '' } })
+    })
+
     test('explains an empty result as a filter problem, not an empty library', async ({ page }) => {
         const controller = await openTracks(page)
 
@@ -225,16 +286,31 @@ test.describe('filtering by entity', () => {
         await expect(chip).toBeHidden()
     })
 
-    test('scopes to missing tracks only', async ({ page }) => {
+    test('scopes to missing tracks from the badge on a missing row', async ({ page }) => {
         const controller = await openTracks(page)
 
-        await page.getByRole('button', { name: 'Missing' }).click()
+        // The badge is the only entry point, and it exists exactly when there is
+        // something to filter for — there is no standing availability control.
+        await page.getByRole('button', { name: 'Missing — show only missing tracks' }).click()
 
         await expect
             .poll(() => lastQuery(controller))
             .toMatchObject({
                 query: { filter: { presence: 'missing' } },
             })
+        await expect(page.getByRole('button', { name: 'Remove Availability filter Missing' })).toBeVisible()
+    })
+
+    test('drops the availability scope when its chip is removed', async ({ page }) => {
+        const controller = await createRendererScenario(
+            page,
+            rendererScenarios.tracks.withSongs(),
+            '/tracks?presence=missing',
+        )
+
+        await page.getByRole('button', { name: 'Remove Availability filter Missing' }).click()
+
+        await expect.poll(async () => (await lastQuery(controller)).query.filter.presence).toBeUndefined()
     })
 })
 
@@ -251,6 +327,27 @@ test.describe('virtual scrolling', () => {
             .evaluate(element => element.scrollTo({ top: 40 * 5_000 }))
 
         await expect.poll(async () => (await lastQuery(controller)).window.offset).toBeGreaterThan(4_000)
+    })
+
+    test('asks for a window measured against the real viewport, not the starting guess', async ({ page }) => {
+        // The regression: the table used to measure itself once, on a render hook that
+        // can fire while the shell still has it detached behind a loading state. It
+        // then measured a height of zero, asked for a stub window, and left the list
+        // with blank rows until a scroll or resize happened to re-trigger a fetch.
+        const controller = await openTracks(page, rendererScenarios.tracks.loadPending())
+        await controller.resolveAllPending('library:query-songs', {
+            rows: createSongRows(),
+            offset: 0,
+            total: 20_000,
+        })
+        const grid = page.getByRole('grid', { name: 'Tracks' })
+        await expect(grid).toBeVisible()
+
+        const visibleRows = await grid.evaluate(element => Math.ceil(element.clientHeight / 40))
+
+        await expect
+            .poll(async () => (await lastQuery(controller)).window.limit)
+            .toBeGreaterThanOrEqual(visibleRows)
     })
 
     test('never asks for more rows than the read side will serve', async ({ page }) => {

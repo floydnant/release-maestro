@@ -49,6 +49,9 @@ import {
 /** How often a running scan is allowed to refetch the visible window. */
 const SCAN_REFETCH_INTERVAL_MS = 1_500
 
+/** Availability rides in the same chip list as the entity filters, under its own kind. */
+const PRESENCE_CHIP_KIND = 'presence'
+
 const CHIP_KINDS: { kind: EntityFilterKind; kindLabel: string; field: keyof SongFilter }[] = [
     { kind: 'artist', kindLabel: 'Artist', field: 'artistIds' },
     { kind: 'genre', kindLabel: 'Genre', field: 'genreIds' },
@@ -146,15 +149,30 @@ export class TracksComponent {
 
     protected filterState = computed<BrowseFilterState>(() => ({
         search: this.query().search,
-        presence: this.query().filter.presence ?? SongPresence.any,
         chips: this.chips(),
     }))
 
     protected chips = computed<BrowseFilterChip[]>(() => {
         const description = this.filterDescription()
-        return CHIP_KINDS.flatMap(({ kind, kindLabel }) =>
+        const entityChips = CHIP_KINDS.flatMap(({ kind, kindLabel }) =>
             entitiesFor(description, kind).map(entity => ({ ...entity, kind, kindLabel })),
         )
+
+        // Availability is a chip like any other rather than a permanent control. It
+        // only matters once something is actually missing, and the row badge is where
+        // the user discovers it — see `SongTableComponent.filterMissing`.
+        const presence = this.query().filter.presence
+        if (presence == null || presence == SongPresence.any) return entityChips
+
+        return [
+            ...entityChips,
+            {
+                kind: PRESENCE_CHIP_KIND,
+                kindLabel: 'Availability',
+                id: presence,
+                name: presence == SongPresence.missing ? 'Missing' : 'Available',
+            },
+        ]
     })
 
     protected onSort(field: SongSortField): void {
@@ -165,10 +183,11 @@ export class TracksComponent {
         this.patchQuery({ ...this.query(), search })
     }
 
-    protected onPresence(presence: SongPresence): void {
+    /** The missing badge on a row is the only entry point to the availability filter. */
+    protected onFilterMissing(): void {
         this.patchQuery({
             ...this.query(),
-            filter: { ...this.query().filter, presence },
+            filter: { ...this.query().filter, presence: SongPresence.missing },
         })
     }
 
@@ -195,6 +214,14 @@ export class TracksComponent {
     }
 
     protected onChipRemove(chip: BrowseFilterChip): void {
+        if (chip.kind == PRESENCE_CHIP_KIND) {
+            this.patchQuery({
+                ...this.query(),
+                filter: { ...this.query().filter, presence: SongPresence.any },
+            })
+            return
+        }
+
         const field = CHIP_KINDS.find(chipKind => chipKind.kind == chip.kind)?.field
         if (!field) return
 

@@ -3,43 +3,9 @@
 >
     <h1 class="type-section-title mr-auto capitalize">{{ state().entityLabel }}</h1>
 
-    <div class="browse-shell__search | relative flex items-center" role="search">
-        <app-icon
-            name="octSearch"
-            size="14"
-            color="content.muted"
-            class="pointer-events-none absolute left-2"
-        ></app-icon>
-        <input
-            type="search"
-            class="input w-64 pl-8"
-            placeholder="Search {{ state().entityLabel }}…"
-            [attr.aria-label]="'Search ' + state().entityLabel"
-            [value]="filters().search"
-            (input)="onSearchInput($event)"
-        />
-    </div>
-
-    <div
-        class="browse-shell__presence | flex items-center gap-1 rounded-lg bg-background-surface p-1"
-        role="group"
-        aria-label="Availability"
-    >
-        @for (option of presences; track option.value) {
-            <button
-                type="button"
-                class="type-label-sm rounded-md px-2 py-1"
-                [class.bg-action-secondary]="filters().presence === option.value"
-                [class.text-content-primary]="filters().presence === option.value"
-                [class.text-content-muted]="filters().presence !== option.value"
-                [attr.aria-pressed]="filters().presence === option.value"
-                (click)="presenceChange.emit(option.value)"
-            >
-                {{ option.label }}
-            </button>
-        }
-    </div>
-
+    <!-- The count sits left of the search rather than at the end of the bar: it is the
+         one thing here whose width changes as you type, and at the end it pushed the
+         search and everything beside it around on every keystroke. -->
     <p
         class="type-body-sm shrink-0 tabular-nums text-content-secondary"
         role="status"
@@ -49,6 +15,35 @@
             {{ state().total | number }} {{ countLabel() }}
         }
     </p>
+
+    <div class="browse-shell__search | relative flex shrink-0 items-center" role="search">
+        <app-icon
+            name="octSearch"
+            size="14"
+            color="content.muted"
+            class="pointer-events-none absolute left-2"
+        ></app-icon>
+        <input
+            type="search"
+            class="input w-64 px-8"
+            placeholder="Search {{ state().entityLabel }}…"
+            [attr.aria-label]="'Search ' + state().entityLabel"
+            [value]="filters().search"
+            (input)="onSearchInput($event)"
+        />
+        @if (filters().search) {
+            <!-- Our own clear affordance. The native one is a WebKit-drawn control that
+                 ignores the token set entirely, so it is suppressed in styles.css. -->
+            <button
+                type="button"
+                class="absolute right-2 grid size-5 place-items-center rounded-full text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
+                aria-label="Clear search"
+                (click)="searchChange.emit('')"
+            >
+                <app-icon name="octX" size="12"></app-icon>
+            </button>
+        }
+    </div>
 </header>
 
 @if (filters().chips.length) {

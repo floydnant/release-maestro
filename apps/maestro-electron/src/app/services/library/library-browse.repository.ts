@@ -57,6 +57,8 @@ export class LibraryBrowseRepository {
                 path: songsTable.path,
                 present: songsTable.present,
                 title: songsTable.title,
+                coverPath: songsTable.coverPath,
+                albumCoverPath: albumsTable.coverPath,
                 artistText: songsTable.artistText,
                 albumId: songsTable.albumId,
                 albumTitle: songsTable.albumTitle,
@@ -87,6 +89,8 @@ export class LibraryBrowseRepository {
                 path: row.path,
                 present: row.present,
                 title: row.title,
+                // A track without embedded art still belongs to a release that has some.
+                coverPath: row.coverPath ?? row.albumCoverPath,
                 artistText: row.artistText,
                 artistCredit: creditsBySong.get(row.id) ?? [],
                 albumId: row.albumId,

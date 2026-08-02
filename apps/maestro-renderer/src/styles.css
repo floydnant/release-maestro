@@ -94,6 +94,14 @@ body {
         transition: box-shadow var(--foundation-motion-duration-fast) var(--foundation-motion-easing-standard);
     }
 
+    /* WebKit draws its own clear button for `type="search"`, in its own colours and
+       at its own size — it ignores the token set completely and reads as foreign in a
+       dark theme. Suppressed here so a search field can supply an on-theme one. */
+    input[type='search']::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
     .input {
         @apply rounded-lg border border-border-default bg-background-canvas px-3 py-1 text-content-primary placeholder-content-muted;
         font-family: var(--type-body-md-family);

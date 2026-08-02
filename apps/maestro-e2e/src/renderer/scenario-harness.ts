@@ -292,6 +292,9 @@ export const createSongRow = (overrides: Partial<SongRow> = {}): SongRow => {
         path: '/scenario/music/dawn.mp3',
         present: true,
         title: 'Dawn',
+        // No cover path by default: a `file://` src would 404 in a browser scenario,
+        // and the fallback placeholder is what most rows render anyway.
+        coverPath: null,
         artistText,
         artistCredit: artistText ? [{ artistId: 'artist-1', creditedAs: artistText, joinPhrase: '' }] : [],
         albumId: 'album-1',

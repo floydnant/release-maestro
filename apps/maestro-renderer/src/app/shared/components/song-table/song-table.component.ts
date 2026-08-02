@@ -4,7 +4,9 @@ import {
     ChangeDetectionStrategy,
     Component,
     computed,
+    DestroyRef,
     ElementRef,
+    inject,
     input,
     output,
     signal,
@@ -27,6 +29,7 @@ import {
     toggleRow,
     type SongSelectionState,
 } from '../../browse/song-selection'
+import { fileUrl } from '../../utils/file-url.util'
 import { formatBpm, formatDateShort, formatDuration } from '../../utils/formatting.utils'
 import { IconComponent } from '../icon/icon.component'
 import { SongTableHeadingComponent } from './song-table-heading.component'
@@ -65,12 +68,7 @@ export interface EntityFilterRequest {
     templateUrl: './song-table.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [IconComponent, NgClass, SongTableHeadingComponent],
-    host: {
-        class: 'flex min-h-0 min-w-0 flex-1 flex-col',
-        // A taller window needs more rows than the default window holds, and nothing
-        // else would tell us — a resize fires no scroll event.
-        '(window:resize)': 'onScroll()',
-    },
+    host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class SongTableComponent {
     /** The loaded window, its offset, and the total the scrollbar is sized from. */
@@ -82,6 +80,14 @@ export class SongTableComponent {
     selectionChange = output<SongSelectionState>()
     viewportChange = output<BrowseWindow>()
     entityFilter = output<EntityFilterRequest>()
+    /**
+     * Scope the list to missing tracks.
+     *
+     * The affordance is the missing badge itself, which is the only place it can be
+     * both discoverable and unobtrusive: it exists exactly when there is something to
+     * filter for, and costs nothing when there is not.
+     */
+    filterMissing = output<void>()
 
     protected readonly rowHeight = ROW_HEIGHT
 
@@ -103,10 +109,24 @@ export class SongTableComponent {
     protected windowTop = computed(() => this.offset() * ROW_HEIGHT)
     protected selectedCount = computed(() => selectionSize(this.selection()))
 
+    private destroyRef = inject(DestroyRef)
+
     constructor() {
-        // The default window is a guess made before the table has a height. Measure
-        // once the scroller exists, so a tall window is not left with blank rows.
-        afterNextRender(() => this.onScroll())
+        // The starting window is a guess made before the table has a height — and the
+        // table is often measured while its branch of the shell is still detached, so
+        // that guess can be measured against a height of zero and leave the list with
+        // blank rows below the fold until something happens to re-trigger a fetch.
+        //
+        // A ResizeObserver closes that whole class of bug: attaching, laying out and
+        // resizing all surface as a size change, and each one re-measures the window.
+        afterNextRender(() => {
+            const element = this.scroller()?.nativeElement
+            if (!element) return
+
+            const observer = new ResizeObserver(() => this.onScroll())
+            observer.observe(element)
+            this.destroyRef.onDestroy(() => observer.disconnect())
+        })
     }
 
     protected isRowSelected(index: number): boolean {
@@ -199,6 +219,11 @@ export class SongTableComponent {
         this.entityFilter.emit({ kind, id, name })
     }
 
+    protected onMissingBadge(event: MouseEvent): void {
+        event.stopPropagation()
+        this.filterMissing.emit()
+    }
+
     protected rowLabel(row: SongRow): string {
         const artist = row.artistText ? ` by ${row.artistText}` : ''
         return `${row.title}${artist}${row.present ? '' : ' — missing'}`
@@ -207,6 +232,7 @@ export class SongTableComponent {
     protected formatDuration = formatDuration
     protected formatDateShort = formatDateShort
     protected formatBpm = formatBpm
+    protected fileUrl = fileUrl
 
     // -----------------------------------------------------------------------
 
