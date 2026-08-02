@@ -9,6 +9,10 @@ import {
     octPlus,
     octScreenFull,
     octScreenNormal,
+    octSearch,
+    octTriangleDown,
+    octTriangleUp,
+    octUnlink,
     octX,
     octXCircleFill,
 } from '@ng-icons/octicons'
@@ -25,6 +29,11 @@ const icons = {
     octPlus,
     octScreenFull,
     octScreenNormal,
+    octSearch,
+    octTriangleDown,
+    octTriangleUp,
+    /** A song whose file a scan could not find — see the `missing` glossary entry. */
+    octUnlink,
     octX,
     octXCircleFill,
     play: solarPlayBold,

@@ -1,0 +1,239 @@
+<div
+    #scroller
+    class="song-table | min-h-0 flex-1 overflow-auto outline-none ring-inset focus-visible:ring-2"
+    role="grid"
+    tabindex="0"
+    aria-label="Tracks"
+    [attr.aria-rowcount]="total() + 1"
+    aria-multiselectable="true"
+    (scroll)="onScroll()"
+    (keydown)="onKeydown($event)"
+>
+    <div
+        class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-surface"
+        role="row"
+        aria-rowindex="1"
+    >
+        <span class="w-8 shrink-0 border-b border-border-subtle" role="columnheader">
+            <span class="sr-only">Availability</span>
+        </span>
+
+        <app-song-table-heading
+            class="min-w-32 flex-1"
+            field="title"
+            label="Title"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="w-52 shrink-0"
+            field="artist"
+            label="Artist"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="w-52 shrink-0"
+            field="release"
+            label="Release"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="w-32 shrink-0"
+            field="genre"
+            label="Genre"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="w-16 shrink-0"
+            field="bpm"
+            label="BPM"
+            [numeric]="true"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="w-12 shrink-0"
+            field="musicalKey"
+            label="Key"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="w-16 shrink-0"
+            field="duration"
+            label="Time"
+            [numeric]="true"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="w-16 shrink-0"
+            field="year"
+            label="Year"
+            [numeric]="true"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="w-32 shrink-0"
+            field="recordLabel"
+            label="Record label"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="w-24 shrink-0"
+            field="dateAdded"
+            label="Added"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+    </div>
+
+    <!-- A spacer as tall as the whole result set gives the scrollbar its range; only
+         the loaded window is ever in the DOM, translated to where it belongs. -->
+    <div class="song-table__canvas | relative w-max min-w-full" [style.height.px]="canvasHeight()">
+        <div
+            class="song-table__window | absolute inset-x-0"
+            [style.transform]="'translateY(' + windowTop() + 'px)'"
+        >
+            @for (row of rows(); track row.id; let rowIndex = $index) {
+                @let index = offset() + rowIndex;
+                @let selected = isRowSelected(index);
+
+                <div
+                    class="song-table__row | flex items-center ring-inset"
+                    role="row"
+                    [ngClass]="{
+                        'row-selected | bg-background-elevated': selected,
+                        'row-hover | hover:bg-background-surface': !selected,
+                        'row-missing | text-content-muted': !row.present,
+                        'row-focused | ring-1 ring-border-focus': focusedIndex() === index,
+                    }"
+                    [style.height.px]="rowHeight"
+                    [attr.aria-rowindex]="index + 2"
+                    [attr.aria-selected]="selected"
+                    [attr.aria-label]="rowLabel(row)"
+                    (mousedown)="onRowPointerDown($event, index, row)"
+                >
+                    <span class="flex w-8 shrink-0 items-center justify-center" role="gridcell">
+                        @if (!row.present) {
+                            <app-icon
+                                name="octUnlink"
+                                size="14"
+                                color="content.warning"
+                                title="Missing — this file is no longer where the library saw it"
+                            ></app-icon>
+                            <span class="sr-only">Missing</span>
+                        }
+                    </span>
+
+                    <span class="min-w-32 flex-1 truncate px-2" role="gridcell" [title]="row.title">
+                        {{ row.title }}
+                    </span>
+
+                    <span
+                        class="song-table__artist | w-52 shrink-0 truncate px-2"
+                        role="gridcell"
+                        [title]="row.artistText || ''"
+                    >
+                        @if (row.artistCredit.length) {
+                            @for (segment of row.artistCredit; track segment.artistId; let last = $last) {
+                                <button
+                                    type="button"
+                                    class="rounded-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                                    (click)="onArtistSegment($event, segment)"
+                                >
+                                    {{ segment.creditedAs }}
+                                </button>
+                                @if (!last) {
+                                    <span>{{ segment.joinPhrase }}</span>
+                                }
+                            }
+                        } @else {
+                            <span class="text-content-muted">—</span>
+                        }
+                    </span>
+
+                    <span class="w-52 shrink-0 truncate px-2" role="gridcell" [title]="row.albumTitle || ''">
+                        @if (row.albumId && row.albumTitle) {
+                            <button
+                                type="button"
+                                class="max-w-full truncate rounded-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                                (click)="onEntity($event, 'album', row.albumId, row.albumTitle)"
+                            >
+                                {{ row.albumTitle }}
+                            </button>
+                        } @else {
+                            <span class="text-content-muted">—</span>
+                        }
+                    </span>
+
+                    <span class="w-32 shrink-0 truncate px-2" role="gridcell" [title]="row.genreText || ''">
+                        @if (row.genres.length) {
+                            @for (genre of row.genres; track genre.id; let last = $last) {
+                                <button
+                                    type="button"
+                                    class="rounded-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                                    (click)="onEntity($event, 'genre', genre.id, genre.name)"
+                                >
+                                    {{ genre.name }}
+                                </button>
+                                @if (!last) {
+                                    <span>, </span>
+                                }
+                            }
+                        } @else {
+                            <span class="text-content-muted">—</span>
+                        }
+                    </span>
+
+                    <span class="w-16 shrink-0 truncate px-2 text-right font-mono" role="gridcell">
+                        {{ formatBpm(row.bpm) }}
+                    </span>
+
+                    <span class="w-12 shrink-0 truncate px-2 font-mono" role="gridcell">
+                        {{ row.musicalKey || '—' }}
+                    </span>
+
+                    <span class="w-16 shrink-0 truncate px-2 text-right font-mono" role="gridcell">
+                        {{ row.duration ? formatDuration(row.duration) : '—' }}
+                    </span>
+
+                    <span class="w-16 shrink-0 truncate px-2 text-right font-mono" role="gridcell">
+                        {{ row.year || '—' }}
+                    </span>
+
+                    <span
+                        class="w-32 shrink-0 truncate px-2"
+                        role="gridcell"
+                        [title]="row.recordLabelText || ''"
+                    >
+                        @if (row.recordLabelId && row.recordLabelText) {
+                            <button
+                                type="button"
+                                class="max-w-full truncate rounded-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                                (click)="
+                                    onEntity($event, 'recordLabel', row.recordLabelId, row.recordLabelText)
+                                "
+                            >
+                                {{ row.recordLabelText }}
+                            </button>
+                        } @else {
+                            <span class="text-content-muted">{{ row.recordLabelText || '—' }}</span>
+                        }
+                    </span>
+
+                    <span class="w-24 shrink-0 truncate px-2 text-content-secondary" role="gridcell">
+                        {{ row.dateAdded ? formatDateShort(row.dateAdded) : '—' }}
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<p class="sr-only" role="status">{{ selectedCount() }} of {{ total() }} tracks selected</p>
