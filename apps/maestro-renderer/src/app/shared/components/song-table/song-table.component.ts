@@ -21,11 +21,14 @@ import type {
 } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
 import {
-    applySelectionGesture,
+    applySongSelectionGesture,
+    clearSelection,
+    isEmptySelection,
     isSelected,
+    isSelectionModifierHeld,
     selectAll,
     selectionSize,
-    type SelectionAnchor,
+    type SongSelectionAnchor,
     type SongSelectionState,
 } from '../../browse/song-selection'
 import { fileUrl } from '../../utils/file-url.util'
@@ -67,7 +70,10 @@ export interface EntityFilterRequest {
     templateUrl: './song-table.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [IconComponent, NgClass, SongTableHeadingComponent],
-    host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
+    host: {
+        class: 'flex min-h-0 min-w-0 flex-1 flex-col',
+        '(document:mousedown)': 'onDocumentPointerDown($event)',
+    },
 })
 export class SongTableComponent {
     /** The loaded window, its offset, and the total the scrollbar is sized from. */
@@ -91,8 +97,8 @@ export class SongTableComponent {
     protected readonly rowHeight = ROW_HEIGHT
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
-    /** Where a shift-extension starts from, and whether it adds or replaces. */
-    private anchor: SelectionAnchor | null = null
+    /** Where a shift-extension starts from, and whether it adds, replaces or removes. */
+    private anchor: SongSelectionAnchor | null = null
     protected focusedIndex = signal(0)
     /**
      * Whether the grid holds keyboard focus. The focus ring is drawn on a row rather
@@ -153,14 +159,37 @@ export class SongTableComponent {
         // menu that does not exist yet and must not silently move the selection.
         if (event.button != 0) return
 
-        // A press that lands on a control inside the row belongs to that control.
+        // A press that lands on a control inside the row belongs to that control —
+        // unless a selection modifier is down, in which case the user is plainly
+        // building a selection and a link would be the last thing they meant.
         // Selection runs on mousedown so a drag feels immediate, and mousedown fires
-        // before click — so stopping propagation in the link handler is too late.
-        if ((event.target as HTMLElement | null)?.closest('button, a')) return
+        // before click, so stopping propagation in the link handler is too late.
+        if (!isSelectionModifierHeld(event) && (event.target as HTMLElement | null)?.closest('button, a')) {
+            return
+        }
 
         event.preventDefault()
         this.focusedIndex.set(index)
         this.applyGesture(event, index, row)
+    }
+
+    /**
+     * Clear the selection when a press lands anywhere that is not a row — blank space
+     * under the last row, the toolbar, another page — which is what every other app
+     * does. Presses on the scroller itself are its scrollbar, and scrolling must not
+     * throw a selection away.
+     */
+    protected onDocumentPointerDown(event: MouseEvent): void {
+        if (event.button != 0) return
+
+        const scroller = this.scroller()?.nativeElement
+        const target = event.target
+        if (!scroller || !(target instanceof Element) || target === scroller) return
+        if (target.closest('[role="row"][aria-selected]')) return
+        if (isEmptySelection(this.selection())) return
+
+        this.anchor = null
+        this.selectionChange.emit(clearSelection(this.selection()))
     }
 
     protected onKeydown(event: KeyboardEvent): void {
@@ -211,19 +240,23 @@ export class SongTableComponent {
     }
 
     protected onArtistSegment(event: MouseEvent, segment: ArtistCreditSegment): void {
-        // The cell sits inside a row that also selects; a click on the link means the
-        // artist, not the row.
+        // The cell sits inside a row that also selects; a plain click on the link means
+        // the artist, not the row. With a selection modifier down it means the row, and
+        // the mousedown handler has already dealt with it.
         event.stopPropagation()
+        if (isSelectionModifierHeld(event)) return
         this.entityFilter.emit({ kind: 'artist', id: segment.artistId, name: segment.creditedAs })
     }
 
     protected onEntity(event: MouseEvent, kind: EntityFilterKind, id: string, name: string): void {
         event.stopPropagation()
+        if (isSelectionModifierHeld(event)) return
         this.entityFilter.emit({ kind, id, name })
     }
 
     protected onMissingBadge(event: MouseEvent): void {
         event.stopPropagation()
+        if (isSelectionModifierHeld(event)) return
         this.filterMissing.emit()
     }
 
@@ -262,7 +295,7 @@ export class SongTableComponent {
         shiftKey: boolean
         toggleKey: boolean
     }): void {
-        const { selection, anchor } = applySelectionGesture(this.selection(), this.anchor, gesture)
+        const { selection, anchor } = applySongSelectionGesture(this.selection(), this.anchor, gesture)
         this.anchor = anchor
         this.selectionChange.emit(selection)
     }

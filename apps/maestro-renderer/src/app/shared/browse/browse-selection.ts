@@ -1,0 +1,359 @@
+import { type SelectionRange } from '@release-maestro/core'
+
+/**
+ * Browse selection mechanics, per
+ * [ADR 0004](../../../../../../docs/adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md).
+ *
+ * A selection is not a list of rows. `Cmd-A` on a 500k library would otherwise mean
+ * serialising 500k ids through structured clone on every change, so a selection
+ * carries index ranges within its query's ordering, plus the individual rows added
+ * outside them or removed inside them.
+ *
+ * **Entity-agnostic on purpose.** Tracks are the first surface, but releases, artists,
+ * record labels and genres all select the same way, and none of them should re-derive
+ * this. Everything here is generic over the query type; `song-selection.ts` binds it
+ * to songs, and a second entity binds it the same way in a dozen lines.
+ *
+ * **Why this keeps indices the wire format does not.** The wire format carries
+ * `excluded`/`included` as bare id arrays, which is all the main process needs to
+ * resolve them in SQL. But the renderer has to answer "is this row selected?" and
+ * "how many are selected?" without a round trip, and an id alone cannot say whether it
+ * falls inside a range. The renderer knows every row's index when the user clicks it,
+ * so it keeps them, and {@link toWireSelection} drops them at the boundary.
+ *
+ * The invariants below are what make the count exact, and every operation restores
+ * them:
+ *
+ * - every `excluded` row lies inside some range;
+ * - no `included` row lies inside any range;
+ * - ranges are disjoint, non-empty and sorted.
+ *
+ * So `size = Σ range lengths − excluded + included` is always correct.
+ */
+
+/** A row the user picked out by hand, with the index it had when they did. */
+export interface SelectedRow {
+    id: string
+    index: number
+}
+
+/** The renderer's working selection: the wire shape plus the indices it elides. */
+export interface BrowseSelectionState<TQuery> {
+    /** The filter + sort the {@link ranges} indices are meaningful against. */
+    query: TQuery
+    ranges: SelectionRange[]
+    /** Rows deselected inside {@link ranges}. */
+    excluded: SelectedRow[]
+    /** Rows selected outside {@link ranges}. */
+    included: SelectedRow[]
+}
+
+/** What crosses IPC, and what an action resolves in SQL. */
+export interface WireSelection<TQuery> {
+    query: TQuery
+    ranges: SelectionRange[]
+    excluded: string[]
+    included: string[]
+}
+
+export type QueryComparator<TQuery> = (left: TQuery, right: TQuery) => boolean
+
+export const emptySelection = <TQuery>(query: TQuery): BrowseSelectionState<TQuery> => ({
+    query,
+    ranges: [],
+    excluded: [],
+    included: [],
+})
+
+export const toWireSelection = <TQuery>(state: BrowseSelectionState<TQuery>): WireSelection<TQuery> => ({
+    query: state.query,
+    ranges: state.ranges,
+    excluded: state.excluded.map(row => row.id),
+    included: state.included.map(row => row.id),
+})
+
+export const isSelected = <TQuery>(state: BrowseSelectionState<TQuery>, index: number): boolean =>
+    isInRanges(state.ranges, index)
+        ? !state.excluded.some(row => row.index == index)
+        : state.included.some(row => row.index == index)
+
+/**
+ * How many rows the selection covers. Exact at any size, and it never enumerates a
+ * range — the point of the whole model is that `Cmd-A` costs one pair of numbers.
+ */
+export const selectionSize = <TQuery>(state: BrowseSelectionState<TQuery>): number =>
+    state.ranges.reduce((total, range) => total + range.end - range.start, 0) -
+    state.excluded.length +
+    state.included.length
+
+export const isEmptySelection = <TQuery>(state: BrowseSelectionState<TQuery>): boolean =>
+    selectionSize(state) == 0
+
+/** Plain click: this row and nothing else. */
+export const selectOnly = <TQuery>(query: TQuery, row: SelectedRow): BrowseSelectionState<TQuery> => ({
+    query,
+    ranges: [],
+    excluded: [],
+    included: [row],
+})
+
+/** Drop everything, keeping the query the selection was relative to. */
+export const clearSelection = <TQuery>(state: BrowseSelectionState<TQuery>): BrowseSelectionState<TQuery> =>
+    emptySelection(state.query)
+
+/** Cmd-click: flip one row, leaving the rest of the selection alone. */
+export const toggleRow = <TQuery>(
+    state: BrowseSelectionState<TQuery>,
+    row: SelectedRow,
+): BrowseSelectionState<TQuery> => {
+    if (isInRanges(state.ranges, row.index)) {
+        const alreadyExcluded = state.excluded.some(excluded => excluded.index == row.index)
+        return {
+            ...state,
+            excluded: alreadyExcluded
+                ? state.excluded.filter(excluded => excluded.index != row.index)
+                : [...state.excluded, row],
+        }
+    }
+
+    const alreadyIncluded = state.included.some(included => included.index == row.index)
+    return {
+        ...state,
+        included: alreadyIncluded
+            ? state.included.filter(included => included.index != row.index)
+            : [...state.included, row],
+    }
+}
+
+/**
+ * Select `[start, end)`.
+ *
+ * Non-additive replaces the whole selection, which is what a plain shift-click means
+ * everywhere else. `additive` merges the range in and keeps what was already there.
+ *
+ * Either way the new range is **fresh**: any row it covers becomes selected, so
+ * exclusions and hand-picked inclusions inside it are dropped rather than left to
+ * punch holes in a range the user just drew over them.
+ */
+export const selectRange = <TQuery>(
+    state: BrowseSelectionState<TQuery>,
+    range: SelectionRange,
+    { additive = false }: { additive?: boolean } = {},
+): BrowseSelectionState<TQuery> => {
+    const normalized = normalizeRange(range)
+    if (!normalized) return state
+    if (!additive) return { query: state.query, ranges: [normalized], excluded: [], included: [] }
+
+    return restoreInvariants({
+        query: state.query,
+        ranges: mergeRanges([...state.ranges, normalized]),
+        excluded: state.excluded.filter(row => !isInRange(normalized, row.index)),
+        included: state.included.filter(row => !isInRange(normalized, row.index)),
+    })
+}
+
+/**
+ * Deselect `[start, end)` — the inverse gesture, reached by cmd-shift-clicking from a
+ * row the user just cmd-clicked *off*.
+ *
+ * The range is cut out of the existing ranges rather than covered with exclusions.
+ * Excluding row by row would be correct but unbounded: deselecting a 100k-row span
+ * would mean 100k ids, which is exactly what the model exists to avoid. Splitting a
+ * range costs at most one extra pair of numbers.
+ */
+export const deselectRange = <TQuery>(
+    state: BrowseSelectionState<TQuery>,
+    range: SelectionRange,
+): BrowseSelectionState<TQuery> => {
+    const normalized = normalizeRange(range)
+    if (!normalized) return state
+
+    return restoreInvariants({
+        query: state.query,
+        ranges: subtractRange(state.ranges, normalized),
+        excluded: state.excluded.filter(row => !isInRange(normalized, row.index)),
+        included: state.included.filter(row => !isInRange(normalized, row.index)),
+    })
+}
+
+/** Cmd-A: one pair of numbers, whatever the library's size. */
+export const selectAll = <TQuery>(query: TQuery, total: number): BrowseSelectionState<TQuery> =>
+    total <= 0
+        ? emptySelection(query)
+        : { query, ranges: [{ start: 0, end: total }], excluded: [], included: [] }
+
+/**
+ * Reconcile a selection with a refetch.
+ *
+ * Browse views refetch as a scan ingests rows, and an insert above a selected range
+ * silently changes what `[[12, 45)]` refers to — an action would then hit the wrong
+ * files. So any selection holding ranges is dropped when the row count changes.
+ * Selections made only of ids survive: an id means the same row wherever it moved to.
+ */
+export const selectionAfterRefetch = <TQuery>(
+    state: BrowseSelectionState<TQuery>,
+    previousTotal: number,
+    nextTotal: number,
+): BrowseSelectionState<TQuery> => {
+    if (previousTotal == nextTotal) return state
+    if (state.ranges.length == 0) return state
+    return emptySelection(state.query)
+}
+
+/**
+ * Reconcile a selection with a new query. Index ranges mean nothing against a
+ * different ordering, so searching, filtering or re-sorting drops the selection —
+ * which is also what every other app does when the list underneath you changes.
+ */
+export const selectionForQuery = <TQuery>(
+    state: BrowseSelectionState<TQuery>,
+    query: TQuery,
+    sameQuery: QueryComparator<TQuery>,
+): BrowseSelectionState<TQuery> => (sameQuery(state.query, query) ? state : emptySelection(query))
+
+// ---------------------------------------------------------------------------
+// Gestures
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a shift-extension starts from, and what it means.
+ *
+ * A shift-click is not one gesture — what it does depends on how its anchor was set.
+ * After a plain click it *replaces* the selection with the range; after a cmd-click it
+ * *adds* one; and after a cmd-click that turned a selected row off, it *removes* one.
+ * That last case is what lets the same gesture deselect a span.
+ */
+export interface SelectionAnchor<TQuery> {
+    index: number
+    /** True when the anchor came from an additive click, so extending keeps the rest. */
+    additive: boolean
+    /** Whether extending from this anchor selects or deselects the span. */
+    mode: 'select' | 'deselect'
+    /**
+     * The selection as it stood when the anchor was set. Every extension re-applies
+     * from here rather than from the current selection, so dragging a range shorter
+     * shrinks it instead of leaving the longer one merged underneath.
+     */
+    base: BrowseSelectionState<TQuery>
+}
+
+/** One click, reduced to what selection semantics actually depend on. */
+export interface SelectionGesture {
+    index: number
+    /** The row's id; only the gestures that name a single row need it. */
+    id: string | null
+    shiftKey: boolean
+    /** Cmd on macOS, Ctrl elsewhere. */
+    toggleKey: boolean
+}
+
+export interface SelectionGestureResult<TQuery> {
+    selection: BrowseSelectionState<TQuery>
+    anchor: SelectionAnchor<TQuery> | null
+}
+
+/** Read a gesture off a pointer event. Any browse surface can use this verbatim. */
+export const selectionGestureFrom = (event: MouseEvent, row: SelectedRow): SelectionGesture => ({
+    index: row.index,
+    id: row.id,
+    shiftKey: event.shiftKey,
+    toggleKey: event.metaKey || event.ctrlKey,
+})
+
+/** True when a click with these modifiers is meant for the selection, not for a link. */
+export const isSelectionModifierHeld = (event: MouseEvent): boolean =>
+    event.shiftKey || event.metaKey || event.ctrlKey
+
+/**
+ * Apply a click to a selection, and report the anchor the next click should use.
+ *
+ * Kept out of any component because it is selection semantics rather than rendering,
+ * and because the case matrix is worth testing without a DOM.
+ */
+export const applySelectionGesture = <TQuery>(
+    state: BrowseSelectionState<TQuery>,
+    anchor: SelectionAnchor<TQuery> | null,
+    gesture: SelectionGesture,
+    sameQuery: QueryComparator<TQuery>,
+): SelectionGestureResult<TQuery> => {
+    // An anchor from a different query points into an ordering that no longer exists.
+    const usableAnchor = anchor && sameQuery(anchor.base.query, state.query) ? anchor : null
+
+    if (gesture.shiftKey && usableAnchor) {
+        const span = {
+            start: Math.min(usableAnchor.index, gesture.index),
+            end: Math.max(usableAnchor.index, gesture.index) + 1,
+        }
+        const selection =
+            usableAnchor.mode == 'deselect'
+                ? deselectRange(usableAnchor.base, span)
+                : selectRange(usableAnchor.base, span, {
+                      additive: usableAnchor.additive || gesture.toggleKey,
+                  })
+
+        // The anchor stays put, so extending again re-measures from the same row.
+        return { selection, anchor: usableAnchor }
+    }
+
+    if (gesture.id == null) return { selection: state, anchor: usableAnchor }
+    const row = { id: gesture.id, index: gesture.index }
+
+    if (!gesture.toggleKey) {
+        const selection = selectOnly(state.query, row)
+        return { selection, anchor: { index: row.index, additive: false, mode: 'select', base: selection } }
+    }
+
+    // A cmd-click on an already-selected row is a *removal*, and an extension from it
+    // should keep removing rather than suddenly start adding.
+    const mode = isSelected(state, row.index) ? 'deselect' : 'select'
+    const selection = toggleRow(state, row)
+    return { selection, anchor: { index: row.index, additive: true, mode, base: selection } }
+}
+
+// ---------------------------------------------------------------------------
+
+const isInRange = (range: SelectionRange, index: number): boolean => index >= range.start && index < range.end
+
+const isInRanges = (ranges: SelectionRange[], index: number): boolean =>
+    ranges.some(range => isInRange(range, index))
+
+/** Order the endpoints and reject an empty range, so a click-without-drag is a no-op. */
+const normalizeRange = (range: SelectionRange): SelectionRange | null => {
+    const start = Math.max(0, Math.min(range.start, range.end))
+    const end = Math.max(range.start, range.end)
+    return end > start ? { start, end } : null
+}
+
+/** Sort and coalesce, so overlapping or touching ranges never double-count a row. */
+const mergeRanges = (ranges: SelectionRange[]): SelectionRange[] => {
+    const sorted = [...ranges].sort((left, right) => left.start - right.start)
+    const merged: SelectionRange[] = []
+
+    for (const range of sorted) {
+        const previous = merged[merged.length - 1]
+        if (previous && range.start <= previous.end) {
+            previous.end = Math.max(previous.end, range.end)
+            continue
+        }
+        merged.push({ ...range })
+    }
+
+    return merged
+}
+
+/** Cut `hole` out of every range, splitting the ones it lands in the middle of. */
+const subtractRange = (ranges: SelectionRange[], hole: SelectionRange): SelectionRange[] =>
+    ranges.flatMap(range => {
+        if (hole.end <= range.start || hole.start >= range.end) return [range]
+
+        const remainder: SelectionRange[] = []
+        if (range.start < hole.start) remainder.push({ start: range.start, end: hole.start })
+        if (hole.end < range.end) remainder.push({ start: hole.end, end: range.end })
+        return remainder
+    })
+
+const restoreInvariants = <TQuery>(state: BrowseSelectionState<TQuery>): BrowseSelectionState<TQuery> => ({
+    ...state,
+    excluded: state.excluded.filter(row => isInRanges(state.ranges, row.index)),
+    included: state.included.filter(row => !isInRanges(state.ranges, row.index)),
+})

@@ -18,7 +18,7 @@ import {
     emptySelection,
     sameQuery,
     selectionAfterRefetch,
-    selectionForQuery,
+    selectionForSongQuery,
     type SongSelectionState,
 } from '../../shared/browse/song-selection'
 import {
@@ -142,7 +142,7 @@ export class TracksComponent {
      */
     protected selection = computed<SongSelectionState>(() =>
         selectionAfterRefetch(
-            selectionForQuery(this.selection_(), this.query()),
+            selectionForSongQuery(this.selection_(), this.query()),
             this.selectionTotal_(),
             this.result().total,
         ),

@@ -97,7 +97,11 @@
 
     <!-- A spacer as tall as the whole result set gives the scrollbar its range; only
          the loaded window is ever in the DOM, translated to where it belongs. -->
-    <div class="song-table__canvas | relative w-max min-w-full" [style.height.px]="canvasHeight()">
+    <!-- `min-h-full` so the canvas covers the viewport even when a handful of rows do
+         not. Otherwise the empty space below them belongs to the scroller itself,
+         which is indistinguishable from its scrollbar — and a press there has to
+         clear the selection, not be mistaken for scrolling. -->
+    <div class="song-table__canvas | relative min-h-full w-max min-w-full" [style.height.px]="canvasHeight()">
         <!-- `w-max min-w-full` rather than `inset-x-0`: the rows are the only thing
              that knows how wide the table really is, and pinning them to the canvas
              would stop a selected row's highlight at the viewport edge whenever the

@@ -358,6 +358,8 @@ test.describe('virtual scrolling', () => {
         // then measured a height of zero, asked for a stub window, and left the list
         // with blank rows until a scroll or resize happened to re-trigger a fetch.
         const controller = await openTracks(page, rendererScenarios.tracks.loadPending())
+        // Wait for the first request to actually be in flight before settling it.
+        await expect(page.getByText('Loading tracks…')).toBeVisible()
         await controller.resolveAllPending('library:query-songs', {
             rows: createSongRows(),
             offset: 0,
@@ -450,6 +452,78 @@ test.describe('selection', () => {
             rows.map((_row, index) => rowByTitle(page, `Row ${index}`).getAttribute('aria-selected')),
         )
         expect(selection).toEqual(['false', 'true', 'true', 'true', 'false', 'true', 'true', 'true'])
+    })
+
+    test('clears the selection when clicking the blank space below the rows', async ({ page }) => {
+        await openTracks(page)
+        await clickRow(page, 'Dawn')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+
+        // Well below three rows of content, but still inside the scroller.
+        await page.getByRole('grid', { name: 'Tracks' }).click({ position: { x: 200, y: 400 } })
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    test('clears the selection when clicking outside the table', async ({ page }) => {
+        await openTracks(page)
+        await clickRow(page, 'Dawn')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+
+        await page.getByRole('heading', { name: 'tracks' }).click()
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    test('keeps the selection while scrolling', async ({ page }) => {
+        await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 5_000 }).build())
+        await clickRow(page, 'Dawn')
+
+        await page.getByRole('grid', { name: 'Tracks' }).evaluate(element => element.scrollTo({ top: 400 }))
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+    })
+
+    test('clears the selection when a search changes the list underneath it', async ({ page }) => {
+        await openTracks(page)
+        await clickRow(page, 'Dawn')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+
+        await page.getByRole('searchbox', { name: 'Search tracks' }).fill('dawn')
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    test('selects the row instead of filtering when a modifier is held over a link', async ({ page }) => {
+        const controller = await openTracks(page)
+        await clickRow(page, 'Dawn')
+
+        // A cmd-click on the artist link plainly means "add this row", not "filter".
+        await rowByTitle(page, 'Dusk')
+            .getByRole('button', { name: 'Night Cartel', exact: true })
+            .click({ modifiers: ['ControlOrMeta'] })
+
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+        await expect(page).not.toHaveURL(/artist=/)
+        expect((await lastQuery(controller)).query.filter.artistIds).toBeUndefined()
+    })
+
+    test('deselects a span with the same cmd-shift pattern that selects one', async ({ page }) => {
+        const rows = Array.from({ length: 8 }, (_value, index) =>
+            createSongRow({ id: `song-${index}`, title: `Row ${index}` }),
+        )
+        await openTracks(page, scenarioBuilder().songs(rows).build())
+
+        await clickRow(page, 'Row 0')
+        await clickRow(page, 'Row 7', ['Shift'])
+        await clickRow(page, 'Row 2', ['ControlOrMeta'])
+        await clickRow(page, 'Row 5', ['ControlOrMeta', 'Shift'])
+
+        const selection = await Promise.all(
+            rows.map((_row, index) => rowByTitle(page, `Row ${index}`).getAttribute('aria-selected')),
+        )
+        expect(selection).toEqual(['true', 'true', 'false', 'false', 'false', 'false', 'true', 'true'])
     })
 
     test('selects the whole library on cmd-A without loading it', async ({ page }) => {
