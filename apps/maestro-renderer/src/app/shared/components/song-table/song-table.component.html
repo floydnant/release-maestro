@@ -8,6 +8,8 @@
     aria-multiselectable="true"
     (scroll)="onScroll()"
     (keydown)="onKeydown($event)"
+    (focusin)="hasFocus.set(true)"
+    (focusout)="hasFocus.set(false)"
 >
     <div
         class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-surface"
@@ -85,7 +87,7 @@
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
-            class="w-24 shrink-0"
+            class="w-32 shrink-0"
             field="dateAdded"
             label="Added"
             [sort]="sort()"
@@ -110,8 +112,8 @@
                     [ngClass]="{
                         'row-selected | bg-background-elevated': selected,
                         'row-hover | hover:bg-background-surface': !selected,
-                        'row-missing | text-content-muted': !row.present,
-                        'row-focused | ring-1 ring-border-focus': focusedIndex() === index,
+                        'row-missing | opacity-70': !row.present,
+                        'row-focused | ring-1 ring-border-focus': hasFocus() && focusedIndex() === index,
                     }"
                     [style.height.px]="rowHeight"
                     [attr.aria-rowindex]="index + 2"
@@ -227,7 +229,7 @@
                         }
                     </span>
 
-                    <span class="w-24 shrink-0 truncate px-2 text-content-secondary" role="gridcell">
+                    <span class="w-32 shrink-0 truncate px-2 text-content-secondary" role="gridcell">
                         {{ row.dateAdded ? formatDateShort(row.dateAdded) : '—' }}
                     </span>
                 </div>

@@ -89,6 +89,12 @@ export class SongTableComponent {
     /** Where a shift-click extends from. Null until the user has picked a row. */
     private anchorIndex: number | null = null
     protected focusedIndex = signal(0)
+    /**
+     * Whether the grid holds keyboard focus. The focus ring is drawn on a row rather
+     * than on the grid, so without this the first row would wear a ring from the
+     * moment the page loads — which reads as a selection nobody made.
+     */
+    protected hasFocus = signal(false)
 
     protected total = computed(() => this.result().total)
     protected offset = computed(() => this.result().offset)
