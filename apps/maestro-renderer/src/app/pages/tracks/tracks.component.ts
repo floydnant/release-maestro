@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
 import {
@@ -18,7 +18,6 @@ import {
     emptySelection,
     sameQuery,
     selectionAfterRefetch,
-    selectionForSongQuery,
     type SongSelectionState,
 } from '../../shared/browse/song-selection'
 import {
@@ -126,27 +125,26 @@ export class TracksComponent {
             .subscribe(search => this.patchQuery({ ...this.query(), search }, { replaceUrl: true }))
     }
 
-    private selection_ = signal<SongSelectionState>(emptySelection(songQueryFromParams({})))
     /**
-     * The row count the stored selection was made against. Kept beside the selection
-     * rather than inside it, because it is what a *drift check* compares — and it is
-     * written in the same handler as the selection, so the two can never disagree.
+     * The selection, reset whenever the ground beneath it moves (ADR 0004): a filter,
+     * sort or search change invalidates every index, and a refetch that changes the row
+     * count re-points any range.
+     *
+     * A `linkedSignal` rather than a `signal` read through a reconciling `computed`,
+     * because reconciling on read only *hides* a stale selection — the stored one is
+     * still there, and it reappears the moment the query returns to what it was. This
+     * resets the stored value, so a cleared selection stays cleared.
      */
-    private selectionTotal_ = signal(0)
+    private selection_ = linkedSignal<{ query: SongQuery; total: number }, SongSelectionState>({
+        source: () => ({ query: this.query(), total: this.result().total }),
+        computation: ({ query, total }, previous) => {
+            if (!previous) return emptySelection(query)
+            if (!sameQuery(previous.source.query, query)) return emptySelection(query)
+            return selectionAfterRefetch(previous.value, previous.source.total, total)
+        },
+    })
 
-    /**
-     * The selection to render, reconciled with whatever moved underneath it (ADR 0004):
-     * a filter or sort change invalidates every index, and a refetch that changes the
-     * row count re-points any range. Both are pure derivations — no effect writes a
-     * signal another effect reads.
-     */
-    protected selection = computed<SongSelectionState>(() =>
-        selectionAfterRefetch(
-            selectionForSongQuery(this.selection_(), this.query()),
-            this.selectionTotal_(),
-            this.result().total,
-        ),
-    )
+    protected selection = this.selection_.asReadonly()
 
     protected shellState = computed<BrowseShellState>(() => {
         const result = this.result()
@@ -261,7 +259,6 @@ export class TracksComponent {
 
     protected onSelectionChange(selection: SongSelectionState): void {
         this.selection_.set(selection)
-        this.selectionTotal_.set(this.result().total)
     }
 
     protected onRetry(): void {

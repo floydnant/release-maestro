@@ -22,9 +22,14 @@ import {
 const openTracks = (page: Page, scenario = rendererScenarios.tracks.withSongs()) =>
     createRendererScenario(page, scenario, '/tracks')
 
-const lastQuery = async (controller: RendererScenarioController): Promise<QuerySongsRequest> => {
+/**
+ * The most recent window request, or `undefined` before the first one lands. It has to
+ * be undefined rather than throw: `expect.poll` surfaces a thrown error immediately
+ * instead of retrying, which turns "not asked yet" into a flake.
+ */
+const lastQuery = async (controller: RendererScenarioController): Promise<QuerySongsRequest | undefined> => {
     const call = await controller.lastCall('library:query-songs')
-    return call?.payload as QuerySongsRequest
+    return call?.payload as QuerySongsRequest | undefined
 }
 
 const rowByTitle = (page: Page, title: string) => page.getByRole('row').filter({ hasText: title })
@@ -305,7 +310,7 @@ test.describe('filtering by entity', () => {
         // Removing the last id drops the param, and an absent param is an absent
         // filter — not an empty list, so the two compare equal by value.
         await expect(page).not.toHaveURL(/artist=/)
-        await expect.poll(async () => (await lastQuery(controller)).query.filter.artistIds).toBeUndefined()
+        await expect.poll(async () => (await lastQuery(controller))?.query.filter.artistIds).toBeUndefined()
         await expect(chip).toBeHidden()
     })
 
@@ -333,7 +338,7 @@ test.describe('filtering by entity', () => {
 
         await page.getByRole('button', { name: 'Remove Availability filter Missing' }).click()
 
-        await expect.poll(async () => (await lastQuery(controller)).query.filter.presence).toBeUndefined()
+        await expect.poll(async () => (await lastQuery(controller))?.query.filter.presence).toBeUndefined()
     })
 })
 
@@ -349,7 +354,7 @@ test.describe('virtual scrolling', () => {
             .getByRole('grid', { name: 'Tracks' })
             .evaluate(element => element.scrollTo({ top: 40 * 5_000 }))
 
-        await expect.poll(async () => (await lastQuery(controller)).window.offset).toBeGreaterThan(4_000)
+        await expect.poll(async () => (await lastQuery(controller))?.window.offset).toBeGreaterThan(4_000)
     })
 
     test('asks for a window measured against the real viewport, not the starting guess', async ({ page }) => {
@@ -371,7 +376,7 @@ test.describe('virtual scrolling', () => {
         const visibleRows = await grid.evaluate(element => Math.ceil(element.clientHeight / 40))
 
         await expect
-            .poll(async () => (await lastQuery(controller)).window.limit)
+            .poll(async () => (await lastQuery(controller))?.window.limit)
             .toBeGreaterThanOrEqual(visibleRows)
     })
 
@@ -397,7 +402,7 @@ test.describe('virtual scrolling', () => {
             scenarioBuilder().songs(createSongRows(), { total: 20_000 }).build(),
         )
 
-        await expect.poll(async () => (await lastQuery(controller)).window.limit).toBeLessThanOrEqual(500)
+        await expect.poll(async () => (await lastQuery(controller))?.window.limit).toBeLessThanOrEqual(500)
     })
 })
 
@@ -494,6 +499,56 @@ test.describe('selection', () => {
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
     })
 
+    test('does not resurrect a cleared selection when the search is emptied again', async ({ page }) => {
+        // Reported: clearing was only projected over the stored selection, so undoing
+        // the search brought it back.
+        await openTracks(page)
+        await clickRow(page, 'Dawn')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+
+        const search = page.getByRole('searchbox', { name: 'Search tracks' })
+        await search.fill('dawn')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+
+        await search.fill('')
+        await expect(page).not.toHaveURL(/q=/)
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    test('does not resurrect a cleared selection when a filter is removed again', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .songs(createSongRows())
+            .songFilterDescription({ genres: [{ id: 'genre-2', name: 'Techno' }] })
+            .build()
+        await createRendererScenario(page, scenario, '/tracks')
+
+        await clickRow(page, 'Dawn')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+
+        await page.getByRole('button', { name: 'Techno', exact: true }).first().click()
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+
+        await page.getByRole('button', { name: 'Remove Genre filter Techno' }).click()
+        await expect(page).not.toHaveURL(/genre=/)
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    test('does not resurrect a cleared selection when the sort returns to the default', async ({ page }) => {
+        await openTracks(page)
+        await clickRow(page, 'Dawn')
+
+        await page.getByRole('button', { name: 'Sort by Title' }).click()
+        await expect(page).toHaveURL(/sort=title/)
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+
+        // Back to the default ordering, so the query is byte-for-byte the one the
+        // selection was made against — which is exactly when it used to come back.
+        await page.getByRole('button', { name: 'Sort by Added' }).click()
+        await expect(page).not.toHaveURL(/sort=/)
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
     test('selects the row instead of filtering when a modifier is held over a link', async ({ page }) => {
         const controller = await openTracks(page)
         await clickRow(page, 'Dawn')
@@ -506,7 +561,7 @@ test.describe('selection', () => {
         await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
         await expect(page).not.toHaveURL(/artist=/)
-        expect((await lastQuery(controller)).query.filter.artistIds).toBeUndefined()
+        expect((await lastQuery(controller))?.query.filter.artistIds).toBeUndefined()
     })
 
     test('deselects a span with the same cmd-shift pattern that selects one', async ({ page }) => {
