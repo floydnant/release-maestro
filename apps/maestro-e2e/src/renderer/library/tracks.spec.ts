@@ -653,14 +653,53 @@ test.describe('selection', () => {
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
     })
 
-    test('moves the selection with the arrow keys', async ({ page }) => {
+    test('moves the selection with the arrow keys, with no second cursor to chase', async ({ page }) => {
         await openTracks(page)
 
-        await page.getByRole('grid', { name: 'Tracks' }).click()
+        await clickRow(page, 'Dawn')
         await page.keyboard.press('ArrowDown')
-        await page.keyboard.press('Enter')
 
+        // One state: arrowing *is* selecting, so there is nothing else to render.
         await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    test('works from the keyboard straight after a click, without tabbing first', async ({ page }) => {
+        await openTracks(page)
+
+        await clickRow(page, 'Dawn')
+
+        // Reported as inconsistent: the click used to leave focus elsewhere, so the
+        // first arrow key did nothing until the user happened to tab into the grid.
+        await expect(page.getByRole('grid', { name: 'Tracks' })).toBeFocused()
+        await page.keyboard.press('ArrowDown')
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+    })
+
+    test('extends the selection with shift and the arrow keys', async ({ page }) => {
+        await openTracks(page)
+
+        await clickRow(page, 'Dawn')
+        await page.keyboard.press('Shift+ArrowDown')
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+    })
+
+    test('gives the grid a current row when the keyboard arrives at it', async ({ page }) => {
+        await openTracks(page)
+
+        // The grid has no focus ring of its own any more, so landing on it has to put
+        // the selection somewhere visible.
+        await page.keyboard.press('Tab')
+        await page.getByRole('grid', { name: 'Tracks' }).focus()
+        await page.keyboard.press('ArrowDown')
+
+        await expect(page.getByRole('grid', { name: 'Tracks' })).toHaveAttribute(
+            'aria-activedescendant',
+            /song-row-/,
+        )
+        await expect(page.getByRole('row', { selected: true })).toHaveCount(1)
     })
 })
 

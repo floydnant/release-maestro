@@ -48,8 +48,13 @@ import { SongTableHeadingComponent } from './song-table-heading.component'
  * translated into place — so the DOM holds a screenful and memory holds one window.
  *
  * The component is presentational: it renders the window it is given and emits the
- * gesture results. It owns only what is genuinely its own — which row has keyboard
- * focus, and the anchor a shift-click extends from.
+ * gesture results. It owns only what is genuinely its own — the cursor the next arrow
+ * key moves from, and the anchor a shift-click extends from.
+ *
+ * **There is one row state, not two.** Arrow keys move the selection rather than a
+ * separate cursor, so the selected row is the current row and needs no ring of its
+ * own; the grid has no focus ring either, because the selection is the focus
+ * indicator and `aria-activedescendant` carries it to assistive tech.
  */
 
 /** Row height in pixels. Fixed, because virtualisation needs to map scroll offset to index. */
@@ -57,6 +62,8 @@ export const ROW_HEIGHT = 40
 
 /** Rows fetched beyond the viewport on each side, so scrolling does not chase the data. */
 const OVERSCAN_ROWS = 20
+
+let nextTableId = 0
 
 /** Which catalog entity a cell's link addresses. Filtering by it is the page's call. */
 export type EntityFilterKind = 'artist' | 'genre' | 'recordLabel' | 'album'
@@ -106,13 +113,13 @@ export class SongTableComponent {
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
     /** Where a shift-extension starts from, and whether it adds, replaces or removes. */
     private anchor: SongSelectionAnchor | null = null
-    protected focusedIndex = signal(0)
     /**
-     * Whether the grid holds keyboard focus. The focus ring is drawn on a row rather
-     * than on the grid, so without this the first row would wear a ring from the
-     * moment the page loads — which reads as a selection nobody made.
+     * Where the next arrow key moves from. Never drawn: arrow keys move the
+     * *selection*, so the selected row is the cursor, and there is no second state to
+     * show. It exists only as the origin for the next move and for
+     * `aria-activedescendant`.
      */
-    protected hasFocus = signal(false)
+    private cursorIndex = signal(0)
 
     protected sort = computed(() => this.query().sort)
     protected total = computed(() => this.result().total)
@@ -121,6 +128,23 @@ export class SongTableComponent {
     protected canvasHeight = computed(() => this.total() * ROW_HEIGHT)
     protected windowTop = computed(() => this.offset() * ROW_HEIGHT)
     protected selectedCount = computed(() => selectionSize(this.selection()))
+
+    /** Unique per table instance, so two tables on a page cannot collide on row ids. */
+    private readonly rowIdPrefix = `song-row-${nextTableId++}`
+
+    protected rowElementId = (index: number): string => `${this.rowIdPrefix}-${index}`
+
+    /**
+     * The row assistive tech should treat as current. Only set while that row is
+     * actually rendered — pointing at an element that does not exist is worse than
+     * pointing at nothing.
+     */
+    protected activeDescendantId = computed(() => {
+        const index = this.cursorIndex()
+        const first = this.offset()
+        const withinWindow = index >= first && index < first + this.rows().length
+        return withinWindow ? this.rowElementId(index) : null
+    })
 
     private destroyRef = inject(DestroyRef)
 
@@ -188,8 +212,29 @@ export class SongTableComponent {
         }
 
         event.preventDefault()
-        this.focusedIndex.set(index)
+        this.cursorIndex.set(index)
         this.applyGesture(event, index, row)
+
+        // Take focus so the keyboard works immediately. Applying the gesture first
+        // means the grid is never focused with an empty selection here, so the
+        // focus handler below leaves the click's own result alone.
+        this.scroller()?.nativeElement.focus({ preventScroll: true })
+    }
+
+    /**
+     * Give the grid a current row when the keyboard arrives at it.
+     *
+     * The container has no focus ring of its own any more, so the selected row *is*
+     * the focus indicator — landing here with nothing selected would mean focus with
+     * nowhere visible to be. Only for keyboard focus: a pointer press has already
+     * said what it wanted.
+     */
+    protected onGridFocus(): void {
+        const scroller = this.scroller()?.nativeElement
+        if (!scroller?.matches(':focus-visible')) return
+        if (this.total() == 0 || !isEmptySelection(this.selection())) return
+
+        this.moveTo(Math.min(this.cursorIndex(), this.total() - 1), { extend: false })
     }
 
     /**
@@ -216,6 +261,11 @@ export class SongTableComponent {
         this.selectionChange.emit(clearSelection(this.selection()))
     }
 
+    /**
+     * Arrow keys move the **selection**, the way a file list does — there is no second
+     * cursor travelling independently of it, which is what made the old model feel
+     * like two things at once. Shift extends from the anchor instead of replacing.
+     */
     protected onKeydown(event: KeyboardEvent): void {
         const lastIndex = this.total() - 1
         if (lastIndex < 0) return
@@ -232,35 +282,26 @@ export class SongTableComponent {
         if (event.key == 'Escape') {
             event.preventDefault()
             this.anchor = null
-            this.selectionChange.emit({ ...this.selection(), ranges: [], excluded: [], included: [] })
+            this.selectionChange.emit(clearSelection(this.selection()))
             return
         }
 
         const nextIndex = this.movedIndex(event, lastIndex)
-        if (nextIndex == null) {
-            if (event.key == ' ' || event.key == 'Enter') {
-                event.preventDefault()
-                this.selectFocusedRow(event.metaKey || event.ctrlKey)
-            }
-            return
-        }
+        if (nextIndex == null) return
 
         event.preventDefault()
-        this.focusedIndex.set(nextIndex)
-        this.scrollIndexIntoView(nextIndex)
+        this.moveTo(nextIndex, { extend: event.shiftKey })
+    }
 
-        // Shift-arrow extends from the anchor, which is what makes keyboard range
-        // selection feel the same as dragging with the mouse — including whether it
-        // adds to the selection or replaces it.
-        if (event.shiftKey) {
-            const row = this.rows()[nextIndex - this.offset()]
-            this.emitGesture({
-                index: nextIndex,
-                id: row?.id ?? null,
-                shiftKey: true,
-                toggleKey: false,
-            })
-        }
+    /** Put the cursor on a row, selecting it — or extending the selection to it. */
+    private moveTo(index: number, { extend }: { extend: boolean }): void {
+        this.cursorIndex.set(index)
+        this.scrollIndexIntoView(index)
+
+        // The row may be outside the loaded window after a jump to the end; the
+        // gesture falls back to addressing it by index alone.
+        const row = this.rows()[index - this.offset()]
+        this.emitGesture({ index, id: row?.id ?? null, shiftKey: extend, toggleKey: false })
     }
 
     protected onArtistSegment(event: MouseEvent, segment: ArtistCreditSegment): void {
@@ -305,14 +346,6 @@ export class SongTableComponent {
         })
     }
 
-    private selectFocusedRow(additive: boolean): void {
-        const index = this.focusedIndex()
-        const row = this.rows()[index - this.offset()]
-        if (!row) return
-
-        this.emitGesture({ index, id: row.id, shiftKey: false, toggleKey: additive })
-    }
-
     private emitGesture(gesture: {
         index: number
         id: string | null
@@ -325,7 +358,7 @@ export class SongTableComponent {
     }
 
     private movedIndex(event: KeyboardEvent, lastIndex: number): number | null {
-        const current = this.focusedIndex()
+        const current = this.cursorIndex()
         const pageRows = Math.max(
             1,
             Math.floor((this.scroller()?.nativeElement.clientHeight ?? 0) / ROW_HEIGHT) - 1,

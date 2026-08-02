@@ -1,6 +1,6 @@
 <div
     #scroller
-    class="song-table | min-h-0 flex-1 overflow-auto outline-none ring-inset focus-visible:ring-2"
+    class="song-table | min-h-0 flex-1 overflow-auto outline-none"
     role="grid"
     tabindex="0"
     aria-label="Tracks"
@@ -8,8 +8,8 @@
     aria-multiselectable="true"
     (scroll)="onScroll()"
     (keydown)="onKeydown($event)"
-    (focusin)="hasFocus.set(true)"
-    (focusout)="hasFocus.set(false)"
+    (focus)="onGridFocus()"
+    [attr.aria-activedescendant]="activeDescendantId()"
 >
     <div
         class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-canvas"
@@ -118,13 +118,13 @@
                 @let selected = isRowSelected(index);
 
                 <div
-                    class="song-table__row | flex items-center ring-inset"
+                    class="song-table__row | flex items-center"
                     role="row"
+                    [id]="rowElementId(index)"
                     [ngClass]="{
                         'row-selected | bg-background-elevated': selected,
                         'row-hover | hover:bg-background-surface': !selected,
                         'row-missing | opacity-70': !row.present,
-                        'row-focused | ring-1 ring-border-focus': hasFocus() && focusedIndex() === index,
                     }"
                     [style.height.px]="rowHeight"
                     [attr.aria-rowindex]="index + 2"
