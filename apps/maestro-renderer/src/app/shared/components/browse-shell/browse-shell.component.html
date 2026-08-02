@@ -28,17 +28,17 @@
             class="input w-64 px-8"
             placeholder="Search {{ state().entityLabel }}…"
             [attr.aria-label]="'Search ' + state().entityLabel"
-            [value]="filters().search"
+            [value]="searchDraft()"
             (input)="onSearchInput($event)"
         />
-        @if (filters().search) {
+        @if (searchDraft()) {
             <!-- Our own clear affordance. The native one is a WebKit-drawn control that
                  ignores the token set entirely, so it is suppressed in styles.css. -->
             <button
                 type="button"
                 class="absolute right-2 grid size-5 place-items-center rounded-full text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
                 aria-label="Clear search"
-                (click)="searchChange.emit('')"
+                (click)="onClearSearch()"
             >
                 <app-icon name="octX" size="12"></app-icon>
             </button>

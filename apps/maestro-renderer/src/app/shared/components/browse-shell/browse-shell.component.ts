@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common'
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import { type CatalogEntityRef } from '@release-maestro/core'
 import type { BrowseStatus } from '../../browse/browse-query'
@@ -82,7 +82,25 @@ export class BrowseShellComponent {
         return state.total == 1 ? state.entityLabelSingular : state.entityLabel
     })
 
+    /**
+     * What the search box shows.
+     *
+     * It has to be local: the page debounces before writing the term to the URL, so
+     * binding the input straight to `filters().search` would keep resetting it to a
+     * value a couple of keystrokes behind, and move the caret with it. `linkedSignal`
+     * still re-seeds from the URL, which is what makes back/forward and a shared link
+     * restore the box.
+     */
+    protected searchDraft = linkedSignal(() => this.filters().search)
+
     protected onSearchInput(event: Event): void {
-        this.searchChange.emit((event.target as HTMLInputElement).value)
+        const term = (event.target as HTMLInputElement).value
+        this.searchDraft.set(term)
+        this.searchChange.emit(term)
+    }
+
+    protected onClearSearch(): void {
+        this.searchDraft.set('')
+        this.searchChange.emit('')
     }
 }

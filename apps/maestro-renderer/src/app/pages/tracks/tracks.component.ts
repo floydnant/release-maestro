@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core'
-import { toObservable, toSignal } from '@angular/core/rxjs-interop'
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
 import {
     SongPresence,
@@ -9,7 +9,7 @@ import {
     type SongQuery,
     type SongSortField,
 } from '@release-maestro/core'
-import { auditTime, filter, from, of, switchMap } from 'rxjs'
+import { auditTime, debounceTime, distinctUntilChanged, filter, from, of, Subject, switchMap } from 'rxjs'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
@@ -48,6 +48,9 @@ import {
 
 /** How often a running scan is allowed to refetch the visible window. */
 const SCAN_REFETCH_INTERVAL_MS = 1_500
+
+/** How long typing settles before a search reaches the URL and the read side. */
+const SEARCH_DEBOUNCE_MS = 200
 
 /** Availability rides in the same chip list as the entity filters, under its own kind. */
 const PRESENCE_CHIP_KIND = 'presence'
@@ -112,6 +115,16 @@ export class TracksComponent {
         ),
         { initialValue: EMPTY_DESCRIPTION },
     )
+
+    private searchInput$ = new Subject<string>()
+
+    constructor() {
+        // A manual subscribe, because the result of this stream is a navigation rather
+        // than state — there is no signal for it to land in. `takeUntilDestroyed` ends it.
+        this.searchInput$
+            .pipe(debounceTime(SEARCH_DEBOUNCE_MS), distinctUntilChanged(), takeUntilDestroyed())
+            .subscribe(search => this.patchQuery({ ...this.query(), search }, { replaceUrl: true }))
+    }
 
     private selection_ = signal<SongSelectionState>(emptySelection(songQueryFromParams({})))
     /**
@@ -179,8 +192,13 @@ export class TracksComponent {
         this.patchQuery({ ...this.query(), sort: nextSort(this.query().sort, field) })
     }
 
+    /**
+     * Typing is debounced before it reaches the URL, so a search costs one query
+     * rather than one per keystroke. The navigation replaces rather than pushes:
+     * back should leave the search, not walk back through every letter of it.
+     */
     protected onSearch(search: string): void {
-        this.patchQuery({ ...this.query(), search })
+        this.searchInput$.next(search)
     }
 
     /** The missing badge on a row is the only entry point to the availability filter. */
@@ -250,11 +268,12 @@ export class TracksComponent {
         this.browse.retry()
     }
 
-    private patchQuery(query: SongQuery): void {
+    private patchQuery(query: SongQuery, { replaceUrl = false }: { replaceUrl?: boolean } = {}): void {
         this.router.navigate([], {
             relativeTo: this.route,
             queryParams: songQueryToParams(query),
             queryParamsHandling: 'merge',
+            replaceUrl,
         })
     }
 }

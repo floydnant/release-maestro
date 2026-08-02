@@ -120,7 +120,7 @@ describe('createBrowseQuery', () => {
         expect(browse.rowAt(80)).toEqual({ id: 'row-80' })
     })
 
-    it('clears the rows when the query changes, because they answer a different question', async () => {
+    it('keeps the rows on screen while a new query loads, rather than flashing empty', async () => {
         const browse = create()
         await settle()
         latest().resolve(windowOf(0, 1_204, 20))
@@ -129,7 +129,17 @@ describe('createBrowseQuery', () => {
         query.set({ sort: 'bpm' })
         await settle()
 
-        expect(browse.result()).toMatchObject({ status: 'loading', rows: [], loaded: false })
+        // Blanking them would be more literally correct — they answer the previous
+        // question — but it makes the table flash a loading state on every keystroke
+        // of a search, which is far worse to use.
+        expect(browse.result()).toMatchObject({ status: 'loading', loaded: true })
+        expect(browse.result().rows).toHaveLength(20)
+
+        latest().resolve(windowOf(0, 7, 7))
+        await settle()
+
+        expect(browse.result()).toMatchObject({ status: 'ready', total: 7 })
+        expect(browse.result().rows).toHaveLength(7)
     })
 
     it('does not refetch when an equal query is rebuilt', async () => {

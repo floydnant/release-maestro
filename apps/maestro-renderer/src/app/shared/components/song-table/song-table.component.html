@@ -16,15 +16,12 @@
         role="row"
         aria-rowindex="1"
     >
-        <span class="w-8 shrink-0 border-b border-border-subtle" role="columnheader">
-            <span class="sr-only">Availability</span>
-        </span>
-        <span class="w-8 shrink-0 border-b border-border-subtle" role="columnheader">
+        <span class="w-10 shrink-0 border-b border-border-subtle" role="columnheader">
             <span class="sr-only">Cover art</span>
         </span>
 
         <app-song-table-heading
-            class="min-w-32 flex-1"
+            class="w-64 shrink-0 grow"
             field="title"
             label="Title"
             [sort]="sort()"
@@ -128,11 +125,35 @@
                     [attr.aria-label]="rowLabel(row)"
                     (mousedown)="onRowPointerDown($event, index, row)"
                 >
-                    <span class="flex w-8 shrink-0 items-center justify-center" role="gridcell">
+                    <!-- The artwork runs the full height of the row, inset by a couple of
+                         pixels. Padding belongs to the text columns, not to it. -->
+                    <span class="song-table__cover | w-10 shrink-0 self-stretch p-0.5" role="gridcell">
+                        @if (row.coverPath) {
+                            <img
+                                class="size-full rounded-sm object-cover"
+                                alt=""
+                                loading="lazy"
+                                [src]="fileUrl(row.coverPath)"
+                            />
+                        } @else {
+                            <span
+                                class="block size-full rounded-sm bg-background-elevated outline-1 outline-background-surface"
+                                [class.outline]="selected"
+                            ></span>
+                        }
+                    </span>
+
+                    <!-- The missing badge lives in the title cell rather than a column of
+                         its own: a dedicated column reserves width in every library, and
+                         most libraries have nothing missing at all. -->
+                    <span
+                        class="song-table__title | flex w-64 shrink-0 grow items-center gap-1.5 px-2"
+                        role="gridcell"
+                    >
                         @if (!row.present) {
                             <button
                                 type="button"
-                                class="grid size-6 place-items-center rounded-sm hover:bg-action-quiet-hover"
+                                class="grid size-5 shrink-0 place-items-center rounded-sm hover:bg-action-quiet-hover"
                                 aria-label="Missing — show only missing tracks"
                                 title="Missing — this file is no longer where the library saw it. Show only missing tracks."
                                 (click)="onMissingBadge($event)"
@@ -140,29 +161,7 @@
                                 <app-icon name="octUnlink" size="14" color="content.warning"></app-icon>
                             </button>
                         }
-                    </span>
-
-                    <span
-                        class="song-table__cover | flex w-8 shrink-0 items-center justify-center"
-                        role="gridcell"
-                    >
-                        @if (row.coverPath) {
-                            <img
-                                class="size-6 rounded-sm object-cover"
-                                alt=""
-                                loading="lazy"
-                                [src]="fileUrl(row.coverPath)"
-                            />
-                        } @else {
-                            <span
-                                class="size-6 rounded-sm bg-background-elevated outline-1 outline-background-surface"
-                                [class.outline]="selected"
-                            ></span>
-                        }
-                    </span>
-
-                    <span class="min-w-32 flex-1 truncate px-2" role="gridcell" [title]="row.title">
-                        {{ row.title }}
+                        <span class="truncate" [title]="row.title">{{ row.title }}</span>
                     </span>
 
                     <span

@@ -29,6 +29,17 @@ const lastQuery = async (controller: RendererScenarioController): Promise<QueryS
 
 const rowByTitle = (page: Page, title: string) => page.getByRole('row').filter({ hasText: title })
 
+/**
+ * Click a row where nothing else is interactive. The cover cell never is, and a press
+ * that lands on an entity link belongs to that link rather than to the selection — so
+ * clicking a row's centre is not a reliable way to select it.
+ */
+const clickRow = (page: Page, title: string, modifiers?: ('Shift' | 'ControlOrMeta')[]) =>
+    rowByTitle(page, title)
+        .getByRole('gridcell')
+        .first()
+        .click(modifiers ? { modifiers } : undefined)
+
 test.describe('rendering a window', () => {
     test('shows the tracks in the window and the total of the whole library', async ({ page }) => {
         await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 1_204 }).build())
@@ -221,6 +232,18 @@ test.describe('search', () => {
         await expect.poll(() => lastQuery(controller)).toMatchObject({ query: { search: '' } })
     })
 
+    test('keeps the rows on screen while typing instead of flashing a loading state', async ({ page }) => {
+        const controller = await openTracks(page)
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+
+        // Hold the next window open, so the in-between state is the one under test.
+        await controller.setHandler('library:query-songs', { kind: 'pending' })
+        await page.getByRole('searchbox', { name: 'Search tracks' }).fill('dus')
+
+        await expect(page.getByText('Loading tracks…')).toBeHidden()
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+    })
+
     test('explains an empty result as a filter problem, not an empty library', async ({ page }) => {
         const controller = await openTracks(page)
 
@@ -350,6 +373,22 @@ test.describe('virtual scrolling', () => {
             .toBeGreaterThanOrEqual(visibleRows)
     })
 
+    test('replaces the window rather than accumulating it, however far you scroll', async ({ page }) => {
+        // The memory claim behind ADR 0004: the renderer holds one window, not the
+        // library. If windows accumulated, scrolling would grow the row count without
+        // bound and a 500k library would end up in the renderer after all.
+        await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 200_000 }).build())
+        const grid = page.getByRole('grid', { name: 'Tracks' })
+        const renderedRows = page.locator('[role="row"][aria-label]')
+
+        await expect(renderedRows).toHaveCount(3)
+
+        for (const top of [40_000, 400_000, 4_000_000]) {
+            await grid.evaluate((element, scrollTop) => element.scrollTo({ top: scrollTop }), top)
+            await expect(renderedRows).toHaveCount(3)
+        }
+    })
+
     test('never asks for more rows than the read side will serve', async ({ page }) => {
         const controller = await openTracks(
             page,
@@ -364,10 +403,10 @@ test.describe('selection', () => {
     test('selects one row on click and replaces it on the next click', async ({ page }) => {
         await openTracks(page)
 
-        await rowByTitle(page, 'Dawn').click()
+        await clickRow(page, 'Dawn')
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
 
-        await rowByTitle(page, 'Dusk').click()
+        await clickRow(page, 'Dusk')
         await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
     })
@@ -375,8 +414,8 @@ test.describe('selection', () => {
     test('adds a row to the selection on cmd-click', async ({ page }) => {
         await openTracks(page)
 
-        await rowByTitle(page, 'Dawn').click()
-        await rowByTitle(page, 'Void').click({ modifiers: ['ControlOrMeta'] })
+        await clickRow(page, 'Dawn')
+        await clickRow(page, 'Void', ['ControlOrMeta'])
 
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
         await expect(rowByTitle(page, 'Void')).toHaveAttribute('aria-selected', 'true')
@@ -385,8 +424,8 @@ test.describe('selection', () => {
     test('selects a range on shift-click', async ({ page }) => {
         await openTracks(page)
 
-        await rowByTitle(page, 'Dawn').click()
-        await rowByTitle(page, 'Void').click({ modifiers: ['Shift'] })
+        await clickRow(page, 'Dawn')
+        await clickRow(page, 'Void', ['Shift'])
 
         for (const title of ['Dawn', 'Dusk', 'Void']) {
             await expect(rowByTitle(page, title)).toHaveAttribute('aria-selected', 'true')
@@ -405,7 +444,7 @@ test.describe('selection', () => {
     test('clears the selection when the sort changes, because indices moved', async ({ page }) => {
         await openTracks(page)
 
-        await rowByTitle(page, 'Dawn').click()
+        await clickRow(page, 'Dawn')
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
 
         await page.getByRole('button', { name: 'Sort by Title' }).click()

@@ -1,4 +1,4 @@
-import { computed, Signal } from '@angular/core'
+import { Signal } from '@angular/core'
 import { toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { BROWSE_WINDOW_MAX_LIMIT, type BrowseWindow, type BrowseWindowResult } from '@release-maestro/core'
 import {
@@ -47,7 +47,10 @@ export interface BrowseResult<TRow> {
     /** Row count of the whole query, which is what gives the scrollbar its height. */
     total: number
     error: string | null
-    /** False until the first window for the current query has landed. */
+    /**
+     * False until the first window has landed at all. It stays true across later
+     * queries, because those keep the previous rows visible while they load.
+     */
     loaded: boolean
 }
 
@@ -93,14 +96,7 @@ export const createBrowseQuery = <TQuery, TRow>(
     const sameQuery = options.sameQuery ?? Object.is
     const retry$ = new Subject<void>()
 
-    // A generation number changes only when the *query* changes. It is what tells
-    // the reducer that the rows on screen describe a result set that no longer
-    // exists and must be dropped, rather than a window that is merely being moved.
-    let generation = 0
-    const query$ = toObservable(options.query).pipe(
-        distinctUntilChanged(sameQuery),
-        map(query => ({ query, generation: ++generation })),
-    )
+    const query$ = toObservable(options.query).pipe(distinctUntilChanged(sameQuery))
     const viewport$ = toObservable(options.viewport).pipe(
         map(clampWindow),
         distinctUntilChanged((left, right) => left.offset == right.offset && left.limit == right.limit),
@@ -112,7 +108,7 @@ export const createBrowseQuery = <TQuery, TRow>(
             viewport$,
             merge(options.refresh ?? EMPTY, retry$).pipe(startWith(null)),
         ]).pipe(
-            switchMap(([{ query, generation }, window]) =>
+            switchMap(([query, window]) =>
                 defer(() => options.fetchWindow(query, window)).pipe(
                     map((response): BrowseReducer<TRow> => () => ({
                         status: 'ready',
@@ -129,47 +125,37 @@ export const createBrowseQuery = <TQuery, TRow>(
                             error: browseErrorMessage(error),
                         })),
                     ),
-                    // Emitted before the request settles, so the shell can show a
-                    // pending state without the rows underneath it vanishing — but
-                    // only while the query is the same one. A new query makes the
-                    // rows on screen answers to a question nobody asked any more.
-                    startWith((previous: BrowseResult<TRow>, sameGeneration: boolean): BrowseResult<TRow> =>
-                        sameGeneration
-                            ? { ...previous, status: 'loading', error: null }
-                            : initialResult<TRow>(),
-                    ),
-                    map(reducer => ({ reducer, generation })),
+                    // Emitted before the request settles, and it deliberately keeps the
+                    // rows already on screen — including across a *query* change.
+                    //
+                    // Blanking them would be more literally correct, since they answer
+                    // the previous question. It also makes the table flash a loading
+                    // state on every keystroke of a search, which is far worse to use
+                    // than a moment of slightly stale rows under a busy indicator.
+                    startWith((previous: BrowseResult<TRow>): BrowseResult<TRow> => ({
+                        ...previous,
+                        status: 'loading',
+                        error: null,
+                    })),
                 ),
             ),
-            scan(
-                (previous, { reducer, generation }) => ({
-                    result: reducer(previous.result, generation == previous.generation),
-                    generation,
-                }),
-                { result: initialResult<TRow>(), generation: 0 },
-            ),
+            scan((previous, reducer) => reducer(previous), initialResult<TRow>()),
         ),
-        { initialValue: { result: initialResult<TRow>(), generation: 0 } },
+        { initialValue: initialResult<TRow>() },
     )
 
-    const result = computed(() => state().result)
-
     return {
-        result,
+        result: state,
         rowAt: index => {
-            const current = state().result
+            const current = state()
             return current.rows[index - current.offset]
         },
         retry: () => retry$.next(),
     }
 }
 
-/**
- * How one pipeline emission folds into the visible result. `sameGeneration` is false
- * when the query changed, which is the only case where previous rows must be dropped
- * rather than kept underneath a loading state.
- */
-type BrowseReducer<TRow> = (previous: BrowseResult<TRow>, sameGeneration: boolean) => BrowseResult<TRow>
+/** How one pipeline emission folds into the visible result. */
+type BrowseReducer<TRow> = (previous: BrowseResult<TRow>) => BrowseResult<TRow>
 
 /**
  * Keep a requested window inside what the main process will serve. An over-scrolled
