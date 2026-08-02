@@ -5,6 +5,9 @@ import {
     HydratedFeedItem,
     MainIpcContract,
     RendererIpcContract,
+    SongFilterDescription,
+    SongRow,
+    SongWindowResult,
 } from '@release-maestro/core'
 
 type MainIpcChannel = keyof MainIpcContract & string
@@ -58,6 +61,7 @@ declare global {
             lastCall: (channel: string) => IpcCall | undefined
             setHandler: (channel: string, behavior: ScenarioBehavior) => void
             resolvePending: (channel: string, value?: IpcPayload) => void
+            resolveAllPending: (channel: string, value?: IpcPayload) => void
             emit: (channel: string, payload?: IpcPayload) => void
             deserialize: (value: ScenarioSerializedValue) => unknown
             serialize: (value: unknown) => ScenarioSerializedValue
@@ -108,6 +112,13 @@ const serializeScenarioValue = (value: unknown): ScenarioSerializedValue =>
 const parseScenarioValue = <T>(value: ScenarioSerializedValue): T =>
     JSON.parse(value, scenarioJsonReviver) as T
 
+const EMPTY_FILTER_DESCRIPTION: SongFilterDescription = {
+    artists: [],
+    genres: [],
+    recordLabels: [],
+    albums: [],
+}
+
 const defaultScenario = (): RendererScenario => ({
     handlers: {
         'window-minimize': { kind: 'resolve' },
@@ -139,6 +150,14 @@ const defaultScenario = (): RendererScenario => ({
         },
         'library:validate-folders': { kind: 'resolve', value: [] },
         'library:pick-folders': { kind: 'resolve', value: null },
+        'library:query-songs': {
+            kind: 'resolve',
+            value: { rows: [], offset: 0, total: 0 } satisfies SongWindowResult,
+        },
+        'library:describe-song-filter': {
+            kind: 'resolve',
+            value: EMPTY_FILTER_DESCRIPTION,
+        },
     },
 })
 
@@ -182,6 +201,32 @@ export const scenarioBuilder = (scenario: Partial<RendererScenario> = {}) => {
         feedLoadSequence(steps: ScenarioBehavior[], options: { hasFeed?: boolean } = {}) {
             current.handlers['load-feed'] = { kind: 'sequence', steps }
             setHasFeed(options, false)
+            return this
+        },
+        /**
+         * One window of tracks.
+         *
+         * The harness answers with a fixed value rather than reacting to the requested
+         * window, so `total` is stated separately: that is what lets a test set up a
+         * library far larger than the rows it hands over, and assert that scrolling
+         * asks for a *different* window rather than that the fake paged correctly.
+         */
+        songs(rows: SongRow[], options: { total?: number; offset?: number } = {}) {
+            current.handlers['library:query-songs'] = {
+                kind: 'resolve',
+                value: {
+                    rows,
+                    offset: options.offset ?? 0,
+                    total: options.total ?? rows.length,
+                } satisfies SongWindowResult,
+            }
+            return this
+        },
+        songFilterDescription(description: Partial<SongFilterDescription>) {
+            current.handlers['library:describe-song-filter'] = {
+                kind: 'resolve',
+                value: { ...EMPTY_FILTER_DESCRIPTION, ...description },
+            }
             return this
         },
         build(): RendererScenario {
@@ -235,7 +280,93 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
     ...overrides,
 })
 
+/**
+ * One track row, credited to a single artist entity — which is what ingest actually
+ * produces today, because it never splits a raw name (MAE-97 owns that). Pass a
+ * multi-name `artistText` to get the `Burial & Four Tet` case: still one segment.
+ */
+export const createSongRow = (overrides: Partial<SongRow> = {}): SongRow => {
+    const artistText = overrides.artistText === undefined ? 'Aurora Fields' : overrides.artistText
+    return {
+        id: 'song-1',
+        path: '/scenario/music/dawn.mp3',
+        present: true,
+        title: 'Dawn',
+        artistText,
+        artistCredit: artistText ? [{ artistId: 'artist-1', creditedAs: artistText, joinPhrase: '' }] : [],
+        albumId: 'album-1',
+        albumTitle: 'Daybreak',
+        genreText: 'Ambient',
+        genres: [{ id: 'genre-1', name: 'Ambient' }],
+        recordLabelId: 'label-1',
+        recordLabelText: 'Kosmische',
+        year: 2019,
+        bpm: 120,
+        musicalKey: '8A',
+        duration: 245,
+        dateAdded: Date.UTC(2026, 0, 15),
+        ...overrides,
+    }
+}
+
+/** A handful of rows that disagree on every sortable column. */
+export const createSongRows = (): SongRow[] => [
+    createSongRow(),
+    createSongRow({
+        id: 'song-2',
+        path: '/scenario/music/dusk.mp3',
+        title: 'Dusk',
+        artistText: 'Night Cartel',
+        artistCredit: [{ artistId: 'artist-2', creditedAs: 'Night Cartel', joinPhrase: '' }],
+        albumId: 'album-2',
+        albumTitle: 'Afterglow',
+        genreText: 'Techno',
+        genres: [{ id: 'genre-2', name: 'Techno' }],
+        recordLabelId: 'label-2',
+        recordLabelText: 'Hardwire',
+        year: 2021,
+        bpm: 140,
+        musicalKey: '4A',
+        duration: 372,
+        dateAdded: Date.UTC(2026, 1, 3),
+    }),
+    createSongRow({
+        id: 'song-3',
+        path: '/scenario/music/void.mp3',
+        title: 'Void',
+        // Two names, one artist entity — the degenerate credit the table must print
+        // verbatim while still addressing an entity.
+        artistText: 'Night Cartel & Aurora Fields',
+        artistCredit: [{ artistId: 'artist-3', creditedAs: 'Night Cartel & Aurora Fields', joinPhrase: '' }],
+        albumId: 'album-2',
+        albumTitle: 'Afterglow',
+        genreText: 'Techno',
+        genres: [{ id: 'genre-2', name: 'Techno' }],
+        recordLabelId: 'label-2',
+        recordLabelText: 'Hardwire',
+        year: 2021,
+        bpm: 134,
+        musicalKey: '11B',
+        duration: 198,
+        dateAdded: Date.UTC(2026, 2, 20),
+        present: false,
+    }),
+]
+
 export const rendererScenarios = {
+    tracks: {
+        empty: () => scenarioBuilder().songs([]).build(),
+        withSongs: () => scenarioBuilder().songs(createSongRows()).build(),
+        loadPending: () => scenarioBuilder().handler('library:query-songs', { kind: 'pending' }).build(),
+        loadError: () =>
+            scenarioBuilder()
+                .handler('library:query-songs', {
+                    kind: 'reject',
+                    message: 'Backend failed to query the library',
+                    userFacingMessage: 'Could not reach the library',
+                })
+                .build(),
+    },
     feed: {
         emptyNoSetup: () => scenarioBuilder().feed([], { hasFeed: false }).build(),
         emptyCaughtUp: () => scenarioBuilder().feed([], { hasFeed: true }).build(),
@@ -301,6 +432,26 @@ export class RendererScenarioController {
         return this.page.evaluate(
             ({ selectedChannel, nextValue }) =>
                 window.__maestroScenario.resolvePending(
+                    selectedChannel,
+                    nextValue == null ? nextValue : window.__maestroScenario.deserialize(nextValue),
+                ),
+            { selectedChannel: channel, nextValue: serializedValue },
+        )
+    }
+
+    /**
+     * Resolve every outstanding call on a channel with the same value.
+     *
+     * Needed where the renderer supersedes its own request — a browse view fetches a
+     * guessed window, then a measured one, and `switchMap` abandons the first. With
+     * one-at-a-time `resolvePending` the test would settle the abandoned call and
+     * wait forever for a render that never comes.
+     */
+    resolveAllPending(channel: MainIpcChannel, value?: IpcPayload): Promise<void> {
+        const serializedValue = value == null ? value : serializeScenarioValue(value)
+        return this.page.evaluate(
+            ({ selectedChannel, nextValue }) =>
+                window.__maestroScenario.resolveAllPending(
                     selectedChannel,
                     nextValue == null ? nextValue : window.__maestroScenario.deserialize(nextValue),
                 ),
@@ -477,6 +628,12 @@ export const createRendererScenario = async (
                 },
                 resolvePending: (channel, value) => {
                     settlePending(channel, pendingCall => pendingCall.resolve(value))
+                },
+                resolveAllPending: (channel, value) => {
+                    const pending = state.pending[channel] ?? []
+                    if (pending.length === 0) throw new Error(`No pending scenario call for ${channel}`)
+                    state.pending[channel] = []
+                    for (const pendingCall of pending) pendingCall.resolve(value)
                 },
                 emit: (channel, payload) => {
                     for (const listener of listeners.get(channel) ?? []) {

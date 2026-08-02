@@ -28,6 +28,7 @@ import {
     mergeExternalRefs,
     metadataHash,
     normalizeDisplayText,
+    releaseYear,
     relevantExternalRefsMap,
     stableHash,
 } from './library-normalization'
@@ -197,6 +198,8 @@ export class LibraryBackendRepository {
         const albumTitle = normalizeDisplayText(metadata.albumTitle)
         const genreText = normalizeDisplayText(metadata.genre)
         const recordLabelText = normalizeDisplayText(metadata.label)
+        // Almost no MP3 fills the dedicated year field — see `releaseYear`.
+        const year = releaseYear(metadata)
         const externalRefs = extractExternalRefs(metadata.extraMetadata, metadata.comment)
 
         return db.transaction(tx => {
@@ -415,7 +418,7 @@ export class LibraryBackendRepository {
                     identityKey,
                     title: albumTitle,
                     artistText: albumArtistText,
-                    year: metadata.year,
+                    year,
                     date: normalizeDisplayText(metadata.date),
                     catalogNumber: normalizeDisplayText(metadata.catalogNumber),
                     coverPath: metadata.coverPath,
@@ -484,7 +487,7 @@ export class LibraryBackendRepository {
                 genreText,
                 recordLabelText,
                 catalogNumber: normalizeDisplayText(metadata.catalogNumber),
-                year: metadata.year,
+                year,
                 trackNumber: metadata.track,
                 comment: normalizeDisplayText(metadata.comment),
                 musicalKey: normalizeDisplayText(metadata.musicalKey),

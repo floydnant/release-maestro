@@ -1,0 +1,368 @@
+import { expect, test, type Page } from '@playwright/test'
+import type { QuerySongsRequest } from '@release-maestro/core'
+import {
+    createRendererScenario,
+    createSongRow,
+    createSongRows,
+    rendererScenarios,
+    scenarioBuilder,
+    type RendererScenarioController,
+} from '../scenario-harness'
+
+/**
+ * The track list against mocked IPC.
+ *
+ * The scenario harness answers `library:query-songs` with a fixed window, so these
+ * tests assert two different things depending on what is under test: what the page
+ * *renders* from a window it was given, and what it *asks for* when the user sorts,
+ * filters, searches or scrolls. The second is the real contract with the read side —
+ * asserting that a fake paged correctly would prove nothing.
+ */
+
+const openTracks = (page: Page, scenario = rendererScenarios.tracks.withSongs()) =>
+    createRendererScenario(page, scenario, '/tracks')
+
+const lastQuery = async (controller: RendererScenarioController): Promise<QuerySongsRequest> => {
+    const call = await controller.lastCall('library:query-songs')
+    return call?.payload as QuerySongsRequest
+}
+
+const rowByTitle = (page: Page, title: string) => page.getByRole('row').filter({ hasText: title })
+
+test.describe('rendering a window', () => {
+    test('shows the tracks in the window and the total of the whole library', async ({ page }) => {
+        await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 1_204 }).build())
+
+        await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()
+        await expect(
+            page.getByRole('status', { name: 'Result count' }).filter({ hasText: '1,204 tracks' }),
+        ).toBeVisible()
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+        await expect(rowByTitle(page, 'Dusk')).toBeVisible()
+    })
+
+    test('sizes the scrollbar from the total, not from the rows it was given', async ({ page }) => {
+        await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 5_000 }).build())
+
+        const scrollHeight = await page
+            .getByRole('grid', { name: 'Tracks' })
+            .evaluate(element => element.scrollHeight)
+
+        // 5,000 rows at 40px each — far taller than three rows of DOM.
+        expect(scrollHeight).toBeGreaterThan(100_000)
+    })
+
+    test('renders a multi-name credit verbatim while still addressing one artist', async ({ page }) => {
+        await openTracks(page)
+
+        await expect(
+            page.getByRole('button', { name: 'Night Cartel & Aurora Fields', exact: true }),
+        ).toBeVisible()
+    })
+
+    test('marks a missing track for sighted and assistive users alike', async ({ page }) => {
+        await openTracks(page)
+
+        const missingRow = rowByTitle(page, 'Void')
+        await expect(missingRow).toHaveAttribute('aria-label', /missing/i)
+        await expect(missingRow.getByText('Missing')).toBeAttached()
+    })
+
+    test('shows a dash where a tag is absent instead of an empty cell', async ({ page }) => {
+        const untagged = createSongRow({
+            id: 'song-bare',
+            title: 'Untagged',
+            artistText: null,
+            albumId: null,
+            albumTitle: null,
+            genres: [],
+            genreText: null,
+            recordLabelId: null,
+            recordLabelText: null,
+            bpm: null,
+            musicalKey: null,
+            duration: null,
+            year: null,
+            dateAdded: null,
+        })
+        await openTracks(page, scenarioBuilder().songs([untagged]).build())
+
+        await expect(rowByTitle(page, 'Untagged').getByText('—').first()).toBeVisible()
+    })
+})
+
+test.describe('sorting', () => {
+    test('asks for a new ordering when a column heading is clicked', async ({ page }) => {
+        const controller = await openTracks(page)
+
+        await page.getByRole('button', { name: 'Sort by BPM' }).click()
+
+        await expect
+            .poll(() => lastQuery(controller))
+            .toMatchObject({
+                query: { sort: { field: 'bpm', direction: 'desc' } },
+            })
+    })
+
+    test('flips the direction when the same heading is clicked again', async ({ page }) => {
+        const controller = await openTracks(page)
+
+        await page.getByRole('button', { name: 'Sort by Title' }).click()
+        await expect
+            .poll(() => lastQuery(controller))
+            .toMatchObject({
+                query: { sort: { field: 'title', direction: 'asc' } },
+            })
+
+        await page.getByRole('button', { name: 'Sort by Title' }).click()
+        await expect
+            .poll(() => lastQuery(controller))
+            .toMatchObject({
+                query: { sort: { field: 'title', direction: 'desc' } },
+            })
+    })
+
+    test('puts the sort in the URL and announces it on the column', async ({ page }) => {
+        await openTracks(page)
+
+        await page.getByRole('button', { name: 'Sort by Title' }).click()
+
+        await expect(page).toHaveURL(/sort=title/)
+        await expect(page).toHaveURL(/dir=asc/)
+        await expect(page.getByRole('columnheader', { name: /Title/ })).toHaveAttribute(
+            'aria-sort',
+            'ascending',
+        )
+    })
+
+    test('restores the sort from the URL on load', async ({ page }) => {
+        const controller = await createRendererScenario(
+            page,
+            rendererScenarios.tracks.withSongs(),
+            '/tracks?sort=year&dir=asc',
+        )
+
+        await expect
+            .poll(() => lastQuery(controller))
+            .toMatchObject({
+                query: { sort: { field: 'year', direction: 'asc' } },
+            })
+    })
+})
+
+test.describe('search', () => {
+    test('sends the typed term with the query', async ({ page }) => {
+        const controller = await openTracks(page)
+
+        await page.getByRole('searchbox', { name: 'Search tracks' }).fill('dusk')
+
+        await expect.poll(() => lastQuery(controller)).toMatchObject({ query: { search: 'dusk' } })
+        await expect(page).toHaveURL(/q=dusk/)
+    })
+
+    test('explains an empty result as a filter problem, not an empty library', async ({ page }) => {
+        const controller = await openTracks(page)
+
+        await controller.setHandler('library:query-songs', {
+            kind: 'resolve',
+            value: { rows: [], offset: 0, total: 0 },
+        })
+        await page.getByRole('searchbox', { name: 'Search tracks' }).fill('nothing matches this')
+
+        await expect(page.getByText('No tracks match these filters')).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Clear filters' })).toBeVisible()
+    })
+})
+
+test.describe('filtering by entity', () => {
+    test('filters by the artist entity when an artist credit is clicked', async ({ page }) => {
+        const controller = await openTracks(page)
+
+        await page.getByRole('button', { name: 'Night Cartel', exact: true }).click()
+
+        await expect
+            .poll(() => lastQuery(controller))
+            .toMatchObject({
+                query: { filter: { artistIds: ['artist-2'] } },
+            })
+        await expect(page).toHaveURL(/artist=artist-2/)
+    })
+
+    test('filters by genre and by record label from their cells', async ({ page }) => {
+        const controller = await openTracks(page)
+
+        await page.getByRole('button', { name: 'Techno', exact: true }).first().click()
+        await expect
+            .poll(() => lastQuery(controller))
+            .toMatchObject({
+                query: { filter: { genreIds: ['genre-2'] } },
+            })
+
+        await page.getByRole('button', { name: 'Hardwire', exact: true }).first().click()
+        await expect
+            .poll(() => lastQuery(controller))
+            .toMatchObject({
+                query: { filter: { recordLabelIds: ['label-2'] } },
+            })
+    })
+
+    test('shows an applied filter as a removable chip', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .songs(createSongRows())
+            .songFilterDescription({ artists: [{ id: 'artist-2', name: 'Night Cartel' }] })
+            .build()
+        const controller = await createRendererScenario(page, scenario, '/tracks?artist=artist-2')
+
+        const chip = page.getByRole('button', { name: 'Remove Artist filter Night Cartel' })
+        await expect(chip).toBeVisible()
+
+        await chip.click()
+
+        // Removing the last id drops the param, and an absent param is an absent
+        // filter — not an empty list, so the two compare equal by value.
+        await expect(page).not.toHaveURL(/artist=/)
+        await expect.poll(async () => (await lastQuery(controller)).query.filter.artistIds).toBeUndefined()
+        await expect(chip).toBeHidden()
+    })
+
+    test('scopes to missing tracks only', async ({ page }) => {
+        const controller = await openTracks(page)
+
+        await page.getByRole('button', { name: 'Missing' }).click()
+
+        await expect
+            .poll(() => lastQuery(controller))
+            .toMatchObject({
+                query: { filter: { presence: 'missing' } },
+            })
+    })
+})
+
+test.describe('virtual scrolling', () => {
+    test('asks for a later window as the viewport moves down', async ({ page }) => {
+        const controller = await openTracks(
+            page,
+            scenarioBuilder().songs(createSongRows(), { total: 20_000 }).build(),
+        )
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+
+        await page
+            .getByRole('grid', { name: 'Tracks' })
+            .evaluate(element => element.scrollTo({ top: 40 * 5_000 }))
+
+        await expect.poll(async () => (await lastQuery(controller)).window.offset).toBeGreaterThan(4_000)
+    })
+
+    test('never asks for more rows than the read side will serve', async ({ page }) => {
+        const controller = await openTracks(
+            page,
+            scenarioBuilder().songs(createSongRows(), { total: 20_000 }).build(),
+        )
+
+        await expect.poll(async () => (await lastQuery(controller)).window.limit).toBeLessThanOrEqual(500)
+    })
+})
+
+test.describe('selection', () => {
+    test('selects one row on click and replaces it on the next click', async ({ page }) => {
+        await openTracks(page)
+
+        await rowByTitle(page, 'Dawn').click()
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+
+        await rowByTitle(page, 'Dusk').click()
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    test('adds a row to the selection on cmd-click', async ({ page }) => {
+        await openTracks(page)
+
+        await rowByTitle(page, 'Dawn').click()
+        await rowByTitle(page, 'Void').click({ modifiers: ['ControlOrMeta'] })
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+        await expect(rowByTitle(page, 'Void')).toHaveAttribute('aria-selected', 'true')
+    })
+
+    test('selects a range on shift-click', async ({ page }) => {
+        await openTracks(page)
+
+        await rowByTitle(page, 'Dawn').click()
+        await rowByTitle(page, 'Void').click({ modifiers: ['Shift'] })
+
+        for (const title of ['Dawn', 'Dusk', 'Void']) {
+            await expect(rowByTitle(page, title)).toHaveAttribute('aria-selected', 'true')
+        }
+    })
+
+    test('selects the whole library on cmd-A without loading it', async ({ page }) => {
+        await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 500_000 }).build())
+
+        await page.getByRole('grid', { name: 'Tracks' }).click()
+        await page.keyboard.press('ControlOrMeta+a')
+
+        await expect(page.getByText('500000 of 500000 tracks selected')).toBeAttached()
+    })
+
+    test('clears the selection when the sort changes, because indices moved', async ({ page }) => {
+        await openTracks(page)
+
+        await rowByTitle(page, 'Dawn').click()
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+
+        await page.getByRole('button', { name: 'Sort by Title' }).click()
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    test('moves the selection with the arrow keys', async ({ page }) => {
+        await openTracks(page)
+
+        await page.getByRole('grid', { name: 'Tracks' }).click()
+        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('Enter')
+
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+    })
+})
+
+test.describe('loading, empty and error states', () => {
+    test('shows a loading state until the first window lands', async ({ page }) => {
+        const controller = await openTracks(page, rendererScenarios.tracks.loadPending())
+
+        await expect(page.getByText('Loading tracks…')).toBeVisible()
+
+        // The table asks twice on mount — once for a guessed window, then for the one
+        // it measured — and switchMap abandons the first.
+        await controller.resolveAllPending('library:query-songs', {
+            rows: createSongRows(),
+            offset: 0,
+            total: 3,
+        })
+
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+    })
+
+    test('offers a route to the scanner when the library is empty', async ({ page }) => {
+        await openTracks(page, rendererScenarios.tracks.empty())
+
+        await expect(page.getByText('No tracks yet')).toBeVisible()
+        await expect(page.getByRole('link', { name: 'Library settings' })).toBeVisible()
+    })
+
+    test('surfaces a failure and retries on demand', async ({ page }) => {
+        const controller = await openTracks(page, rendererScenarios.tracks.loadError())
+
+        await expect(page.getByText('Could not load your tracks')).toBeVisible()
+        await expect(page.getByText('Could not reach the library')).toBeVisible()
+
+        await controller.setHandler('library:query-songs', {
+            kind: 'resolve',
+            value: { rows: createSongRows(), offset: 0, total: 3 },
+        })
+        await page.getByRole('button', { name: 'Try again' }).click()
+
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+    })
+})

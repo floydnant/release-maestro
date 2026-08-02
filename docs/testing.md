@@ -20,6 +20,14 @@ two differ, this document wins.
   Electron IPC/backend responses to exercise complex UI states.
 - Electron E2E tests launch the full Electron app with Playwright and verify renderer, IPC, Electron
   services, SQLite, and the metadata-engine worker together.
+- Scale checks seed rows straight into SQLite — no scan, no metadata engine — and assert that a query
+  still holds up at library size. `library-browse.scale.spec.ts` is the worked example: it inserts
+  50k songs and asserts the **query plan**, because every correctness test passes just as happily
+  against a full table scan, so nothing else in the suite can catch a missing index. Assert the plan
+  rather than the clock; a wall-time budget belongs there only as a loose smoke check, since a loaded
+  CI machine must not turn a performance guard into a flaky failure. Browse surfaces are designed for
+  50k–500k songs ([ADR 0004](adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md)),
+  so adding a sortable column means adding an index and a case here.
 
 Both E2E layers live in `apps/maestro-e2e/`.
 

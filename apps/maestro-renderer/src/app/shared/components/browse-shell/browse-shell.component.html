@@ -40,7 +40,11 @@
         }
     </div>
 
-    <p class="type-body-sm shrink-0 tabular-nums text-content-secondary" role="status">
+    <p
+        class="type-body-sm shrink-0 tabular-nums text-content-secondary"
+        role="status"
+        aria-label="Result count"
+    >
         @if (state().loaded) {
             {{ state().total | number }} {{ countLabel() }}
         }

@@ -13,6 +13,28 @@ export const normalizeDisplayText = (value: string | null | undefined): string |
     return normalized ? normalized : null
 }
 
+/**
+ * The release year of a song, falling back to the leading year of its date.
+ *
+ * Almost no MP3 in the wild fills the dedicated year field: `lofty` upgrades ID3v2.3's
+ * `TYER` to v2.4's `TDRC` on read, and `TDRC` is a *date*, so `metadata.year` is null
+ * for both tag versions and the year arrives only inside `date`. Without this the
+ * `songs.year` column — and the browse table's sortable Year column with it — would be
+ * empty for essentially every real library.
+ *
+ * Only a leading four-digit year is accepted, so a malformed date yields null rather
+ * than a plausible-looking wrong number.
+ */
+export const releaseYear = (metadata: Pick<SongMetadata, 'year' | 'date'>): number | null => {
+    if (metadata.year != null) return metadata.year
+
+    const match = /^(\d{4})(?:\D|$)/.exec(normalizeDisplayText(metadata.date) ?? '')
+    if (!match?.[1]) return null
+
+    const year = Number.parseInt(match[1], 10)
+    return Number.isFinite(year) ? year : null
+}
+
 const stableValue = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(stableValue)
     if (value && typeof value == 'object') {

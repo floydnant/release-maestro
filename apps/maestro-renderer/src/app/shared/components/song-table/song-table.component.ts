@@ -127,6 +127,12 @@ export class SongTableComponent {
         // Only the primary button drives selection; a right-click is for a context
         // menu that does not exist yet and must not silently move the selection.
         if (event.button != 0) return
+
+        // A press that lands on a control inside the row belongs to that control.
+        // Selection runs on mousedown so a drag feels immediate, and mousedown fires
+        // before click — so stopping propagation in the link handler is too late.
+        if ((event.target as HTMLElement | null)?.closest('button, a')) return
+
         event.preventDefault()
         this.focusedIndex.set(index)
         this.applyGesture(event, index, row)
