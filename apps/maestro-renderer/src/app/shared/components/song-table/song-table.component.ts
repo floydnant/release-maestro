@@ -5,18 +5,20 @@ import {
     Component,
     computed,
     DestroyRef,
+    effect,
     ElementRef,
     inject,
     input,
     output,
     signal,
+    untracked,
     viewChild,
 } from '@angular/core'
 import type {
     ArtistCreditSegment,
     BrowseWindow,
+    SongQuery,
     SongRow,
-    SongSort,
     SongSortField,
 } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
@@ -78,7 +80,12 @@ export interface EntityFilterRequest {
 export class SongTableComponent {
     /** The loaded window, its offset, and the total the scrollbar is sized from. */
     result = input.required<BrowseResult<SongRow>>()
-    sort = input.required<SongSort>()
+    /**
+     * The filter, sort and search the window answers. The table needs the whole query
+     * rather than just the sort, because a *new* query means a new result set and the
+     * scroll position from the old one has to go with it.
+     */
+    query = input.required<SongQuery>()
     selection = input.required<SongSelectionState>()
 
     sortChange = output<SongSortField>()
@@ -107,6 +114,7 @@ export class SongTableComponent {
      */
     protected hasFocus = signal(false)
 
+    protected sort = computed(() => this.query().sort)
     protected total = computed(() => this.result().total)
     protected offset = computed(() => this.result().offset)
     protected rows = computed(() => this.result().rows)
@@ -131,6 +139,17 @@ export class SongTableComponent {
             const observer = new ResizeObserver(() => this.onScroll())
             observer.observe(element)
             this.destroyRef.onDestroy(() => observer.disconnect())
+        })
+
+        // A new query is a new result set, and the scroll position measured against
+        // the old one is meaningless against it — 5,000 rows down a list that now has
+        // three leaves the window translated far below anything visible, so the table
+        // renders blank until a scroll or resize happens to re-measure it.
+        //
+        // An effect because the outcome is a DOM side effect, not derived state.
+        effect(() => {
+            this.query()
+            untracked(() => this.scroller()?.nativeElement?.scrollTo({ top: 0 }))
         })
     }
 
@@ -175,17 +194,22 @@ export class SongTableComponent {
 
     /**
      * Clear the selection when a press lands anywhere that is not a row — blank space
-     * under the last row, the toolbar, another page — which is what every other app
-     * does. Presses on the scroller itself are its scrollbar, and scrolling must not
-     * throw a selection away.
+     * under the last row, a margin, the toolbar, another page — which is what every
+     * other app does.
+     *
+     * The only exception is the scrollbar, and it has to be identified by geometry
+     * rather than by "the press landed on the scroller": margins and padding land
+     * there too, and treating those as scrollbar presses is what left whole strips of
+     * the table unable to clear a selection.
      */
     protected onDocumentPointerDown(event: MouseEvent): void {
         if (event.button != 0) return
 
         const scroller = this.scroller()?.nativeElement
         const target = event.target
-        if (!scroller || !(target instanceof Element) || target === scroller) return
+        if (!scroller || !(target instanceof Element)) return
         if (target.closest('[role="row"][aria-selected]')) return
+        if (isScrollbarPress(scroller, event)) return
         if (isEmptySelection(this.selection())) return
 
         this.anchor = null
@@ -336,4 +360,16 @@ export class SongTableComponent {
             element.scrollTop = bottom - element.clientHeight
         }
     }
+}
+
+/**
+ * Whether a press landed on the scroller's own scrollbars, which sit outside its
+ * client box. Overlay scrollbars take up no client space and never reach here.
+ */
+const isScrollbarPress = (scroller: HTMLElement, event: MouseEvent): boolean => {
+    const bounds = scroller.getBoundingClientRect()
+    return (
+        event.clientX > bounds.left + scroller.clientWidth ||
+        event.clientY > bounds.top + scroller.clientHeight
+    )
 }

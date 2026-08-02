@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
 import {
@@ -51,6 +51,9 @@ const SCAN_REFETCH_INTERVAL_MS = 1_500
 /** How long typing settles before a search reaches the URL and the read side. */
 const SEARCH_DEBOUNCE_MS = 200
 
+/** A guess, used only until the table has measured its own height. */
+const INITIAL_WINDOW_LIMIT = 60
+
 /** Availability rides in the same chip list as the entity filters, under its own kind. */
 const PRESENCE_CHIP_KIND = 'presence'
 
@@ -75,9 +78,27 @@ export class TracksComponent {
     private libraryService = inject(LibraryService)
 
     private queryParams = toSignal(this.route.queryParams, { initialValue: {} })
-    protected query = computed<SongQuery>(() => songQueryFromParams(this.queryParams()))
+    /**
+     * Compared by value, so a navigation that rebuilds an identical query does not
+     * read as a change — everything downstream keys off this identity.
+     */
+    protected query = computed<SongQuery>(() => songQueryFromParams(this.queryParams()), {
+        equal: sameQuery,
+    })
 
-    protected viewport = signal<BrowseWindow>({ offset: 0, limit: 60 })
+    /**
+     * The slice the table wants. It goes back to the top whenever the query changes:
+     * offset 5,000 means nothing in a result set the user has just filtered down, and
+     * fetching it would only waste a round trip on rows nobody can see.
+     */
+    protected viewport = linkedSignal<SongQuery, BrowseWindow>({
+        source: () => this.query(),
+        computation: (_query, previous) => ({
+            offset: 0,
+            // Keep whatever the table measured; only the offset is stale.
+            limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
+        }),
+    })
 
     /**
      * Browse views refetch while a scan ingests songs. It is audited rather than

@@ -396,6 +396,30 @@ test.describe('virtual scrolling', () => {
         }
     })
 
+    test('shows rows straight away after filtering from deep in a long list', async ({ page }) => {
+        // Reported: the table rendered blank until a scroll or resize. Scrolled 5,000
+        // rows down, the window was still translated to where those rows used to be —
+        // far below anything visible in a result set that had just shrunk.
+        const controller = await openTracks(
+            page,
+            scenarioBuilder().songs(createSongRows(), { total: 20_000 }).build(),
+        )
+        const grid = page.getByRole('grid', { name: 'Tracks' })
+        await grid.evaluate(element => element.scrollTo({ top: 40 * 5_000 }))
+        await expect.poll(async () => (await lastQuery(controller))?.window.offset).toBeGreaterThan(4_000)
+
+        await controller.setHandler('library:query-songs', {
+            kind: 'resolve',
+            value: { rows: createSongRows(), offset: 0, total: 3 },
+        })
+        await page.getByRole('searchbox', { name: 'Search tracks' }).fill('dawn')
+
+        // Visible without touching the scroll wheel again.
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+        await expect.poll(async () => (await lastQuery(controller))?.window.offset).toBe(0)
+        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(0)
+    })
+
     test('never asks for more rows than the read side will serve', async ({ page }) => {
         const controller = await openTracks(
             page,
@@ -466,6 +490,34 @@ test.describe('selection', () => {
 
         // Well below three rows of content, but still inside the scroller.
         await page.getByRole('grid', { name: 'Tracks' }).click({ position: { x: 200, y: 400 } })
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    test('clears the selection when clicking the canvas margin', async ({ page }) => {
+        // Reported: the margin around the canvas belongs to the scroller, and treating
+        // every press on the scroller as a scrollbar press left strips of the table
+        // unable to clear anything.
+        await openTracks(page)
+        await clickRow(page, 'Dawn')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+
+        // The canvas carries a bottom margin, which only comes into view at the end of
+        // the scroll. A press there lands on the scroller itself — the same thing a
+        // press on its scrollbar does, which is why geometry has to tell them apart.
+        const grid = page.getByRole('grid', { name: 'Tracks' })
+        await grid.evaluate(element => element.scrollTo({ top: element.scrollHeight }))
+        const point = await grid.evaluate(element => {
+            const bounds = element.getBoundingClientRect()
+            return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height - 24 }
+        })
+        const landsOnScroller = await grid.evaluate(
+            (element, at) => document.elementFromPoint(at.x, at.y) === element,
+            point,
+        )
+        expect(landsOnScroller).toBe(true)
+
+        await page.mouse.click(point.x, point.y)
 
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
     })

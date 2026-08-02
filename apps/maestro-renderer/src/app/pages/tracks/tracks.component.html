@@ -8,7 +8,7 @@
 >
     <app-song-table
         [result]="result()"
-        [sort]="query().sort"
+        [query]="query()"
         [selection]="selection()"
         (sortChange)="onSort($event)"
         (selectionChange)="onSelectionChange($event)"
