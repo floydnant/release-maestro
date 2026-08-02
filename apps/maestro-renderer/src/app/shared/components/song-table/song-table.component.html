@@ -16,7 +16,7 @@
         role="row"
         aria-rowindex="1"
     >
-        <span class="w-10 shrink-0 border-b border-border-subtle" role="columnheader">
+        <span class="w-16 shrink-0 border-b border-border-subtle" role="columnheader">
             <span class="sr-only">Cover art</span>
         </span>
 
@@ -101,7 +101,10 @@
          not. Otherwise the empty space below them belongs to the scroller itself,
          which is indistinguishable from its scrollbar — and a press there has to
          clear the selection, not be mistaken for scrolling. -->
-    <div class="song-table__canvas | relative min-h-full w-max min-w-full" [style.height.px]="canvasHeight()">
+    <div
+        class="song-table__canvas | relative mb-22 mt-2 min-h-full w-max min-w-full"
+        [style.height.px]="canvasHeight()"
+    >
         <!-- `w-max min-w-full` rather than `inset-x-0`: the rows are the only thing
              that knows how wide the table really is, and pinning them to the canvas
              would stop a selected row's highlight at the viewport edge whenever the
@@ -130,18 +133,19 @@
                     (mousedown)="onRowPointerDown($event, index, row)"
                 >
                     <!-- The artwork runs the full height of the row, inset by a couple of
-                         pixels. Padding belongs to the text columns, not to it. -->
-                    <span class="song-table__cover | w-10 shrink-0 self-stretch p-0.5" role="gridcell">
+                         pixels, and is held off the left edge so it is not cramped
+                         against it. Its own square shape comes from the row height. -->
+                    <span class="song-table__cover | w-16 shrink-0 self-stretch py-0.5 pl-6" role="gridcell">
                         @if (row.coverPath) {
                             <img
-                                class="size-full rounded-sm object-cover"
+                                class="aspect-square h-full rounded-sm object-cover"
                                 alt=""
                                 loading="lazy"
                                 [src]="fileUrl(row.coverPath)"
                             />
                         } @else {
                             <span
-                                class="flex size-full items-center justify-center rounded-sm bg-background-elevated outline-1 outline-background-surface"
+                                class="flex aspect-square h-full items-center justify-center rounded-sm bg-background-elevated outline-1 outline-background-surface"
                                 [class.outline]="selected"
                             >
                                 <app-icon name="musicNote" size="14" color="content.muted"></app-icon>
