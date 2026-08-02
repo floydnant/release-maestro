@@ -126,6 +126,77 @@ export const selectRange = (
     return restoreInvariants({ ...state, ranges: mergeRanges([...state.ranges, normalized]) })
 }
 
+/**
+ * Where a shift-extension starts from, and what it means.
+ *
+ * A shift-click is not one gesture — what it does depends on how its anchor was set.
+ * After a plain click it *replaces* the selection with the range; after a cmd-click it
+ * *adds* a range and leaves everything else alone. That is the difference between
+ * "select these ten" and "and also these ten", and it is why the anchor has to
+ * remember which kind of click created it.
+ */
+export interface SelectionAnchor {
+    index: number
+    /** True when the anchor came from an additive click, so extending adds a range. */
+    additive: boolean
+    /**
+     * The selection as it stood when the anchor was set. Every extension re-applies
+     * from here rather than from the current selection, so dragging a range shorter
+     * shrinks it instead of leaving the longer one merged underneath.
+     */
+    base: SongSelectionState
+}
+
+/** One click, reduced to what selection semantics actually depend on. */
+export interface SelectionGesture {
+    index: number
+    /** The row's id; only needed for the gestures that name a single row. */
+    id: string | null
+    shiftKey: boolean
+    /** Cmd on macOS, Ctrl elsewhere. */
+    toggleKey: boolean
+}
+
+export interface SelectionGestureResult {
+    selection: SongSelectionState
+    anchor: SelectionAnchor | null
+}
+
+/**
+ * Apply a click to a selection, and report the anchor the next click should use.
+ *
+ * Kept here rather than in the table because it is selection semantics, not
+ * rendering — and because the case matrix is worth testing without a DOM.
+ */
+export const applySelectionGesture = (
+    state: SongSelectionState,
+    anchor: SelectionAnchor | null,
+    gesture: SelectionGesture,
+): SelectionGestureResult => {
+    // An anchor from a different query points into an ordering that no longer exists.
+    const usableAnchor = anchor && sameQuery(anchor.base.query, state.query) ? anchor : null
+
+    if (gesture.shiftKey && usableAnchor) {
+        const start = Math.min(usableAnchor.index, gesture.index)
+        const end = Math.max(usableAnchor.index, gesture.index) + 1
+        return {
+            selection: selectRange(
+                usableAnchor.base,
+                { start, end },
+                { additive: usableAnchor.additive || gesture.toggleKey },
+            ),
+            // The anchor stays put, so extending again re-measures from the same row.
+            anchor: usableAnchor,
+        }
+    }
+
+    if (gesture.id == null) return { selection: state, anchor: usableAnchor }
+    const row = { id: gesture.id, index: gesture.index }
+
+    const selection = gesture.toggleKey ? toggleRow(state, row) : selectOnly(state.query, row)
+    return { selection, anchor: { index: gesture.index, additive: gesture.toggleKey, base: selection } }
+}
+
 /** Cmd-A: one pair of numbers, whatever the library's size. */
 export const selectAll = (query: SongQuery, total: number): SongSelectionState =>
     total <= 0

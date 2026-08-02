@@ -21,12 +21,11 @@ import type {
 } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
 import {
+    applySelectionGesture,
     isSelected,
     selectAll,
-    selectOnly,
-    selectRange,
     selectionSize,
-    toggleRow,
+    type SelectionAnchor,
     type SongSelectionState,
 } from '../../browse/song-selection'
 import { fileUrl } from '../../utils/file-url.util'
@@ -92,8 +91,8 @@ export class SongTableComponent {
     protected readonly rowHeight = ROW_HEIGHT
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
-    /** Where a shift-click extends from. Null until the user has picked a row. */
-    private anchorIndex: number | null = null
+    /** Where a shift-extension starts from, and whether it adds or replaces. */
+    private anchor: SelectionAnchor | null = null
     protected focusedIndex = signal(0)
     /**
      * Whether the grid holds keyboard focus. The focus ring is drawn on a row rather
@@ -170,12 +169,16 @@ export class SongTableComponent {
 
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() == 'a') {
             event.preventDefault()
+            // Both of these replace the selection wholesale, so there is no longer an
+            // anchor a shift-extension could sensibly measure from.
+            this.anchor = null
             this.selectionChange.emit(selectAll(this.selection().query, this.total()))
             return
         }
 
         if (event.key == 'Escape') {
             event.preventDefault()
+            this.anchor = null
             this.selectionChange.emit({ ...this.selection(), ranges: [], excluded: [], included: [] })
             return
         }
@@ -194,16 +197,16 @@ export class SongTableComponent {
         this.scrollIndexIntoView(nextIndex)
 
         // Shift-arrow extends from the anchor, which is what makes keyboard range
-        // selection feel the same as dragging with the mouse.
+        // selection feel the same as dragging with the mouse — including whether it
+        // adds to the selection or replaces it.
         if (event.shiftKey) {
-            const anchor = this.anchorIndex ?? nextIndex
-            this.anchorIndex = anchor
-            this.selectionChange.emit(
-                selectRange(this.selection(), {
-                    start: Math.min(anchor, nextIndex),
-                    end: Math.max(anchor, nextIndex) + 1,
-                }),
-            )
+            const row = this.rows()[nextIndex - this.offset()]
+            this.emitGesture({
+                index: nextIndex,
+                id: row?.id ?? null,
+                shiftKey: true,
+                toggleKey: false,
+            })
         }
     }
 
@@ -237,28 +240,12 @@ export class SongTableComponent {
     // -----------------------------------------------------------------------
 
     private applyGesture(event: MouseEvent, index: number, row: SongRow): void {
-        const selected = { id: row.id, index }
-
-        if (event.shiftKey && this.anchorIndex != null) {
-            const anchor = this.anchorIndex
-            this.selectionChange.emit(
-                selectRange(
-                    this.selection(),
-                    { start: Math.min(anchor, index), end: Math.max(anchor, index) + 1 },
-                    { additive: event.metaKey || event.ctrlKey },
-                ),
-            )
-            return
-        }
-
-        this.anchorIndex = index
-
-        if (event.metaKey || event.ctrlKey) {
-            this.selectionChange.emit(toggleRow(this.selection(), selected))
-            return
-        }
-
-        this.selectionChange.emit(selectOnly(this.selection().query, selected))
+        this.emitGesture({
+            index,
+            id: row.id,
+            shiftKey: event.shiftKey,
+            toggleKey: event.metaKey || event.ctrlKey,
+        })
     }
 
     private selectFocusedRow(additive: boolean): void {
@@ -266,11 +253,18 @@ export class SongTableComponent {
         const row = this.rows()[index - this.offset()]
         if (!row) return
 
-        this.anchorIndex = index
-        const selected = { id: row.id, index }
-        this.selectionChange.emit(
-            additive ? toggleRow(this.selection(), selected) : selectOnly(this.selection().query, selected),
-        )
+        this.emitGesture({ index, id: row.id, shiftKey: false, toggleKey: additive })
+    }
+
+    private emitGesture(gesture: {
+        index: number
+        id: string | null
+        shiftKey: boolean
+        toggleKey: boolean
+    }): void {
+        const { selection, anchor } = applySelectionGesture(this.selection(), this.anchor, gesture)
+        this.anchor = anchor
+        this.selectionChange.emit(selection)
     }
 
     private movedIndex(event: KeyboardEvent, lastIndex: number): number | null {

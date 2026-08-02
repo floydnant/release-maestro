@@ -432,6 +432,26 @@ test.describe('selection', () => {
         }
     })
 
+    test('keeps an earlier range when a cmd-click starts a second one', async ({ page }) => {
+        // Reported: shift-range, then cmd-click, then shift again threw the first
+        // range away. A shift-click means "and also these" when its anchor came from
+        // a cmd-click, and "just these" when it came from a plain click.
+        const rows = Array.from({ length: 8 }, (_value, index) =>
+            createSongRow({ id: `song-${index}`, title: `Row ${index}` }),
+        )
+        await openTracks(page, scenarioBuilder().songs(rows).build())
+
+        await clickRow(page, 'Row 1')
+        await clickRow(page, 'Row 3', ['Shift'])
+        await clickRow(page, 'Row 5', ['ControlOrMeta'])
+        await clickRow(page, 'Row 7', ['Shift'])
+
+        const selection = await Promise.all(
+            rows.map((_row, index) => rowByTitle(page, `Row ${index}`).getAttribute('aria-selected')),
+        )
+        expect(selection).toEqual(['false', 'true', 'true', 'true', 'false', 'true', 'true', 'true'])
+    })
+
     test('selects the whole library on cmd-A without loading it', async ({ page }) => {
         await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 500_000 }).build())
 
