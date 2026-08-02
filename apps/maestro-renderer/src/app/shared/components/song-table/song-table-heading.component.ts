@@ -23,7 +23,7 @@ import { IconComponent } from '../icon/icon.component'
     template: `
         <button
             type="button"
-            class="type-label-sm flex w-full items-center gap-1 p-2 uppercase text-content-muted"
+            class="type-label-sm flex w-full items-center gap-1 p-2 text-content-muted"
             [class.justify-end]="numeric()"
             [class.text-content-primary]="isActive()"
             [attr.aria-label]="'Sort by ' + label()"

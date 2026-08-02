@@ -64,7 +64,7 @@ export const formatDateShort = (date: Date | number): string => shortDateFormatt
  * the same track, and a column of those is unreadable.
  */
 export const formatBpm = (bpm: number | null): string => {
-    if (bpm == null || !Number.isFinite(bpm)) return '—'
+    if (bpm == null || !Number.isFinite(bpm)) return ''
     return Number.isInteger(bpm) ? String(bpm) : bpm.toFixed(1)
 }
 

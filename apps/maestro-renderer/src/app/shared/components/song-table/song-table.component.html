@@ -12,7 +12,7 @@
     (focusout)="hasFocus.set(false)"
 >
     <div
-        class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-surface"
+        class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-canvas"
         role="row"
         aria-rowindex="1"
     >
@@ -222,20 +222,26 @@
                         }
                     </span>
 
-                    <span class="w-16 shrink-0 truncate px-2 text-right font-mono" role="gridcell">
+                    <span class="w-16 shrink-0 truncate px-2 text-right" role="gridcell">
                         {{ formatBpm(row.bpm) }}
                     </span>
 
-                    <span class="w-12 shrink-0 truncate px-2 font-mono" role="gridcell">
-                        {{ row.musicalKey || '—' }}
+                    <span class="w-12 shrink-0 truncate px-2" role="gridcell">
+                        {{ row.musicalKey }}
                     </span>
 
-                    <span class="w-16 shrink-0 truncate px-2 text-right font-mono" role="gridcell">
+                    <span
+                        class="w-16 shrink-0 truncate px-2 text-right text-content-secondary"
+                        role="gridcell"
+                    >
                         {{ row.duration ? formatDuration(row.duration) : '—' }}
                     </span>
 
-                    <span class="w-16 shrink-0 truncate px-2 text-right font-mono" role="gridcell">
-                        {{ row.year || '—' }}
+                    <span
+                        class="w-16 shrink-0 truncate px-2 text-right text-content-secondary"
+                        role="gridcell"
+                    >
+                        {{ row.year }}
                     </span>
 
                     <span
