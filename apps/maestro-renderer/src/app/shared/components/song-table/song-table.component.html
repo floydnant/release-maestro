@@ -154,7 +154,10 @@
                                 [src]="fileUrl(row.coverPath)"
                             />
                         } @else {
-                            <span class="size-6 rounded-sm bg-background-elevated"></span>
+                            <span
+                                class="size-6 rounded-sm bg-background-elevated outline-1 outline-background-surface"
+                                [class.outline]="selected"
+                            ></span>
                         }
                     </span>
 
