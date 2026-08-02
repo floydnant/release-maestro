@@ -16,7 +16,12 @@ import {
     octX,
     octXCircleFill,
 } from '@ng-icons/octicons'
-import { solarAlarmSleepBold, solarPauseBold, solarPlayBold } from '@ng-icons/solar-icons/bold'
+import {
+    solarAlarmSleepBold,
+    solarMusicNoteBold,
+    solarPauseBold,
+    solarPlayBold,
+} from '@ng-icons/solar-icons/bold'
 import { solarAlarmSleep } from '@ng-icons/solar-icons/outline'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
@@ -40,6 +45,7 @@ const icons = {
     pause: solarPauseBold,
     snooze: solarAlarmSleep,
     snoozeFilled: solarAlarmSleepBold,
+    musicNote: solarMusicNoteBold,
 } satisfies Record<string, string>
 export type IconIdentitfier = keyof typeof icons
 
