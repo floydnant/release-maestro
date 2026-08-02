@@ -95,13 +95,12 @@ body {
     }
 
     .input {
-        @apply rounded-lg border border-border-default bg-background-canvas px-3 py-1.5 text-content-primary placeholder-content-muted;
+        @apply rounded-lg border border-border-default bg-background-canvas px-3 py-1 text-content-primary placeholder-content-muted;
         font-family: var(--type-body-md-family);
         font-size: var(--type-body-md-size);
         font-weight: var(--type-body-md-weight);
         line-height: var(--type-body-md-line-height);
         letter-spacing: var(--type-body-md-letter-spacing);
-        min-height: var(--foundation-size-control-md);
     }
 
     [disabled] {
