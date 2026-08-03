@@ -66,13 +66,19 @@ const SEARCH_DEBOUNCE_MS = 200
 /** A guess, used only until the table has measured its own height. */
 const INITIAL_WINDOW_LIMIT = 60
 
+/** What this page browses, in copy. Song in code, track in copy — see the glossary. */
+const TRACKS_LABEL = 'tracks'
+const TRACK_LABEL = 'track'
+
 /** Availability rides in the same chip list as the entity filters, under its own kind. */
 const PRESENCE_CHIP_KIND = 'presence'
 
 const CHIP_KINDS: { kind: EntityFilterKind; kindLabel: string; field: keyof SongFilter }[] = [
     { kind: 'artist', kindLabel: 'Artist', field: 'artistIds' },
     { kind: 'genre', kindLabel: 'Genre', field: 'genreIds' },
-    { kind: 'recordLabel', kindLabel: 'Label', field: 'recordLabelIds' },
+    // "Record label", never bare "Label" — on its own it reads as a tag name or a UI
+    // caption rather than as the company that put the record out.
+    { kind: 'recordLabel', kindLabel: 'Record label', field: 'recordLabelIds' },
     { kind: 'album', kindLabel: 'Album', field: 'albumIds' },
 ]
 
@@ -143,6 +149,7 @@ export class TracksComponent {
         query: this.query,
         viewport: this.viewport,
         sameQuery,
+        entityLabel: TRACKS_LABEL,
         refresh: this.scanProgress$,
         fetchWindow: (query, window) => this.browseService.querySongs(query, window),
     })
@@ -206,8 +213,8 @@ export class TracksComponent {
     protected shellState = computed<BrowseShellState>(() => {
         const result = this.result()
         return {
-            entityLabel: 'tracks',
-            entityLabelSingular: 'track',
+            entityLabel: TRACKS_LABEL,
+            entityLabelSingular: TRACK_LABEL,
             total: result.total,
             status: result.status,
             loaded: result.loaded,

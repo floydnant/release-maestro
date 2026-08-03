@@ -72,6 +72,16 @@ missing. Missing songs are retained, not deleted, and come back on the next scan
 A configured folder the scan could not reach. Dropped from the walk; its tracks go missing. Reported
 on the scan status (`unavailableFolders`) so the UI can explain the count — not an error (ADR 0003).
 
+**Availability**:
+Whether a browse surface is showing everything, only present tracks, or only missing ones. It names
+the _filter_, not the state of any one song — a song is **missing** or it is not; availability is the
+question the list is asking about them. `SongPresence` in code (`any` / `present` / `missing`),
+"Availability" on the filter chip.
+
+Reached only from the missing badge on a row, deliberately: a standing control would need a second
+count query to know whether it had anything to offer, and most libraries have nothing missing at all.
+_Avoid_: presence as user-facing copy, status, reachability
+
 **Terminal result**:
 The one-shot summary produced when a scan ends, carrying the outcome (`completed`, `cancelled`,
 `failed`) and the final tallies. Every non-idle scan produces exactly one.

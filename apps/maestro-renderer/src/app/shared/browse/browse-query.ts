@@ -71,6 +71,13 @@ export interface BrowseQueryOptions<TQuery, TRow> {
      * reference identity, which is right when the caller holds queries immutably.
      */
     sameQuery?: (left: TQuery, right: TQuery) => boolean
+    /**
+     * Plural noun for what is being browsed, in user-facing copy: `tracks`, `albums`.
+     * Only reached by the last-resort error message, when a failure carries no message
+     * of its own — but this module serves every browse surface, so it cannot be the
+     * one deciding they are all tracks.
+     */
+    entityLabel?: string
 }
 
 export interface BrowseQuery<TRow> {
@@ -122,7 +129,7 @@ export const createBrowseQuery = <TQuery, TRow>(
                         of((previous: BrowseResult<TRow>): BrowseResult<TRow> => ({
                             ...previous,
                             status: 'error',
-                            error: browseErrorMessage(error),
+                            error: browseErrorMessage(error, options.entityLabel ?? 'results'),
                         })),
                     ),
                     // Emitted before the request settles, and it deliberately keeps the
@@ -166,11 +173,11 @@ const clampWindow = (window: BrowseWindow): BrowseWindow => ({
     limit: Math.min(BROWSE_WINDOW_MAX_LIMIT, Math.max(0, Math.trunc(window.limit))),
 })
 
-const browseErrorMessage = (error: unknown): string => {
+const browseErrorMessage = (error: unknown, entityLabel: string): string => {
     if (typeof error == 'string') return error
     if (error != null && typeof error == 'object' && 'userFacingMessage' in error) {
         return String(error.userFacingMessage)
     }
     if (error instanceof Error) return error.message
-    return 'Could not load tracks'
+    return `Could not load ${entityLabel}`
 }
