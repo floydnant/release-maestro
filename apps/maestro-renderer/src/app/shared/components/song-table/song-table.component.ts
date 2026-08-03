@@ -118,7 +118,7 @@ export interface EntityFilterRequest {
     imports: [NgClass, SongTableHeadingComponent, SongTableRowComponent],
     host: {
         class: 'flex min-h-0 min-w-0 flex-1 flex-col',
-        '(document:mousedown)': 'onDocumentPointerDown($event)',
+        '(document:pointerdown)': 'onDocumentPointerDown($event)',
     },
 })
 export class SongTableComponent {
@@ -321,16 +321,26 @@ export class SongTableComponent {
      * under the last row, a margin, the toolbar, another page — which is what every
      * other app does.
      *
-     * **The scrollbar is not excepted, deliberately.** There used to be a geometric
-     * test for "did this land outside the client box", which is where a *classic*
-     * scrollbar sits. It could never work on the platform this ships to first: macOS
-     * overlay scrollbars take up no client space at all, so they are drawn over the
-     * content and every press on one reads as a press on whatever is beneath it. The
-     * check was inert where it mattered and only ever exercised in CI, where it could
-     * not fail. Dragging a classic scrollbar now clears the selection, which is the
-     * cost of not carrying a guard that does not guard.
+     * **`pointerdown` rather than `mousedown`, to spare scrollbar presses.** There used
+     * to be a geometric test for "did this land outside the client box", which is where
+     * a *classic* scrollbar sits. It could never work on the platform this ships to
+     * first: macOS overlay scrollbars take up no client space at all, so they are drawn
+     * over the content and every press on one reads as a press on whatever is beneath
+     * it. Listening a layer up is meant to spare both without measuring anything, on
+     * the grounds that Blink dispatches `mousedown` for a press on a native scrollbar
+     * but no pointer event.
+     *
+     * **That last claim is unverified.** No Chromium available here renders a classic
+     * scrollbar — overlay is forced by the OS setting, and the gutter measures zero
+     * under every styling — so there is no test below covering it, and there cannot be
+     * one until the suite runs somewhere with `Show scroll bars: Always` or on
+     * Windows/Linux. Until then a classic-scrollbar drag clearing the selection is a
+     * known residual risk, not a regression this comment promises against.
+     *
+     * The row handler stays on `mousedown`, where `preventDefault()` still suppresses
+     * the text selection a drag would otherwise start.
      */
-    protected onDocumentPointerDown(event: MouseEvent): void {
+    protected onDocumentPointerDown(event: PointerEvent): void {
         if (event.button != 0) return
 
         const target = event.target
