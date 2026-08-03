@@ -6,7 +6,6 @@ import {
     type BrowseSelectionState,
     type SelectionAnchor,
     type SelectionGesture,
-    type SelectionGestureResult,
 } from './browse-selection'
 
 /**
@@ -21,7 +20,6 @@ export type SongSelectionState = BrowseSelectionState<SongQuery>
 export type SongSelectionAnchor = SelectionAnchor<SongQuery>
 
 export {
-    anchorAfterRefetch,
     clearSelection,
     deselectRange,
     emptySelection,
@@ -68,6 +66,5 @@ export const selectionForSongQuery = (state: SongSelectionState, query: SongQuer
 
 export const applySongSelectionGesture = (
     state: SongSelectionState,
-    anchor: SongSelectionAnchor | null,
     gesture: SelectionGesture,
-): SelectionGestureResult<SongQuery> => applySelectionGesture(state, anchor, gesture, sameQuery)
+): SongSelectionState => applySelectionGesture(state, gesture, sameQuery)

@@ -1,6 +1,5 @@
 import { emptySongQuery, SongSortField, type SongQuery } from '@release-maestro/core'
 import {
-    anchorAfterRefetch,
     applySelectionGesture,
     deselectRange,
     emptySelection,
@@ -23,6 +22,23 @@ const query = emptySongQuery()
 const row = (index: number) => ({ id: `song-${index}`, index })
 const selectedIndices = (state: BrowseSelectionState<SongQuery>, upTo: number) =>
     Array.from({ length: upTo }, (_value, index) => index).filter(index => isSelected(state, row(index)))
+
+/** One gesture, applied. Returns the whole next selection — cursor and anchor with it. */
+const click = (
+    state: BrowseSelectionState<SongQuery>,
+    index: number,
+    keys: { shiftKey?: boolean; toggleKey?: boolean; id?: string | null } = {},
+) =>
+    applySelectionGesture(
+        state,
+        {
+            index,
+            id: keys.id === undefined ? `song-${index}` : keys.id,
+            shiftKey: keys.shiftKey ?? false,
+            toggleKey: keys.toggleKey ?? false,
+        },
+        sameQuery,
+    )
 
 describe('song selection', () => {
     describe('the gestures in ADR 0004', () => {
@@ -180,7 +196,10 @@ describe('song selection', () => {
         it('keeps an id-only selection across a row count change, because ids do not drift', () => {
             const state = [row(3), row(9)].reduce(toggleRow, emptySelection(query))
 
-            expect(selectionAfterRefetch(state, 1_000, 1_200)).toBe(state)
+            expect(selectionAfterRefetch(state, 1_000, 1_200)).toMatchObject({
+                included: state.included,
+                ranges: [],
+            })
         })
 
         it('clears cmd-A-minus-exclusions, since the range underneath it moved', () => {
@@ -203,19 +222,33 @@ describe('song selection', () => {
             expect(isSelected(afterInsert, { id: 'song-8', index: 9 })).toBe(false)
         })
 
-        it('drops the shift anchor when the row count changes', () => {
-            const anchor: SelectionAnchor<SongQuery> = {
-                index: 12,
-                additive: false,
-                mode: 'select',
-                base: selectRange(emptySelection(query), { start: 12, end: 45 }),
-            }
+        it('drops the shift anchor with the selection it would re-apply', () => {
+            // The anchor carries the selection an extension measures from, so an anchor
+            // that outlives the refetch can rebuild the very range that was just
+            // cleared. It travels inside the selection now, so one reconciler settles
+            // both rather than two rules that can disagree.
+            const ranged = click(emptySelection(query), 12)
+            const state = click(ranged, 45, { shiftKey: true })
+            expect(state.anchor).not.toBeNull()
 
-            // The anchor carries the selection an extension re-applies from, so an
-            // anchor that outlives the refetch can rebuild the very range that
-            // `selectionAfterRefetch` just cleared.
-            expect(anchorAfterRefetch(anchor, 1_000, 1_001)).toBeNull()
-            expect(anchorAfterRefetch(anchor, 1_000, 1_000)).toBe(anchor)
+            expect(selectionAfterRefetch(state, 1_000, 1_001).anchor).toBeNull()
+            expect(selectionAfterRefetch(state, 1_000, 1_000).anchor).toBe(state.anchor)
+        })
+
+        it('drops the cursor with a cleared selection, so the next arrow key starts over', () => {
+            // Reported: select the second row, change the sort, then arrow down — it
+            // resumed from the old index and landed on the third row. The cursor was a
+            // separate field with its own lifetime; it is part of the selection now.
+            const state = click(emptySelection(query), 1)
+            const resorted = { ...query, sort: { field: SongSortField.title, direction: 'asc' as const } }
+
+            expect(selectionForQuery(state, resorted, sameQuery).cursor).toBe(0)
+        })
+
+        it('pulls the cursor back inside a result set that shrank', () => {
+            const state = click(emptySelection(query), 900)
+
+            expect(selectionAfterRefetch(state, 1_000, 40).cursor).toBe(39)
         })
     })
 
@@ -252,107 +285,90 @@ describe('song selection', () => {
     })
 
     describe('click gestures and the anchor', () => {
-        const click = (
-            state: BrowseSelectionState<SongQuery>,
-            anchor: SelectionAnchor<SongQuery> | null,
-            index: number,
-            keys: { shiftKey?: boolean; toggleKey?: boolean } = {},
-        ) =>
-            applySelectionGesture(
-                state,
-                anchor,
-                {
-                    index,
-                    id: `song-${index}`,
-                    shiftKey: keys.shiftKey ?? false,
-                    toggleKey: keys.toggleKey ?? false,
-                },
-                sameQuery,
-            )
-
         it('replaces the selection when shift follows a plain click', () => {
-            const first = click(emptySelection(query), null, 5)
-            const extended = click(first.selection, first.anchor, 10, { shiftKey: true })
+            const first = click(emptySelection(query), 5)
+            const extended = click(first, 10, { shiftKey: true })
 
-            expect(extended.selection.ranges).toEqual([{ start: 5, end: 11 }])
-            expect(selectionSize(extended.selection)).toBe(6)
+            expect(extended.ranges).toEqual([{ start: 5, end: 11 }])
+            expect(selectionSize(extended)).toBe(6)
         })
 
         it('shrinks the range when shift-clicking back towards the anchor', () => {
-            const first = click(emptySelection(query), null, 5)
-            const long = click(first.selection, first.anchor, 20, { shiftKey: true })
-            const short = click(long.selection, long.anchor, 8, { shiftKey: true })
+            const first = click(emptySelection(query), 5)
+            const long = click(first, 20, { shiftKey: true })
+            const short = click(long, 8, { shiftKey: true })
 
             // Re-measured from the anchor's base, so the longer range is gone rather
             // than left merged underneath the shorter one.
-            expect(short.selection.ranges).toEqual([{ start: 5, end: 9 }])
+            expect(short.ranges).toEqual([{ start: 5, end: 9 }])
         })
 
         it('keeps an existing range when shift follows a cmd-click', () => {
             // The reported bug: this used to throw the first range away.
-            const first = click(emptySelection(query), null, 5)
-            const range = click(first.selection, first.anchor, 10, { shiftKey: true })
-            const picked = click(range.selection, range.anchor, 40, { toggleKey: true })
-            const second = click(picked.selection, picked.anchor, 45, { shiftKey: true })
+            const first = click(emptySelection(query), 5)
+            const range = click(first, 10, { shiftKey: true })
+            const picked = click(range, 40, { toggleKey: true })
+            const second = click(picked, 45, { shiftKey: true })
 
-            expect(second.selection.ranges).toEqual([
+            expect(second.ranges).toEqual([
                 { start: 5, end: 11 },
                 { start: 40, end: 46 },
             ])
-            expect(selectionSize(second.selection)).toBe(12)
+            expect(selectionSize(second)).toBe(12)
         })
 
         it('re-measures the second range without disturbing the first', () => {
-            const first = click(emptySelection(query), null, 5)
-            const range = click(first.selection, first.anchor, 10, { shiftKey: true })
-            const picked = click(range.selection, range.anchor, 40, { toggleKey: true })
-            const long = click(picked.selection, picked.anchor, 60, { shiftKey: true })
-            const short = click(long.selection, long.anchor, 43, { shiftKey: true })
+            const first = click(emptySelection(query), 5)
+            const range = click(first, 10, { shiftKey: true })
+            const picked = click(range, 40, { toggleKey: true })
+            const long = click(picked, 60, { shiftKey: true })
+            const short = click(long, 43, { shiftKey: true })
 
-            expect(short.selection.ranges).toEqual([
+            expect(short.ranges).toEqual([
                 { start: 5, end: 11 },
                 { start: 40, end: 44 },
             ])
         })
 
         it('never double-counts the cmd-clicked row once its range swallows it', () => {
-            const picked = click(emptySelection(query), null, 40, { toggleKey: true })
-            const extended = click(picked.selection, picked.anchor, 45, { shiftKey: true })
+            const picked = click(emptySelection(query), 40, { toggleKey: true })
+            const extended = click(picked, 45, { shiftKey: true })
 
-            expect(selectionSize(extended.selection)).toBe(6)
-            expect(toWireSelection(extended.selection).included).toEqual([])
+            expect(selectionSize(extended)).toBe(6)
+            expect(toWireSelection(extended).included).toEqual([])
         })
 
         it('adds a range on cmd-shift-click even when the anchor came from a plain click', () => {
-            const first = click(emptySelection(query), null, 5)
-            const range = click(first.selection, first.anchor, 10, { shiftKey: true })
-            const added = click(range.selection, range.anchor, 40, { shiftKey: true, toggleKey: true })
+            const first = click(emptySelection(query), 5)
+            const range = click(first, 10, { shiftKey: true })
+            const added = click(range, 40, { shiftKey: true, toggleKey: true })
 
             // Extending additively from the same anchor grows the one range rather
             // than leaving a second, overlapping one behind.
-            expect(added.selection.ranges).toEqual([{ start: 5, end: 41 }])
+            expect(added.ranges).toEqual([{ start: 5, end: 41 }])
         })
 
         it('starts over when a plain click follows a range', () => {
-            const first = click(emptySelection(query), null, 5)
-            const range = click(first.selection, first.anchor, 10, { shiftKey: true })
-            const plain = click(range.selection, range.anchor, 30)
+            const first = click(emptySelection(query), 5)
+            const range = click(first, 10, { shiftKey: true })
+            const plain = click(range, 30)
 
-            expect(plain.selection.ranges).toEqual([])
-            expect(toWireSelection(plain.selection).included).toEqual(['song-30'])
+            expect(plain.ranges).toEqual([])
+            expect(toWireSelection(plain).included).toEqual(['song-30'])
         })
 
         it('ignores an anchor left over from a different query', () => {
-            const first = click(emptySelection(query), null, 5)
-            const stale = first.anchor
+            const first = click(emptySelection(query), 5)
             const resorted = { ...query, sort: { field: SongSortField.title, direction: 'asc' as const } }
+            // A selection rebuilt for the new ordering, carrying the stale anchor.
+            const carriedOver = { ...emptySelection(resorted), anchor: first.anchor }
 
-            const extended = click(emptySelection(resorted), stale, 10, { shiftKey: true })
+            const extended = click(carriedOver, 10, { shiftKey: true })
 
             // Falls back to selecting the clicked row rather than extending across an
             // ordering the anchor's indices no longer describe.
-            expect(extended.selection.ranges).toEqual([])
-            expect(toWireSelection(extended.selection).included).toEqual(['song-10'])
+            expect(extended.ranges).toEqual([])
+            expect(toWireSelection(extended).included).toEqual(['song-10'])
         })
     })
 
@@ -439,47 +455,29 @@ describe('song selection', () => {
     })
 
     describe('the inverse gesture', () => {
-        const click = (
-            state: BrowseSelectionState<SongQuery>,
-            anchor: SelectionAnchor<SongQuery> | null,
-            index: number,
-            keys: { shiftKey?: boolean; toggleKey?: boolean } = {},
-        ) =>
-            applySelectionGesture(
-                state,
-                anchor,
-                {
-                    index,
-                    id: `song-${index}`,
-                    shiftKey: keys.shiftKey ?? false,
-                    toggleKey: keys.toggleKey ?? false,
-                },
-                sameQuery,
-            )
-
         it('deselects a span when cmd-shift extends from a row cmd-clicked off', () => {
             // Reported: the same pattern should work in reverse.
             const ranged = selectRange(emptySelection(query), { start: 0, end: 20 })
-            const removed = click(ranged, null, 5, { toggleKey: true })
+            const removed = click(ranged, 5, { toggleKey: true })
             expect(removed.anchor?.mode).toBe('deselect')
 
-            const span = click(removed.selection, removed.anchor, 9, { shiftKey: true, toggleKey: true })
+            const span = click(removed, 9, { shiftKey: true, toggleKey: true })
 
-            expect(span.selection.ranges).toEqual([
+            expect(span.ranges).toEqual([
                 { start: 0, end: 5 },
                 { start: 10, end: 20 },
             ])
-            expect(selectionSize(span.selection)).toBe(15)
+            expect(selectionSize(span)).toBe(15)
         })
 
         it('keeps adding when the cmd-click landed on an unselected row', () => {
             const ranged = selectRange(emptySelection(query), { start: 0, end: 10 })
-            const added = click(ranged, null, 50, { toggleKey: true })
+            const added = click(ranged, 50, { toggleKey: true })
             expect(added.anchor?.mode).toBe('select')
 
-            const span = click(added.selection, added.anchor, 55, { shiftKey: true })
+            const span = click(added, 55, { shiftKey: true })
 
-            expect(span.selection.ranges).toEqual([
+            expect(span.ranges).toEqual([
                 { start: 0, end: 10 },
                 { start: 50, end: 56 },
             ])
@@ -487,12 +485,12 @@ describe('song selection', () => {
 
         it('re-measures a deselection when the extension is dragged back', () => {
             const ranged = selectRange(emptySelection(query), { start: 0, end: 20 })
-            const removed = click(ranged, null, 5, { toggleKey: true })
-            const wide = click(removed.selection, removed.anchor, 15, { shiftKey: true })
-            const narrow = click(wide.selection, wide.anchor, 7, { shiftKey: true })
+            const removed = click(ranged, 5, { toggleKey: true })
+            const wide = click(removed, 15, { shiftKey: true })
+            const narrow = click(wide, 7, { shiftKey: true })
 
             // Re-applied from the anchor's base, so the wider hole is gone.
-            expect(narrow.selection.ranges).toEqual([
+            expect(narrow.ranges).toEqual([
                 { start: 0, end: 5 },
                 { start: 8, end: 20 },
             ])
@@ -500,54 +498,36 @@ describe('song selection', () => {
 
         it('deselects a single row when the extension does not move', () => {
             const ranged = selectRange(emptySelection(query), { start: 0, end: 20 })
-            const removed = click(ranged, null, 5, { toggleKey: true })
-            const span = click(removed.selection, removed.anchor, 5, { shiftKey: true })
+            const removed = click(ranged, 5, { toggleKey: true })
+            const span = click(removed, 5, { shiftKey: true })
 
-            expect(isSelected(span.selection, row(5))).toBe(false)
-            expect(selectionSize(span.selection)).toBe(19)
+            expect(isSelected(span, row(5))).toBe(false)
+            expect(selectionSize(span)).toBe(19)
         })
     })
 
     describe('gesture edge cases', () => {
-        const click = (
-            state: BrowseSelectionState<SongQuery>,
-            anchor: SelectionAnchor<SongQuery> | null,
-            index: number,
-            keys: { shiftKey?: boolean; toggleKey?: boolean; id?: string | null } = {},
-        ) =>
-            applySelectionGesture(
-                state,
-                anchor,
-                {
-                    index,
-                    id: keys.id === undefined ? `song-${index}` : keys.id,
-                    shiftKey: keys.shiftKey ?? false,
-                    toggleKey: keys.toggleKey ?? false,
-                },
-                sameQuery,
-            )
-
         it('treats a shift-click with no anchor as a plain click', () => {
-            const state = click(emptySelection(query), null, 7, { shiftKey: true })
+            const state = click(emptySelection(query), 7, { shiftKey: true })
 
-            expect(toWireSelection(state.selection).included).toEqual(['song-7'])
+            expect(toWireSelection(state).included).toEqual(['song-7'])
             expect(state.anchor).toMatchObject({ index: 7, additive: false, mode: 'select' })
         })
 
         it('extends backwards from the anchor', () => {
-            const first = click(emptySelection(query), null, 20)
-            const back = click(first.selection, first.anchor, 10, { shiftKey: true })
+            const first = click(emptySelection(query), 20)
+            const back = click(first, 10, { shiftKey: true })
 
-            expect(back.selection.ranges).toEqual([{ start: 10, end: 21 }])
+            expect(back.ranges).toEqual([{ start: 10, end: 21 }])
         })
 
         it('keeps the anchor across repeated extensions', () => {
-            const first = click(emptySelection(query), null, 10)
-            const once = click(first.selection, first.anchor, 20, { shiftKey: true })
-            const twice = click(once.selection, once.anchor, 30, { shiftKey: true })
+            const first = click(emptySelection(query), 10)
+            const once = click(first, 20, { shiftKey: true })
+            const twice = click(once, 30, { shiftKey: true })
 
             expect(twice.anchor?.index).toBe(10)
-            expect(twice.selection.ranges).toEqual([{ start: 10, end: 31 }])
+            expect(twice.ranges).toEqual([{ start: 10, end: 31 }])
         })
 
         it('selects a row outside the loaded window as a one-row range', () => {
@@ -555,52 +535,54 @@ describe('song selection', () => {
             // id to hand-pick with. A range addresses the row positionally and needs
             // none, which is what keeps the jump from moving the viewport while
             // leaving the previous row selected.
-            const first = click(emptySelection(query), null, 5)
-            const jumped = click(first.selection, first.anchor, 9_999, { id: null })
+            const first = click(emptySelection(query), 5)
+            const jumped = click(first, 9_999, { id: null })
 
-            expect(jumped.selection.ranges).toEqual([{ start: 9_999, end: 10_000 }])
-            expect(jumped.selection.included).toEqual([])
-            expect(isSelected(jumped.selection, { id: 'song-5', index: 5 })).toBe(false)
+            expect(jumped.ranges).toEqual([{ start: 9_999, end: 10_000 }])
+            expect(jumped.included).toEqual([])
+            expect(isSelected(jumped, { id: 'song-5', index: 5 })).toBe(false)
             expect(jumped.anchor).toMatchObject({ index: 9_999, mode: 'select' })
         })
 
         it('refuses to toggle a row it cannot name', () => {
             // Unlike a plain move, cmd-click means "this row on top of the rest" —
             // a claim about a specific row, which a bare index cannot stand in for.
-            const first = click(emptySelection(query), null, 5)
-            const nothing = click(first.selection, first.anchor, 9, { id: null, toggleKey: true })
+            const first = click(emptySelection(query), 5)
+            const nothing = click(first, 9, { id: null, toggleKey: true })
 
-            expect(nothing.selection).toBe(first.selection)
-            expect(nothing.anchor).toBe(first.anchor)
+            // Equal rather than identical: the gesture always returns a fresh value.
+            expect(nothing).toEqual(first)
         })
 
         it('still extends without an id, because a range needs only indices', () => {
-            const first = click(emptySelection(query), null, 5)
-            const extended = click(first.selection, first.anchor, 9, { shiftKey: true, id: null })
+            const first = click(emptySelection(query), 5)
+            const extended = click(first, 9, { shiftKey: true, id: null })
 
-            expect(extended.selection.ranges).toEqual([{ start: 5, end: 10 }])
+            expect(extended.ranges).toEqual([{ start: 5, end: 10 }])
         })
 
         it('drops an anchor whose base belongs to a different query', () => {
-            const first = click(emptySelection(query), null, 5)
+            const first = click(emptySelection(query), 5)
             const resorted: SongQuery = {
                 ...query,
                 sort: { field: SongSortField.title, direction: 'asc' },
             }
 
-            const extended = click(emptySelection(resorted), first.anchor, 10, { shiftKey: true })
+            // A selection rebuilt for the new ordering, still carrying the old anchor.
+            const carriedOver = { ...emptySelection(resorted), anchor: first.anchor }
+            const extended = click(carriedOver, 10, { shiftKey: true })
 
-            expect(extended.selection.ranges).toEqual([])
-            expect(toWireSelection(extended.selection).included).toEqual(['song-10'])
+            expect(extended.ranges).toEqual([])
+            expect(toWireSelection(extended).included).toEqual(['song-10'])
         })
 
         it('toggles a row back on with a second cmd-click, and flips the anchor with it', () => {
             const off = click(selectRange(emptySelection(query), { start: 0, end: 10 }), null, 4, {
                 toggleKey: true,
             })
-            const on = click(off.selection, off.anchor, 4, { toggleKey: true })
+            const on = click(off, 4, { toggleKey: true })
 
-            expect(isSelected(on.selection, row(4))).toBe(true)
+            expect(isSelected(on, row(4))).toBe(true)
             expect(on.anchor?.mode).toBe('select')
         })
 

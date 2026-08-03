@@ -893,6 +893,101 @@ test.describe('the grid for keyboard and assistive tech', () => {
     })
 })
 
+test.describe('selection against a moving list', () => {
+    /**
+     * The unit tests cover the selection model; these cover the wiring, which is where
+     * every bug in it actually lived. The model was right and the table kept its own
+     * copies of where the selection was — a cursor and a shift-anchor with their own
+     * lifetimes — so each one went stale on a different event.
+     */
+    const scanStatus = (phase: LibraryScanStatus['phase'], revision: number) =>
+        ({
+            scanId: 1,
+            revision,
+            trigger: 'manual',
+            phase,
+            scannedFolders: ['/music'],
+            unavailableFolders: [],
+            startedAt: Date.now() - 10_000,
+            finishedAt: null,
+            discovered: 3,
+            new: 3,
+            changed: 0,
+            unchanged: 0,
+            readDone: 3,
+            readTotal: 3,
+            imported: 3,
+            failedFiles: 0,
+            normalizationIssues: 0,
+            terminal: null,
+        }) satisfies LibraryScanStatus
+
+    test('keeps the highlight on the song, not the index, when a scan grows the list', async ({ page }) => {
+        const controller = await openTracks(page, scenarioBuilder().songs(createSongRows()).build())
+        await clickRow(page, 'Dusk')
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+
+        // A scan inserts a row above the selected one: same song, new index. The
+        // selection travels as an id, so the highlight has to travel with it — it used
+        // to stay on whichever row inherited the old index.
+        const shifted = [createSongRow({ id: 'song-new', title: 'Zenith' }), ...createSongRows()]
+        await controller.setHandler('library:query-songs', {
+            kind: 'resolve',
+            value: { rows: shifted, offset: 0, total: shifted.length },
+        })
+        await controller.emit('library:scan-status', {
+            status: scanStatus('completed', 2),
+            newAlbums: [],
+        })
+
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+        await expect(rowByTitle(page, 'Zenith')).toHaveAttribute('aria-selected', 'false')
+        await expect(page.getByText('1 of 4 tracks selected')).toBeAttached()
+    })
+
+    test('starts the keyboard over at the top after the sort changes', async ({ page }) => {
+        // Reported: select the second row, re-sort, then arrow down — it resumed from
+        // the old index and landed on the third row. Clearing the selection was not
+        // enough, because the cursor was a separate field with its own lifetime.
+        await openTracks(page)
+        await clickRow(page, 'Dusk')
+
+        await page.getByRole('button', { name: 'Sort by Title' }).click()
+        await expect(page.getByRole('row', { selected: true })).toHaveCount(0)
+
+        await page.getByRole('grid', { name: 'Tracks' }).focus()
+        await page.keyboard.press('ArrowDown')
+
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+    })
+
+    test('does not rebuild a cleared range from a stale anchor', async ({ page }) => {
+        const controller = await openTracks(page, scenarioBuilder().songs(createSongRows()).build())
+        await clickRow(page, 'Dawn')
+        await clickRow(page, 'Void', ['Shift'])
+        await expect(page.getByText('3 of 3 tracks selected')).toBeAttached()
+
+        // The row count changes, so the range is dropped. The anchor it was measured
+        // from used to survive that, and the next shift-click re-applied the selection
+        // the anchor had captured — resurrecting the range that had just been cleared.
+        const grown = [...createSongRows(), createSongRow({ id: 'song-4', title: 'Zenith' })]
+        await controller.setHandler('library:query-songs', {
+            kind: 'resolve',
+            value: { rows: grown, offset: 0, total: grown.length },
+        })
+        await controller.emit('library:scan-status', {
+            status: scanStatus('completed', 2),
+            newAlbums: [],
+        })
+        await expect(page.getByRole('row', { selected: true })).toHaveCount(0)
+
+        await clickRow(page, 'Dusk', ['Shift'])
+
+        // A fresh single selection, not the old span.
+        await expect(page.getByText('1 of 4 tracks selected')).toBeAttached()
+    })
+})
+
 test.describe('live updates during a scan', () => {
     /** A status snapshot in one phase; only the phase and the revision matter here. */
     const scanStatus = (phase: LibraryScanStatus['phase'], revision: number) =>

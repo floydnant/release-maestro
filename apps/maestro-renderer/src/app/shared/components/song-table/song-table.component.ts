@@ -10,14 +10,12 @@ import {
     inject,
     input,
     output,
-    signal,
     untracked,
     viewChild,
 } from '@angular/core'
 import type { BrowseWindow, SongQuery, SongRow, SongSortField } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
 import {
-    anchorAfterRefetch,
     applySongSelectionGesture,
     clearSelection,
     isEmptySelection,
@@ -25,7 +23,6 @@ import {
     isSelectionModifierHeld,
     selectAll,
     selectionSize,
-    type SongSelectionAnchor,
     type SongSelectionState,
 } from '../../browse/song-selection'
 import { SongTableHeadingComponent } from './song-table-heading.component'
@@ -41,8 +38,9 @@ import { SongTableRowComponent } from './song-table-row.component'
  * translated into place — so the DOM holds a screenful and memory holds one window.
  *
  * The component is presentational: it renders the window it is given and emits the
- * gesture results. It owns only what is genuinely its own — the cursor the next arrow
- * key moves from, and the anchor a shift-click extends from.
+ * whole next selection. It holds no selection state of its own — the cursor and the
+ * shift-anchor live in the selection value, because they are positions *within* it and
+ * every rule for when they go stale is a rule the selection already has.
  *
  * **There is one row state, not two.** Arrow keys move the selection rather than a
  * separate cursor, so the selected row is the current row and needs no ring of its
@@ -118,17 +116,30 @@ export class SongTableComponent {
     protected readonly rowHeight = ROW_HEIGHT
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
-    /** Where a shift-extension starts from, and whether it adds, replaces or removes. */
-    private anchor: SongSelectionAnchor | null = null
-    /** The total the anchor's indices were measured against — see {@link liveAnchor}. */
-    private anchorTotal = 0
+    /**
+     * Set while a pointer press is taking focus, so {@link onGridFocus} leaves the
+     * click's own result alone.
+     *
+     * The press applies its gesture and then focuses the grid, but the selection it
+     * emitted has not come back through the input yet — so the focus handler would
+     * read the *previous* selection, find it empty, and put the cursor back where that
+     * one had been. `focus()` dispatches synchronously, so the flag spans exactly the
+     * call it needs to.
+     */
+    private focusFromPointer = false
+
     /**
      * Where the next arrow key moves from. Never drawn: arrow keys move the
      * *selection*, so the selected row is the cursor, and there is no second state to
      * show. It exists only as the origin for the next move and for
      * `aria-activedescendant`.
+     *
+     * Read off the selection rather than held here. It used to be a field, and it
+     * outlived the selection it belonged to: re-sorting cleared the selection but left
+     * the cursor where the old one had been, so the next arrow key resumed from a row
+     * the user was no longer on.
      */
-    private cursorIndex = signal(0)
+    protected cursorIndex = computed(() => this.selection().cursor)
 
     protected sort = computed(() => this.query().sort)
     protected total = computed(() => this.result().total)
@@ -221,13 +232,13 @@ export class SongTableComponent {
         }
 
         event.preventDefault()
-        this.cursorIndex.set(index)
         this.applyGesture(event, index, row)
 
-        // Take focus so the keyboard works immediately. Applying the gesture first
-        // means the grid is never focused with an empty selection here, so the
-        // focus handler below leaves the click's own result alone.
+        // Take focus so the keyboard works immediately, without the focus handler
+        // second-guessing the gesture that just ran.
+        this.focusFromPointer = true
         this.scroller()?.nativeElement.focus({ preventScroll: true })
+        this.focusFromPointer = false
     }
 
     /**
@@ -239,6 +250,8 @@ export class SongTableComponent {
      * said what it wanted.
      */
     protected onGridFocus(): void {
+        if (this.focusFromPointer) return
+
         const scroller = this.scroller()?.nativeElement
         if (!scroller?.matches(':focus-visible')) return
         if (this.total() == 0 || !isEmptySelection(this.selection())) return
@@ -266,7 +279,6 @@ export class SongTableComponent {
         if (isScrollbarPress(scroller, event)) return
         if (isEmptySelection(this.selection())) return
 
-        this.anchor = null
         this.selectionChange.emit(clearSelection(this.selection()))
     }
 
@@ -281,16 +293,14 @@ export class SongTableComponent {
 
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() == 'a') {
             event.preventDefault()
-            // Both of these replace the selection wholesale, so there is no longer an
-            // anchor a shift-extension could sensibly measure from.
-            this.anchor = null
+            // Replaces the selection wholesale, and `selectAll` resets the cursor and
+            // anchor with it — there is no longer a row an extension could measure from.
             this.selectionChange.emit(selectAll(this.selection().query, this.total()))
             return
         }
 
         if (event.key == 'Escape') {
             event.preventDefault()
-            this.anchor = null
             this.focusGrid()
             this.selectionChange.emit(clearSelection(this.selection()))
             return
@@ -298,6 +308,15 @@ export class SongTableComponent {
 
         if (event.key == 'ArrowRight' || event.key == 'ArrowLeft') {
             if (this.moveWithinRow(event.key == 'ArrowRight' ? 1 : -1)) event.preventDefault()
+            return
+        }
+
+        // With nothing selected, the first directional key lands *on* the cursor rather
+        // than moving off it — otherwise arrowing down after a sort change would skip
+        // the first row, because there is no selected row to move away from.
+        if (isEmptySelection(this.selection()) && this.movedIndex(event, lastIndex) != null) {
+            event.preventDefault()
+            this.moveTo(Math.min(this.cursorIndex(), lastIndex), { extend: false })
             return
         }
 
@@ -360,7 +379,6 @@ export class SongTableComponent {
         // Vertical movement is about rows, so focus belongs back on the grid rather
         // than on whatever control in the old row the user had stepped into.
         this.focusGrid()
-        this.cursorIndex.set(index)
         this.scrollIndexIntoView(index)
 
         // The row may be outside the loaded window after a jump to the end, in which
@@ -392,24 +410,7 @@ export class SongTableComponent {
         shiftKey: boolean
         toggleKey: boolean
     }): void {
-        const { selection, anchor } = applySongSelectionGesture(this.selection(), this.liveAnchor(), gesture)
-        this.anchor = anchor
-        this.anchorTotal = this.total()
-        this.selectionChange.emit(selection)
-    }
-
-    /**
-     * The anchor, dropped if the result set has changed size since it was set.
-     *
-     * The parent already clears a ranged selection when a refetch changes the total,
-     * but the anchor lives here and outlived it — and because an extension re-applies
-     * from `anchor.base`, the next shift-click rebuilt the range that had just been
-     * cleared. An anchor is a bare index, so a total change invalidates it outright.
-     */
-    private liveAnchor(): SongSelectionAnchor | null {
-        this.anchor = anchorAfterRefetch(this.anchor, this.anchorTotal, this.total())
-        this.anchorTotal = this.total()
-        return this.anchor
+        this.selectionChange.emit(applySongSelectionGesture(this.selection(), gesture))
     }
 
     private movedIndex(event: KeyboardEvent, lastIndex: number): number | null {

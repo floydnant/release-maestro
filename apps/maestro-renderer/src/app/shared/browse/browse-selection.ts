@@ -37,7 +37,18 @@ export interface SelectedRow {
     index: number
 }
 
-/** The renderer's working selection: the wire shape plus the indices it elides. */
+/**
+ * The renderer's working selection: the wire shape, the indices it elides, and the two
+ * pieces of position that only mean anything relative to it.
+ *
+ * **All of it lives here on purpose.** The cursor and the anchor were previously fields
+ * on the table component, reconciled separately from the selection and from each other
+ * — three pieces of "where the selection is" with three rules for when they go stale.
+ * Every one of them was a bug: the anchor outlived a refetch that cleared the ranges it
+ * pointed into, and the cursor outlived a sort change, so the first arrow key after
+ * re-sorting resumed from wherever the old selection had been. One value with one set of
+ * reconcilers is what makes those states impossible rather than merely fixed.
+ */
 export interface BrowseSelectionState<TQuery> {
     /** The filter + sort the {@link ranges} indices are meaningful against. */
     query: TQuery
@@ -46,6 +57,13 @@ export interface BrowseSelectionState<TQuery> {
     excluded: SelectedRow[]
     /** Rows selected outside {@link ranges}. */
     included: SelectedRow[]
+    /**
+     * Where the next arrow key moves from. An index, so it means nothing against a
+     * different ordering and nothing past the end of a shrunken result set.
+     */
+    cursor: number
+    /** Where a shift-extension measures from — see {@link SelectionAnchor}. */
+    anchor: SelectionAnchor<TQuery> | null
 }
 
 /** What crosses IPC, and what an action resolves in SQL. */
@@ -63,6 +81,8 @@ export const emptySelection = <TQuery>(query: TQuery): BrowseSelectionState<TQue
     ranges: [],
     excluded: [],
     included: [],
+    cursor: 0,
+    anchor: null,
 })
 
 export const toWireSelection = <TQuery>(state: BrowseSelectionState<TQuery>): WireSelection<TQuery> => ({
@@ -109,6 +129,8 @@ export const selectOnly = <TQuery>(query: TQuery, row: SelectedRow): BrowseSelec
     ranges: [],
     excluded: [],
     included: [row],
+    cursor: row.index,
+    anchor: null,
 })
 
 /** Drop everything, keeping the query the selection was relative to. */
@@ -158,10 +180,12 @@ export const selectRange = <TQuery>(
 ): BrowseSelectionState<TQuery> => {
     const normalized = normalizeRange(range)
     if (!normalized) return state
-    if (!additive) return { query: state.query, ranges: [normalized], excluded: [], included: [] }
+    if (!additive) {
+        return { ...state, ranges: [normalized], excluded: [], included: [] }
+    }
 
     return restoreInvariants({
-        query: state.query,
+        ...state,
         ranges: mergeRanges([...state.ranges, normalized]),
         excluded: state.excluded.filter(row => !isInRange(normalized, row.index)),
         included: state.included.filter(row => !isInRange(normalized, row.index)),
@@ -185,7 +209,7 @@ export const deselectRange = <TQuery>(
     if (!normalized) return state
 
     return restoreInvariants({
-        query: state.query,
+        ...state,
         ranges: subtractRange(state.ranges, normalized),
         excluded: state.excluded.filter(row => !isInRange(normalized, row.index)),
         included: state.included.filter(row => !isInRange(normalized, row.index)),
@@ -196,7 +220,10 @@ export const deselectRange = <TQuery>(
 export const selectAll = <TQuery>(query: TQuery, total: number): BrowseSelectionState<TQuery> =>
     total <= 0
         ? emptySelection(query)
-        : { query, ranges: [{ start: 0, end: total }], excluded: [], included: [] }
+        : {
+              ...emptySelection(query),
+              ranges: [{ start: 0, end: total }],
+          }
 
 /**
  * Reconcile a selection with a refetch.
@@ -212,24 +239,19 @@ export const selectionAfterRefetch = <TQuery>(
     nextTotal: number,
 ): BrowseSelectionState<TQuery> => {
     if (previousTotal == nextTotal) return state
-    if (state.ranges.length == 0) return state
-    return emptySelection(state.query)
+
+    // Ranges are indices into an ordering whose length just changed, and so is the
+    // anchor — which additionally carries the selection it would re-apply, so leaving
+    // it behind lets the next shift-click rebuild what this just cleared.
+    if (state.ranges.length > 0) return { ...emptySelection(state.query), cursor: state.cursor }
+
+    // An id-only selection survives, because an id names the same row wherever it
+    // moved to. The cursor still has to stay inside the result set.
+    return { ...state, anchor: null, cursor: clampCursor(state.cursor, nextTotal) }
 }
 
-/**
- * Reconcile a shift-anchor with a refetch.
- *
- * An anchor is an index and nothing else, so it cannot survive a change in the row
- * count the way an id-only selection does. It also carries `base` — the selection as
- * it stood when the anchor was set — and every extension re-applies from there. Left
- * alone across a refetch that cleared the selection, the next shift-click rebuilds
- * the very range {@link selectionAfterRefetch} had just dropped.
- */
-export const anchorAfterRefetch = <TQuery>(
-    anchor: SelectionAnchor<TQuery> | null,
-    previousTotal: number,
-    nextTotal: number,
-): SelectionAnchor<TQuery> | null => (previousTotal == nextTotal ? anchor : null)
+const clampCursor = (cursor: number, total: number): number =>
+    total <= 0 ? 0 : Math.max(0, Math.min(cursor, total - 1))
 
 /**
  * Reconcile a selection with a new query. Index ranges mean nothing against a
@@ -264,6 +286,11 @@ export interface SelectionAnchor<TQuery> {
      * The selection as it stood when the anchor was set. Every extension re-applies
      * from here rather than from the current selection, so dragging a range shorter
      * shrinks it instead of leaving the longer one merged underneath.
+     *
+     * Always stored with its own `anchor` nulled. The anchor lives inside the
+     * selection, so capturing one wholesale would nest the previous anchor inside this
+     * one, and its predecessor inside that — a chain that grows with every gesture and
+     * carries stale bases along with it.
      */
     base: BrowseSelectionState<TQuery>
 }
@@ -282,11 +309,6 @@ export interface SelectionGesture {
     toggleKey: boolean
 }
 
-export interface SelectionGestureResult<TQuery> {
-    selection: BrowseSelectionState<TQuery>
-    anchor: SelectionAnchor<TQuery> | null
-}
-
 /** Read a gesture off a pointer event. Any browse surface can use this verbatim. */
 export const selectionGestureFrom = (event: MouseEvent, row: SelectedRow): SelectionGesture => ({
     index: row.index,
@@ -300,19 +322,21 @@ export const isSelectionModifierHeld = (event: MouseEvent): boolean =>
     event.shiftKey || event.metaKey || event.ctrlKey
 
 /**
- * Apply a click to a selection, and report the anchor the next click should use.
+ * Apply a click to a selection, returning the whole next selection — cursor and anchor
+ * included.
  *
  * Kept out of any component because it is selection semantics rather than rendering,
- * and because the case matrix is worth testing without a DOM.
+ * and because the case matrix is worth testing without a DOM. Taking and returning one
+ * value is what stops a caller from updating the selection and forgetting the two
+ * pieces of position that only mean anything against it.
  */
 export const applySelectionGesture = <TQuery>(
     state: BrowseSelectionState<TQuery>,
-    anchor: SelectionAnchor<TQuery> | null,
     gesture: SelectionGesture,
     sameQuery: QueryComparator<TQuery>,
-): SelectionGestureResult<TQuery> => {
+): BrowseSelectionState<TQuery> => {
     // An anchor from a different query points into an ordering that no longer exists.
-    const usableAnchor = anchor && sameQuery(anchor.base.query, state.query) ? anchor : null
+    const usableAnchor = state.anchor && sameQuery(state.anchor.base.query, state.query) ? state.anchor : null
 
     if (gesture.shiftKey && usableAnchor) {
         const span = {
@@ -327,7 +351,7 @@ export const applySelectionGesture = <TQuery>(
                   })
 
         // The anchor stays put, so extending again re-measures from the same row.
-        return { selection, anchor: usableAnchor }
+        return { ...selection, cursor: gesture.index, anchor: usableAnchor }
     }
 
     if (gesture.id == null) {
@@ -340,12 +364,13 @@ export const applySelectionGesture = <TQuery>(
         //
         // Toggling is the exception. Cmd-clicking a row means "this specific row, on
         // top of the rest", and that is a claim about a row we cannot name yet.
-        if (gesture.toggleKey) return { selection: state, anchor: usableAnchor }
+        if (gesture.toggleKey) return { ...state, anchor: usableAnchor }
 
         const selection = selectRange(state, { start: gesture.index, end: gesture.index + 1 })
         return {
-            selection,
-            anchor: { index: gesture.index, additive: false, mode: 'select', base: selection },
+            ...selection,
+            cursor: gesture.index,
+            anchor: anchorAt(gesture.index, { additive: false, mode: 'select' }, selection),
         }
     }
 
@@ -353,15 +378,29 @@ export const applySelectionGesture = <TQuery>(
 
     if (!gesture.toggleKey) {
         const selection = selectOnly(state.query, row)
-        return { selection, anchor: { index: row.index, additive: false, mode: 'select', base: selection } }
+        return {
+            ...selection,
+            anchor: anchorAt(row.index, { additive: false, mode: 'select' }, selection),
+        }
     }
 
     // A cmd-click on an already-selected row is a *removal*, and an extension from it
     // should keep removing rather than suddenly start adding.
     const mode = isSelected(state, row) ? 'deselect' : 'select'
     const selection = toggleRow(state, row)
-    return { selection, anchor: { index: row.index, additive: true, mode, base: selection } }
+    return {
+        ...selection,
+        cursor: row.index,
+        anchor: anchorAt(row.index, { additive: true, mode }, selection),
+    }
 }
+
+/** An anchor over `base`, with `base`'s own anchor dropped — see {@link SelectionAnchor.base}. */
+const anchorAt = <TQuery>(
+    index: number,
+    { additive, mode }: { additive: boolean; mode: 'select' | 'deselect' },
+    base: BrowseSelectionState<TQuery>,
+): SelectionAnchor<TQuery> => ({ index, additive, mode, base: { ...base, anchor: null } })
 
 // ---------------------------------------------------------------------------
 
