@@ -48,9 +48,8 @@ import { SongTableRowComponent } from './song-table-row.component'
  * separate cursor, so the selected row is the current row and needs no ring of its
  * own; the grid has no focus ring either, because the selection is the focus
  * indicator and `aria-activedescendant` carries it to assistive tech. That puts the
- * whole weight of "where am I" on how a selected row is drawn, which is why it is
- * marked by a bar as well as a background — a state carried by colour alone is one
- * some people cannot see.
+ * whole weight of "where am I" on the selected row's background, so its contrast
+ * against the canvas is load-bearing rather than decorative.
  *
  * **The grid is one tab stop.** Every control inside a row is `tabindex="-1"` and
  * reached with the left and right arrows, per the ARIA grid pattern the vertical keys
@@ -63,6 +62,13 @@ export const ROW_HEIGHT = 40
 
 /** Rows fetched beyond the viewport on each side, so scrolling does not chase the data. */
 const OVERSCAN_ROWS = 20
+
+/**
+ * Rows kept visible past the cursor when the keyboard moves it. Distinct from
+ * {@link OVERSCAN_ROWS}, which is about what is *fetched*; this is about what the user
+ * can see ahead of where they are.
+ */
+const SCROLL_PADDING_ROWS = 4
 
 let nextTableId = 0
 
@@ -431,15 +437,39 @@ export class SongTableComponent {
         }
     }
 
+    /**
+     * Keep the cursor row inside the viewport, with room to see where it is going.
+     *
+     * Scrolling it to the very edge is technically "in view" and useless to read: the
+     * next row down is the one you are about to move to, and it is off screen. So the
+     * row is kept {@link SCROLL_PADDING_ROWS} rows clear of both edges.
+     *
+     * The row's position is measured off the DOM when it is rendered, because the
+     * canvas carries margins that `index × ROW_HEIGHT` knows nothing about — that gap
+     * is what left a downward move showing a sliver of the row it had just selected.
+     * A jump past the loaded window has no element to measure and falls back to the
+     * arithmetic, which is close enough to land in the right region; the next render
+     * corrects it.
+     */
     private scrollIndexIntoView(index: number): void {
         const element = this.scroller()?.nativeElement
         if (!element) return
 
-        const top = index * ROW_HEIGHT
+        const padding = SCROLL_PADDING_ROWS * ROW_HEIGHT
+        // The header floats over the top of the scroller, so the space behind it is
+        // not viewport the cursor can be seen in.
+        const header = element.querySelector<HTMLElement>('.song-table__header')?.clientHeight ?? 0
+
+        const rendered = document.getElementById(this.rowElementId(index))
+        const top = rendered
+            ? rendered.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop
+            : index * ROW_HEIGHT
         const bottom = top + ROW_HEIGHT
-        if (top < element.scrollTop) element.scrollTop = top
-        else if (bottom > element.scrollTop + element.clientHeight) {
-            element.scrollTop = bottom - element.clientHeight
+
+        if (top - padding - header < element.scrollTop) {
+            element.scrollTop = Math.max(0, top - padding - header)
+        } else if (bottom + padding > element.scrollTop + element.clientHeight) {
+            element.scrollTop = bottom + padding - element.clientHeight
         }
     }
 }

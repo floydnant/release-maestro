@@ -12,10 +12,8 @@
     [attr.aria-activedescendant]="activeDescendantId()"
 >
     <!-- **Header and body column widths must be edited together** or they drift apart when the viewport shrinks. -->
-    <!-- The transparent left border matches the selection marker the rows carry, so
-         the columns stay aligned with the header instead of shifting 2px sideways. -->
     <div
-        class="song-table__header | sticky top-0 z-10 flex w-max min-w-full border-l-2 border-transparent bg-background-canvas"
+        class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-canvas"
         role="row"
         aria-rowindex="1"
     >
@@ -127,21 +125,13 @@
                 @let index = offset() + rowIndex;
                 @let selected = isRowSelected(row, index);
 
-                <!-- The selected row carries a marker bar as well as a lifted
-                     background. The background alone made selection a colour-only
-                     state, which anyone with low vision or a colour vision deficiency
-                     may not resolve at all against the canvas — and since arrow keys
-                     move the selection, the selected row is also where focus is. The
-                     bar is present or absent rather than one hue or another, so it
-                     reads without depending on colour. Transparent when unselected so
-                     nothing shifts sideways as the selection moves. -->
                 <div
-                    class="song-table__row | flex items-center border-l-2"
+                    class="song-table__row | flex items-center"
                     role="row"
                     [id]="rowElementId(index)"
                     [ngClass]="{
-                        'row-selected | border-content-action bg-background-elevated': selected,
-                        'row-hover | border-transparent hover:bg-background-surface': !selected,
+                        'row-selected | bg-background-elevated': selected,
+                        'row-hover | hover:bg-background-surface': !selected,
                         'row-missing | opacity-70': !row.present,
                     }"
                     [style.height.px]="rowHeight"

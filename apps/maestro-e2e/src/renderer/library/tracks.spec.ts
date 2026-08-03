@@ -846,22 +846,31 @@ test.describe('the grid for keyboard and assistive tech', () => {
         await expect(grid).toHaveAttribute('aria-rowcount', '4') // header + three songs
     })
 
-    test('marks the selected row by more than its colour', async ({ page }) => {
-        await openTracks(page)
-        await clickRow(page, 'Dawn')
-
-        // Arrow keys move the selection, so the selected row is also where focus is.
-        // A background alone leaves that state invisible to anyone who cannot resolve
-        // it against the canvas, so the row carries a marker bar as well.
-        const borderWidth = await rowByTitle(page, 'Dawn').evaluate(
-            element => getComputedStyle(element).borderLeftColor,
+    test('keeps the cursor row clear of both viewport edges', async ({ page }) => {
+        // Scrolling the cursor to the very edge is technically in view and useless to
+        // read — the row you are about to arrow onto is off screen. Arrowing down used
+        // to leave a sliver of the selected row below the fold.
+        await createRendererScenario(
+            page,
+            scenarioBuilder().handler('library:query-songs', { kind: 'song-window', total: 5_000 }).build(),
+            '/tracks',
         )
-        const unselected = await rowByTitle(page, 'Dusk').evaluate(
-            element => getComputedStyle(element).borderLeftColor,
-        )
+        await clickRow(page, 'Row 0')
 
-        expect(borderWidth).not.toBe(unselected)
-        expect(unselected).toBe('rgba(0, 0, 0, 0)')
+        const grid = page.getByRole('grid', { name: 'Tracks' })
+        for (let press = 0; press < 40; press++) await page.keyboard.press('ArrowDown')
+
+        const clearance = await grid.evaluate(element => {
+            const selected = element.querySelector('[role="row"][aria-selected="true"]')
+            if (!selected) return null
+            const bounds = element.getBoundingClientRect()
+            const row = selected.getBoundingClientRect()
+            return { below: bounds.bottom - row.bottom, above: row.top - bounds.top }
+        })
+
+        // Four rows of 40px, less a pixel of rounding.
+        expect(clearance?.below).toBeGreaterThan(159)
+        expect(clearance?.above).toBeGreaterThan(0)
     })
 
     test('is a single tab stop, with the row controls on the arrow keys', async ({ page }) => {
