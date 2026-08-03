@@ -9,7 +9,6 @@ import {
     type SongFilter,
     type SongFilterDescription,
     type SongQuery,
-    type SongRow,
     type SongWindowResult,
 } from '@release-maestro/core'
 import { and, asc, count, desc, eq, exists, inArray, type SQL } from 'drizzle-orm'
