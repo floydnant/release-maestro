@@ -76,8 +76,6 @@ const PRESENCE_CHIP_KIND = 'presence'
 const CHIP_KINDS: { kind: EntityFilterKind; kindLabel: string; field: keyof SongFilter }[] = [
     { kind: 'artist', kindLabel: 'Artist', field: 'artistIds' },
     { kind: 'genre', kindLabel: 'Genre', field: 'genreIds' },
-    // "Record label", never bare "Label" — on its own it reads as a tag name or a UI
-    // caption rather than as the company that put the record out.
     { kind: 'recordLabel', kindLabel: 'Record label', field: 'recordLabelIds' },
     { kind: 'album', kindLabel: 'Album', field: 'albumIds' },
 ]
