@@ -28,6 +28,7 @@ import { createBrowseQuery } from '../../shared/browse/browse-query'
 import { nextSort, songQueryFromParams, songQueryToParams } from '../../shared/browse/song-query-params'
 import {
     emptySelection,
+    sameFilter,
     sameQuery,
     selectionAfterRefetch,
     type SongSelectionState,
@@ -158,9 +159,14 @@ export class TracksComponent {
      * The applied filter resolved to names. Refetched only when the *filter* changes —
      * a chip's name has nothing to do with which window is on screen, so tying it to
      * the viewport would re-resolve it on every scroll tick.
+     *
+     * Compared with `sameFilter` rather than by identity, because `songQueryFromParams`
+     * builds a fresh filter object for every query: a sort click or a settled search
+     * term would otherwise reissue `describeSongFilter` over IPC for a filter that had
+     * not changed, which is exactly what the sentence above promises it does not do.
      */
     private filterDescription = toSignal(
-        toObservable(computed(() => this.query().filter)).pipe(
+        toObservable(computed(() => this.query().filter, { equal: sameFilter })).pipe(
             switchMap(currentFilter =>
                 hasEntityFilter(currentFilter)
                     ? from(this.browseService.describeSongFilter(currentFilter)).pipe(

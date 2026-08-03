@@ -367,6 +367,23 @@ test.describe('filtering by entity', () => {
         await expect.poll(async () => (await lastQuery(controller))?.query.filter.presence).toBeUndefined()
     })
 
+    test('does not re-resolve the chip names when only the sort changes', async ({ page }) => {
+        // `songQueryFromParams` builds a fresh filter object for every query, so an
+        // identity comparison made a sort click — or a settled search term — look like
+        // a filter change and reissued the names over IPC.
+        const controller = await createRendererScenario(
+            page,
+            rendererScenarios.tracks.withSongs(),
+            '/tracks?artist=artist-2',
+        )
+        await expect.poll(async () => (await controller.calls('library:describe-song-filter')).length).toBe(1)
+
+        await page.getByRole('button', { name: 'Sort by BPM' }).click()
+        await expect.poll(async () => (await lastQuery(controller))?.query.sort.field).toBe('bpm')
+
+        expect(await controller.calls('library:describe-song-filter')).toHaveLength(1)
+    })
+
     test('still renders the table when the filter names cannot be resolved', async ({ page }) => {
         // Naming a chip is a second round trip, independent of the rows. If it fails
         // the page has to survive it: the description feeds `chips`, `chips` feeds

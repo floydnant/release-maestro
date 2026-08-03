@@ -1,4 +1,4 @@
-import { type SongQuery, type SongSelection } from '@release-maestro/core'
+import { type SongFilter, type SongQuery, type SongSelection } from '@release-maestro/core'
 import {
     applySelectionGesture,
     selectionForQuery,
@@ -47,11 +47,22 @@ export const sameQuery = (left: SongQuery, right: SongQuery): boolean =>
     left.search == right.search &&
     left.sort.field == right.sort.field &&
     left.sort.direction == right.sort.direction &&
-    (left.filter.presence ?? 'any') == (right.filter.presence ?? 'any') &&
-    sameIds(left.filter.artistIds, right.filter.artistIds) &&
-    sameIds(left.filter.genreIds, right.filter.genreIds) &&
-    sameIds(left.filter.recordLabelIds, right.filter.recordLabelIds) &&
-    sameIds(left.filter.albumIds, right.filter.albumIds)
+    sameFilter(left.filter, right.filter)
+
+/**
+ * Structural comparison of two filters, on the same terms.
+ *
+ * Separate from {@link sameQuery} because the filter is the only part of a query the
+ * chip names depend on: a sort click rebuilds the query object, and identity equality
+ * would send that rebuilt-but-equal filter back over IPC to resolve names nobody
+ * asked to change.
+ */
+export const sameFilter = (left: SongFilter, right: SongFilter): boolean =>
+    (left.presence ?? 'any') == (right.presence ?? 'any') &&
+    sameIds(left.artistIds, right.artistIds) &&
+    sameIds(left.genreIds, right.genreIds) &&
+    sameIds(left.recordLabelIds, right.recordLabelIds) &&
+    sameIds(left.albumIds, right.albumIds)
 
 const sameIds = (left: string[] | undefined, right: string[] | undefined): boolean => {
     const leftIds = left ?? []
