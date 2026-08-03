@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import type { QuerySongsRequest } from '@release-maestro/core'
+import type { LibraryScanStatus, QuerySongsRequest } from '@release-maestro/core'
 import {
     createRendererScenario,
     createSongRow,
@@ -733,6 +733,51 @@ test.describe('selection', () => {
             /song-row-/,
         )
         await expect(page.getByRole('row', { selected: true })).toHaveCount(1)
+    })
+})
+
+test.describe('live updates during a scan', () => {
+    /** A status snapshot in one phase; only the phase and the revision matter here. */
+    const scanStatus = (phase: LibraryScanStatus['phase'], revision: number) =>
+        ({
+            scanId: 1,
+            revision,
+            trigger: 'manual',
+            phase,
+            scannedFolders: ['/music'],
+            unavailableFolders: [],
+            startedAt: Date.now() - 10_000,
+            finishedAt: null,
+            discovered: 3,
+            new: 3,
+            changed: 0,
+            unchanged: 0,
+            readDone: 3,
+            readTotal: 3,
+            imported: 3,
+            failedFiles: 0,
+            normalizationIssues: 0,
+            terminal: null,
+        }) satisfies LibraryScanStatus
+
+    test('refetches once a scan finishes, not only while it runs', async ({ page }) => {
+        const controller = await openTracks(page)
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+
+        const before = (await controller.calls('library:query-songs')).length
+
+        // The refetch is audited while a scan runs, so it emits the *last* status of
+        // each window. Whatever the scan commits after its final progress event lands
+        // with nothing left to announce it — the table would hold a stale count and a
+        // stale window until the user happened to scroll or navigate.
+        await controller.emit('library:scan-status', {
+            status: scanStatus('completed', 2),
+            newAlbums: [],
+        })
+
+        await expect
+            .poll(async () => (await controller.calls('library:query-songs')).length)
+            .toBeGreaterThan(before)
     })
 })
 

@@ -16,6 +16,8 @@ import {
     distinctUntilChanged,
     filter,
     from,
+    map,
+    merge,
     of,
     Subject,
     switchMap,
@@ -110,14 +112,31 @@ export class TracksComponent {
         }),
     })
 
+    private scanStatus$ = toObservable(this.libraryService.scanStatus)
+
     /**
-     * Browse views refetch while a scan ingests songs. It is audited rather than
-     * taken raw because scan status ticks far faster than a table needs to move, and
-     * rows shifting under the cursor is already the accepted cost (ADR 0004).
+     * Browse views refetch while a scan ingests songs.
+     *
+     * While it runs the status is audited rather than taken raw, because it ticks far
+     * faster than a table needs to move, and rows shifting under the cursor is already
+     * the accepted cost (ADR 0004).
+     *
+     * The end of a scan is a separate trigger, not just another tick. Auditing emits
+     * the *last* value of each window, so whatever the scan commits after its final
+     * progress event — the closing flush, and the normalization pass behind it — lands
+     * with nothing left to announce it. Without this the table holds a stale count and
+     * a stale window until the user happens to scroll or navigate.
      */
-    private scanProgress$ = toObservable(this.libraryService.scanStatus).pipe(
-        filter(status => status?.phase == 'discovering' || status?.phase == 'reading'),
-        auditTime(SCAN_REFETCH_INTERVAL_MS),
+    private scanProgress$ = merge(
+        this.scanStatus$.pipe(
+            filter(status => status?.phase == 'discovering' || status?.phase == 'reading'),
+            auditTime(SCAN_REFETCH_INTERVAL_MS),
+        ),
+        this.scanStatus$.pipe(
+            map(status => status?.phase),
+            distinctUntilChanged(),
+            filter(phase => phase == 'completed' || phase == 'cancelled' || phase == 'failed'),
+        ),
     )
 
     private browse = createBrowseQuery({
@@ -334,8 +353,7 @@ const hasEntityFilter = (songFilter: SongFilter): boolean =>
 
 /** Any filter at all, entity or availability — what "Clear filters" undoes. */
 const hasAnyFilter = (songFilter: SongFilter): boolean =>
-    hasEntityFilter(songFilter) ||
-    (songFilter.presence != null && songFilter.presence != SongPresence.any)
+    hasEntityFilter(songFilter) || (songFilter.presence != null && songFilter.presence != SongPresence.any)
 
 const entitiesFor = (description: SongFilterDescription, kind: EntityFilterKind) => {
     switch (kind) {
