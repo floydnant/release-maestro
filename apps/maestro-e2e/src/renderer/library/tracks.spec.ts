@@ -1159,6 +1159,33 @@ test.describe('live updates during a scan', () => {
             terminal: null,
         }) satisfies LibraryScanStatus
 
+    test('refetches while a scan runs, throttled rather than per tick', async ({ page }) => {
+        const controller = await openTracks(page)
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+
+        const before = (await controller.calls('library:query-songs')).length
+
+        // A scan ticks far faster than a table needs to move, so progress is audited.
+        // Auditing emits the last value of each window: a burst of ticks buys one
+        // refetch, and the window is 1.5s.
+        const grown = [...createSongRows(), createSongRow({ id: 'song-4', title: 'Zenith' })]
+        await controller.setHandler('library:query-songs', {
+            kind: 'resolve',
+            value: { rows: grown, offset: 0, total: grown.length },
+        })
+        for (let tick = 0; tick < 5; tick++) {
+            await controller.emit('library:scan-status', {
+                status: scanStatus('reading', 2 + tick),
+                newAlbums: [],
+            })
+        }
+
+        await expect(rowByTitle(page, 'Zenith')).toBeVisible()
+        // The burst bought one refetch, not five — the scan is still running, so the
+        // terminal-phase trigger has not fired and this is the audited branch alone.
+        expect((await controller.calls('library:query-songs')).length).toBe(before + 1)
+    })
+
     test('refetches once a scan finishes, not only while it runs', async ({ page }) => {
         const controller = await openTracks(page)
         await expect(rowByTitle(page, 'Dawn')).toBeVisible()
