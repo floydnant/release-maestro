@@ -159,7 +159,7 @@ const queryPlan = (sqlite: Database.Database, sort: SongSort): string => {
 const planColumns: Record<SongSortField, string> = {
     [SongSortField.title]: 'title',
     [SongSortField.artist]: 'artist_text',
-    [SongSortField.release]: 'album_title',
+    [SongSortField.album]: 'album_title',
     [SongSortField.genre]: 'genre_text',
     [SongSortField.bpm]: 'bpm',
     [SongSortField.musicalKey]: 'musical_key',

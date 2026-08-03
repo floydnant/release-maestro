@@ -322,7 +322,7 @@ type CatalogEntityTable =
 const sortColumns: Record<SongSortField, AnySQLiteColumn> = {
     [SongSortField.title]: songsTable.title,
     [SongSortField.artist]: songsTable.artistText,
-    [SongSortField.release]: songsTable.albumTitle,
+    [SongSortField.album]: songsTable.albumTitle,
     [SongSortField.genre]: songsTable.genreText,
     [SongSortField.bpm]: songsTable.bpm,
     [SongSortField.musicalKey]: songsTable.musicalKey,

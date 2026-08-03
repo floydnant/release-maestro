@@ -67,8 +67,8 @@ export interface CatalogEntityRef {
 export const SongSortField = {
     title: 'title',
     artist: 'artist',
-    /** *Release* in copy — sorts on the album title denormalized onto the song. */
-    release: 'release',
+    /** Sorts on the album title denormalized onto the song. */
+    album: 'album',
     genre: 'genre',
     bpm: 'bpm',
     musicalKey: 'musicalKey',

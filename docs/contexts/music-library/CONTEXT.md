@@ -107,18 +107,26 @@ _Avoid_: `track` in any identifier; file, item, entry as synonyms for song
 **Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on a
 release, not a song. Do not "correct" it to `songNumber`.
 
-**Album** (code) / **release** (user-facing copy):
-A group of songs issued together. Code says **album** — `albums`, `albumId`, `albumArtists`; copy says
-**release** — a "Releases" tab, "12 releases". The register split exists because a release is not
-always an album: it may equally be an EP, a single or a compilation. The library does not distinguish
-these yet; a `releaseType` attribute is expected later. Until it exists, do not call a release an
-album in copy.
-_Avoid_: record, LP, disc
+**Album**:
+A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,
+`albumArtists`, an "Albums" tab, "12 albums". It is what music players call this, and it is what
+users looking for it will say.
 
-The release feed has a **release** too, and it is the same real-world concept modelled twice — see
-[CONTEXT-MAP](../../../CONTEXT-MAP.md). The library's is _inferred_ from tags on files the user owns;
-the feed's is _announced_ by Bandcamp and not necessarily owned. Neither model converts to the other,
-so never pass one where the other is expected.
+There was a register split here — code _album_, copy _release_ — and it was dropped. A "Releases" tab
+reads like an inbox of things arriving rather than a collection of records already owned, which is
+precisely what the release feed is and this is not. Keeping the word for the feed alone is worth more
+than the split was.
+
+The cost, stated so it is not rediscovered as a bug: an album is not always an album. It may equally
+be an EP, a single or a compilation, and "release" covered those where "album" strains. The library
+does not distinguish them yet; when a `releaseType` attribute lands, the copy can say _EP_ or _single_
+where it knows, which is a better answer than a vaguer word everywhere.
+
+**Release** now belongs to the [release feed](../release-feed/CONTEXT.md) and to nothing here. The two
+were the same real-world concept modelled twice — the library's _inferred_ from tags on files the user
+owns, the feed's _announced_ by Bandcamp and not necessarily owned — and the word no longer has to be
+qualified to tell them apart. See [CONTEXT-MAP](../../../CONTEXT-MAP.md).
+_Avoid_: release, record, LP, disc
 
 **Artist credit**:
 How one song names the artists behind it, in the tag's own phrasing. An ordered list of segments —
@@ -138,10 +146,10 @@ raw names on its own — splitting is a user-confirmed act (`confirmedByUser`). 
 is currently one artist entity. Treat the single segment as the degenerate case, not as the model.
 
 **Appears on**:
-The albums an artist has songs on without being an album artist of them — compilations, VA releases,
-guest features, DJ mixes. Defined by exclusion, so it is strictly disjoint from that artist's own
-releases; the two together account for every album the artist touches. An artist's own album never
-shows up here.
+The albums an artist has songs on without being an album artist of them — compilations, VA
+collections, guest features, DJ mixes. Defined by exclusion, so it is strictly disjoint from that
+artist's own albums; the two together account for every album the artist touches. An artist's own
+album never shows up here.
 _Avoid_: featured on, guest appearances, other releases
 
 **Record label**:

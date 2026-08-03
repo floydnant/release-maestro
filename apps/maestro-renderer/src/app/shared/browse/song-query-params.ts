@@ -27,7 +27,7 @@ export const SongQueryParam = {
     artist: 'artist',
     genre: 'genre',
     recordLabel: 'label',
-    release: 'release',
+    album: 'album',
     presence: 'presence',
 } as const
 
@@ -49,7 +49,7 @@ export const songQueryFromParams = (params: ReadonlyParams): SongQuery => {
         artistIds: idList(params[SongQueryParam.artist]),
         genreIds: idList(params[SongQueryParam.genre]),
         recordLabelIds: idList(params[SongQueryParam.recordLabel]),
-        albumIds: idList(params[SongQueryParam.release]),
+        albumIds: idList(params[SongQueryParam.album]),
         presence: presence != null && PRESENCES.has(presence) ? (presence as SongPresence) : undefined,
     }
 
@@ -81,7 +81,7 @@ export const songQueryToParams = (query: SongQuery): Record<string, string | nul
     [SongQueryParam.artist]: idParam(query.filter.artistIds),
     [SongQueryParam.genre]: idParam(query.filter.genreIds),
     [SongQueryParam.recordLabel]: idParam(query.filter.recordLabelIds),
-    [SongQueryParam.release]: idParam(query.filter.albumIds),
+    [SongQueryParam.album]: idParam(query.filter.albumIds),
     [SongQueryParam.presence]:
         query.filter.presence == null || query.filter.presence == SongPresence.any
             ? null

@@ -15,7 +15,7 @@ describe('song query params', () => {
         })
 
         it('reads entity filters as comma-separated id lists', () => {
-            const query = songQueryFromParams({ artist: 'a1,a2', genre: 'g1', label: 'l1', release: 'r1' })
+            const query = songQueryFromParams({ artist: 'a1,a2', genre: 'g1', label: 'l1', album: 'r1' })
 
             expect(query.filter).toEqual({
                 artistIds: ['a1', 'a2'],

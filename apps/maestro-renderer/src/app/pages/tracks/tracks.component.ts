@@ -73,7 +73,7 @@ const CHIP_KINDS: { kind: EntityFilterKind; kindLabel: string; field: keyof Song
     { kind: 'artist', kindLabel: 'Artist', field: 'artistIds' },
     { kind: 'genre', kindLabel: 'Genre', field: 'genreIds' },
     { kind: 'recordLabel', kindLabel: 'Label', field: 'recordLabelIds' },
-    { kind: 'album', kindLabel: 'Release', field: 'albumIds' },
+    { kind: 'album', kindLabel: 'Album', field: 'albumIds' },
 ]
 
 @Component({
