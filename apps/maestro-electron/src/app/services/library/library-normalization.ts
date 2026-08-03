@@ -8,6 +8,21 @@ for (const [key, value] of Object.entries(ExternalRefKeys)) {
     EXTERNAL_REF_KEYS[key.toUpperCase()] = value
 }
 
+/**
+ * The revision of this module's derivation rules.
+ *
+ * A scan re-reads a file only when the file itself changed — path, size or mtime. That
+ * is right for tag edits and wrong for *our* edits: change how a column is derived and
+ * every existing row keeps the value the old rules produced, with nothing on disk to
+ * trigger a re-read. `releaseYear` was the first case of it, and left the browse
+ * table's Year column empty on every library scanned before it existed.
+ *
+ * **Bump this whenever a change here alters what is written to a song row.** Rows
+ * stamped with an older version are re-read on the next scan; that is the only thing
+ * that makes a normaliser change reach data already in the database.
+ */
+export const NORMALIZER_VERSION = 1
+
 export const normalizeDisplayText = (value: string | null | undefined): string | null => {
     const normalized = value?.trim().replace(/\s+/g, ' ')
     return normalized ? normalized : null
@@ -59,6 +74,15 @@ export const fileFingerprint = (fact: PrescanFileFact): string =>
         size: fact.size,
     })
 
+/**
+ * Deliberately hashes the *raw* year, and must keep doing so.
+ *
+ * This key is stored under a unique index and is how an album is found again on the
+ * next scan. Changing what goes into it re-keys every album already in the database,
+ * orphaning their songs instead of updating them. Swapping in the derived year would
+ * also gain nothing: `date` is already part of the key and the derived year is read
+ * out of `date`, so it adds no way to tell two albums apart.
+ */
 export const albumIdentityKey = (metadata: SongMetadata): string =>
     stableHash({
         albumArtist: normalizeDisplayText(metadata.albumArtist),
@@ -69,6 +93,15 @@ export const albumIdentityKey = (metadata: SongMetadata): string =>
         year: metadata.year,
     })
 
+/**
+ * A digest of the tag as it was read. Written to `songs.metadata_hash` and, today,
+ * never read back — nothing branches on it.
+ *
+ * In particular it is **not** what decides whether a file is re-read. That is the file
+ * fingerprint, plus {@link NORMALIZER_VERSION} for changes on our side. Adding derived
+ * values here would not change that, and would not tell two tags apart either: every
+ * derivation in this module is a pure function of fields already hashed below.
+ */
 export const metadataHash = (metadata: SongMetadata): string =>
     stableHash({
         albumArtist: normalizeDisplayText(metadata.albumArtist),

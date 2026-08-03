@@ -27,6 +27,7 @@ import {
     filterExternalRefs,
     mergeExternalRefs,
     metadataHash,
+    NORMALIZER_VERSION,
     normalizeDisplayText,
     releaseYear,
     relevantExternalRefsMap,
@@ -139,10 +140,7 @@ export class LibraryBackendRepository {
     }
 
     listSongsNeedingMetadata(afterPath: string | null, limit: number): PrescanFileFact[] {
-        const pendingCondition = or(
-            isNull(songsTable.scannedFileFingerprint),
-            ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
-        )
+        const pendingCondition = songsNeedingMetadata()
         const where = afterPath
             ? and(eq(songsTable.present, true), pendingCondition, gt(songsTable.path, afterPath))
             : and(eq(songsTable.present, true), pendingCondition)
@@ -174,15 +172,7 @@ export class LibraryBackendRepository {
             this.database.db
                 .select({ count: count(songsTable.id) })
                 .from(songsTable)
-                .where(
-                    and(
-                        eq(songsTable.present, true),
-                        or(
-                            isNull(songsTable.scannedFileFingerprint),
-                            ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
-                        ),
-                    ),
-                )
+                .where(and(eq(songsTable.present, true), songsNeedingMetadata()))
                 .get()?.count ?? 0
         )
     }
@@ -505,6 +495,7 @@ export class LibraryBackendRepository {
                 tagType: metadata.fileInfo?.tagType ?? null,
                 codec: metadata.fileInfo?.codec ?? null,
                 metadataHash: metadataHash(metadata),
+                normalizerVersion: NORMALIZER_VERSION,
                 externalRefs: mergeExternalRefs([existingSong?.externalRefs, externalRefs]),
                 albumId,
             } satisfies Omit<typeof songsTable.$inferInsert, 'id'>
@@ -614,3 +605,23 @@ export class LibraryBackendRepository {
         })
     }
 }
+
+/**
+ * Which songs still owe the metadata pass.
+ *
+ * Shared by the count and the listing on purpose — they answer the same question, and
+ * when they were written out separately a condition added to one silently did not
+ * reach the other.
+ *
+ * A file qualifies when it has never been read, when the file itself changed, or when
+ * it was last read by an older revision of the normalizer. That last clause is what
+ * lets a change in how a column is derived reach rows already in the database: nothing
+ * happens on disk, so the fingerprint alone would skip them forever.
+ */
+const songsNeedingMetadata = () =>
+    or(
+        isNull(songsTable.scannedFileFingerprint),
+        ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
+        isNull(songsTable.normalizerVersion),
+        ne(songsTable.normalizerVersion, NORMALIZER_VERSION),
+    )

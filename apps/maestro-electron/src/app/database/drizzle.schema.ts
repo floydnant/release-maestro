@@ -204,6 +204,12 @@ export const songsTable = sqliteTable(
         codec: text('codec'),
 
         metadataHash: text('metadata_hash'),
+        /**
+         * Which revision of the normaliser produced this row's derived columns. Null
+         * for rows written before the column existed, which is why a version mismatch
+         * and a null both mean "re-read this file" — see `NORMALIZER_VERSION`.
+         */
+        normalizerVersion: integer('normalizer_version'),
         externalRefs: text('external_refs', { mode: 'json' }).$type<ExternalRefs>().notNull().default({}),
         albumId: text('album_id').references(() => albumsTable.id, {
             onDelete: 'set null',
