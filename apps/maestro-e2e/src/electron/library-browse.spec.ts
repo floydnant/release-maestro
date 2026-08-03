@@ -80,9 +80,12 @@ const scanAndOpenTracks = async (appDataDir: string, libraryDir: string): Promis
  * mid-swap and throw on a detached node.
  */
 const rowTitles = (): Promise<string[]> =>
-    page
-        .locator('[role="row"][aria-label]')
-        .evaluateAll(rows => rows.map(row => (row.getAttribute('aria-label') ?? '').split(' by ')[0] ?? ''))
+    page.getByRole('row').evaluateAll(rows =>
+        rows
+            .map(row => row.getAttribute('aria-label'))
+            .filter((label): label is string => label != null)
+            .map(label => label.split(' by ')[0] ?? ''),
+    )
 
 test('a scanned library is browsable, sortable and filterable end to end', async ({}, testInfo) => {
     const appDataDir = testInfo.outputPath('app-data')

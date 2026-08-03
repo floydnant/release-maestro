@@ -15,7 +15,6 @@ import {
     toggleRow,
     toWireSelection,
     type BrowseSelectionState,
-    type SelectionAnchor,
 } from './browse-selection'
 import { sameQuery } from './song-selection'
 

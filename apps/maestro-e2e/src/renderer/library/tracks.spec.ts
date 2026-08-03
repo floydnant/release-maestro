@@ -839,8 +839,9 @@ test.describe('what the window actually renders', () => {
 
     const expectContiguousFrom = (indices: number[], expectedFirst: number) => {
         expect(indices.length).toBeGreaterThan(5)
-        expect(indices).toEqual(indices.map((_index, position) => indices[0]! + position))
-        expect(Math.abs(indices[0]! - expectedFirst)).toBeLessThanOrEqual(2)
+        const [first = 0] = indices
+        expect(indices).toEqual(indices.map((_index, position) => first + position))
+        expect(Math.abs(first - expectedFirst)).toBeLessThanOrEqual(2)
     }
 
     test('fills the viewport at the top, with no gaps', async ({ page }) => {
@@ -1183,7 +1184,7 @@ test.describe('live updates during a scan', () => {
         await expect(rowByTitle(page, 'Zenith')).toBeVisible()
         // The burst bought one refetch, not five — the scan is still running, so the
         // terminal-phase trigger has not fired and this is the audited branch alone.
-        expect((await controller.calls('library:query-songs')).length).toBe(before + 1)
+        expect(await controller.calls('library:query-songs')).toHaveLength(before + 1)
     })
 
     test('refetches once a scan finishes, not only while it runs', async ({ page }) => {

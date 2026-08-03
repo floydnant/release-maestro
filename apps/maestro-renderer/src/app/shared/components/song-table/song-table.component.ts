@@ -149,6 +149,12 @@ export class SongTableComponent {
     protected readonly columns = SONG_TABLE_COLUMN_WIDTHS
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
+    /**
+     * The sticky header, referenced rather than queried by class. Its class is a
+     * descriptor — a human convention nothing validates — so a typo in one would have
+     * been silently behavioural instead of a compile error.
+     */
+    private header = viewChild<ElementRef<HTMLElement>>('header')
     /** The last window emitted, so an unchanged one never reaches the signal graph. */
     private lastWindow: BrowseWindow | null = null
     /**
@@ -533,7 +539,7 @@ export class SongTableComponent {
         const padding = SCROLL_PADDING_ROWS * ROW_HEIGHT
         // The header floats over the top of the scroller, so the space behind it is
         // not viewport the cursor can be seen in.
-        const header = element.querySelector<HTMLElement>('.song-table__header')?.clientHeight ?? 0
+        const header = this.header()?.nativeElement.clientHeight ?? 0
 
         const rendered = document.getElementById(this.rowElementId(index))
         const top = rendered

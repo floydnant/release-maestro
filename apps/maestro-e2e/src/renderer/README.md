@@ -69,6 +69,21 @@ Current release feed presets:
 - `rendererScenarios.feed.loadError()`
 - `rendererScenarios.feed.withOneRelease()`
 
+Current track list presets:
+
+- `rendererScenarios.tracks.empty()`
+- `rendererScenarios.tracks.withSongs()`
+- `rendererScenarios.tracks.loadPending()`
+- `rendererScenarios.tracks.loadError()`
+
+Track list builders:
+
+- `.songs(rows, { total?, offset? })` serves **one fixed window** whatever is asked for. The
+  `total` is what sizes the scrollbar, so passing one far larger than `rows` is how a test
+  asserts that scrolling asks for a _different_ window.
+- `.songCatalog(page, total)` serves whatever window is asked for — see
+  [Computed Answers](#computed-answers).
+
 ## Channel Behaviors
 
 Every main-process IPC channel has a default behavior. Override the channels that matter to the test.

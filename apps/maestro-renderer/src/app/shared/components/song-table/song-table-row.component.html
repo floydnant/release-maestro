@@ -72,7 +72,7 @@
 </span>
 
 <span
-    class="shrink-0 truncate px-2"
+    class="song-table__album | shrink-0 truncate px-2"
     role="gridcell"
     [style.width.px]="columns.album"
     [title]="row().albumTitle || ''"
@@ -92,7 +92,7 @@
 </span>
 
 <span
-    class="shrink-0 truncate px-2"
+    class="song-table__genre | shrink-0 truncate px-2"
     role="gridcell"
     [style.width.px]="columns.genre"
     [title]="row().genreText || ''"
@@ -116,16 +116,20 @@
     }
 </span>
 
-<span class="shrink-0 truncate px-2 text-right" role="gridcell" [style.width.px]="columns.bpm">
+<span
+    class="song-table__bpm | shrink-0 truncate px-2 text-right"
+    role="gridcell"
+    [style.width.px]="columns.bpm"
+>
     {{ formatBpm(row().bpm) }}
 </span>
 
-<span class="shrink-0 truncate px-2" role="gridcell" [style.width.px]="columns.musicalKey">
+<span class="song-table__key | shrink-0 truncate px-2" role="gridcell" [style.width.px]="columns.musicalKey">
     {{ row().musicalKey }}
 </span>
 
 <span
-    class="shrink-0 truncate px-2 text-right text-content-secondary"
+    class="song-table__duration | shrink-0 truncate px-2 text-right text-content-secondary"
     role="gridcell"
     [style.width.px]="columns.duration"
 >
@@ -133,7 +137,7 @@
 </span>
 
 <span
-    class="shrink-0 truncate px-2 text-right text-content-secondary"
+    class="song-table__year | shrink-0 truncate px-2 text-right text-content-secondary"
     role="gridcell"
     [style.width.px]="columns.year"
 >
@@ -141,7 +145,7 @@
 </span>
 
 <span
-    class="shrink-0 truncate px-2"
+    class="song-table__record-label | shrink-0 truncate px-2"
     role="gridcell"
     [style.width.px]="columns.recordLabel"
     [title]="row().recordLabelText || ''"
@@ -161,7 +165,7 @@
 </span>
 
 <span
-    class="shrink-0 truncate px-2 text-content-secondary"
+    class="song-table__date-added | shrink-0 truncate px-2 text-content-secondary"
     role="gridcell"
     [style.width.px]="columns.dateAdded"
 >
