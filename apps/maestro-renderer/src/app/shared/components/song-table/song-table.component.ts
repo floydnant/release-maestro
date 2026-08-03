@@ -320,19 +320,21 @@ export class SongTableComponent {
      * under the last row, a margin, the toolbar, another page — which is what every
      * other app does.
      *
-     * The only exception is the scrollbar, and it has to be identified by geometry
-     * rather than by "the press landed on the scroller": margins and padding land
-     * there too, and treating those as scrollbar presses is what left whole strips of
-     * the table unable to clear a selection.
+     * **The scrollbar is not excepted, deliberately.** There used to be a geometric
+     * test for "did this land outside the client box", which is where a *classic*
+     * scrollbar sits. It could never work on the platform this ships to first: macOS
+     * overlay scrollbars take up no client space at all, so they are drawn over the
+     * content and every press on one reads as a press on whatever is beneath it. The
+     * check was inert where it mattered and only ever exercised in CI, where it could
+     * not fail. Dragging a classic scrollbar now clears the selection, which is the
+     * cost of not carrying a guard that does not guard.
      */
     protected onDocumentPointerDown(event: MouseEvent): void {
         if (event.button != 0) return
 
-        const scroller = this.scroller()?.nativeElement
         const target = event.target
-        if (!scroller || !(target instanceof Element)) return
+        if (!(target instanceof Element)) return
         if (target.closest('[role="row"][aria-selected]')) return
-        if (isScrollbarPress(scroller, event)) return
         if (isEmptySelection(this.selection())) return
 
         this.selectionChange.emit(clearSelection(this.selection()))
@@ -529,16 +531,4 @@ export class SongTableComponent {
             element.scrollTop = bottom + padding - element.clientHeight
         }
     }
-}
-
-/**
- * Whether a press landed on the scroller's own scrollbars, which sit outside its
- * client box. Overlay scrollbars take up no client space and never reach here.
- */
-const isScrollbarPress = (scroller: HTMLElement, event: MouseEvent): boolean => {
-    const bounds = scroller.getBoundingClientRect()
-    return (
-        event.clientX > bounds.left + scroller.clientWidth ||
-        event.clientY > bounds.top + scroller.clientHeight
-    )
 }

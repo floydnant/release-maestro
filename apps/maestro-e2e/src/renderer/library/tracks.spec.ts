@@ -540,16 +540,16 @@ test.describe('selection', () => {
     })
 
     test('clears the selection when clicking the canvas margin', async ({ page }) => {
-        // Reported: the margin around the canvas belongs to the scroller, and treating
-        // every press on the scroller as a scrollbar press left strips of the table
-        // unable to clear anything.
+        // Reported: the margin around the canvas belongs to the scroller, and an
+        // earlier attempt to spare scrollbar presses treated every press on the
+        // scroller as one — leaving strips of the table unable to clear anything.
         await openTracks(page)
         await clickRow(page, 'Dawn')
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
 
         // The canvas carries a bottom margin, which only comes into view at the end of
-        // the scroll. A press there lands on the scroller itself — the same thing a
-        // press on its scrollbar does, which is why geometry has to tell them apart.
+        // the scroll. A press there lands on the scroller itself, and still has to
+        // clear.
         const grid = page.getByRole('grid', { name: 'Tracks' })
         await grid.evaluate(element => element.scrollTo({ top: element.scrollHeight }))
         const point = await grid.evaluate(element => {

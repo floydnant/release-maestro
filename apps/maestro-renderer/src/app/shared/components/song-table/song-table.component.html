@@ -113,9 +113,7 @@
     <!-- A spacer as tall as the whole result set gives the scrollbar its range; only
          the loaded window is ever in the DOM, translated to where it belongs. -->
     <!-- `min-h-full` so the canvas covers the viewport even when a handful of rows do
-         not. Otherwise the empty space below them belongs to the scroller itself,
-         which is indistinguishable from its scrollbar — and a press there has to
-         clear the selection, not be mistaken for scrolling. -->
+         not, rather than leaving the empty space below them belonging to the scroller. -->
     <!-- `role="presentation"` on both wrappers, and it is load-bearing rather than
          decorative: `role="row"` has to be owned by the grid, and two untyped divs in
          between detach every data row from it. Assistive tech then sees a grid with
