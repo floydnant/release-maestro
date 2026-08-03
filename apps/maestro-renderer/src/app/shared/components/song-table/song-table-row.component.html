@@ -1,7 +1,7 @@
 <!-- The artwork runs the full height of the row, inset by a couple of pixels, and is
      held off the left edge so it is not cramped against it. Its own square shape comes
      from the row height. -->
-<span class="song-table__cover | w-16 shrink-0 self-stretch py-0.5 pl-6" role="gridcell">
+<span class="song-table__cover | self-stretch py-0.5 pl-6" role="gridcell">
     @if (row().coverPath) {
         <img
             class="aspect-square h-full rounded-sm object-cover"
@@ -22,7 +22,7 @@
 <!-- The missing badge lives in the title cell rather than a column of its own: a
      dedicated column reserves width in every library, and most libraries have nothing
      missing at all. -->
-<span class="song-table__title | flex w-64 shrink-0 grow items-center gap-1.5 px-2" role="gridcell">
+<span class="song-table__title | flex items-center gap-1.5 px-2" role="gridcell">
     @if (!row().present) {
         <button
             type="button"
@@ -38,11 +38,7 @@
     <span class="truncate" [title]="row().title">{{ row().title }}</span>
 </span>
 
-<span
-    class="song-table__artist | w-52 shrink-0 truncate px-2"
-    role="gridcell"
-    [title]="row().artistText || ''"
->
+<span class="song-table__artist | truncate px-2" role="gridcell" [title]="row().artistText || ''">
     @if (row().artistCredit.length) {
         @for (segment of row().artistCredit; track segment.artistId; let last = $last) {
             <button
@@ -62,7 +58,7 @@
     }
 </span>
 
-<span class="w-52 shrink-0 truncate px-2" role="gridcell" [title]="row().albumTitle || ''">
+<span class="truncate px-2" role="gridcell" [title]="row().albumTitle || ''">
     @if (row().albumId && row().albumTitle) {
         <button
             type="button"
@@ -77,7 +73,7 @@
     }
 </span>
 
-<span class="w-32 shrink-0 truncate px-2" role="gridcell" [title]="row().genreText || ''">
+<span class="truncate px-2" role="gridcell" [title]="row().genreText || ''">
     @if (row().genres.length) {
         @for (genre of row().genres; track genre.id; let last = $last) {
             <button
@@ -97,23 +93,23 @@
     }
 </span>
 
-<span class="w-16 shrink-0 truncate px-2 text-right" role="gridcell">
+<span class="truncate px-2 text-right" role="gridcell">
     {{ formatBpm(row().bpm) }}
 </span>
 
-<span class="w-12 shrink-0 truncate px-2" role="gridcell">
+<span class="truncate px-2" role="gridcell">
     {{ row().musicalKey }}
 </span>
 
-<span class="w-16 shrink-0 truncate px-2 text-right text-content-secondary" role="gridcell">
+<span class="truncate px-2 text-right text-content-secondary" role="gridcell">
     {{ row().duration ? formatDuration(row().duration!) : '—' }}
 </span>
 
-<span class="w-16 shrink-0 truncate px-2 text-right text-content-secondary" role="gridcell">
+<span class="truncate px-2 text-right text-content-secondary" role="gridcell">
     {{ row().year }}
 </span>
 
-<span class="w-32 shrink-0 truncate px-2" role="gridcell" [title]="row().recordLabelText || ''">
+<span class="truncate px-2" role="gridcell" [title]="row().recordLabelText || ''">
     @if (row().recordLabelId && row().recordLabelText) {
         <button
             type="button"
@@ -128,6 +124,6 @@
     }
 </span>
 
-<span class="w-32 shrink-0 truncate px-2 text-content-secondary" role="gridcell">
+<span class="truncate px-2 text-content-secondary" role="gridcell">
     {{ row().dateAdded ? formatDateShort(row().dateAdded!) : '—' }}
 </span>

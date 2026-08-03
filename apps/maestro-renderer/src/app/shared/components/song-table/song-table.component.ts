@@ -82,6 +82,37 @@ export interface EntityFilterRequest {
 @Component({
     selector: 'app-song-table',
     templateUrl: './song-table.component.html',
+    /**
+     * The column widths, declared once for the header and every row.
+     *
+     * They used to be `w-52 shrink-0` utilities repeated on eleven header cells and
+     * eleven body cells, in two files after the row was extracted — two lists that had
+     * to be edited together and drifted apart when the viewport shrank if they were
+     * not. A grid template makes that impossible: header and rows are grid rows over
+     * the same track list, so a column has one width by construction.
+     *
+     * `min-width: 0` on the cells because a grid item's default `auto` minimum refuses
+     * to shrink below its content, which stops `truncate` from ever truncating.
+     * `width: max-content` keeps the table wider than the viewport rather than
+     * squeezing columns, so the horizontal scroll still works.
+     */
+    styles: `
+        .song-table__header,
+        .song-table__row {
+            display: grid;
+            grid-template-columns:
+                4rem minmax(16rem, 1fr) 13rem 13rem 8rem
+                4rem 3rem 4rem 4rem 8rem 8rem;
+            align-items: center;
+            width: max-content;
+            min-width: 100%;
+        }
+
+        .song-table__header > *,
+        .song-table__row > * > * {
+            min-width: 0;
+        }
+    `,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [NgClass, SongTableHeadingComponent, SongTableRowComponent],
     host: {
