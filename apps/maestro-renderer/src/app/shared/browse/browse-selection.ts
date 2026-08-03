@@ -271,7 +271,11 @@ export interface SelectionAnchor<TQuery> {
 /** One click, reduced to what selection semantics actually depend on. */
 export interface SelectionGesture {
     index: number
-    /** The row's id; only the gestures that name a single row need it. */
+    /**
+     * The row's id, or null when the row is outside the loaded window. A pointer
+     * gesture always has one; a keyboard jump past the loaded window does not, and
+     * is answered with a positional range instead.
+     */
     id: string | null
     shiftKey: boolean
     /** Cmd on macOS, Ctrl elsewhere. */
@@ -326,7 +330,25 @@ export const applySelectionGesture = <TQuery>(
         return { selection, anchor: usableAnchor }
     }
 
-    if (gesture.id == null) return { selection: state, anchor: usableAnchor }
+    if (gesture.id == null) {
+        // The row is outside the loaded window — a keyboard jump to the end of a large
+        // list gets there long before the data does — so there is no id to hand-pick
+        // it with. A range needs none: a one-row range addresses it positionally,
+        // which is exactly what ranges are for, and the main process resolves it in
+        // SQL the same way. Returning the selection unchanged instead used to move the
+        // viewport while leaving the old row selected.
+        //
+        // Toggling is the exception. Cmd-clicking a row means "this specific row, on
+        // top of the rest", and that is a claim about a row we cannot name yet.
+        if (gesture.toggleKey) return { selection: state, anchor: usableAnchor }
+
+        const selection = selectRange(state, { start: gesture.index, end: gesture.index + 1 })
+        return {
+            selection,
+            anchor: { index: gesture.index, additive: false, mode: 'select', base: selection },
+        }
+    }
+
     const row = { id: gesture.id, index: gesture.index }
 
     if (!gesture.toggleKey) {

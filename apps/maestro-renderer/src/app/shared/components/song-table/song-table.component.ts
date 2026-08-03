@@ -301,8 +301,9 @@ export class SongTableComponent {
         this.cursorIndex.set(index)
         this.scrollIndexIntoView(index)
 
-        // The row may be outside the loaded window after a jump to the end; the
-        // gesture falls back to addressing it by index alone.
+        // The row may be outside the loaded window after a jump to the end, in which
+        // case there is no id to send and the gesture selects it as a one-row range
+        // instead — see `applySelectionGesture`.
         const row = this.rows()[index - this.offset()]
         this.emitGesture({ index, id: row?.id ?? null, shiftKey: extend, toggleKey: false })
     }

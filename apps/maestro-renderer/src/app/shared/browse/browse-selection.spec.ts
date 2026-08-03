@@ -550,9 +550,25 @@ describe('song selection', () => {
             expect(twice.selection.ranges).toEqual([{ start: 10, end: 31 }])
         })
 
-        it('does nothing when a row-naming gesture arrives without an id', () => {
+        it('selects a row outside the loaded window as a one-row range', () => {
+            // End on a large list arrives long before the window does, so there is no
+            // id to hand-pick with. A range addresses the row positionally and needs
+            // none, which is what keeps the jump from moving the viewport while
+            // leaving the previous row selected.
             const first = click(emptySelection(query), null, 5)
-            const nothing = click(first.selection, first.anchor, 9, { id: null })
+            const jumped = click(first.selection, first.anchor, 9_999, { id: null })
+
+            expect(jumped.selection.ranges).toEqual([{ start: 9_999, end: 10_000 }])
+            expect(jumped.selection.included).toEqual([])
+            expect(isSelected(jumped.selection, { id: 'song-5', index: 5 })).toBe(false)
+            expect(jumped.anchor).toMatchObject({ index: 9_999, mode: 'select' })
+        })
+
+        it('refuses to toggle a row it cannot name', () => {
+            // Unlike a plain move, cmd-click means "this row on top of the rest" —
+            // a claim about a specific row, which a bare index cannot stand in for.
+            const first = click(emptySelection(query), null, 5)
+            const nothing = click(first.selection, first.anchor, 9, { id: null, toggleKey: true })
 
             expect(nothing.selection).toBe(first.selection)
             expect(nothing.anchor).toBe(first.anchor)

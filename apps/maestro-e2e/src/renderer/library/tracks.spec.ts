@@ -705,6 +705,20 @@ test.describe('selection', () => {
         await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
     })
 
+    test('selects the last row on End, far past the loaded window', async ({ page }) => {
+        // End on a large library jumps thousands of rows ahead of the data. The row it
+        // lands on has no id yet, and a gesture that needed one used to move the
+        // viewport while leaving the previous row selected — the list scrolled and the
+        // selection stayed behind.
+        await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 50_000 }).build())
+
+        await clickRow(page, 'Dawn')
+        await page.keyboard.press('End')
+
+        await expect(page.getByText('1 of 50000 tracks selected')).toBeAttached()
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
+    })
+
     test('gives the grid a current row when the keyboard arrives at it', async ({ page }) => {
         await openTracks(page)
 
