@@ -108,7 +108,7 @@ describe('LibraryBrowseRepository', () => {
             expect(result.rows).toHaveLength(5)
         })
 
-        it('pages without repeating or dropping a row when sort values tie', () => {
+        it('slides the window without repeating or dropping a row when sort values tie', () => {
             // Every row here has a null BPM, so the sort column alone cannot order
             // them — only the id tiebreaker makes consecutive windows disjoint.
             const sort = { field: SongSortField.bpm, direction: 'asc' } as const
@@ -119,9 +119,9 @@ describe('LibraryBrowseRepository', () => {
             })
             const third = repository.querySongs({ query: query({ sort }), window: { offset: 20, limit: 10 } })
 
-            const paged = [...first.rows, ...second.rows, ...third.rows].map(row => row.id)
-            expect(new Set(paged).size).toBe(25)
-            expect(paged).toHaveLength(25)
+            const windowed = [...first.rows, ...second.rows, ...third.rows].map(row => row.id)
+            expect(new Set(windowed).size).toBe(25)
+            expect(windowed).toHaveLength(25)
         })
 
         it('returns an empty window past the end rather than failing', () => {
@@ -298,7 +298,7 @@ describe('LibraryBrowseRepository', () => {
             ['BURIAL', ['Archangel', 'Moth']],
             ['untrue', ['Archangel']],
             ['text', ['Moth']],
-        ])('matches %s across title, artist, release and record label', (search, expected) => {
+        ])('matches %s across title, artist, album and record label', (search, expected) => {
             const result = repository.querySongs({
                 query: query({ search, sort: { field: SongSortField.title, direction: 'asc' } }),
                 window: { offset: 0, limit: 10 },
@@ -415,7 +415,7 @@ describe('LibraryBrowseRepository', () => {
             expect(result.rows[0]?.coverPath).toBe('/covers/song.png')
         })
 
-        it("falls back to the album's, because a track with no embedded art still has a release", () => {
+        it("falls back to the album's, because a track with no embedded art still has an album", () => {
             seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', coverPath: null })
 
             const result = repository.querySongs({ query: query(), window: { offset: 0, limit: 10 } })

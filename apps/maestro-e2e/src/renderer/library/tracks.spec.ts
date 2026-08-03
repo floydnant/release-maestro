@@ -16,7 +16,7 @@ import {
  * tests assert two different things depending on what is under test: what the page
  * *renders* from a window it was given, and what it *asks for* when the user sorts,
  * filters, searches or scrolls. The second is the real contract with the read side —
- * asserting that a fake paged correctly would prove nothing.
+ * asserting that a fake windowed correctly would prove nothing.
  */
 
 const openTracks = (page: Page, scenario = rendererScenarios.tracks.withSongs()) =>

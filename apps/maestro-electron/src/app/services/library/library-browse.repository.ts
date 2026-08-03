@@ -62,7 +62,7 @@ export class LibraryBrowseRepository {
                 path: row.path,
                 present: row.present,
                 title: row.title,
-                // A track without embedded art still belongs to a release that has some.
+                // A track without embedded art still belongs to an album that has some.
                 coverPath: row.coverPath ?? row.albumCoverPath,
                 artistText: row.artistText,
                 artistCredit: creditsBySong.get(row.id) ?? [],
@@ -198,7 +198,8 @@ export class LibraryBrowseRepository {
         if (albumIds) conditions.push(inArray(songsTable.albumId, albumIds))
 
         // A song reaches its record label through its album — `songs` carries the
-        // label only as denormalized text, and text is never what a filter addresses.
+        // record label only as denormalized text, and text is never what a filter
+        // addresses.
         const recordLabelIds = nonEmpty(query.filter.recordLabelIds)
         if (recordLabelIds) {
             conditions.push(

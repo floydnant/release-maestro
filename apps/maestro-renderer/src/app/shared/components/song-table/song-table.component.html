@@ -11,7 +11,7 @@
     (focus)="onGridFocus()"
     [attr.aria-activedescendant]="activeDescendantId()"
 >
-    <!-- **Header and body column widths must be edited together** or they drift apart when the viewport shrinks. -->
+    <!-- Widths come from `SONG_TABLE_COLUMN_WIDTHS`, which header and body share, so there is nothing to keep in step by hand. -->
     <div
         class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-canvas"
         role="row"

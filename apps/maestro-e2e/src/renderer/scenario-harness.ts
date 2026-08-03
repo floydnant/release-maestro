@@ -241,7 +241,7 @@ export const scenarioBuilder = (scenario: Partial<RendererScenario> = {}) => {
          * The harness answers with a fixed value rather than reacting to the requested
          * window, so `total` is stated separately: that is what lets a test set up a
          * library far larger than the rows it hands over, and assert that scrolling
-         * asks for a *different* window rather than that the fake paged correctly.
+         * asks for a *different* window rather than that the fake windowed correctly.
          */
         songs(rows: SongRow[], options: { total?: number; offset?: number } = {}) {
             current.handlers['library:query-songs'] = {

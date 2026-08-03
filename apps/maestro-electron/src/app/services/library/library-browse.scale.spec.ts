@@ -29,7 +29,7 @@ import { LibraryBrowseRepository } from './library-browse.repository'
  * *plan*: a sort that falls back to `USE TEMP B-TREE FOR ORDER BY` is building an
  * ordering over every row in the table on every window, and that is a missing index
  * no matter how fast the machine happens to be. Deep-`OFFSET` cost is a known,
- * accepted property of the paging model (ADR 0004) rather than something a test can
+ * accepted property of the windowing model (ADR 0004) rather than something a test can
  * usefully police.
  *
  * The statement it explains is the repository's own window query, and rows are seeded
@@ -38,7 +38,7 @@ import { LibraryBrowseRepository } from './library-browse.repository'
  */
 
 const SONG_COUNT = 50_000
-/** Deep enough that a table scan cannot fake it, and where OFFSET paging actually hurts. */
+/** Deep enough that a table scan cannot fake it, and where a deep OFFSET actually hurts. */
 const DEEP_OFFSET = 45_000
 
 const migrationsFolderCandidates = [

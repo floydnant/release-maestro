@@ -22,7 +22,7 @@ const escapeLikePattern = (term: string): string => term.replace(/[\\%_]/g, char
  * search for a space — otherwise a stray keystroke empties the table.
  *
  * The term is matched against the columns a user would expect to be searching:
- * title, artist credit, release title and record label. Matching is
+ * title, artist credit, album title and record label. Matching is
  * case-insensitive for ASCII (SQLite's `LIKE` default) — accented characters
  * compare case-sensitively, which is a limitation of `LIKE` that FTS5 will fix.
  */

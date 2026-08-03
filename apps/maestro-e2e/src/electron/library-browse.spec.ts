@@ -135,7 +135,7 @@ test('search and entity filters narrow a real library', async ({}, testInfo) => 
 
     await scanAndOpenTracks(appDataDir, libraryDir)
 
-    // Search reaches title, artist, release and record label alike.
+    // Search reaches title, artist, album and record label alike.
     await page.getByRole('searchbox', { name: 'Search tracks' }).fill('afterglow')
     await expect.poll(rowTitles).toEqual(expect.arrayContaining(['Dusk', 'Void']))
     await expect(
@@ -159,7 +159,8 @@ test('search and entity filters narrow a real library', async ({}, testInfo) => 
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '6 tracks' }),
     ).toBeVisible()
 
-    // A record label reaches songs through their album — songs carry no label FK.
+    // A record label reaches songs through their album — songs carry no record
+    // label of their own.
     await page.getByRole('button', { name: 'Saltmarsh', exact: true }).first().click()
     await expect.poll(rowTitles).toEqual(expect.arrayContaining(['Tide', 'Gleam']))
     await expect(

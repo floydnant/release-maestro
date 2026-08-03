@@ -45,7 +45,8 @@ cases differ in kind rather than in size:
 
 Hand-picking is bounded by how many times a human can click, so explicit ids are always small. The
 only unbounded gestures — range and select-all — are exactly the ones that compress to index pairs.
-One model, with a hard ceiling on payload size.
+One model, and a payload that stays small because of what gestures can produce rather than because
+anything enforces a limit — nothing in the types bounds `included`, `excluded` or the range count.
 
 ## Consequences
 

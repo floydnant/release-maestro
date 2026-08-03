@@ -9,7 +9,7 @@
  * total for the scrollbar.
  *
  * Vocabulary is the music-library glossary: **song** in code, *track* in copy;
- * **album** in code, *release* in copy.
+ * **album** in code and in copy alike.
  */
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,10 @@ export type SongPresence = (typeof SongPresence)[keyof typeof SongPresence]
 export interface SongFilter {
     artistIds?: string[]
     genreIds?: string[]
-    /** Record labels reach songs through their album — `songs` has no label FK. */
+    /**
+     * Record labels reach songs through their album — `songs` carries no record
+     * label of its own beyond the denormalized tag text.
+     */
     recordLabelIds?: string[]
     albumIds?: string[]
     presence?: SongPresence
@@ -174,14 +177,13 @@ export interface SongRow {
     /**
      * Absolute filesystem path to cached cover art, rendered through a `file://` URL.
      * The song's own artwork when it has any, otherwise its album's — a track tagged
-     * without embedded art still belongs to a release that has some.
+     * without embedded art still belongs to an album that has some.
      */
     coverPath: string | null
     /** The credit exactly as tagged; `null` when the file carries no artist tag. */
     artistText: string | null
     artistCredit: ArtistCreditSegment[]
     albumId: string | null
-    /** *Release* in copy. */
     albumTitle: string | null
     genreText: string | null
     genres: CatalogEntityRef[]

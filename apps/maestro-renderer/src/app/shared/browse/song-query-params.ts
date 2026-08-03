@@ -18,6 +18,11 @@ import {
  *
  * Params are read defensively. A hand-edited or stale URL narrows or falls back to a
  * default; it never throws and never renders an error page.
+ *
+ * The keys are the glossary's names, not abbreviations of them — a URL is a surface
+ * users read, and `recordLabel` is the two-word name everywhere outside the raw
+ * `metadata.label` tag. `q` is the exception, by the convention every search box on
+ * the web already taught them.
  */
 
 export const SongQueryParam = {
@@ -26,7 +31,7 @@ export const SongQueryParam = {
     direction: 'dir',
     artist: 'artist',
     genre: 'genre',
-    recordLabel: 'label',
+    recordLabel: 'recordLabel',
     album: 'album',
     presence: 'presence',
 } as const
