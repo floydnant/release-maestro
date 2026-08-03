@@ -72,16 +72,6 @@ missing. Missing songs are retained, not deleted, and come back on the next scan
 A configured folder the scan could not reach. Dropped from the walk; its tracks go missing. Reported
 on the scan status (`unavailableFolders`) so the UI can explain the count — not an error (ADR 0003).
 
-**Availability**:
-Whether a browse surface is showing everything, only present tracks, or only missing ones. It names
-the _filter_, not the state of any one song — a song is **missing** or it is not; availability is the
-question the list is asking about them. `SongPresence` in code (`any` / `present` / `missing`),
-"Availability" on the filter chip.
-
-Reached only from the missing badge on a row, deliberately: a standing control would need a second
-count query to know whether it had anything to offer, and most libraries have nothing missing at all.
-_Avoid_: presence as user-facing copy, status, reachability
-
 **Terminal result**:
 The one-shot summary produced when a scan ends, carrying the outcome (`completed`, `cancelled`,
 `failed`) and the final tallies. Every non-idle scan produces exactly one.
@@ -114,8 +104,8 @@ actually say. The same register split as _record label_ and as _discovery_, whic
 metadata-engine boundary.
 _Avoid_: `track` in any identifier; file, item, entry as synonyms for song
 
-**Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on a
-release, not a song. Do not "correct" it to `songNumber`.
+**Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on an
+album, not a song. Do not "correct" it to `songNumber`.
 
 **Album**:
 A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,
@@ -180,42 +170,12 @@ Artist and genre carry no ambiguity as entities and are not listed here.
 
 ## Browsing
 
-The architecture is [ADR 0004](../../adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md);
-these are the words for it. All five browse surfaces share them.
-
-**Browse query**:
-The whole question a surface is asking: filter, sort and search together. `SongQuery` in code. It is
-the unit everything passes around — the read side takes it, the URL serialises it, and a selection
-carries one so its indices mean something. Two structurally equal queries are the same query;
-rebuilding one identical does not invalidate what is on screen.
-_Avoid_: params, criteria, options
+The architecture is [ADR 0004](../../adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md),
+and the terms it defines are not repeated here. One word is worth pinning because the
+obvious synonym is wrong:
 
 **Window**:
-The slice of an ordering a surface currently holds — an offset and a limit. Never the result set. The
-window is the rows on screen plus a fixed overscan margin, and the main process clamps the limit, so
-"the renderer holds one window" stays true whatever a caller asks for.
-_Avoid_: page — nothing here is paginated; the scrollbar is continuous and the window slides.
-
-**Total**:
-The row count of the whole query, which is what gives the scrollbar its height. Fetched with the
-window, and separate from it — the renderer knows how many rows exist without holding them.
-
-**Selection**:
-`{ query, ranges, excluded, included }` — see ADR 0004. Never a list of songs. Note that _selected_ is
-a property of a **song**, addressed by id, while a _range_ is positional: the two are reconciled every
-refetch and the rules for that are in the ADR.
-
-**Anchor**:
-The row a shift-extension measures from, plus the selection it re-applies over. Belongs to the
-surface rather than to the selection, and is dropped on the same conditions.
-
-## Naming
-
-**Route and page-component names follow the route.** A route is user-facing copy, so `/tracks` is
-served by `TracksComponent` in `pages/tracks/` — the identifier names a view, not a domain concept.
-The code/copy register split applies to the domain, which is why `SongTableComponent` sits one folder
-away carrying `Song` rows: it is named for what it holds, and the page is named for where the user
-thinks they are.
-
-Without this rule, every page in the library would disagree with its own URL, which is worse for
-anyone navigating the codebase from what they see on screen.
+The slice of an ordering a surface currently holds — an offset and a limit, plus a fixed
+overscan margin. Never the result set.
+_Avoid_: **page**. Nothing here is paginated: the scrollbar is continuous, the window
+slides, and there is no page number for anything to be on.

@@ -44,6 +44,11 @@ silently overriding it.
   develops vocabulary of its own.
 - A generic skill that says `CONTEXT.md` must contain no implementation details should follow the
   limited-anchor rule above instead.
+- **Route and page-component names follow the route.** A route is user-facing copy, so `/tracks` is
+  served by `TracksComponent` in `pages/tracks/`, even though the glossary says `track` belongs in
+  copy and `song` in code. The identifier names a view, not a domain concept; the register split
+  applies to the domain, which is why `SongTableComponent` sits one folder away carrying `Song` rows.
+  Without this, every page in the library disagrees with its own URL.
 - `ADR-FORMAT.md` (bundled with `/grill-with-docs`, also cited by
   `/improve-codebase-architecture`) owns the ADR format and the test for when one is warranted.
   Two things it does not know about this repo: `docs/adr/` already exists, so ignore its instruction
