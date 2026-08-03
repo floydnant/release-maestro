@@ -50,33 +50,7 @@ export class LibraryBrowseRepository {
         // viewport request after a filter narrows the result set is routine, not an error.
         if (offset >= total) return { rows: [], offset, total }
 
-        const rows = this.database.db
-            .select({
-                id: songsTable.id,
-                path: songsTable.path,
-                present: songsTable.present,
-                title: songsTable.title,
-                coverPath: songsTable.coverPath,
-                albumCoverPath: albumsTable.coverPath,
-                artistText: songsTable.artistText,
-                albumId: songsTable.albumId,
-                albumTitle: songsTable.albumTitle,
-                genreText: songsTable.genreText,
-                recordLabelId: albumsTable.recordLabelId,
-                recordLabelText: songsTable.recordLabelText,
-                year: songsTable.year,
-                bpm: songsTable.bpm,
-                musicalKey: songsTable.musicalKey,
-                duration: songsTable.duration,
-                createdAt: songsTable.createdAt,
-            })
-            .from(songsTable)
-            .leftJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
-            .where(where)
-            .orderBy(...this.songOrdering(query.sort))
-            .limit(limit)
-            .offset(offset)
-            .all()
+        const rows = this.songWindowQuery({ query, window }).all()
 
         const songIds = rows.map(row => row.id)
         const creditsBySong = this.artistCredits(songIds)
@@ -107,6 +81,56 @@ export class LibraryBrowseRepository {
             offset,
             total,
         }
+    }
+
+    /**
+     * The SQL the window above actually runs, for `EXPLAIN QUERY PLAN`.
+     *
+     * Exposed for the scale check, which is the only test that can catch a missing
+     * index and so has to explain the *real* query. Explaining a hand-built stand-in
+     * would let a predicate or a join that defeats the ordering index pass, which is
+     * precisely the failure the check exists to catch.
+     */
+    songWindowSql(request: QuerySongsRequest): { sql: string; params: unknown[] } {
+        return this.songWindowQuery(request).toSQL()
+    }
+
+    /**
+     * The window's rows: 16 columns, the album left-join behind cover art and the
+     * record label, and the filter's `WHERE`.
+     *
+     * The album join is `LEFT` on purpose — a song need not belong to one, and an
+     * inner join would silently drop every album-less song out of the library.
+     */
+    private songWindowQuery({ query, window }: QuerySongsRequest) {
+        const { offset, limit } = normalizeWindow(window)
+
+        return this.database.db
+            .select({
+                id: songsTable.id,
+                path: songsTable.path,
+                present: songsTable.present,
+                title: songsTable.title,
+                coverPath: songsTable.coverPath,
+                albumCoverPath: albumsTable.coverPath,
+                artistText: songsTable.artistText,
+                albumId: songsTable.albumId,
+                albumTitle: songsTable.albumTitle,
+                genreText: songsTable.genreText,
+                recordLabelId: albumsTable.recordLabelId,
+                recordLabelText: songsTable.recordLabelText,
+                year: songsTable.year,
+                bpm: songsTable.bpm,
+                musicalKey: songsTable.musicalKey,
+                duration: songsTable.duration,
+                createdAt: songsTable.createdAt,
+            })
+            .from(songsTable)
+            .leftJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
+            .where(this.songConditions(query))
+            .orderBy(...this.songOrdering(query.sort))
+            .limit(limit)
+            .offset(offset)
     }
 
     /**

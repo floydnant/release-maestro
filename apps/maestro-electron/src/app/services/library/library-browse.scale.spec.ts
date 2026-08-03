@@ -1,4 +1,10 @@
-import { emptySongQuery, SongSortField, type SongQuery, type SongSort } from '@release-maestro/core'
+import {
+    emptySongQuery,
+    SongPresence,
+    SongSortField,
+    type SongQuery,
+    type SongSort,
+} from '@release-maestro/core'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
@@ -7,7 +13,7 @@ import { join } from 'path'
 import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
 import { songsTable } from '../../database/drizzle.schema'
-import { LibraryBrowseRepository, songOrdering } from './library-browse.repository'
+import { LibraryBrowseRepository } from './library-browse.repository'
 
 /**
  * The scale check.
@@ -26,9 +32,9 @@ import { LibraryBrowseRepository, songOrdering } from './library-browse.reposito
  * accepted property of the paging model (ADR 0004) rather than something a test can
  * usefully police.
  *
- * The ordering it explains comes from the repository's own `songOrdering`, and rows
- * are seeded through Drizzle — both so a schema change breaks this loudly at compile
- * time rather than leaving it silently checking the wrong thing.
+ * The statement it explains is the repository's own window query, and rows are seeded
+ * through Drizzle — both so a schema change breaks this loudly at compile time rather
+ * than leaving it silently checking the wrong thing.
  */
 
 const SONG_COUNT = 50_000
@@ -56,19 +62,19 @@ describe('LibraryBrowseRepository at library scale', () => {
     let repository: LibraryBrowseRepository
 
     /**
-     * The plan for the ordering the repository actually emits.
+     * The plan for the window query the repository actually runs.
      *
-     * Built with Drizzle from `songOrdering` and handed to SQLite through `.toSQL()`,
-     * so there is no second field-to-column table to fall out of step with the first.
+     * Taken from the repository through `songWindowSql`, not rebuilt here. A minimal
+     * `select(id).from(songs).orderBy(…)` stand-in explains a different statement from
+     * production's sixteen columns, album left-join and filter predicates — so a join
+     * or a predicate that defeated the ordering index would explain clean and the
+     * check would pass while the real query fell back to a temp B-tree.
      */
-    const queryPlan = (sort: SongSort): string => {
-        const { sql, params } = db
-            .select({ id: songsTable.id })
-            .from(songsTable)
-            .orderBy(...songOrdering(sort))
-            .limit(100)
-            .offset(DEEP_OFFSET)
-            .toSQL()
+    const queryPlan = (query: SongQuery): string => {
+        const { sql, params } = repository.songWindowSql({
+            query,
+            window: { offset: DEEP_OFFSET, limit: 100 },
+        })
 
         const rows = sqlite.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as { detail: string }[]
         return rows.map(row => row.detail).join('\n')
@@ -131,7 +137,21 @@ describe('LibraryBrowseRepository at library scale', () => {
     ])
 
     it.each(sorts)('sorts by $field $direction from an index, not a temp B-tree', sort => {
-        const plan = queryPlan(sort)
+        const plan = queryPlan({ ...emptySongQuery(), sort })
+
+        expect(plan).not.toMatch(/TEMP B-TREE/i)
+        expect(plan).toMatch(/USING (COVERING )?INDEX songs_/)
+    })
+
+    it('still sorts from an index when a filter narrows the window', () => {
+        // The predicate is what a chip click sends, and it rides on the same statement
+        // as the ordering. An `EXISTS` subquery that SQLite chose to drive the outer
+        // query from would cost the ordering its index and the sort a temp B-tree.
+        const plan = queryPlan({
+            ...emptySongQuery(),
+            filter: { ...emptySongQuery().filter, presence: SongPresence.present },
+            sort: { field: SongSortField.title, direction: 'asc' },
+        })
 
         expect(plan).not.toMatch(/TEMP B-TREE/i)
         expect(plan).toMatch(/USING (COVERING )?INDEX songs_/)
