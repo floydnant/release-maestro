@@ -120,7 +120,7 @@ body {
     }
 
     .badge {
-        @apply inline-flex items-center rounded-full border border-border-default bg-background-elevated px-2 py-1 text-content-secondary;
+        @apply inline-flex items-center rounded-full border border-border-default bg-background-elevated px-3 py-1 text-content-secondary;
         font-family: var(--type-label-sm-family);
         font-size: var(--type-label-sm-size);
         font-weight: var(--type-label-sm-weight);

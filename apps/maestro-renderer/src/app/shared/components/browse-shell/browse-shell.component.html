@@ -51,16 +51,16 @@
 @if (filters().chips.length || filters().hasFilter) {
     <div class="browse-shell__chips | flex shrink-0 flex-wrap items-center gap-2 px-4 py-2">
         @for (chip of filters().chips; track chip.kind + chip.id) {
-            <span class="badge gap-1 pr-1">
+            <span class="badge relative gap-1 border-border-subtle bg-background-surface pr-[1.75rem]">
                 <span class="text-content-muted">{{ chip.kindLabel }}</span>
                 {{ chip.name }}
                 <button
                     type="button"
-                    class="flex items-center rounded-full p-0.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
+                    class="btn absolute inset-y-0 right-0 flex items-center rounded-full px-1.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
                     [attr.aria-label]="'Remove ' + chip.kindLabel + ' filter ' + chip.name"
                     (click)="chipRemove.emit(chip)"
                 >
-                    <app-icon name="octX" size="12"></app-icon>
+                    <app-icon name="octX" size="14"></app-icon>
                 </button>
             </span>
         }
