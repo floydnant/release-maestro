@@ -29,6 +29,17 @@ export type ScenarioBehavior =
     | { kind: 'reject'; message: string; userFacingMessage?: string }
     | { kind: 'pending' }
     | { kind: 'sequence'; steps: ScenarioBehavior[]; fallback?: ScenarioBehavior }
+    /**
+     * Answer `library:query-songs` with the window it actually asked for, generating
+     * rows on demand out of a catalog of `total`.
+     *
+     * Every other behavior serves one fixed window, which is enough to assert what a
+     * surface *requests* but cannot show whether it renders what it got: a table that
+     * asks for the right window and then draws it in the wrong place looks identical.
+     * Titles are `Row <absolute index>`, so a test can name the rows it expects to see
+     * at a given scroll position.
+     */
+    | { kind: 'song-window'; total: number }
 
 export type RendererScenario = {
     handlers: Record<string, ScenarioBehavior>
@@ -586,6 +597,40 @@ export const createRendererScenario = async (
                             Object.assign(error, { userFacingMessage: behavior.userFacingMessage })
                         }
                         return Promise.reject(error)
+                    }
+                    if (behavior.kind === 'song-window') {
+                        const requested = (payload as { window?: { offset?: number; limit?: number } })
+                            ?.window
+                        const offset = Math.max(0, Math.min(requested?.offset ?? 0, behavior.total))
+                        const limit = Math.max(0, requested?.limit ?? 0)
+                        const count = Math.max(0, Math.min(limit, behavior.total - offset))
+                        return Promise.resolve({
+                            rows: Array.from({ length: count }, (_row, position) => {
+                                const index = offset + position
+                                return {
+                                    id: `song-${index}`,
+                                    path: `/scenario/music/row-${index}.mp3`,
+                                    present: true,
+                                    title: `Row ${index}`,
+                                    coverPath: null,
+                                    artistText: null,
+                                    artistCredit: [],
+                                    albumId: null,
+                                    albumTitle: null,
+                                    genreText: null,
+                                    genres: [],
+                                    recordLabelId: null,
+                                    recordLabelText: null,
+                                    year: null,
+                                    bpm: null,
+                                    musicalKey: null,
+                                    duration: null,
+                                    dateAdded: null,
+                                }
+                            }),
+                            offset,
+                            total: behavior.total,
+                        })
                     }
 
                     return new Promise(resolve => {

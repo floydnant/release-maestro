@@ -736,6 +736,96 @@ test.describe('selection', () => {
     })
 })
 
+test.describe('what the window actually renders', () => {
+    /**
+     * The tests above assert what the table *asks for*. These assert what it draws, at
+     * several scroll positions against a read side that answers each window honestly.
+     * Reported as blank or missing regions that only filled in after a nudge — a table
+     * that requests the right window and then translates it to the wrong place asks
+     * identically to one that works, so nothing keyed on the request can catch it.
+     */
+    const openLargeLibrary = (page: Page, total = 50_000) =>
+        createRendererScenario(
+            page,
+            scenarioBuilder().handler('library:query-songs', { kind: 'song-window', total }).build(),
+            '/tracks',
+        )
+
+    /** Every row the user can actually see, top to bottom. */
+    const visibleTitles = async (page: Page): Promise<string[]> => {
+        const grid = page.getByRole('grid', { name: 'Tracks' })
+        return grid.evaluate(element => {
+            const bounds = element.getBoundingClientRect()
+            return [...element.querySelectorAll('[role="row"][aria-selected]')]
+                .filter(row => {
+                    const box = row.getBoundingClientRect()
+                    return box.bottom > bounds.top + 1 && box.top < bounds.bottom - 1
+                })
+                .map(row => row.querySelector('.song-table__title')?.textContent?.trim() ?? '')
+        })
+    }
+
+    /**
+     * The indices of the visible rows.
+     *
+     * Asserted as a contiguous run rather than against an index computed from the
+     * scroll position: the exact first row depends on the canvas margins, and pinning
+     * those here would make this a layout test. Contiguity is the property under
+     * test — a blank region is a gap in this sequence, and a mistranslated window is a
+     * sequence starting somewhere it should not.
+     */
+    const visibleIndices = async (page: Page): Promise<number[]> =>
+        (await visibleTitles(page)).map(title => Number(title.replace('Row ', '')))
+
+    const expectContiguousFrom = (indices: number[], expectedFirst: number) => {
+        expect(indices.length).toBeGreaterThan(5)
+        expect(indices).toEqual(indices.map((_index, position) => indices[0]! + position))
+        expect(Math.abs(indices[0]! - expectedFirst)).toBeLessThanOrEqual(2)
+    }
+
+    test('fills the viewport at the top, with no gaps', async ({ page }) => {
+        await openLargeLibrary(page)
+        await expect(rowByTitle(page, 'Row 0')).toBeVisible()
+
+        expectContiguousFrom(await visibleIndices(page), 0)
+    })
+
+    test('fills the viewport again after scrolling deep into the list', async ({ page }) => {
+        await openLargeLibrary(page)
+        await expect(rowByTitle(page, 'Row 0')).toBeVisible()
+
+        const grid = page.getByRole('grid', { name: 'Tracks' })
+        for (const top of [8_000, 400_000, 120_000]) {
+            await grid.evaluate((element, scrollTop) => element.scrollTo({ top: scrollTop }), top)
+
+            const first = Math.floor(top / 40)
+            await expect(rowByTitle(page, `Row ${first}`)).toBeVisible()
+            expectContiguousFrom(await visibleIndices(page), first)
+        }
+    })
+
+    test('fills the viewport after a resize', async ({ page }) => {
+        // The other half of the report: it said blank regions filled in after a scroll
+        // *or a resize*. A resize re-measures the viewport and issues a different
+        // window, which has to land in the right place like any other.
+        await openLargeLibrary(page)
+        await expect(rowByTitle(page, 'Row 0')).toBeVisible()
+
+        await page.setViewportSize({ width: 1_280, height: 900 })
+
+        await expect(rowByTitle(page, 'Row 0')).toBeVisible()
+        expectContiguousFrom(await visibleIndices(page), 0)
+    })
+
+    // Not covered: the first window landing *after* the table's branch has been
+    // attached and measured, which is the exact state the blank-region report came
+    // from. Staging it needs the initial fetch held across a layout pass the harness
+    // cannot currently sequence — the `pending` behaviour leaves the call unresolved
+    // rather than in flight. The ResizeObserver in `SongTableComponent` is what closes
+    // that case, and it is the one thing here still resting on reasoning rather than
+    // on a test.
+})
+
 test.describe('the grid for keyboard and assistive tech', () => {
     test('owns its rows through the layout wrappers between them', async ({ page }) => {
         await openTracks(page)
