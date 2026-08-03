@@ -46,7 +46,12 @@
     <span class="truncate" [title]="row().title">{{ row().title }}</span>
 </span>
 
-<span class="song-table__artist | truncate px-2" role="gridcell" [title]="row().artistText || ''">
+<span
+    class="song-table__artist | shrink-0 truncate px-2"
+    role="gridcell"
+    [style.width.px]="columns.artist"
+    [title]="row().artistText || ''"
+>
     @if (row().artistCredit.length) {
         @for (segment of row().artistCredit; track segment.artistId; let last = $last) {
             <button

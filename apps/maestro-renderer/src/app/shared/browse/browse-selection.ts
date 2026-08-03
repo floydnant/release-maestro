@@ -60,6 +60,12 @@ export interface BrowseSelectionState<TQuery> {
     /**
      * Where the next arrow key moves from. An index, so it means nothing against a
      * different ordering and nothing past the end of a shrunken result set.
+     *
+     * `-1` means "nowhere yet", which is what a cleared selection resets it to. Arrow
+     * arithmetic then lands the first press on row 0 without anyone testing for it —
+     * `min(last, -1 + 1)` and `max(0, -1 - 1)` are both 0. Branching on "is the
+     * selection empty?" instead would read a selection that a click may not have
+     * finished propagating, and answer the wrong question a keystroke later.
      */
     cursor: number
     /** Where a shift-extension measures from — see {@link SelectionAnchor}. */
@@ -81,9 +87,12 @@ export const emptySelection = <TQuery>(query: TQuery): BrowseSelectionState<TQue
     ranges: [],
     excluded: [],
     included: [],
-    cursor: 0,
+    cursor: NO_CURSOR,
     anchor: null,
 })
+
+/** No row has been arrowed to yet — see {@link BrowseSelectionState.cursor}. */
+export const NO_CURSOR = -1
 
 export const toWireSelection = <TQuery>(state: BrowseSelectionState<TQuery>): WireSelection<TQuery> => ({
     query: state.query,
@@ -243,15 +252,19 @@ export const selectionAfterRefetch = <TQuery>(
     // Ranges are indices into an ordering whose length just changed, and so is the
     // anchor — which additionally carries the selection it would re-apply, so leaving
     // it behind lets the next shift-click rebuild what this just cleared.
-    if (state.ranges.length > 0) return { ...emptySelection(state.query), cursor: state.cursor }
+    if (state.ranges.length > 0) {
+        return { ...emptySelection(state.query), cursor: clampCursor(state.cursor, nextTotal) }
+    }
 
     // An id-only selection survives, because an id names the same row wherever it
     // moved to. The cursor still has to stay inside the result set.
     return { ...state, anchor: null, cursor: clampCursor(state.cursor, nextTotal) }
 }
 
-const clampCursor = (cursor: number, total: number): number =>
-    total <= 0 ? 0 : Math.max(0, Math.min(cursor, total - 1))
+const clampCursor = (cursor: number, total: number): number => {
+    if (cursor < 0) return NO_CURSOR
+    return total <= 0 ? NO_CURSOR : Math.min(cursor, total - 1)
+}
 
 /**
  * Reconcile a selection with a new query. Index ranges mean nothing against a

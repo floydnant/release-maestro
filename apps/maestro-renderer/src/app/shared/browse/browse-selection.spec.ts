@@ -1,6 +1,7 @@
 import { emptySongQuery, SongSortField, type SongQuery } from '@release-maestro/core'
 import {
     applySelectionGesture,
+    NO_CURSOR,
     deselectRange,
     emptySelection,
     isEmptySelection,
@@ -242,7 +243,8 @@ describe('song selection', () => {
             const state = click(emptySelection(query), 1)
             const resorted = { ...query, sort: { field: SongSortField.title, direction: 'asc' as const } }
 
-            expect(selectionForQuery(state, resorted, sameQuery).cursor).toBe(0)
+            // -1 is "nowhere yet", so the arrow arithmetic lands the next press on 0.
+            expect(selectionForQuery(state, resorted, sameQuery).cursor).toBe(NO_CURSOR)
         })
 
         it('pulls the cursor back inside a result set that shrank', () => {

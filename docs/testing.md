@@ -42,6 +42,9 @@ It installs a fake Electron bridge before Angular bootstraps:
 - `window.process.type = 'renderer'`, so the real renderer services take their Electron code paths.
 - `window.require('electron').ipcRenderer`, with mocked `invoke`, `send`, `on`, `off`, and `once`.
 - A browser-side scenario backend that tests can inspect and mutate through Playwright helpers.
+- `respond()`, for answers a fixed value cannot give — the responder runs in Node with the request,
+  so it can use the fixture creators and the real contract types. Reach for it when the answer
+  depends on what was asked, which in practice means anything windowed.
 
 Do not mock Node modules such as `fs` or `child_process` in renderer E2E. Renderer code should go
 through typed IPC for backend behavior; full Electron E2E covers the real Electron/Node integration.

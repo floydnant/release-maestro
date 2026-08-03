@@ -288,7 +288,7 @@ export class SongTableComponent {
         if (!scroller?.matches(':focus-visible')) return
         if (this.total() == 0 || !isEmptySelection(this.selection())) return
 
-        this.moveTo(Math.min(this.cursorIndex(), this.total() - 1), { extend: false })
+        this.moveTo(Math.max(0, Math.min(this.cursorIndex(), this.total() - 1)), { extend: false })
     }
 
     /**

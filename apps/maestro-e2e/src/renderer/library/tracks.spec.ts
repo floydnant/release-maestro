@@ -710,13 +710,17 @@ test.describe('selection', () => {
         // lands on has no id yet, and a gesture that needed one used to move the
         // viewport while leaving the previous row selected — the list scrolled and the
         // selection stayed behind.
-        await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 50_000 }).build())
+        // A catalog rather than a fixed fixture, so the row End lands on actually
+        // exists and can be asserted on. Against a static three-row window the only
+        // thing left to check was the count, and whether the old rows were still in
+        // the DOM depended on where the scroll ended up.
+        await createRendererScenario(page, scenarioBuilder().songCatalog(page, 50_000).build(), '/tracks')
 
-        await clickRow(page, 'Dawn')
+        await clickRow(page, 'Row 0')
         await page.keyboard.press('End')
 
+        await expect(rowByTitle(page, 'Row 49999')).toHaveAttribute('aria-selected', 'true')
         await expect(page.getByText('1 of 50000 tracks selected')).toBeAttached()
-        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
     })
 
     test('gives the grid a current row when the keyboard arrives at it', async ({ page }) => {
@@ -820,6 +824,37 @@ test.describe('what the window actually renders', () => {
     // rather than in flight. The ResizeObserver in `SongTableComponent` is what closes
     // that case, and it is the one thing here still resting on reasoning rather than
     // on a test.
+})
+
+test.describe('column alignment', () => {
+    /**
+     * The one thing the table has always been able to get wrong quietly. Header widths
+     * and body widths were two lists of literal classes that had to be edited together,
+     * with a comment saying so and nothing enforcing it; they are one constant now, but
+     * a cell that forgets to bind it still sizes to its content and shifts every column
+     * after it. That is invisible to every other test here, which look up cells by role
+     * and never ask where they are.
+     */
+    test('every body cell sits under its own header cell', async ({ page }) => {
+        await createRendererScenario(page, scenarioBuilder().songCatalog(page, 500).build(), '/tracks')
+        await expect(rowByTitle(page, 'Row 0')).toBeVisible()
+
+        const columns = await page.getByRole('grid', { name: 'Tracks' }).evaluate(grid => {
+            const box = (element: Element) => {
+                const rect = element.getBoundingClientRect()
+                return { left: Math.round(rect.left), width: Math.round(rect.width) }
+            }
+            const header = grid.querySelector('.song-table__header')
+            const row = grid.querySelector('[role="row"][aria-selected]')
+            return {
+                header: [...(header?.children ?? [])].map(box),
+                body: [...(row?.querySelectorAll('[role="gridcell"]') ?? [])].map(box),
+            }
+        })
+
+        expect(columns.body).toHaveLength(columns.header.length)
+        expect(columns.body).toEqual(columns.header)
+    })
 })
 
 test.describe('the grid for keyboard and assistive tech', () => {
@@ -938,19 +973,32 @@ test.describe('selection against a moving list', () => {
     })
 
     test('starts the keyboard over at the top after the sort changes', async ({ page }) => {
-        // Reported: select the second row, re-sort, then arrow down — it resumed from
-        // the old index and landed on the third row. Clearing the selection was not
-        // enough, because the cursor was a separate field with its own lifetime.
+        // Reported: select the second row, re-sort, then keep arrowing — it resumed
+        // from the old index rather than from the top. Clearing the selection was not
+        // enough, because the cursor was a separate field with its own lifetime and
+        // nothing reset it.
         await openTracks(page)
         await clickRow(page, 'Dusk')
 
         await page.getByRole('button', { name: 'Sort by Title' }).click()
         await expect(page.getByRole('row', { selected: true })).toHaveCount(0)
 
+        // Clicking a header takes focus out of the grid, so coming back is part of the
+        // gesture. Landing on it with nothing selected puts the cursor somewhere
+        // visible — at the top, now that the cursor was cleared along with the
+        // selection. It used to land on the second row, wherever that now was.
+        //
+        // Tab first: the handler only fires for *keyboard* focus, and Chromium will not
+        // call a programmatic focus keyboard-driven while the last input was a click.
+        await page.keyboard.press('Tab')
         await page.getByRole('grid', { name: 'Tracks' }).focus()
-        await page.keyboard.press('ArrowDown')
 
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'false')
+
+        // And carries on from there.
+        await page.keyboard.press('ArrowDown')
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
     })
 
     test('does not rebuild a cleared range from a stale anchor', async ({ page }) => {

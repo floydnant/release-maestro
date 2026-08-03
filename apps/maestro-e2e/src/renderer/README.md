@@ -86,6 +86,42 @@ Supported behaviors:
 - `{ kind: 'reject', message }` rejects `ipcRenderer.invoke`.
 - `{ kind: 'pending' }` leaves the call unresolved until the test resolves it.
 - `{ kind: 'sequence', steps, fallback }` consumes one behavior per call.
+- `{ kind: 'respond', responder }` calls back into the test — see below.
+
+## Computed Answers
+
+The behaviors above all carry a value decided before the page loads. That is enough when a
+call's answer does not depend on what it asked for, and not enough when it does: a windowed
+list requests a different slice on every scroll, and a fixture that ignores the offset can
+only prove the table asked correctly, never that it rendered what came back.
+
+`respond()` registers a responder that runs **in Node**, with the request payload:
+
+```ts
+const scenario = scenarioBuilder()
+    .handler(
+        'library:query-songs',
+        respond(page, 'first-page-only', (request: QuerySongsRequest) => ({
+            rows: request.window.offset === 0 ? createSongRows() : [],
+            offset: request.window.offset,
+            total: 3,
+        })),
+    )
+    .build()
+```
+
+Running in Node is the point: a responder can use `createSongRow` and the real contract
+types, which page-side code cannot — the harness is installed through `addInitScript`, so
+anything inside it is serialised and cannot reach this module. Only the responder's _name_
+crosses the boundary; `page.exposeFunction` bridges the call back.
+
+Register responders **before** `createRendererScenario`, and expect a Node round trip per
+answered call.
+
+`scenarioBuilder().songCatalog(page, 50_000)` is the ready-made one: it serves whatever
+window is asked for out of a catalog of rows titled `Row 0`, `Row 1`, … Use it when the
+assertion is about what the table _renders_; `songs()` serves one fixed window and is right
+when the assertion is about what it _requests_.
 
 ## Testing Loading And Retry
 

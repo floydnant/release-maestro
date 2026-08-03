@@ -3,13 +3,16 @@ import type { SongSort, SongSortField } from '@release-maestro/core'
 import { IconComponent } from '../icon/icon.component'
 
 /**
- * One sortable column heading.
+ * One sortable column heading: the button, the active-sort affordance and `aria-sort`.
  *
- * It exists because column widths have to be written as literal classes — a class
- * list assembled from a column definition is invisible to the design-system
- * validator — and repeating a ten-line sort button beside each literal width would
- * be far worse than repeating the width. The parent applies the width; this owns the
- * button, the active-sort affordance and `aria-sort`.
+ * It was originally extracted because column widths had to be literal classes, and
+ * repeating a ten-line sort button beside each literal width was worse than repeating
+ * the width. That reason is gone — widths come from `SONG_TABLE_COLUMN_WIDTHS` and are
+ * bound as inline styles now — but the component is not: ten copies of this button
+ * would still be ten places to change an `aria-sort` rule or a focus affordance.
+ *
+ * Width stays the parent's to apply. A heading has no opinion about how wide its
+ * column is, and the row cells opposite it are bound from the same constant.
  */
 @Component({
     selector: 'app-song-table-heading',
