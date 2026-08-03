@@ -29,7 +29,7 @@ import {
     metadataHash,
     NORMALIZER_VERSION,
     normalizeDisplayText,
-    releaseYear,
+    yearFromMetadata,
     relevantExternalRefsMap,
     stableHash,
 } from './library-normalization'
@@ -188,8 +188,8 @@ export class LibraryBackendRepository {
         const albumTitle = normalizeDisplayText(metadata.albumTitle)
         const genreText = normalizeDisplayText(metadata.genre)
         const recordLabelText = normalizeDisplayText(metadata.label)
-        // Almost no MP3 fills the dedicated year field — see `releaseYear`.
-        const year = releaseYear(metadata)
+        // Almost no MP3 fills the dedicated year field — see `yearFromMetadata`.
+        const year = yearFromMetadata(metadata)
         const externalRefs = extractExternalRefs(metadata.extraMetadata, metadata.comment)
 
         return db.transaction(tx => {

@@ -7,7 +7,7 @@ import {
     fileFingerprint,
     metadataHash,
     normalizeDisplayText,
-    releaseYear,
+    yearFromMetadata,
 } from './library-normalization'
 
 describe('library normalization', () => {
@@ -89,9 +89,9 @@ describe('library normalization', () => {
         ])
     })
 
-    describe('releaseYear', () => {
+    describe('yearFromMetadata', () => {
         it('prefers the dedicated year field when a tag actually carries one', () => {
-            expect(releaseYear({ year: 1998, date: '2019-05-01' })).toBe(1998)
+            expect(yearFromMetadata({ year: 1998, date: '2019-05-01' })).toBe(1998)
         })
 
         it.each([
@@ -102,13 +102,13 @@ describe('library normalization', () => {
         ])('falls back to the leading year of %s', (date, expected) => {
             // MP3s land here rather than in `year`: lofty upgrades ID3v2.3's TYER to
             // TDRC, which is a date, so the year only ever arrives inside `date`.
-            expect(releaseYear({ year: null, date })).toBe(expected)
+            expect(yearFromMetadata({ year: null, date })).toBe(expected)
         })
 
         it.each([[null], [''], ['unknown'], ['99'], ['May 2019']])(
             'refuses to guess a year from %s',
             date => {
-                expect(releaseYear({ year: null, date })).toBeNull()
+                expect(yearFromMetadata({ year: null, date })).toBeNull()
             },
         )
     })

@@ -14,7 +14,7 @@ for (const [key, value] of Object.entries(ExternalRefKeys)) {
  * A scan re-reads a file only when the file itself changed — path, size or mtime. That
  * is right for tag edits and wrong for *our* edits: change how a column is derived and
  * every existing row keeps the value the old rules produced, with nothing on disk to
- * trigger a re-read. `releaseYear` was the first case of it, and left the browse
+ * trigger a re-read. `yearFromMetadata` was the first case of it, and left the browse
  * table's Year column empty on every library scanned before it existed.
  *
  * **Bump this whenever a change here alters what is written to a song row.** Rows
@@ -29,7 +29,8 @@ export const normalizeDisplayText = (value: string | null | undefined): string |
 }
 
 /**
- * The release year of a song, falling back to the leading year of its date.
+ * The year a song was issued, read out of the tag and falling back to the leading
+ * year of its date. Both a song and its album take their year from this.
  *
  * Almost no MP3 in the wild fills the dedicated year field: `lofty` upgrades ID3v2.3's
  * `TYER` to v2.4's `TDRC` on read, and `TDRC` is a *date*, so `metadata.year` is null
@@ -40,7 +41,7 @@ export const normalizeDisplayText = (value: string | null | undefined): string |
  * Only a leading four-digit year is accepted, so a malformed date yields null rather
  * than a plausible-looking wrong number.
  */
-export const releaseYear = (metadata: Pick<SongMetadata, 'year' | 'date'>): number | null => {
+export const yearFromMetadata = (metadata: Pick<SongMetadata, 'year' | 'date'>): number | null => {
     if (metadata.year != null) return metadata.year
 
     const match = /^(\d{4})(?:\D|$)/.exec(normalizeDisplayText(metadata.date) ?? '')
