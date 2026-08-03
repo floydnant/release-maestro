@@ -854,18 +854,17 @@ test.describe('what the window actually renders', () => {
 
 test.describe('column alignment', () => {
     /**
-     * The one thing the table has always been able to get wrong quietly. Header widths
+     * The one thing this table has always been able to get wrong quietly. Header widths
      * and body widths were two lists of literal classes that had to be edited together,
      * with a comment saying so and nothing enforcing it; they are one constant now, but
      * a cell that forgets to bind it still sizes to its content and shifts every column
-     * after it. That is invisible to every other test here, which look up cells by role
+     * after it. That is invisible to every other test here, which look cells up by role
      * and never ask where they are.
      */
-    test('every body cell sits under its own header cell', async ({ page }) => {
-        await createRendererScenario(page, scenarioBuilder().songCatalog(page, 500).build(), '/tracks')
-        await expect(rowByTitle(page, 'Row 0')).toBeVisible()
 
-        const columns = await page.getByRole('grid', { name: 'Tracks' }).evaluate(grid => {
+    /** Every header cell and its opposite body cell, as left edge and width. */
+    const measureColumns = (page: Page) =>
+        page.getByRole('grid', { name: 'Tracks' }).evaluate(grid => {
             const box = (element: Element) => {
                 const rect = element.getBoundingClientRect()
                 return { left: Math.round(rect.left), width: Math.round(rect.width) }
@@ -878,7 +877,55 @@ test.describe('column alignment', () => {
             }
         })
 
-        expect(columns.body).toHaveLength(columns.header.length)
+    // Narrow enough that the columns overflow and the table scrolls sideways, wide
+    // enough that the title column has slack to grow into, and one in between. The
+    // reported drift was specifically "when the viewport shrinks", and a single width
+    // cannot see it: header and body sit in different containers, so anything that
+    // distributes free space can resolve differently on either side.
+    for (const width of [640, 1024, 1800]) {
+        test(`every body cell sits under its own header cell at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 800 })
+            await createRendererScenario(page, scenarioBuilder().songCatalog(page, 500).build(), '/tracks')
+            await expect(rowByTitle(page, 'Row 0')).toBeVisible()
+
+            const columns = await measureColumns(page)
+
+            expect(columns.body).toHaveLength(columns.header.length)
+            expect(columns.body).toEqual(columns.header)
+        })
+    }
+
+    test('stays aligned after the table is scrolled sideways', async ({ page }) => {
+        // Horizontal scroll is where the two containers are most likely to disagree:
+        // the header is sticky vertically but scrolls horizontally with the rows, and
+        // it is a sibling of the canvas the rows live in rather than a parent.
+        await page.setViewportSize({ width: 640, height: 800 })
+        await createRendererScenario(page, scenarioBuilder().songCatalog(page, 500).build(), '/tracks')
+        await expect(rowByTitle(page, 'Row 0')).toBeVisible()
+
+        const grid = page.getByRole('grid', { name: 'Tracks' })
+        await grid.evaluate(element => element.scrollTo({ left: element.scrollWidth }))
+
+        const columns = await measureColumns(page)
+
+        expect(columns.body).toEqual(columns.header)
+        // And the scroll actually went somewhere, so this is not asserting on a table
+        // that never overflowed.
+        expect(await grid.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    })
+
+    test('stays aligned when the viewport is resized under it', async ({ page }) => {
+        // The original comment warned they "drift apart when the viewport shrinks" —
+        // not on load at a given size, but on the transition.
+        await page.setViewportSize({ width: 1800, height: 800 })
+        await createRendererScenario(page, scenarioBuilder().songCatalog(page, 500).build(), '/tracks')
+        await expect(rowByTitle(page, 'Row 0')).toBeVisible()
+
+        await page.setViewportSize({ width: 700, height: 800 })
+        await expect(rowByTitle(page, 'Row 0')).toBeVisible()
+
+        const columns = await measureColumns(page)
+
         expect(columns.body).toEqual(columns.header)
     })
 })
