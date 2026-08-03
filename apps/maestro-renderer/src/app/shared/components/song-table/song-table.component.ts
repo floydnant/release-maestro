@@ -14,13 +14,7 @@ import {
     untracked,
     viewChild,
 } from '@angular/core'
-import type {
-    ArtistCreditSegment,
-    BrowseWindow,
-    SongQuery,
-    SongRow,
-    SongSortField,
-} from '@release-maestro/core'
+import type { BrowseWindow, SongQuery, SongRow, SongSortField } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
 import {
     anchorAfterRefetch,
@@ -34,10 +28,8 @@ import {
     type SongSelectionAnchor,
     type SongSelectionState,
 } from '../../browse/song-selection'
-import { fileUrl } from '../../utils/file-url.util'
-import { formatBpm, formatDateShort, formatDuration } from '../../utils/formatting.utils'
-import { IconComponent } from '../icon/icon.component'
 import { SongTableHeadingComponent } from './song-table-heading.component'
+import { SongTableRowComponent } from './song-table-row.component'
 
 /**
  * The track table, shared between `/tracks` and every detail tab in slices 2–5.
@@ -87,7 +79,7 @@ export interface EntityFilterRequest {
     selector: 'app-song-table',
     templateUrl: './song-table.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent, NgClass, SongTableHeadingComponent],
+    imports: [NgClass, SongTableHeadingComponent, SongTableRowComponent],
     host: {
         class: 'flex min-h-0 min-w-0 flex-1 flex-col',
         '(document:mousedown)': 'onDocumentPointerDown($event)',
@@ -372,36 +364,10 @@ export class SongTableComponent {
         this.emitGesture({ index, id: row?.id ?? null, shiftKey: extend, toggleKey: false })
     }
 
-    protected onArtistSegment(event: MouseEvent, segment: ArtistCreditSegment): void {
-        // The cell sits inside a row that also selects; a plain click on the link means
-        // the artist, not the row. With a selection modifier down it means the row, and
-        // the mousedown handler has already dealt with it.
-        event.stopPropagation()
-        if (isSelectionModifierHeld(event)) return
-        this.entityFilter.emit({ kind: 'artist', id: segment.artistId, name: segment.creditedAs })
-    }
-
-    protected onEntity(event: MouseEvent, kind: EntityFilterKind, id: string, name: string): void {
-        event.stopPropagation()
-        if (isSelectionModifierHeld(event)) return
-        this.entityFilter.emit({ kind, id, name })
-    }
-
-    protected onMissingBadge(event: MouseEvent): void {
-        event.stopPropagation()
-        if (isSelectionModifierHeld(event)) return
-        this.filterMissing.emit()
-    }
-
     protected rowLabel(row: SongRow): string {
         const artist = row.artistText ? ` by ${row.artistText}` : ''
         return `${row.title}${artist}${row.present ? '' : ' — missing'}`
     }
-
-    protected formatDuration = formatDuration
-    protected formatDateShort = formatDateShort
-    protected formatBpm = formatBpm
-    protected fileUrl = fileUrl
 
     // -----------------------------------------------------------------------
 
