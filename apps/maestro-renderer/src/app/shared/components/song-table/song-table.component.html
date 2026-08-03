@@ -12,8 +12,10 @@
     [attr.aria-activedescendant]="activeDescendantId()"
 >
     <!-- **Header and body column widths must be edited together** or they drift apart when the viewport shrinks. -->
+    <!-- The transparent left border matches the selection marker the rows carry, so
+         the columns stay aligned with the header instead of shifting 2px sideways. -->
     <div
-        class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-canvas"
+        class="song-table__header | sticky top-0 z-10 flex w-max min-w-full border-l-2 border-transparent bg-background-canvas"
         role="row"
         aria-rowindex="1"
     >
@@ -102,8 +104,14 @@
          not. Otherwise the empty space below them belongs to the scroller itself,
          which is indistinguishable from its scrollbar — and a press there has to
          clear the selection, not be mistaken for scrolling. -->
+    <!-- `role="presentation"` on both wrappers, and it is load-bearing rather than
+         decorative: `role="row"` has to be owned by the grid, and two untyped divs in
+         between detach every data row from it. Assistive tech then sees a grid with
+         one row in it — the header — and `aria-rowcount`, `aria-rowindex` and
+         `aria-activedescendant` describe a shape nothing can navigate. -->
     <div
         class="song-table__canvas | relative mb-22 mt-2 min-h-full w-max min-w-full"
+        role="presentation"
         [style.height.px]="canvasHeight()"
     >
         <!-- `w-max min-w-full` rather than `inset-x-0`: the rows are the only thing
@@ -112,19 +120,28 @@
              table is scrolled sideways. -->
         <div
             class="song-table__window | absolute left-0 top-0 w-max min-w-full"
+            role="presentation"
             [style.transform]="'translateY(' + windowTop() + 'px)'"
         >
             @for (row of rows(); track row.id; let rowIndex = $index) {
                 @let index = offset() + rowIndex;
                 @let selected = isRowSelected(row, index);
 
+                <!-- The selected row carries a marker bar as well as a lifted
+                     background. The background alone made selection a colour-only
+                     state, which anyone with low vision or a colour vision deficiency
+                     may not resolve at all against the canvas — and since arrow keys
+                     move the selection, the selected row is also where focus is. The
+                     bar is present or absent rather than one hue or another, so it
+                     reads without depending on colour. Transparent when unselected so
+                     nothing shifts sideways as the selection moves. -->
                 <div
-                    class="song-table__row | flex items-center"
+                    class="song-table__row | flex items-center border-l-2"
                     role="row"
                     [id]="rowElementId(index)"
                     [ngClass]="{
-                        'row-selected | bg-background-elevated': selected,
-                        'row-hover | hover:bg-background-surface': !selected,
+                        'row-selected | border-content-action bg-background-elevated': selected,
+                        'row-hover | border-transparent hover:bg-background-surface': !selected,
                         'row-missing | opacity-70': !row.present,
                     }"
                     [style.height.px]="rowHeight"
@@ -164,6 +181,7 @@
                         @if (!row.present) {
                             <button
                                 type="button"
+                                tabindex="-1"
                                 class="grid size-5 shrink-0 place-items-center rounded-sm hover:bg-action-quiet-hover"
                                 aria-label="Missing — show only missing tracks"
                                 title="Missing — this file is no longer where the library saw it. Show only missing tracks."
@@ -184,6 +202,7 @@
                             @for (segment of row.artistCredit; track segment.artistId; let last = $last) {
                                 <button
                                     type="button"
+                                    tabindex="-1"
                                     class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                                     (click)="onArtistSegment($event, segment)"
                                 >
@@ -202,6 +221,7 @@
                         @if (row.albumId && row.albumTitle) {
                             <button
                                 type="button"
+                                tabindex="-1"
                                 class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                                 (click)="onEntity($event, 'album', row.albumId, row.albumTitle)"
                             >
@@ -217,6 +237,7 @@
                             @for (genre of row.genres; track genre.id; let last = $last) {
                                 <button
                                     type="button"
+                                    tabindex="-1"
                                     class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                                     (click)="onEntity($event, 'genre', genre.id, genre.name)"
                                 >
@@ -261,6 +282,7 @@
                         @if (row.recordLabelId && row.recordLabelText) {
                             <button
                                 type="button"
+                                tabindex="-1"
                                 class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                                 (click)="
                                     onEntity($event, 'recordLabel', row.recordLabelId, row.recordLabelText)

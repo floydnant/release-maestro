@@ -736,6 +736,64 @@ test.describe('selection', () => {
     })
 })
 
+test.describe('the grid for keyboard and assistive tech', () => {
+    test('owns its rows through the layout wrappers between them', async ({ page }) => {
+        await openTracks(page)
+
+        // The rows sit two layout wrappers below the grid — a canvas sized to the
+        // whole result set, and a window translated into place. `role="row"` requires
+        // a grid, table or rowgroup parent, and untyped wrappers break that chain, so
+        // both are marked presentational and the rows re-parent to the grid.
+        //
+        // Asserted on the attribute rather than through the accessibility tree on
+        // purpose: Chromium exposes the rows either way, so a `getByRole('row')` count
+        // passes against the broken markup and proves nothing. Other engines and axe's
+        // `aria-required-parent` are less forgiving, and the spec is what we are
+        // holding to here.
+        const grid = page.getByRole('grid', { name: 'Tracks' })
+        await expect(grid.locator('.song-table__canvas')).toHaveAttribute('role', 'presentation')
+        await expect(grid.locator('.song-table__window')).toHaveAttribute('role', 'presentation')
+        await expect(grid).toHaveAttribute('aria-rowcount', '4') // header + three songs
+    })
+
+    test('marks the selected row by more than its colour', async ({ page }) => {
+        await openTracks(page)
+        await clickRow(page, 'Dawn')
+
+        // Arrow keys move the selection, so the selected row is also where focus is.
+        // A background alone leaves that state invisible to anyone who cannot resolve
+        // it against the canvas, so the row carries a marker bar as well.
+        const borderWidth = await rowByTitle(page, 'Dawn').evaluate(
+            element => getComputedStyle(element).borderLeftColor,
+        )
+        const unselected = await rowByTitle(page, 'Dusk').evaluate(
+            element => getComputedStyle(element).borderLeftColor,
+        )
+
+        expect(borderWidth).not.toBe(unselected)
+        expect(unselected).toBe('rgba(0, 0, 0, 0)')
+    })
+
+    test('is a single tab stop, with the row controls on the arrow keys', async ({ page }) => {
+        await openTracks(page)
+        await clickRow(page, 'Dawn')
+
+        // Every control in a row is out of the tab order: a 60-row window would
+        // otherwise be ~240 stops, and they change identity as the window scrolls.
+        await page.keyboard.press('Tab')
+        await expect(page.getByRole('grid', { name: 'Tracks' })).not.toBeFocused()
+
+        // Reachable, though — right steps into the row, left steps back out to the
+        // grid, where the arrow keys mean the selection again.
+        await page.getByRole('grid', { name: 'Tracks' }).focus()
+        await page.keyboard.press('ArrowRight')
+        await expect(rowByTitle(page, 'Dawn').getByRole('button').first()).toBeFocused()
+
+        await page.keyboard.press('ArrowLeft')
+        await expect(page.getByRole('grid', { name: 'Tracks' })).toBeFocused()
+    })
+})
+
 test.describe('live updates during a scan', () => {
     /** A status snapshot in one phase; only the phase and the revision matter here. */
     const scanStatus = (phase: LibraryScanStatus['phase'], revision: number) =>

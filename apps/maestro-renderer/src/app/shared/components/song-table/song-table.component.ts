@@ -55,7 +55,15 @@ import { SongTableHeadingComponent } from './song-table-heading.component'
  * **There is one row state, not two.** Arrow keys move the selection rather than a
  * separate cursor, so the selected row is the current row and needs no ring of its
  * own; the grid has no focus ring either, because the selection is the focus
- * indicator and `aria-activedescendant` carries it to assistive tech.
+ * indicator and `aria-activedescendant` carries it to assistive tech. That puts the
+ * whole weight of "where am I" on how a selected row is drawn, which is why it is
+ * marked by a bar as well as a background — a state carried by colour alone is one
+ * some people cannot see.
+ *
+ * **The grid is one tab stop.** Every control inside a row is `tabindex="-1"` and
+ * reached with the left and right arrows, per the ARIA grid pattern the vertical keys
+ * already follow. A window of 60 rows would otherwise sit on ~240 tab stops that
+ * change identity under the user as it scrolls.
  */
 
 /** Row height in pixels. Fixed, because virtualisation needs to map scroll offset to index. */
@@ -285,7 +293,13 @@ export class SongTableComponent {
         if (event.key == 'Escape') {
             event.preventDefault()
             this.anchor = null
+            this.focusGrid()
             this.selectionChange.emit(clearSelection(this.selection()))
+            return
+        }
+
+        if (event.key == 'ArrowRight' || event.key == 'ArrowLeft') {
+            if (this.moveWithinRow(event.key == 'ArrowRight' ? 1 : -1)) event.preventDefault()
             return
         }
 
@@ -296,8 +310,58 @@ export class SongTableComponent {
         this.moveTo(nextIndex, { extend: event.shiftKey })
     }
 
+    /**
+     * Move focus along the controls inside the current row.
+     *
+     * The grid is a single tab stop — every control in a row carries `tabindex="-1"`,
+     * because a 60-row window otherwise puts ~240 stops between the table and whatever
+     * follows it, and they change identity under the user as the window rebuilds on
+     * scroll. That is only tenable if the keyboard can still reach them, which is what
+     * this is: the horizontal half of the grid pattern the vertical keys already
+     * implement. Stepping left off the first control returns focus to the grid, so the
+     * arrow keys go back to moving the selection.
+     *
+     * @returns whether the key was consumed.
+     */
+    private moveWithinRow(step: number): boolean {
+        const controls = this.rowControls()
+        if (controls.length == 0) return false
+
+        const active = document.activeElement
+        const current = controls.findIndex(control => control == active)
+
+        // Entering the row from the grid itself starts at the first control.
+        const next = current < 0 ? (step > 0 ? 0 : -1) : current + step
+        if (next < 0) {
+            this.focusGrid()
+            return true
+        }
+        controls[next]?.focus()
+        return true
+    }
+
+    /**
+     * The focusable controls of the row the cursor is on, in visual order.
+     *
+     * Read off the DOM rather than modelled in TypeScript: which cells carry a control
+     * depends on the row — a present track has no missing badge, a track with no label
+     * has no label link — so the list is genuinely a property of what was rendered.
+     * Row ids are unique per document, which is what `rowIdPrefix` is for.
+     */
+    private rowControls(): HTMLElement[] {
+        const row = document.getElementById(this.rowElementId(this.cursorIndex()))
+        return row ? Array.from(row.querySelectorAll<HTMLElement>('button, a[href]')) : []
+    }
+
+    private focusGrid(): void {
+        this.scroller()?.nativeElement.focus({ preventScroll: true })
+    }
+
     /** Put the cursor on a row, selecting it — or extending the selection to it. */
     private moveTo(index: number, { extend }: { extend: boolean }): void {
+        // Vertical movement is about rows, so focus belongs back on the grid rather
+        // than on whatever control in the old row the user had stepped into.
+        this.focusGrid()
         this.cursorIndex.set(index)
         this.scrollIndexIntoView(index)
 
