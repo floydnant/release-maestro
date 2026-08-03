@@ -2,7 +2,11 @@
 
 The library is designed for collections of 50k–500k songs, so no browse surface ever loads the
 catalog into the renderer. Every list fetches `LIMIT`/`OFFSET` windows over an indexed `ORDER BY`
-plus one `COUNT` for the scrollbar, and the renderer holds only the rows currently on screen.
+plus one `COUNT` for the scrollbar, and the renderer holds one window — the rows on screen plus a
+fixed overscan margin on each side, so a flick of the wheel does not outrun the data. The margin is a
+constant number of rows, not a fraction of the result set, which is what keeps "one window" true at
+any catalog size. A hard ceiling on the requested limit is enforced in the main process, so a caller
+cannot ask for the catalog by asking for a very tall viewport.
 
 The consequence people trip over is selection. "Select all" cannot mean "an array of 500k ids" — that
 array has to cross IPC and live in renderer memory. So a selection is not a list of songs. It is:
@@ -60,3 +64,17 @@ One model, with a hard ceiling on payload size.
 - **Search is deliberately not part of this decision.** It is `LIKE '%…%'` today and will not hold at
   the top of the size range. It is kept behind a single seam in the query layer so swapping in FTS5 is
   one file, not a rewrite of five pages.
+- **Virtualisation is hand-rolled, and follows from this.** Angular CDK's `*cdkVirtualFor` needs an
+  array as long as the result set to size its scrollbar, which is the one thing this decision exists
+  to prevent — a 500k-entry array in the renderer costs the same whether the entries are rows or
+  placeholders. Instead a spacer of `total × rowHeight` gives the scrollbar its range and the loaded
+  window is translated into place. The cost is real and accepted: fixed row height, and scroll
+  mathematics we maintain ourselves.
+- **A shift-anchor is an index too.** The rule above clears a ranged selection when the row count
+  changes, but the anchor a shift-click extends from is held separately by the surface, and it carries
+  the selection it would re-apply. It has no id to fall back on, so it is dropped under exactly the
+  same condition — otherwise the next shift-click rebuilds the range that was just cleared.
+- **Membership of a hand-picked selection is by id, not by the index it was picked at.** The whole
+  reason `included` survives a refetch is that an id still names the same song; a surface that then
+  asks "is row _n_ selected?" positionally throws that away and highlights whichever row inherited the
+  index, while the action — which travels as an id — hits the right one.
