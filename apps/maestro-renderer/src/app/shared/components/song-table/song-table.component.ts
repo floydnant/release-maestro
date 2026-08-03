@@ -58,6 +58,37 @@ import { SongTableRowComponent } from './song-table-row.component'
 /** Row height in pixels. Fixed, because virtualisation needs to map scroll offset to index. */
 export const ROW_HEIGHT = 40
 
+/**
+ * Column widths in pixels, in visual order — the single declaration the header and
+ * every row bind to.
+ *
+ * Bound as inline widths rather than written as `w-52` utilities on each of the
+ * twenty-two cells. Two lists of literal widths in two templates drift the moment one
+ * is edited alone, which is what the "edit these together" comment used to be guarding.
+ *
+ * A CSS grid would express this better and cannot be used: the header and the rows are
+ * necessarily separate grids — virtualisation puts the rows inside an absolutely
+ * positioned, transformed window that the header is not in — so each one sizes its
+ * tracks against its own container and its own content. `subgrid` is the feature that
+ * would fix that, and it needs a common grid ancestor the virtualisation cannot provide.
+ *
+ * Inline widths are also where resizable columns have to end up, so this is the shape
+ * that survives.
+ */
+export const SONG_TABLE_COLUMN_WIDTHS = {
+    cover: 64,
+    title: 256,
+    artist: 208,
+    album: 208,
+    genre: 128,
+    bpm: 64,
+    musicalKey: 48,
+    duration: 64,
+    year: 64,
+    recordLabel: 128,
+    dateAdded: 128,
+} as const
+
 /** Rows fetched beyond the viewport on each side, so scrolling does not chase the data. */
 const OVERSCAN_ROWS = 20
 
@@ -82,37 +113,6 @@ export interface EntityFilterRequest {
 @Component({
     selector: 'app-song-table',
     templateUrl: './song-table.component.html',
-    /**
-     * The column widths, declared once for the header and every row.
-     *
-     * They used to be `w-52 shrink-0` utilities repeated on eleven header cells and
-     * eleven body cells, in two files after the row was extracted — two lists that had
-     * to be edited together and drifted apart when the viewport shrank if they were
-     * not. A grid template makes that impossible: header and rows are grid rows over
-     * the same track list, so a column has one width by construction.
-     *
-     * `min-width: 0` on the cells because a grid item's default `auto` minimum refuses
-     * to shrink below its content, which stops `truncate` from ever truncating.
-     * `width: max-content` keeps the table wider than the viewport rather than
-     * squeezing columns, so the horizontal scroll still works.
-     */
-    styles: `
-        .song-table__header,
-        .song-table__row {
-            display: grid;
-            grid-template-columns:
-                4rem minmax(16rem, 1fr) 13rem 13rem 8rem
-                4rem 3rem 4rem 4rem 8rem 8rem;
-            align-items: center;
-            width: max-content;
-            min-width: 100%;
-        }
-
-        .song-table__header > *,
-        .song-table__row > * > * {
-            min-width: 0;
-        }
-    `,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [NgClass, SongTableHeadingComponent, SongTableRowComponent],
     host: {
@@ -145,6 +145,7 @@ export class SongTableComponent {
     filterMissing = output<void>()
 
     protected readonly rowHeight = ROW_HEIGHT
+    protected readonly columns = SONG_TABLE_COLUMN_WIDTHS
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
     /**

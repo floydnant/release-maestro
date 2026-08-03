@@ -1,7 +1,11 @@
 <!-- The artwork runs the full height of the row, inset by a couple of pixels, and is
      held off the left edge so it is not cramped against it. Its own square shape comes
      from the row height. -->
-<span class="song-table__cover | self-stretch py-0.5 pl-6" role="gridcell">
+<span
+    class="song-table__cover | shrink-0 self-stretch py-0.5 pl-6"
+    role="gridcell"
+    [style.width.px]="columns.cover"
+>
     @if (row().coverPath) {
         <img
             class="aspect-square h-full rounded-sm object-cover"
@@ -22,7 +26,11 @@
 <!-- The missing badge lives in the title cell rather than a column of its own: a
      dedicated column reserves width in every library, and most libraries have nothing
      missing at all. -->
-<span class="song-table__title | flex items-center gap-1.5 px-2" role="gridcell">
+<span
+    class="song-table__title | flex shrink-0 grow items-center gap-1.5 px-2"
+    role="gridcell"
+    [style.width.px]="columns.title"
+>
     @if (!row().present) {
         <button
             type="button"
@@ -58,7 +66,12 @@
     }
 </span>
 
-<span class="truncate px-2" role="gridcell" [title]="row().albumTitle || ''">
+<span
+    class="shrink-0 truncate px-2"
+    role="gridcell"
+    [style.width.px]="columns.album"
+    [title]="row().albumTitle || ''"
+>
     @if (row().albumId && row().albumTitle) {
         <button
             type="button"
@@ -73,7 +86,12 @@
     }
 </span>
 
-<span class="truncate px-2" role="gridcell" [title]="row().genreText || ''">
+<span
+    class="shrink-0 truncate px-2"
+    role="gridcell"
+    [style.width.px]="columns.genre"
+    [title]="row().genreText || ''"
+>
     @if (row().genres.length) {
         @for (genre of row().genres; track genre.id; let last = $last) {
             <button
@@ -93,23 +111,36 @@
     }
 </span>
 
-<span class="truncate px-2 text-right" role="gridcell">
+<span class="shrink-0 truncate px-2 text-right" role="gridcell" [style.width.px]="columns.bpm">
     {{ formatBpm(row().bpm) }}
 </span>
 
-<span class="truncate px-2" role="gridcell">
+<span class="shrink-0 truncate px-2" role="gridcell" [style.width.px]="columns.musicalKey">
     {{ row().musicalKey }}
 </span>
 
-<span class="truncate px-2 text-right text-content-secondary" role="gridcell">
+<span
+    class="shrink-0 truncate px-2 text-right text-content-secondary"
+    role="gridcell"
+    [style.width.px]="columns.duration"
+>
     {{ row().duration ? formatDuration(row().duration!) : '—' }}
 </span>
 
-<span class="truncate px-2 text-right text-content-secondary" role="gridcell">
+<span
+    class="shrink-0 truncate px-2 text-right text-content-secondary"
+    role="gridcell"
+    [style.width.px]="columns.year"
+>
     {{ row().year }}
 </span>
 
-<span class="truncate px-2" role="gridcell" [title]="row().recordLabelText || ''">
+<span
+    class="shrink-0 truncate px-2"
+    role="gridcell"
+    [style.width.px]="columns.recordLabel"
+    [title]="row().recordLabelText || ''"
+>
     @if (row().recordLabelId && row().recordLabelText) {
         <button
             type="button"
@@ -124,6 +155,10 @@
     }
 </span>
 
-<span class="truncate px-2 text-content-secondary" role="gridcell">
+<span
+    class="shrink-0 truncate px-2 text-content-secondary"
+    role="gridcell"
+    [style.width.px]="columns.dateAdded"
+>
     {{ row().dateAdded ? formatDateShort(row().dateAdded!) : '—' }}
 </span>

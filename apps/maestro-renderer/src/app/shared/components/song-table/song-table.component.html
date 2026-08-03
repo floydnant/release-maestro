@@ -12,36 +12,54 @@
     [attr.aria-activedescendant]="activeDescendantId()"
 >
     <!-- **Header and body column widths must be edited together** or they drift apart when the viewport shrinks. -->
-    <div class="song-table__header | sticky top-0 z-10 bg-background-canvas" role="row" aria-rowindex="1">
-        <span class="border-b border-border-subtle" role="columnheader">
+    <div
+        class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-canvas"
+        role="row"
+        aria-rowindex="1"
+    >
+        <span
+            class="shrink-0 border-b border-border-subtle"
+            role="columnheader"
+            [style.width.px]="columns.cover"
+        >
             <span class="sr-only">Cover art</span>
         </span>
 
         <app-song-table-heading
+            class="shrink-0 grow"
+            [style.width.px]="columns.title"
             field="title"
             label="Title"
             [sort]="sort()"
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.artist"
             field="artist"
             label="Artist"
             [sort]="sort()"
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.album"
             field="album"
             label="Album"
             [sort]="sort()"
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.genre"
             field="genre"
             label="Genre"
             [sort]="sort()"
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.bpm"
             field="bpm"
             label="BPM"
             [numeric]="true"
@@ -49,12 +67,16 @@
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.musicalKey"
             field="musicalKey"
             label="Key"
             [sort]="sort()"
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.duration"
             field="duration"
             label="Time"
             [numeric]="true"
@@ -62,6 +84,8 @@
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.year"
             field="year"
             label="Year"
             [numeric]="true"
@@ -69,12 +93,16 @@
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.recordLabel"
             field="recordLabel"
             label="Record label"
             [sort]="sort()"
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
         <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.dateAdded"
             field="dateAdded"
             label="Added"
             [sort]="sort()"
@@ -112,7 +140,7 @@
                 @let selected = isRowSelected(row, index);
 
                 <div
-                    class="song-table__row"
+                    class="song-table__row | flex items-center"
                     role="row"
                     [id]="rowElementId(index)"
                     [ngClass]="{

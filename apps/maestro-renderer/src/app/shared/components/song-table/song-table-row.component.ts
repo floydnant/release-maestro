@@ -4,7 +4,11 @@ import { isSelectionModifierHeld } from '../../browse/song-selection'
 import { fileUrl } from '../../utils/file-url.util'
 import { formatBpm, formatDateShort, formatDuration } from '../../utils/formatting.utils'
 import { IconComponent } from '../icon/icon.component'
-import type { EntityFilterKind, EntityFilterRequest } from './song-table.component'
+import {
+    SONG_TABLE_COLUMN_WIDTHS,
+    type EntityFilterKind,
+    type EntityFilterRequest,
+} from './song-table.component'
 
 /**
  * The cells of one track row.
@@ -35,6 +39,9 @@ export class SongTableRowComponent {
     row = input.required<SongRow>()
     /** Only the empty-cover placeholder needs it — the row's own styling is the parent's. */
     selected = input.required<boolean>()
+
+    /** Shared with the header, so a column has one width — see the constant. */
+    protected readonly columns = SONG_TABLE_COLUMN_WIDTHS
 
     entityFilter = output<EntityFilterRequest>()
     filterMissing = output<void>()
