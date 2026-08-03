@@ -5,6 +5,7 @@ import {
     HydratedFeedItem,
     MainIpcContract,
     RendererIpcContract,
+    QuerySongsRequest,
     SongFilterDescription,
     SongRow,
     SongWindowResult,
@@ -30,28 +31,30 @@ export type ScenarioBehavior =
     | { kind: 'pending' }
     | { kind: 'sequence'; steps: ScenarioBehavior[]; fallback?: ScenarioBehavior }
     /**
-     * Answer from a {@link ScenarioPreset} — a canned responder that reads the request.
+     * Answer by calling back into the test, with the request payload.
      *
      * Everything above says *how a call settles*; this says *what the answer contains*,
-     * and the two are deliberately separate. Presets exist because a static value
-     * cannot answer a request that varies: a windowed list asks for a different slice
-     * on every scroll, and asserting against a fixture that ignores the offset proves
-     * only that the table asked correctly, never that it rendered what came back.
+     * computed rather than canned. A static value cannot answer a request that varies:
+     * a windowed list asks for a different slice on every scroll, and a fixture that
+     * ignores the offset can only prove the table asked correctly, never that it
+     * rendered what came back.
      *
-     * They are named rather than passed as functions because the harness is installed
-     * inside the page: a callback would have to cross the Playwright boundary on every
-     * IPC call. The preset table lives in there with it.
+     * The responder itself lives in the test, in Node — see {@link ScenarioResponder}
+     * and `respond()`. The name is what crosses into the page, because the harness is
+     * installed through `addInitScript` and a function cannot be serialised into it.
      */
-    | { kind: 'preset'; preset: ScenarioPreset; options?: IpcPayload }
+    | { kind: 'respond'; responder: string }
 
 /**
- * Canned responders that compute an answer from the request.
+ * A responder registered with `respond()`, run in Node with the request payload.
  *
- * `song-window` serves the window `library:query-songs` asked for out of a catalog of
- * `total` rows, titling each `Row <absolute index>` so a test can name the rows it
- * expects at a scroll position.
+ * Being in Node is the point: it can use `createSongRow` and the real `SongWindowResult`
+ * type, rather than a hand-written literal inlined into the injected script that nothing
+ * type-checks against the contract.
  */
-export type ScenarioPreset = 'song-window'
+export type ScenarioResponder<TRequest = unknown, TResponse = unknown> = (
+    request: TRequest,
+) => TResponse | Promise<TResponse>
 
 export type RendererScenario = {
     handlers: Record<string, ScenarioBehavior>
@@ -79,6 +82,12 @@ declare global {
             platform?: string
         }
         require?: (moduleName: string) => unknown
+        /**
+         * Bridge to a responder running in Node. Installed by `respond()` via
+         * `page.exposeFunction`, which is what lets a scenario answer with real code
+         * instead of a value serialised in ahead of time.
+         */
+        __maestroRespond: (responder: string, request: unknown) => Promise<unknown>
         __maestroScenario: {
             calls: (channel?: string) => IpcCall[]
             lastCall: (channel: string) => IpcCall | undefined
@@ -251,12 +260,12 @@ export const scenarioBuilder = (scenario: Partial<RendererScenario> = {}) => {
          * *renders*; `songs()` serves one fixed window and is right when the assertion
          * is about what it *requests*.
          */
-        songCatalog(total: number) {
-            current.handlers['library:query-songs'] = {
-                kind: 'preset',
-                preset: 'song-window',
-                options: { total },
-            }
+        songCatalog(page: Page, total: number) {
+            current.handlers['library:query-songs'] = respond(
+                page,
+                'song-catalog',
+                songCatalogResponder(total),
+            )
             return this
         },
         songFilterDescription(description: Partial<SongFilterDescription>) {
@@ -512,6 +521,65 @@ export class RendererScenarioController {
     }
 }
 
+/**
+ * Register a responder and return the behavior that reaches it.
+ *
+ * Must be called before `createRendererScenario`, because `exposeFunction` installs the
+ * binding on the page and the scenario's init script expects it to be there. One
+ * binding is installed per page and dispatches by name, so several responders can
+ * coexist without fighting over it.
+ */
+export const respond = <TRequest, TResponse>(
+    page: Page,
+    name: string,
+    responder: ScenarioResponder<TRequest, TResponse>,
+): ScenarioBehavior => {
+    const registry = (responders.get(page) ?? new Map()) as Map<string, ScenarioResponder>
+    const isFirst = registry.size == 0
+    registry.set(name, responder as ScenarioResponder)
+    responders.set(page, registry)
+
+    if (isFirst) {
+        // Serialising the response keeps `Date` and `undefined` intact across the
+        // boundary, exactly as the scenario's own payloads are handled.
+        void page.exposeFunction('__maestroRespond', async (target: string, request: unknown) => {
+            const handler = responders.get(page)?.get(target)
+            if (!handler) throw new Error(`No scenario responder registered for ${target}`)
+            return await handler(request)
+        })
+    }
+
+    return { kind: 'respond', responder: name }
+}
+
+const responders = new WeakMap<Page, Map<string, ScenarioResponder>>()
+
+/**
+ * A responder serving `library:query-songs` out of a catalog of `total` rows, titled
+ * `Row 0`, `Row 1`, … so a test can name the rows it expects at a scroll position.
+ *
+ * Built from {@link createSongRow} and typed as {@link SongWindowResult}, which is the
+ * whole reason this runs in Node.
+ */
+export const songCatalogResponder =
+    (total: number): ScenarioResponder<QuerySongsRequest, SongWindowResult> =>
+    request => {
+        const offset = Math.max(0, Math.min(request.window.offset, total))
+        const count = Math.max(0, Math.min(request.window.limit, total - offset))
+        return {
+            rows: Array.from({ length: count }, (_row, position) => {
+                const index = offset + position
+                return createSongRow({
+                    id: `song-${index}`,
+                    path: `/scenario/music/row-${index}.mp3`,
+                    title: `Row ${index}`,
+                })
+            }),
+            offset,
+            total,
+        }
+    }
+
 export const createRendererScenario = async (
     page: Page,
     scenario: RendererScenario,
@@ -624,41 +692,8 @@ export const createRendererScenario = async (
                         }
                         return Promise.reject(error)
                     }
-                    if (behavior.kind === 'preset') {
-                        // One preset today; the switch is where a second one lands.
-                        const total = (behavior.options as { total?: number } | undefined)?.total ?? 0
-                        const requested = (payload as { window?: { offset?: number; limit?: number } })
-                            ?.window
-                        const offset = Math.max(0, Math.min(requested?.offset ?? 0, total))
-                        const limit = Math.max(0, requested?.limit ?? 0)
-                        const count = Math.max(0, Math.min(limit, total - offset))
-                        return Promise.resolve({
-                            rows: Array.from({ length: count }, (_row, position) => {
-                                const index = offset + position
-                                return {
-                                    id: `song-${index}`,
-                                    path: `/scenario/music/row-${index}.mp3`,
-                                    present: true,
-                                    title: `Row ${index}`,
-                                    coverPath: null,
-                                    artistText: null,
-                                    artistCredit: [],
-                                    albumId: null,
-                                    albumTitle: null,
-                                    genreText: null,
-                                    genres: [],
-                                    recordLabelId: null,
-                                    recordLabelText: null,
-                                    year: null,
-                                    bpm: null,
-                                    musicalKey: null,
-                                    duration: null,
-                                    dateAdded: null,
-                                }
-                            }),
-                            offset,
-                            total,
-                        })
+                    if (behavior.kind === 'respond') {
+                        return window.__maestroRespond(behavior.responder, payload)
                     }
 
                     return new Promise(resolve => {
