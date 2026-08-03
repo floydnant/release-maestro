@@ -21,6 +21,7 @@ import {
     isEmptySelection,
     isSelected,
     isSelectionModifierHeld,
+    NO_CURSOR,
     selectAll,
     selectionSize,
     type SongSelectionState,
@@ -369,19 +370,24 @@ export class SongTableComponent {
             return
         }
 
-        // With nothing selected, the first directional key lands *on* the cursor rather
-        // than moving off it — otherwise arrowing down after a sort change would skip
-        // the first row, because there is no selected row to move away from.
-        if (isEmptySelection(this.selection()) && this.movedIndex(event, lastIndex) != null) {
-            event.preventDefault()
-            this.moveTo(Math.min(this.cursorIndex(), lastIndex), { extend: false })
-            return
-        }
-
         const nextIndex = this.movedIndex(event, lastIndex)
         if (nextIndex == null) return
 
         event.preventDefault()
+
+        // With nothing selected but the cursor still on a row — cmd-clicking the last
+        // selected row off leaves it there — the first directional key lands *on* that
+        // row rather than moving off it, because there is no selected row to move away
+        // from. `NO_CURSOR` is not such a row: Escape and a sort change both reset the
+        // cursor, and landing "on" `-1` would select an empty range and leave the grid
+        // inert for every key after it. There the move arithmetic already does the
+        // right thing — see `BrowseSelectionState.cursor`.
+        const cursor = this.cursorIndex()
+        if (cursor != NO_CURSOR && isEmptySelection(this.selection())) {
+            this.moveTo(Math.min(cursor, lastIndex), { extend: false })
+            return
+        }
+
         this.moveTo(nextIndex, { extend: event.shiftKey })
     }
 

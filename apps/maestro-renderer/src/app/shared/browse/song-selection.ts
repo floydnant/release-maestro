@@ -26,6 +26,7 @@ export {
     isEmptySelection,
     isSelected,
     isSelectionModifierHeld,
+    NO_CURSOR,
     selectAll,
     selectOnly,
     selectRange,

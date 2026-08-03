@@ -749,6 +749,23 @@ test.describe('selection', () => {
         await expect(page.getByText('1 of 50000 tracks selected')).toBeAttached()
     })
 
+    test('keeps arrowing after Escape clears the selection', async ({ page }) => {
+        await openTracks(page)
+
+        // Escape resets the cursor to "nowhere yet". The keyboard used to land *on*
+        // that non-row, selecting an empty range — and every vertical key after it was
+        // then swallowed while the grid still held focus.
+        await clickRow(page, 'Dusk')
+        await page.keyboard.press('Escape')
+        await expect(page.getByRole('row', { selected: true })).toHaveCount(0)
+
+        await page.keyboard.press('ArrowDown')
+        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+
+        await page.keyboard.press('ArrowDown')
+        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+    })
+
     test('gives the grid a current row when the keyboard arrives at it', async ({ page }) => {
         await openTracks(page)
 
