@@ -745,11 +745,7 @@ test.describe('what the window actually renders', () => {
      * identically to one that works, so nothing keyed on the request can catch it.
      */
     const openLargeLibrary = (page: Page, total = 50_000) =>
-        createRendererScenario(
-            page,
-            scenarioBuilder().handler('library:query-songs', { kind: 'song-window', total }).build(),
-            '/tracks',
-        )
+        createRendererScenario(page, scenarioBuilder().songCatalog(total).build(), '/tracks')
 
     /** Every row the user can actually see, top to bottom. */
     const visibleTitles = async (page: Page): Promise<string[]> => {
@@ -850,11 +846,7 @@ test.describe('the grid for keyboard and assistive tech', () => {
         // Scrolling the cursor to the very edge is technically in view and useless to
         // read — the row you are about to arrow onto is off screen. Arrowing down used
         // to leave a sliver of the selected row below the fold.
-        await createRendererScenario(
-            page,
-            scenarioBuilder().handler('library:query-songs', { kind: 'song-window', total: 5_000 }).build(),
-            '/tracks',
-        )
+        await createRendererScenario(page, scenarioBuilder().songCatalog(5_000).build(), '/tracks')
         await clickRow(page, 'Row 0')
 
         const grid = page.getByRole('grid', { name: 'Tracks' })

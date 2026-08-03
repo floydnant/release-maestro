@@ -30,16 +30,28 @@ export type ScenarioBehavior =
     | { kind: 'pending' }
     | { kind: 'sequence'; steps: ScenarioBehavior[]; fallback?: ScenarioBehavior }
     /**
-     * Answer `library:query-songs` with the window it actually asked for, generating
-     * rows on demand out of a catalog of `total`.
+     * Answer from a {@link ScenarioPreset} — a canned responder that reads the request.
      *
-     * Every other behavior serves one fixed window, which is enough to assert what a
-     * surface *requests* but cannot show whether it renders what it got: a table that
-     * asks for the right window and then draws it in the wrong place looks identical.
-     * Titles are `Row <absolute index>`, so a test can name the rows it expects to see
-     * at a given scroll position.
+     * Everything above says *how a call settles*; this says *what the answer contains*,
+     * and the two are deliberately separate. Presets exist because a static value
+     * cannot answer a request that varies: a windowed list asks for a different slice
+     * on every scroll, and asserting against a fixture that ignores the offset proves
+     * only that the table asked correctly, never that it rendered what came back.
+     *
+     * They are named rather than passed as functions because the harness is installed
+     * inside the page: a callback would have to cross the Playwright boundary on every
+     * IPC call. The preset table lives in there with it.
      */
-    | { kind: 'song-window'; total: number }
+    | { kind: 'preset'; preset: ScenarioPreset; options?: IpcPayload }
+
+/**
+ * Canned responders that compute an answer from the request.
+ *
+ * `song-window` serves the window `library:query-songs` asked for out of a catalog of
+ * `total` rows, titling each `Row <absolute index>` so a test can name the rows it
+ * expects at a scroll position.
+ */
+export type ScenarioPreset = 'song-window'
 
 export type RendererScenario = {
     handlers: Record<string, ScenarioBehavior>
@@ -230,6 +242,20 @@ export const scenarioBuilder = (scenario: Partial<RendererScenario> = {}) => {
                     offset: options.offset ?? 0,
                     total: options.total ?? rows.length,
                 } satisfies SongWindowResult,
+            }
+            return this
+        },
+        /**
+         * Serve whatever window is asked for, out of a catalog of `total` rows titled
+         * `Row 0`, `Row 1`, … Use this when the assertion is about what the table
+         * *renders*; `songs()` serves one fixed window and is right when the assertion
+         * is about what it *requests*.
+         */
+        songCatalog(total: number) {
+            current.handlers['library:query-songs'] = {
+                kind: 'preset',
+                preset: 'song-window',
+                options: { total },
             }
             return this
         },
@@ -598,12 +624,14 @@ export const createRendererScenario = async (
                         }
                         return Promise.reject(error)
                     }
-                    if (behavior.kind === 'song-window') {
+                    if (behavior.kind === 'preset') {
+                        // One preset today; the switch is where a second one lands.
+                        const total = (behavior.options as { total?: number } | undefined)?.total ?? 0
                         const requested = (payload as { window?: { offset?: number; limit?: number } })
                             ?.window
-                        const offset = Math.max(0, Math.min(requested?.offset ?? 0, behavior.total))
+                        const offset = Math.max(0, Math.min(requested?.offset ?? 0, total))
                         const limit = Math.max(0, requested?.limit ?? 0)
-                        const count = Math.max(0, Math.min(limit, behavior.total - offset))
+                        const count = Math.max(0, Math.min(limit, total - offset))
                         return Promise.resolve({
                             rows: Array.from({ length: count }, (_row, position) => {
                                 const index = offset + position
@@ -629,7 +657,7 @@ export const createRendererScenario = async (
                                 }
                             }),
                             offset,
-                            total: behavior.total,
+                            total,
                         })
                     }
 
