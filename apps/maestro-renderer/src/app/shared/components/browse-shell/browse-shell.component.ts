@@ -1,5 +1,14 @@
 import { DecimalPipe } from '@angular/common'
-import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output } from '@angular/core'
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    ElementRef,
+    input,
+    linkedSignal,
+    output,
+    viewChild,
+} from '@angular/core'
 import { RouterLink } from '@angular/router'
 import { type CatalogEntityRef } from '@release-maestro/core'
 import type { BrowseStatus } from '../../browse/browse-query'
@@ -53,7 +62,10 @@ export interface BrowseFilterState {
     templateUrl: './browse-shell.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [DecimalPipe, IconComponent, RouterLink],
-    host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
+    host: {
+        class: 'flex min-h-0 min-w-0 flex-1 flex-col',
+        '(document:keydown)': 'onDocumentKeydown($event)',
+    },
 })
 export class BrowseShellComponent {
     state = input.required<BrowseShellState>()
@@ -98,6 +110,32 @@ export class BrowseShellComponent {
      * restore the box.
      */
     protected searchDraft = linkedSignal(() => this.filters().search)
+
+    private searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput')
+
+    /**
+     * Cmd-F focuses the search, the way it does in every list-shaped app.
+     *
+     * On `document` rather than on the shell, because the point is to reach the search
+     * from wherever you are — the table has focus almost all of the time, and a
+     * keyboard user who has just arrowed through a hundred rows should not have to
+     * tab back out to search.
+     *
+     * `preventDefault` because Chromium's own find-in-page would otherwise open over a
+     * window holding one screenful of a 500k-row list, and search the wrong thing.
+     * Selecting the existing term matches the platform: typing replaces it, and the
+     * caret is still there if you would rather refine it.
+     */
+    protected onDocumentKeydown(event: KeyboardEvent): void {
+        if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() != 'f') return
+
+        const input = this.searchInput()?.nativeElement
+        if (!input) return
+
+        event.preventDefault()
+        input.focus()
+        input.select()
+    }
 
     protected onSearchInput(event: Event): void {
         const term = (event.target as HTMLInputElement).value

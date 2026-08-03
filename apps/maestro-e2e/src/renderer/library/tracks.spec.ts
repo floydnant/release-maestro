@@ -249,6 +249,32 @@ test.describe('search', () => {
         await expect(rowByTitle(page, 'Dawn')).toBeVisible()
     })
 
+    test('focuses the search on cmd-F, from wherever you are', async ({ page }) => {
+        await openTracks(page)
+
+        // The table holds focus almost all of the time, so the shortcut has to work
+        // from there rather than only when the toolbar already has it.
+        await clickRow(page, 'Dawn')
+        await expect(page.getByRole('grid', { name: 'Tracks' })).toBeFocused()
+
+        await page.keyboard.press('ControlOrMeta+f')
+
+        await expect(page.getByRole('searchbox', { name: 'Search tracks' })).toBeFocused()
+    })
+
+    test('selects the existing term on cmd-F, so typing replaces it', async ({ page }) => {
+        await openTracks(page)
+        const search = page.getByRole('searchbox', { name: 'Search tracks' })
+        await search.fill('burial')
+
+        await page.getByRole('grid', { name: 'Tracks' }).click()
+        await page.keyboard.press('ControlOrMeta+f')
+        await page.keyboard.type('four tet')
+
+        // Replaced rather than appended, which is what selecting on focus buys.
+        await expect(search).toHaveValue('four tet')
+    })
+
     test('explains an empty result as a filter problem, not an empty library', async ({ page }) => {
         const controller = await openTracks(page)
 

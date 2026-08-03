@@ -82,7 +82,7 @@ export const SONG_TABLE_COLUMN_WIDTHS = {
     album: 208,
     genre: 128,
     bpm: 64,
-    musicalKey: 48,
+    musicalKey: 52,
     duration: 64,
     year: 64,
     recordLabel: 128,
@@ -148,6 +148,8 @@ export class SongTableComponent {
     protected readonly columns = SONG_TABLE_COLUMN_WIDTHS
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
+    /** The last window emitted, so an unchanged one never reaches the signal graph. */
+    private lastWindow: BrowseWindow | null = null
     /**
      * Set while a pointer press is taking focus, so {@link onGridFocus} leaves the
      * click's own result alone.
@@ -225,7 +227,13 @@ export class SongTableComponent {
         // An effect because the outcome is a DOM side effect, not derived state.
         effect(() => {
             this.query()
-            untracked(() => this.scroller()?.nativeElement?.scrollTo({ top: 0 }))
+            untracked(() => {
+                // The parent resets its viewport for a new query, so the last window
+                // this emitted is no longer what it holds — keeping it would let the
+                // comparison in `onScroll` swallow the measurement that re-syncs them.
+                this.lastWindow = null
+                this.scroller()?.nativeElement?.scrollTo({ top: 0 })
+            })
         })
     }
 
@@ -235,8 +243,20 @@ export class SongTableComponent {
 
     /**
      * Translate a scroll position into the window the query primitive should fetch.
-     * Overscan on both sides means a slow flick does not outrun the data, and the
-     * primitive's `distinctUntilChanged` swallows the ticks that change nothing.
+     * Overscan on both sides means a slow flick does not outrun the data.
+     *
+     * **Deliberately not wrapped in `requestAnimationFrame`.** Scrolling here is native:
+     * a spacer of `total × ROW_HEIGHT` gives the scrollbar its range and the loaded
+     * window is translated into place, so the browser composites the scroll and nothing
+     * repositions per frame in JS. There is no animation loop to align to, and browsers
+     * already dispatch `scroll` at most once per frame — a rAF would defer this work
+     * without doing less of it.
+     *
+     * What was worth removing is emitting a window that has not changed. The offset
+     * only moves once per row scrolled and the limit almost never moves, so most scroll
+     * events used to write a signal and run change detection to produce a value
+     * `browse-query` then discarded. Comparing here keeps that off the signal graph
+     * entirely, rather than filtering it one step too late.
      */
     protected onScroll(): void {
         const element = this.scroller()?.nativeElement
@@ -245,8 +265,12 @@ export class SongTableComponent {
         const firstVisible = Math.floor(element.scrollTop / ROW_HEIGHT)
         const visibleCount = Math.ceil(element.clientHeight / ROW_HEIGHT)
         const offset = Math.max(0, firstVisible - OVERSCAN_ROWS)
+        const limit = visibleCount + OVERSCAN_ROWS * 2
 
-        this.viewportChange.emit({ offset, limit: visibleCount + OVERSCAN_ROWS * 2 })
+        if (offset == this.lastWindow?.offset && limit == this.lastWindow.limit) return
+
+        this.lastWindow = { offset, limit }
+        this.viewportChange.emit(this.lastWindow)
     }
 
     protected onRowPointerDown(event: MouseEvent, index: number, row: SongRow): void {
