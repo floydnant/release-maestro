@@ -9,7 +9,17 @@ import {
     type SongQuery,
     type SongSortField,
 } from '@release-maestro/core'
-import { auditTime, debounceTime, distinctUntilChanged, filter, from, of, Subject, switchMap } from 'rxjs'
+import {
+    auditTime,
+    catchError,
+    debounceTime,
+    distinctUntilChanged,
+    filter,
+    from,
+    of,
+    Subject,
+    switchMap,
+} from 'rxjs'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
@@ -129,7 +139,14 @@ export class TracksComponent {
         toObservable(computed(() => this.query().filter)).pipe(
             switchMap(currentFilter =>
                 hasEntityFilter(currentFilter)
-                    ? from(this.browseService.describeSongFilter(currentFilter))
+                    ? from(this.browseService.describeSongFilter(currentFilter)).pipe(
+                          // A rejection here must not take the page down with it.
+                          // `toSignal` rethrows on read, so an unhandled error would
+                          // make every computed that touches the description throw —
+                          // `chips`, `filterState`, and with them the whole template.
+                          // Falling back to unnamed costs the chips, not the table.
+                          catchError(() => of(EMPTY_DESCRIPTION)),
+                      )
                     : of(EMPTY_DESCRIPTION),
             ),
         ),
@@ -182,6 +199,10 @@ export class TracksComponent {
     protected filterState = computed<BrowseFilterState>(() => ({
         search: this.query().search,
         chips: this.chips(),
+        // Read from the query, not from the chips. When `describeSongFilter` fails
+        // there are no chips to remove, but the filter is still in force — and
+        // "Clear filters" is then the only way back out of it.
+        hasFilter: hasAnyFilter(this.query().filter),
     }))
 
     protected chips = computed<BrowseFilterChip[]>(() => {
@@ -310,6 +331,11 @@ const hasEntityFilter = (songFilter: SongFilter): boolean =>
         songFilter.recordLabelIds?.length ||
         songFilter.albumIds?.length
     )
+
+/** Any filter at all, entity or availability — what "Clear filters" undoes. */
+const hasAnyFilter = (songFilter: SongFilter): boolean =>
+    hasEntityFilter(songFilter) ||
+    (songFilter.presence != null && songFilter.presence != SongPresence.any)
 
 const entitiesFor = (description: SongFilterDescription, kind: EntityFilterKind) => {
     switch (kind) {

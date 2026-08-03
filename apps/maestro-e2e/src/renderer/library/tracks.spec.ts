@@ -340,6 +340,25 @@ test.describe('filtering by entity', () => {
 
         await expect.poll(async () => (await lastQuery(controller))?.query.filter.presence).toBeUndefined()
     })
+
+    test('still renders the table when the filter names cannot be resolved', async ({ page }) => {
+        // Naming a chip is a second round trip, independent of the rows. If it fails
+        // the page has to survive it: the description feeds `chips`, `chips` feeds
+        // `filterState`, and an error escaping into a signal takes the whole template
+        // down when it is read, not just the chip bar.
+        const scenario = scenarioBuilder()
+            .songs(createSongRows())
+            .handler('library:describe-song-filter', {
+                kind: 'reject',
+                message: 'Backend failed to describe the filter',
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/tracks?artist=artist-2')
+
+        await expect(rowByTitle(page, 'Dawn')).toBeVisible()
+        // Unnamed, but not inescapable — the filter is still applied to the query.
+        await expect(page.getByRole('button', { name: 'Clear all' })).toBeVisible()
+    })
 })
 
 test.describe('virtual scrolling', () => {

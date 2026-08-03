@@ -40,6 +40,12 @@ export interface BrowseShellState {
 export interface BrowseFilterState {
     search: string
     chips: BrowseFilterChip[]
+    /**
+     * Whether a filter is in force at all, independent of `chips`. A chip needs its
+     * entity name resolved over IPC first; when that fails there are no chips, but
+     * the filter still applies and the user needs a way back out of it.
+     */
+    hasFilter: boolean
 }
 
 @Component({
@@ -68,7 +74,7 @@ export class BrowseShellComponent {
 
     protected hasFilters = computed(() => {
         const filters = this.filters()
-        return filters.chips.length > 0 || !!filters.search
+        return filters.hasFilter || filters.chips.length > 0 || !!filters.search
     })
 
     /**
