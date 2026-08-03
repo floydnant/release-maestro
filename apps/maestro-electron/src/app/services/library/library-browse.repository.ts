@@ -207,8 +207,7 @@ export class LibraryBrowseRepository {
      * of any single index, and would cost a temp B-tree on every window.
      */
     private songOrdering(sort: SongQuery['sort']): SQL[] {
-        const direction = sort.direction == 'desc' ? desc : asc
-        return [direction(sortColumns[sort.field]), direction(songsTable.id)]
+        return songOrdering(sort)
     }
 
     /**
@@ -332,6 +331,19 @@ export class LibraryBrowseRepository {
 /** The catalog tables a filter chip can name: an id and a human-readable label. */
 type CatalogEntityTable =
     typeof artistsTable | typeof genresTable | typeof recordLabelsTable | typeof albumsTable
+
+/**
+ * The exact ordering a browse window is served in, id tiebreaker included.
+ *
+ * Exported so the scale check can ask SQLite to explain *this* ordering rather than
+ * re-deriving it from a second field-to-column table of its own. That duplicate is
+ * how a check like this goes quietly stale: add a sortable column and it covers
+ * everything except the one you added.
+ */
+export const songOrdering = (sort: SongQuery['sort']): SQL[] => {
+    const direction = sort.direction == 'desc' ? desc : asc
+    return [direction(sortColumns[sort.field]), direction(songsTable.id)]
+}
 
 const sortColumns: Record<SongSortField, AnySQLiteColumn> = {
     [SongSortField.title]: songsTable.title,
