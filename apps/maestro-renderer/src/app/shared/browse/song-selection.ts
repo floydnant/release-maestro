@@ -21,6 +21,7 @@ export type SongSelectionState = BrowseSelectionState<SongQuery>
 export type SongSelectionAnchor = SelectionAnchor<SongQuery>
 
 export {
+    anchorAfterRefetch,
     clearSelection,
     deselectRange,
     emptySelection,

@@ -23,6 +23,7 @@ import type {
 } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
 import {
+    anchorAfterRefetch,
     applySongSelectionGesture,
     clearSelection,
     isEmptySelection,
@@ -113,6 +114,8 @@ export class SongTableComponent {
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
     /** Where a shift-extension starts from, and whether it adds, replaces or removes. */
     private anchor: SongSelectionAnchor | null = null
+    /** The total the anchor's indices were measured against — see {@link liveAnchor}. */
+    private anchorTotal = 0
     /**
      * Where the next arrow key moves from. Never drawn: arrow keys move the
      * *selection*, so the selected row is the cursor, and there is no second state to
@@ -177,8 +180,8 @@ export class SongTableComponent {
         })
     }
 
-    protected isRowSelected(index: number): boolean {
-        return isSelected(this.selection(), index)
+    protected isRowSelected(row: SongRow, index: number): boolean {
+        return isSelected(this.selection(), { id: row.id, index })
     }
 
     /**
@@ -352,9 +355,24 @@ export class SongTableComponent {
         shiftKey: boolean
         toggleKey: boolean
     }): void {
-        const { selection, anchor } = applySongSelectionGesture(this.selection(), this.anchor, gesture)
+        const { selection, anchor } = applySongSelectionGesture(this.selection(), this.liveAnchor(), gesture)
         this.anchor = anchor
+        this.anchorTotal = this.total()
         this.selectionChange.emit(selection)
+    }
+
+    /**
+     * The anchor, dropped if the result set has changed size since it was set.
+     *
+     * The parent already clears a ranged selection when a refetch changes the total,
+     * but the anchor lives here and outlived it — and because an extension re-applies
+     * from `anchor.base`, the next shift-click rebuilt the range that had just been
+     * cleared. An anchor is a bare index, so a total change invalidates it outright.
+     */
+    private liveAnchor(): SongSelectionAnchor | null {
+        this.anchor = anchorAfterRefetch(this.anchor, this.anchorTotal, this.total())
+        this.anchorTotal = this.total()
+        return this.anchor
     }
 
     private movedIndex(event: KeyboardEvent, lastIndex: number): number | null {

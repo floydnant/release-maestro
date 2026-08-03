@@ -72,10 +72,24 @@ export const toWireSelection = <TQuery>(state: BrowseSelectionState<TQuery>): Wi
     included: state.included.map(row => row.id),
 })
 
-export const isSelected = <TQuery>(state: BrowseSelectionState<TQuery>, index: number): boolean =>
-    isInRanges(state.ranges, index)
-        ? !state.excluded.some(row => row.index == index)
-        : state.included.some(row => row.index == index)
+/**
+ * Whether a row is selected.
+ *
+ * Hand-picked rows are matched **by id**, not by the index they were picked at. A scan
+ * refetch shifts rows underneath a selection, and `selectionAfterRefetch` deliberately
+ * keeps id-only selections through it on the grounds that "an id means the same row
+ * wherever it moved to" — which is only true if this agrees. Matching on the stored
+ * index instead left the highlight on whatever row had inherited it, while
+ * {@link toWireSelection} sent the *id* on to the action: the user acts on one song
+ * and watches a different one being acted upon.
+ *
+ * Range membership is still positional, because a range is a pair of indices and has
+ * no other meaning. That is sound because a total change drops ranges outright.
+ */
+export const isSelected = <TQuery>(state: BrowseSelectionState<TQuery>, row: SelectedRow): boolean =>
+    isInRanges(state.ranges, row.index)
+        ? !state.excluded.some(excluded => excluded.id == row.id)
+        : state.included.some(included => included.id == row.id)
 
 /**
  * How many rows the selection covers. Exact at any size, and it never enumerates a
@@ -106,21 +120,23 @@ export const toggleRow = <TQuery>(
     state: BrowseSelectionState<TQuery>,
     row: SelectedRow,
 ): BrowseSelectionState<TQuery> => {
+    // By id, for the same reason as `isSelected`: the stored index is where the row
+    // was when it was picked, which a refetch may since have changed.
     if (isInRanges(state.ranges, row.index)) {
-        const alreadyExcluded = state.excluded.some(excluded => excluded.index == row.index)
+        const alreadyExcluded = state.excluded.some(excluded => excluded.id == row.id)
         return {
             ...state,
             excluded: alreadyExcluded
-                ? state.excluded.filter(excluded => excluded.index != row.index)
+                ? state.excluded.filter(excluded => excluded.id != row.id)
                 : [...state.excluded, row],
         }
     }
 
-    const alreadyIncluded = state.included.some(included => included.index == row.index)
+    const alreadyIncluded = state.included.some(included => included.id == row.id)
     return {
         ...state,
         included: alreadyIncluded
-            ? state.included.filter(included => included.index != row.index)
+            ? state.included.filter(included => included.id != row.id)
             : [...state.included, row],
     }
 }
@@ -199,6 +215,21 @@ export const selectionAfterRefetch = <TQuery>(
     if (state.ranges.length == 0) return state
     return emptySelection(state.query)
 }
+
+/**
+ * Reconcile a shift-anchor with a refetch.
+ *
+ * An anchor is an index and nothing else, so it cannot survive a change in the row
+ * count the way an id-only selection does. It also carries `base` — the selection as
+ * it stood when the anchor was set — and every extension re-applies from there. Left
+ * alone across a refetch that cleared the selection, the next shift-click rebuilds
+ * the very range {@link selectionAfterRefetch} had just dropped.
+ */
+export const anchorAfterRefetch = <TQuery>(
+    anchor: SelectionAnchor<TQuery> | null,
+    previousTotal: number,
+    nextTotal: number,
+): SelectionAnchor<TQuery> | null => (previousTotal == nextTotal ? anchor : null)
 
 /**
  * Reconcile a selection with a new query. Index ranges mean nothing against a
@@ -305,7 +336,7 @@ export const applySelectionGesture = <TQuery>(
 
     // A cmd-click on an already-selected row is a *removal*, and an extension from it
     // should keep removing rather than suddenly start adding.
-    const mode = isSelected(state, row.index) ? 'deselect' : 'select'
+    const mode = isSelected(state, row) ? 'deselect' : 'select'
     const selection = toggleRow(state, row)
     return { selection, anchor: { index: row.index, additive: true, mode, base: selection } }
 }

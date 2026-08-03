@@ -1,5 +1,6 @@
 import { emptySongQuery, SongSortField, type SongQuery } from '@release-maestro/core'
 import {
+    anchorAfterRefetch,
     applySelectionGesture,
     deselectRange,
     emptySelection,
@@ -21,7 +22,7 @@ import { sameQuery } from './song-selection'
 const query = emptySongQuery()
 const row = (index: number) => ({ id: `song-${index}`, index })
 const selectedIndices = (state: BrowseSelectionState<SongQuery>, upTo: number) =>
-    Array.from({ length: upTo }, (_value, index) => index).filter(index => isSelected(state, index))
+    Array.from({ length: upTo }, (_value, index) => index).filter(index => isSelected(state, row(index)))
 
 describe('song selection', () => {
     describe('the gestures in ADR 0004', () => {
@@ -102,8 +103,8 @@ describe('song selection', () => {
                 ranges: [{ start: 0, end: 500_000 }],
                 excluded: ['song-3', 'song-7', 'song-11'],
             })
-            expect(isSelected(state, 7)).toBe(false)
-            expect(isSelected(state, 8)).toBe(true)
+            expect(isSelected(state, row(7))).toBe(false)
+            expect(isSelected(state, row(8))).toBe(true)
         })
 
         it('holds the first and last row of a huge library as two ids', () => {
@@ -186,6 +187,35 @@ describe('song selection', () => {
             const state = toggleRow(selectAll(query, 1_000), row(5))
 
             expect(isEmptySelection(selectionAfterRefetch(state, 1_000, 999))).toBe(true)
+        })
+
+        it('follows a surviving id-only selection to the row’s new index', () => {
+            // The whole justification for keeping an id-only selection through a
+            // refetch is that "an id means the same row wherever it moved to". If the
+            // highlight is looked up by the index the row was picked at, that is false
+            // the moment a scan inserts anything above it: the selection would light
+            // up whichever row inherited the index, while the action — which travels
+            // as an id — hit the right one.
+            const picked = toggleRow(emptySelection(query), { id: 'song-9', index: 9 })
+            const afterInsert = selectionAfterRefetch(picked, 1_000, 1_001)
+
+            expect(isSelected(afterInsert, { id: 'song-9', index: 10 })).toBe(true)
+            expect(isSelected(afterInsert, { id: 'song-8', index: 9 })).toBe(false)
+        })
+
+        it('drops the shift anchor when the row count changes', () => {
+            const anchor: SelectionAnchor<SongQuery> = {
+                index: 12,
+                additive: false,
+                mode: 'select',
+                base: selectRange(emptySelection(query), { start: 12, end: 45 }),
+            }
+
+            // The anchor carries the selection an extension re-applies from, so an
+            // anchor that outlives the refetch can rebuild the very range that
+            // `selectionAfterRefetch` just cleared.
+            expect(anchorAfterRefetch(anchor, 1_000, 1_001)).toBeNull()
+            expect(anchorAfterRefetch(anchor, 1_000, 1_000)).toBe(anchor)
         })
     })
 
@@ -473,7 +503,7 @@ describe('song selection', () => {
             const removed = click(ranged, null, 5, { toggleKey: true })
             const span = click(removed.selection, removed.anchor, 5, { shiftKey: true })
 
-            expect(isSelected(span.selection, 5)).toBe(false)
+            expect(isSelected(span.selection, row(5))).toBe(false)
             expect(selectionSize(span.selection)).toBe(19)
         })
     })
@@ -554,7 +584,7 @@ describe('song selection', () => {
             })
             const on = click(off.selection, off.anchor, 4, { toggleKey: true })
 
-            expect(isSelected(on.selection, 4)).toBe(true)
+            expect(isSelected(on.selection, row(4))).toBe(true)
             expect(on.anchor?.mode).toBe('select')
         })
 

@@ -116,7 +116,7 @@
         >
             @for (row of rows(); track row.id; let rowIndex = $index) {
                 @let index = offset() + rowIndex;
-                @let selected = isRowSelected(index);
+                @let selected = isRowSelected(row, index);
 
                 <div
                     class="song-table__row | flex items-center"
