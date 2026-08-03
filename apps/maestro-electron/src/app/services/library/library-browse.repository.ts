@@ -216,9 +216,10 @@ export class LibraryBrowseRepository {
      *
      * Ingest never splits a raw name (MAE-97 owns that), so in practice this returns
      * exactly one segment per song, whose `creditedAs` is `artistText` verbatim —
-     * which is what lets the UI print `Burial & Four Tet` unchanged. Confirmed
-     * splits already storable in `artist_raw_name_artists` produce several segments;
-     * those have no stored join phrases yet, so they fall back to `, `.
+     * which is what lets the UI print `Burial & Four Tet` unchanged.
+     *
+     * The multi-segment branch is therefore dead code today, and it does not satisfy
+     * the contract this method claims: see the comment on it before enabling splits.
      */
     private artistCredits(songIds: string[]): Map<string, ArtistCreditSegment[]> {
         const credits = new Map<string, ArtistCreditSegment[]>()
@@ -257,7 +258,20 @@ export class LibraryBrowseRepository {
                               joinPhrase: '',
                           },
                       ]
-                    : artists.map((artist, position) => ({
+                    : // UNREACHABLE TODAY, AND WRONG WHEN IT IS NOT — read before MAE-97.
+                      //
+                      // `resolveArtists` never splits, so a song always has exactly one
+                      // `song_artists` row and the branch above answers every case. When
+                      // MAE-97 turns splitting on, this one starts running and starts
+                      // lying: the join phrases are *fabricated*. MAE-118 requires the
+                      // segments to reconstruct `artistText` exactly, and `Burial & Four
+                      // Tet` reconstructed from these reads `Burial, Four Tet`.
+                      //
+                      // The phrases have to come from the tag, which means storing them
+                      // when the split is confirmed — the DTO does not change, only
+                      // where `joinPhrase` is read from. Do not paper over it here by
+                      // guessing a separator.
+                      artists.map((artist, position) => ({
                           artistId: artist.artistId,
                           creditedAs: artist.name,
                           joinPhrase: position < artists.length - 1 ? ', ' : '',
