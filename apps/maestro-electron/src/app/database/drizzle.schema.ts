@@ -222,7 +222,7 @@ export const songsTable = sqliteTable(
         index('songs_file_fingerprint_idx').on(table.fileFingerprint),
         index('songs_album_id_idx').on(table.albumId),
 
-        // One index per sortable browse column. Browse queries page through an
+        // One index per sortable browse column. Browse queries move windows through an
         // indexed ORDER BY with a deep OFFSET (ADR 0004); without these, SQLite
         // builds a temp B-tree over the whole table on every window. Adding a
         // sortable column to a browse table is therefore a schema change.

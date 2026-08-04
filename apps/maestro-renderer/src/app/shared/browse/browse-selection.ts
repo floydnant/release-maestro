@@ -9,7 +9,7 @@ import { type SelectionRange } from '@release-maestro/core'
  * carries index ranges within its query's ordering, plus the individual rows added
  * outside them or removed inside them.
  *
- * **Entity-agnostic on purpose.** Tracks are the first surface, but releases, artists,
+ * **Entity-agnostic on purpose.** Tracks are the first surface, but albums, artists,
  * record labels and genres all select the same way, and none of them should re-derive
  * this. Everything here is generic over the query type; `song-selection.ts` binds it
  * to songs, and a second entity binds it the same way in a dozen lines.

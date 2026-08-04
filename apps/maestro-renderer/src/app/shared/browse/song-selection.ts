@@ -12,7 +12,7 @@ import {
  * Songs bound to the generic browse selection mechanics in `browse-selection.ts`.
  *
  * This module is deliberately tiny: it supplies the query comparator and the wire
- * type, and nothing else. Releases, artists, record labels and genres each get a file
+ * type, and nothing else. Albums, artists, record labels and genres each get a file
  * this size rather than their own copy of the selection rules.
  */
 

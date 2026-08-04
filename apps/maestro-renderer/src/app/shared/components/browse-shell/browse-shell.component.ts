@@ -19,7 +19,7 @@ import { IconComponent } from '../icon/icon.component'
  * filter chips, the availability scope, and the loading / empty / error branches.
  *
  * The rows themselves are projected. A browse surface owns its own scroller — the
- * track list virtualises a flat table, the releases grid will virtualise a grid — so
+ * track list virtualises a flat table, the albums grid will virtualise a grid — so
  * a shell that also owned the viewport would have to know which it was framing. The
  * seam is: the shell decides *whether* there is anything to show, and the projected
  * content decides *how* to show it.

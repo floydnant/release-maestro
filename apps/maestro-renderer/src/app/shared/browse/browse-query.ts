@@ -22,7 +22,7 @@ import {
  * rows out, with cancellation and a total.
  *
  * It is entity-agnostic on purpose. The track list is the first consumer, but
- * releases, artists, record labels and genres all window the same way (ADR 0004), and
+ * albums, artists, record labels and genres all window the same way (ADR 0004), and
  * none of them should re-derive this.
  *
  * Shape follows the house pattern: signals hold the state, `toObservable` enters the
