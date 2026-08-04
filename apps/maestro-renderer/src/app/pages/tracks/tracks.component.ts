@@ -189,7 +189,13 @@ export class TracksComponent {
         // A manual subscribe, because the result of this stream is a navigation rather
         // than state — there is no signal for it to land in. `takeUntilDestroyed` ends it.
         this.searchInput$
-            .pipe(debounceTime(SEARCH_DEBOUNCE_MS), distinctUntilChanged(), takeUntilDestroyed())
+            .pipe(
+                debounceTime(SEARCH_DEBOUNCE_MS),
+                // Compare with the URL-derived source of truth, not the Subject's last
+                // emission: another action can clear the query without touching this stream.
+                filter(search => search != this.query().search),
+                takeUntilDestroyed(),
+            )
             .subscribe(search => this.patchQuery({ ...this.query(), search }, { replaceUrl: true }))
     }
 

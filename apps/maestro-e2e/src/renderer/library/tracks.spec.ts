@@ -237,6 +237,25 @@ test.describe('search', () => {
         await expect.poll(() => lastQuery(controller)).toMatchObject({ query: { search: '' } })
     })
 
+    test('reapplies the same search after clearing filters', async ({ page }) => {
+        const controller = await openTracks(page)
+        const search = page.getByRole('searchbox', { name: 'Search tracks' })
+        await controller.setHandler('library:query-songs', {
+            kind: 'resolve',
+            value: { rows: [], offset: 0, total: 0 },
+        })
+
+        await search.fill('ambient')
+        await expect.poll(() => lastQuery(controller)).toMatchObject({ query: { search: 'ambient' } })
+
+        await page.getByRole('button', { name: 'Clear filters' }).click()
+        await expect(search).toHaveValue('')
+        await expect.poll(() => lastQuery(controller)).toMatchObject({ query: { search: '' } })
+
+        await search.fill('ambient')
+        await expect.poll(() => lastQuery(controller)).toMatchObject({ query: { search: 'ambient' } })
+    })
+
     test('keeps the rows on screen while typing instead of flashing a loading state', async ({ page }) => {
         const controller = await openTracks(page)
         await expect(rowByTitle(page, 'Dawn')).toBeVisible()
