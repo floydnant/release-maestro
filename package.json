@@ -58,7 +58,7 @@
         "@nx/js": "22.7.5",
         "@nx/playwright": "22.7.5",
         "@nx/web": "22.7.5",
-        "@nx/workspace": "22.7.5",
+        "@nx/workspace": "23.1.1",
         "@playwright/test": "1.62.0",
         "@schematics/angular": "22.0.9",
         "@swc-node/register": "1.12.1",
