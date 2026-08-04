@@ -1,0 +1,93 @@
+<div
+    #scroller
+    class="album-grid | min-h-0 flex-1 overflow-y-auto overflow-x-hidden outline-none"
+    role="grid"
+    aria-label="Albums"
+    [attr.aria-rowcount]="rowCount()"
+    [attr.aria-colcount]="layout().columns"
+    (scroll)="onScroll()"
+>
+    <!-- A spacer as tall as the whole result set gives the scrollbar its range; only
+         the loaded window is ever in the DOM, translated to where it belongs. -->
+    <div class="album-grid__canvas | relative px-4 pb-8" role="presentation">
+        <div role="presentation" [style.height.px]="canvasHeight()"></div>
+
+        <!-- `role="presentation"` on the wrappers is load-bearing rather than
+             decorative: `role="row"` has to be owned by the grid, and an untyped div in
+             between detaches every row from it — assistive tech then sees an empty grid
+             and `aria-rowcount` describes a shape nothing can navigate. -->
+        <div
+            class="album-grid__window | absolute inset-x-4 top-0"
+            role="presentation"
+            [style.transform]="'translateY(' + windowTop() + 'px)'"
+        >
+            @for (rowStart of windowRowStarts(); track rowStart) {
+                <div
+                    class="album-grid__row | grid"
+                    role="row"
+                    [attr.aria-rowindex]="rowStart / layout().columns + 1"
+                    [style.gap.px]="gap"
+                    [style.height.px]="layout().rowHeight"
+                    [style.gridTemplateColumns]="'repeat(' + layout().columns + ', minmax(0, 1fr))'"
+                >
+                    @for (columnIndex of columnIndices(); track columnIndex) {
+                        @let index = rowStart + columnIndex;
+                        @let album = rowAt(index);
+
+                        @if (album) {
+                            <div role="gridcell" [attr.aria-colindex]="columnIndex + 1">
+                                <a
+                                    class="album-tile | flex size-full flex-col gap-2 rounded-md p-1 outline-none focus-visible:ring-2 focus-visible:ring-border-focus hover:bg-background-surface"
+                                    [id]="tileElementId(index)"
+                                    [tabindex]="tabbableIndex() === index ? 0 : -1"
+                                    [routerLink]="['/albums', album.id]"
+                                    [attr.aria-label]="tileLabel(album)"
+                                    [title]="tileLabel(album)"
+                                    (focus)="onTileFocus(index)"
+                                    (keydown)="onKeydown($event)"
+                                >
+                                    @if (album.coverPath) {
+                                        <img
+                                            class="aspect-square w-full rounded-sm object-cover"
+                                            alt=""
+                                            loading="lazy"
+                                            [src]="fileUrl(album.coverPath)"
+                                        />
+                                    } @else {
+                                        <span
+                                            class="album-tile__no-cover | grid aspect-square w-full place-items-center rounded-sm bg-background-elevated"
+                                        >
+                                            <app-icon name="musicNote" size="28" color="content.muted">
+                                            </app-icon>
+                                        </span>
+                                    }
+
+                                    <span class="album-tile__text | flex min-w-0 flex-col">
+                                        <span class="type-body-sm truncate text-content-primary">
+                                            {{ album.title }}
+                                        </span>
+                                        <span class="type-body-sm truncate text-content-secondary">
+                                            {{ album.albumArtistText || '—' }}
+                                        </span>
+                                        <!-- `content-secondary` rather than `content-muted`:
+                                             muted does not clear AA against the canvas, and
+                                             the smaller type carries the hierarchy anyway. -->
+                                        <span
+                                            class="type-label-sm truncate tabular-nums text-content-secondary"
+                                        >
+                                            @if (album.year) {
+                                                {{ album.year }} ·
+                                            }
+                                            {{ album.trackCount }}
+                                            {{ album.trackCount === 1 ? 'track' : 'tracks' }}
+                                        </span>
+                                    </span>
+                                </a>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>

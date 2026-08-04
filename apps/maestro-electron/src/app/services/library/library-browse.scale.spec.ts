@@ -1,7 +1,11 @@
 import {
+    AlbumSortField,
+    emptyAlbumQuery,
     emptySongQuery,
     SongPresence,
     SongSortField,
+    type AlbumQuery,
+    type AlbumSort,
     type SongQuery,
     type SongSort,
 } from '@release-maestro/core'
@@ -12,7 +16,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
-import { songsTable } from '../../database/drizzle.schema'
+import { albumsTable, songsTable } from '../../database/drizzle.schema'
 import { LibraryBrowseRepository } from './library-browse.repository'
 
 /**
@@ -40,6 +44,14 @@ import { LibraryBrowseRepository } from './library-browse.repository'
 const SONG_COUNT = 50_000
 /** Deep enough that a table scan cannot fake it, and where a deep OFFSET actually hurts. */
 const DEEP_OFFSET = 45_000
+
+/**
+ * Albums are seeded fewer than songs because that is the real ratio — a 50k-song
+ * library is on the order of 5k records — and the plan assertion does not get sharper
+ * with more rows, only slower.
+ */
+const ALBUM_COUNT = 20_000
+const DEEP_ALBUM_OFFSET = 18_000
 
 const migrationsFolderCandidates = [
     join(process.cwd(), 'drizzle'),
@@ -189,5 +201,108 @@ describe('LibraryBrowseRepository at library scale', () => {
         expect(result.total).toBeGreaterThan(0)
         expect(result.rows.length).toBeLessThanOrEqual(50)
         expect(result.rows.length).toBeLessThanOrEqual(result.total)
+    })
+})
+
+/**
+ * The same check for the albums grid (MAE-119).
+ *
+ * Two of its sorts are the reason this exists. `recordLabel` and `trackCount` read
+ * naturally as a join and an aggregate, and both are denormalized onto `albums`
+ * precisely so the ordering can come from an index — an assertion no correctness test
+ * can make, because counting live returns identical rows.
+ */
+describe('LibraryBrowseRepository albums at library scale', () => {
+    let sqlite: Database.Database
+    let db: ReturnType<typeof drizzle<typeof schema>>
+    let repository: LibraryBrowseRepository
+
+    const queryPlan = (query: AlbumQuery): string => {
+        const { sql, params } = repository.albumWindowSql({
+            query,
+            window: { offset: DEEP_ALBUM_OFFSET, limit: 100 },
+        })
+
+        const rows = sqlite.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as { detail: string }[]
+        return rows.map(row => row.detail).join('\n')
+    }
+
+    beforeAll(() => {
+        sqlite = new Database(':memory:')
+        sqlite.pragma('foreign_keys = ON')
+        db = drizzle(sqlite, { schema })
+        migrate(db, { migrationsFolder })
+
+        const rows: (typeof albumsTable.$inferInsert)[] = Array.from(
+            { length: ALBUM_COUNT },
+            (_row, index) => {
+                const id = `album-${index.toString().padStart(6, '0')}`
+                return {
+                    id,
+                    identityKey: `identity-${index}`,
+                    // Shuffled against the id, so nothing sorts in insertion order by luck.
+                    title: `Album ${(index * 7919) % ALBUM_COUNT}`,
+                    artistText: `Artist ${index % 2_000}`,
+                    year: 1990 + (index % 36),
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    recordLabelText: LABELS[index % LABELS.length]!,
+                    // A coarse grid, so plenty of albums tie and the id tiebreaker matters.
+                    trackCount: 1 + (index % 20),
+                } satisfies typeof albumsTable.$inferInsert
+            },
+        )
+
+        db.transaction(tx => {
+            for (let start = 0; start < rows.length; start += 500) {
+                tx.insert(albumsTable)
+                    .values(rows.slice(start, start + 500))
+                    .run()
+            }
+        })
+        sqlite.exec('ANALYZE')
+
+        repository = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
+    })
+
+    afterAll(() => sqlite.close())
+
+    const albumSorts: AlbumSort[] = Object.values(AlbumSortField).flatMap(field => [
+        { field, direction: 'asc' as const },
+        { field, direction: 'desc' as const },
+    ])
+
+    it.each(albumSorts)('sorts by $field $direction from an index, not a temp B-tree', sort => {
+        const plan = queryPlan({ ...emptyAlbumQuery(), sort })
+
+        expect(plan).not.toMatch(/TEMP B-TREE/i)
+        expect(plan).toMatch(/USING (COVERING )?INDEX albums_/)
+    })
+
+    it.each(albumSorts)('serves a full deep window sorted by $field $direction', sort => {
+        const result = repository.queryAlbums({
+            query: { ...emptyAlbumQuery(), sort },
+            window: { offset: DEEP_ALBUM_OFFSET, limit: 100 },
+        })
+
+        expect(result.total).toBe(ALBUM_COUNT)
+        expect(result.rows).toHaveLength(100)
+    })
+
+    it('keeps consecutive deep windows disjoint when sort values tie', () => {
+        // Track count has ~1,000 albums per value at this size, so the whole window sits
+        // inside one tie group — exactly where an unstable ordering repeats rows.
+        const query: AlbumQuery = {
+            ...emptyAlbumQuery(),
+            sort: { field: AlbumSortField.trackCount, direction: 'asc' },
+        }
+
+        const first = repository.queryAlbums({ query, window: { offset: DEEP_ALBUM_OFFSET, limit: 100 } })
+        const second = repository.queryAlbums({
+            query,
+            window: { offset: DEEP_ALBUM_OFFSET + 100, limit: 100 },
+        })
+
+        const ids = [...first.rows, ...second.rows].map(row => row.id)
+        expect(new Set(ids).size).toBe(200)
     })
 })

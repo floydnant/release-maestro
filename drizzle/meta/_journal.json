@@ -36,6 +36,13 @@
       "when": 1785718580824,
       "tag": "0004_mae-118-normalizer-version",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785833088351,
+      "tag": "0005_mae-119-album-browse-read-model",
+      "breakpoints": true
     }
   ]
 }

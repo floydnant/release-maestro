@@ -147,11 +147,35 @@ export const albumsTable = sqliteTable(
             onDelete: 'set null',
             onUpdate: 'cascade',
         }),
+        /**
+         * The record label's name, denormalized off `record_labels` the same way
+         * `songs.record_label_text` is. The albums grid sorts and searches on it, and
+         * an `ORDER BY` that reaches through a join cannot use an index on `albums`.
+         */
+        recordLabelText: text('record_label_text'),
+        /**
+         * Songs in the library belonging to this album, missing ones included.
+         *
+         * Denormalized because it is sortable. Counted live it is an aggregate, and
+         * `ORDER BY (SELECT COUNT(*) …)` has to count every album before it can serve
+         * the first window — precisely the whole-catalog work ADR 0004 exists to
+         * prevent. Maintained by `LibraryBackendRepository` inside the song upsert
+         * transaction; reconciliation does not touch it, because a missing song is
+         * still a song on the record.
+         */
+        trackCount: integer('track_count').notNull().default(0),
     },
     table => [
         uniqueIndex('albums_identity_key_key').on(table.identityKey),
-        index('albums_title_idx').on(table.title),
         index('albums_record_label_id_idx').on(table.recordLabelId),
+
+        // One index per sortable browse column, `id` included as the ORDER BY's
+        // tiebreaker — the same rule and the same reasoning as `songs` below.
+        index('albums_title_idx').on(table.title, table.id),
+        index('albums_artist_text_idx').on(table.artistText, table.id),
+        index('albums_year_idx').on(table.year, table.id),
+        index('albums_record_label_text_idx').on(table.recordLabelText, table.id),
+        index('albums_track_count_idx').on(table.trackCount, table.id),
     ],
 )
 
@@ -241,6 +265,13 @@ export const songsTable = sqliteTable(
         index('songs_musical_key_idx').on(table.musicalKey, table.id),
         index('songs_duration_idx').on(table.duration, table.id),
         index('songs_created_at_idx').on(table.createdAt, table.id),
+        index('songs_track_number_idx').on(table.trackNumber, table.id),
+
+        // The album detail page's track list: `WHERE album_id = ? ORDER BY
+        // track_number, id`. `songs_track_number_idx` alone cannot serve it — the
+        // equality on `album_id` has to be the index's leading column, or SQLite
+        // filters by album and then sorts what is left in a temp B-tree.
+        index('songs_album_id_track_number_idx').on(table.albumId, table.trackNumber, table.id),
     ],
 )
 

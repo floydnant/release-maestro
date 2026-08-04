@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core'
+import { RouterLink } from '@angular/router'
 import type { ArtistCreditSegment, SongRow } from '@release-maestro/core'
 import { isSelectionModifierHeld } from '../../browse/song-selection'
 import { fileUrl } from '../../utils/file-url.util'
@@ -32,7 +33,7 @@ import {
     selector: 'app-song-table-row',
     templateUrl: './song-table-row.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent],
+    imports: [IconComponent, RouterLink],
     host: { class: 'contents' },
 })
 export class SongTableRowComponent {
@@ -59,6 +60,17 @@ export class SongTableRowComponent {
         event.stopPropagation()
         if (isSelectionModifierHeld(event)) return
         this.entityFilter.emit({ kind, id, name })
+    }
+
+    /**
+     * The album cell is a real link to the album's page, so this only has to keep it out
+     * of the row's way — and stop it navigating when the click was building a selection.
+     * Cmd-clicking rows is how you pick several, and having one of them jump to another
+     * page instead would be the last thing the user meant.
+     */
+    protected onAlbumLink(event: MouseEvent): void {
+        event.stopPropagation()
+        if (isSelectionModifierHeld(event)) event.preventDefault()
     }
 
     protected onMissingBadge(event: MouseEvent): void {

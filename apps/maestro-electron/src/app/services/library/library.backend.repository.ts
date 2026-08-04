@@ -417,7 +417,8 @@ export class LibraryBackendRepository {
                         filterExternalRefs(externalRefs, relevantExternalRefsMap.albums),
                     ]),
                     recordLabelId,
-                } satisfies Omit<typeof albumsTable.$inferInsert, 'id'>
+                    recordLabelText,
+                } satisfies Omit<typeof albumsTable.$inferInsert, 'id' | 'trackCount'>
 
                 if (existingAlbum) {
                     tx.update(albumsTable).set(albumValues).where(eq(albumsTable.id, albumId)).run()
@@ -448,6 +449,7 @@ export class LibraryBackendRepository {
                     id: songsTable.id,
                     lastSeenAt: songsTable.lastSeenAt,
                     externalRefs: songsTable.externalRefs,
+                    albumId: songsTable.albumId,
                 })
                 .from(songsTable)
                 .where(eq(songsTable.path, metadata.path))
@@ -505,6 +507,31 @@ export class LibraryBackendRepository {
             } else {
                 tx.insert(songsTable)
                     .values({ id: songId, ...songValues })
+                    .run()
+            }
+
+            // `albums.track_count` is denormalized so the grid can sort on it (ADR
+            // 0004), which makes it this transaction's job to keep true. Both ends of a
+            // move are recounted: re-tagging a file can re-key its album, and counting
+            // only the new one would leave the old inflated forever.
+            //
+            // Recounted rather than incremented, because an increment has to be right
+            // about whether this song was already on the album — and it is not, when a
+            // re-read leaves the album unchanged. A `COUNT` over `songs_album_id_idx`
+            // is cheap and cannot drift.
+            for (const affectedAlbumId of new Set(
+                [existingSong?.albumId, albumId].filter((id): id is string => id != null),
+            )) {
+                tx.update(albumsTable)
+                    .set({
+                        trackCount:
+                            tx
+                                .select({ value: count() })
+                                .from(songsTable)
+                                .where(eq(songsTable.albumId, affectedAlbumId))
+                                .get()?.value ?? 0,
+                    })
+                    .where(eq(albumsTable.id, affectedAlbumId))
                     .run()
             }
 

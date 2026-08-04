@@ -78,14 +78,16 @@
     [title]="row().albumTitle || ''"
 >
     @if (row().albumId && row().albumTitle) {
-        <button
-            type="button"
+        <!-- The one entity cell that navigates rather than filters, because its detail
+             page exists (MAE-119). The others stay filters until theirs land. -->
+        <a
             tabindex="-1"
-            class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
-            (click)="onEntity($event, 'album', row().albumId!, row().albumTitle!)"
+            class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+            [routerLink]="['/albums', row().albumId]"
+            (click)="onAlbumLink($event)"
         >
             {{ row().albumTitle }}
-        </button>
+        </a>
     } @else {
         <span class="text-content-muted">—</span>
     }

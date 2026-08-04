@@ -31,10 +31,28 @@ export interface TaggedTrackSpec {
      */
     year?: number
     recordLabel?: string
+    /**
+     * The album's own artist (`TPE2`), as distinct from the track's (`TPE1`).
+     *
+     * Without it an album has no artist at all — not the track's, which is a different
+     * tag — so the albums grid shows a dash, searching an artist's name finds no records,
+     * and the detail page has nothing to link out to. It is also part of
+     * `albumIdentityKey`, so every track on one album must agree on it.
+     */
+    albumArtist?: string
     /** Track-level tags, and what the browse table sorts and filters on. */
     genre?: string
     bpm?: number
     musicalKey?: string
+    /**
+     * Position on the album, and the order the album detail page lists tracks in.
+     *
+     * Deliberately **not** the order the file names sort in — `01-dawn.mp3` is track 2 of
+     * Daybreak. A fixture whose track numbers agreed with its file names could not tell
+     * an ordering by `trackNumber` apart from one by path or by insertion, which is the
+     * whole thing the detail page's ordering test has to distinguish.
+     */
+    trackNumber?: number
     cover?: keyof typeof coverPngs
     /**
      * Bytes appended after the PNG's IEND chunk (invisible to decoders) so covers
@@ -59,6 +77,17 @@ export interface TaggedTrackSpec {
  * `Night Cartel & Aurora Fields`, and the artist credit has exactly one segment.
  * That is the case the browse table has to render verbatim, so the fixture carries
  * it rather than only well-behaved single-artist strings.
+ *
+ * **Afterglow's album artist is not its tracks' artist.** Both are tagged to
+ * `Night Cartel` at album level while Void's own credit is `Night Cartel & Aurora
+ * Fields` — which is what an album artist is *for*, and what stops the albums grid from
+ * passing on a fixture where the two happen to be the same string everywhere.
+ *
+ * **Track numbers disagree with file names on purpose.** Daybreak has `01-dawn.mp3` as
+ * track 2 and `02-noon.mp3` as track 1, and Afterglow numbers its two tracks 1 and 3.
+ * An album detail page ordering by `trackNumber` therefore lists Noon before Dawn, which
+ * is what tells that ordering apart from one by path, by title or by insertion — all
+ * three of which the old fixture would have satisfied equally.
  */
 export const DEFAULT_LIBRARY: TaggedTrackSpec[] = [
     {
@@ -66,11 +95,13 @@ export const DEFAULT_LIBRARY: TaggedTrackSpec[] = [
         title: 'Dawn',
         artist: 'Aurora Fields',
         album: 'Daybreak',
+        albumArtist: 'Aurora Fields',
         year: 2019,
         recordLabel: 'Kosmische',
         genre: 'Ambient',
         bpm: 120,
         musicalKey: '8A',
+        trackNumber: 2,
         cover: 'red',
     },
     {
@@ -78,11 +109,13 @@ export const DEFAULT_LIBRARY: TaggedTrackSpec[] = [
         title: 'Noon',
         artist: 'Aurora Fields',
         album: 'Daybreak',
+        albumArtist: 'Aurora Fields',
         year: 2019,
         recordLabel: 'Kosmische',
         genre: 'Ambient',
         bpm: 128,
         musicalKey: '9A',
+        trackNumber: 1,
         cover: 'red',
     },
     {
@@ -90,11 +123,13 @@ export const DEFAULT_LIBRARY: TaggedTrackSpec[] = [
         title: 'Dusk',
         artist: 'Night Cartel',
         album: 'Afterglow',
+        albumArtist: 'Night Cartel',
         year: 2021,
         recordLabel: 'Hardwire',
         genre: 'Techno',
         bpm: 140,
         musicalKey: '4A',
+        trackNumber: 3,
         cover: 'blue',
     },
     {
@@ -102,11 +137,13 @@ export const DEFAULT_LIBRARY: TaggedTrackSpec[] = [
         title: 'Void',
         artist: 'Night Cartel & Aurora Fields',
         album: 'Afterglow',
+        albumArtist: 'Night Cartel',
         year: 2021,
         recordLabel: 'Hardwire',
         genre: 'Techno',
         bpm: 134,
         musicalKey: '11B',
+        trackNumber: 1,
         cover: 'blue',
     },
     {
@@ -114,11 +151,13 @@ export const DEFAULT_LIBRARY: TaggedTrackSpec[] = [
         title: 'Tide',
         artist: 'Seafoam',
         album: 'Undertow',
+        albumArtist: 'Seafoam',
         year: 2017,
         recordLabel: 'Saltmarsh',
         genre: 'Dub',
         bpm: 96,
         musicalKey: '1A',
+        trackNumber: 1,
         cover: 'green',
         coverSalt: 'shared-artwork',
     },
@@ -127,11 +166,13 @@ export const DEFAULT_LIBRARY: TaggedTrackSpec[] = [
         title: 'Gleam',
         artist: 'Brasswork',
         album: 'Filaments',
+        albumArtist: 'Brasswork',
         year: 2023,
         recordLabel: 'Saltmarsh',
         genre: 'Jazz',
         bpm: 174,
         musicalKey: '12B',
+        trackNumber: 1,
         cover: 'green',
         coverSalt: 'shared-artwork',
     },
@@ -179,11 +220,13 @@ const buildId3Tag = (spec: TaggedTrackSpec): Buffer => {
         textFrame('TIT2', spec.title),
         textFrame('TPE1', spec.artist),
         textFrame('TALB', spec.album),
+        ...optionalTextFrame('TPE2', spec.albumArtist),
         ...optionalTextFrame('TCON', spec.genre),
         ...optionalTextFrame('TPUB', spec.recordLabel),
         ...optionalTextFrame('TYER', spec.year),
         ...optionalTextFrame('TBPM', spec.bpm),
         ...optionalTextFrame('TKEY', spec.musicalKey),
+        ...optionalTextFrame('TRCK', spec.trackNumber),
         ...(spec.cover ? [coverFrame(coverPngs[spec.cover], spec.coverSalt ?? spec.album)] : []),
     ])
     return Buffer.concat([Buffer.from('ID3\x03\x00\x00', 'latin1'), syncsafe(frames.length), frames])

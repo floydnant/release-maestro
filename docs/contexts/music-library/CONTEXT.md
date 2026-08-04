@@ -122,6 +122,22 @@ be an EP, a single or a compilation, and "release" covered those where "album" s
 does not distinguish them yet; when a `releaseType` attribute lands, the copy can say _EP_ or _single_
 where it knows, which is a better answer than a vaguer word everywhere.
 
+**Album artist**:
+Who a record is credited to as a whole (`TPE2`), as distinct from who played a given track on it
+(`TPE1`). A compilation's album artist is _Various Artists_ while every track has its own; a guest
+feature changes the track's credit and not the album's. Stored as `albums.artistText` plus the
+`album_artists` entities, and it is what the albums grid sorts, filters and links by — the track's
+own artist is a different question, asked on the track list.
+_Avoid_: artist (unqualified, on an album), primary artist, band
+
+Part of `albumIdentityKey`, so two files that disagree on it are two albums.
+
+**Track count**:
+How many songs in the library belong to an album, missing ones included. A stored column rather than a
+live count, because the grid sorts by it — see
+[ADR 0005](../../adr/0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md). It counts what
+the library _has_, not what the record was pressed with: an album ripped in part reads the part.
+
 **Release** now belongs to the [release feed](../release-feed/CONTEXT.md) and to nothing here. The two
 were the same real-world concept modelled twice — the library's _inferred_ from tags on files the user
 owns, the feed's _announced_ by Bandcamp and not necessarily owned — and the word no longer has to be
@@ -179,3 +195,12 @@ The slice of an ordering a surface currently holds — an offset and a limit, pl
 overscan margin. Never the result set.
 _Avoid_: **page**. Nothing here is paginated: the scrollbar is continuous, the window
 slides, and there is no page number for anything to be on.
+
+**Grid**:
+The albums browse surface — tiles of cover art, several per row. There is exactly **one** in the
+library, because `albums.coverPath` is the only artwork the database has; artists, record labels and
+genres are **lists**. So "the grid" unqualified means albums, and calling a list a grid is wrong rather
+than loose. A grid windows exactly as a list does, but by whole rows of tiles: its row height follows
+the measured column width, so the geometry is measured rather than declared.
+_Avoid_: gallery, tiles view, album view; **grid** for the track table, whose `role="grid"` is the ARIA
+pattern and not this word.

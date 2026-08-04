@@ -13,7 +13,13 @@ import type { EmailImportProgressUpdate } from '../schemas/email.schema'
 import type { HydratedFeedItem } from '../schemas/feed.schema'
 import {
     LibraryBrowseIpcChannel,
+    type AlbumDetailResult,
+    type AlbumFilterDescription,
+    type AlbumWindowResult,
+    type DescribeAlbumFilterRequest,
     type DescribeSongFilterRequest,
+    type GetAlbumDetailRequest,
+    type QueryAlbumsRequest,
     type QuerySongsRequest,
     type SongFilterDescription,
     type SongWindowResult,
@@ -99,6 +105,12 @@ export const MainIpcContract = defineIpcContract({
         DescribeSongFilterRequest,
         SongFilterDescription
     >(),
+    [LibraryBrowseIpcChannel.queryAlbums]: defineIpcRequest<QueryAlbumsRequest, AlbumWindowResult>(),
+    [LibraryBrowseIpcChannel.describeAlbumFilter]: defineIpcRequest<
+        DescribeAlbumFilterRequest,
+        AlbumFilterDescription
+    >(),
+    [LibraryBrowseIpcChannel.getAlbumDetail]: defineIpcRequest<GetAlbumDetailRequest, AlbumDetailResult>(),
 })
 export type MainIpcContract = typeof MainIpcContract
 

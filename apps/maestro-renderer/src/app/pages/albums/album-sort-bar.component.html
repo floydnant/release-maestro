@@ -1,0 +1,27 @@
+<label class="type-label-sm text-content-muted" for="album-sort-field">Sort by</label>
+
+<!-- The selected option is marked on the option, not bound as the select's `value`.
+     Binding the value applies it before `@for` has rendered any options, so the select
+     silently keeps its first one — which made a shared `?sort=` link open the grid in the
+     right order under the wrong label. -->
+<select id="album-sort-field" class="input py-0.5 pr-2" (change)="onFieldChange($event)">
+    @for (option of options; track option.field) {
+        <option [value]="option.field" [selected]="option.field === sort().field">
+            {{ option.label }}
+        </option>
+    }
+</select>
+
+<button
+    type="button"
+    class="btn-nkd-neutral gap-1"
+    [attr.aria-label]="directionLabel()"
+    [title]="directionLabel()"
+    (click)="directionToggle.emit()"
+>
+    <app-icon
+        [name]="isAscending() ? 'octTriangleUp' : 'octTriangleDown'"
+        size="12"
+        color="content.action"
+    ></app-icon>
+</button>

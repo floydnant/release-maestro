@@ -19,6 +19,9 @@
 export const LibraryBrowseIpcChannel = {
     querySongs: 'library:query-songs',
     describeSongFilter: 'library:describe-song-filter',
+    queryAlbums: 'library:query-albums',
+    describeAlbumFilter: 'library:describe-album-filter',
+    getAlbumDetail: 'library:get-album-detail',
 } as const
 
 export type LibraryBrowseIpcChannel = (typeof LibraryBrowseIpcChannel)[keyof typeof LibraryBrowseIpcChannel]
@@ -77,6 +80,15 @@ export const SongSortField = {
     recordLabel: 'recordLabel',
     /** `songs.createdAt` (the file's creation time) stands in until MAE-116 lands a real `addedAt`. */
     dateAdded: 'dateAdded',
+    /**
+     * A song's position on its album. The one sort no column header offers, because it
+     * only orders a list that is already one album — the album detail page (MAE-119).
+     * Sorting a whole library by it would interleave every record's track 1.
+     *
+     * A multi-disc album orders `1,1,2,2,3,3…` and cannot do better: there is no disc
+     * number anywhere in the system until MAE-123 lands one.
+     */
+    trackNumber: 'trackNumber',
 } as const
 
 export type SongSortField = (typeof SongSortField)[keyof typeof SongSortField]
@@ -225,6 +237,161 @@ export interface SongFilterDescription {
     recordLabels: CatalogEntityRef[]
     albums: CatalogEntityRef[]
 }
+
+// ---------------------------------------------------------------------------
+// AlbumQuery — filter + sort + search
+// ---------------------------------------------------------------------------
+
+/**
+ * Sortable album columns, each backed by an index on `albums` (see the
+ * `mae-119-album-browse-sort-indexes` migration).
+ *
+ * Two of these are columns only because sorting needs them to be.
+ * `recordLabel` and `trackCount` read naturally as a join and an aggregate, and
+ * both are denormalized onto `albums` instead — an `ORDER BY (SELECT COUNT(*) …)`
+ * has to count every album in the library before it can serve the first window,
+ * which is the one thing ADR 0004 exists to prevent. The write side maintains
+ * them; see `LibraryBackendRepository`.
+ */
+export const AlbumSortField = {
+    title: 'title',
+    albumArtist: 'albumArtist',
+    year: 'year',
+    recordLabel: 'recordLabel',
+    trackCount: 'trackCount',
+} as const
+
+export type AlbumSortField = (typeof AlbumSortField)[keyof typeof AlbumSortField]
+
+export interface AlbumSort {
+    field: AlbumSortField
+    direction: SortDirection
+}
+
+/**
+ * Filters address **entities**, never text — the same rule as {@link SongFilter}.
+ * `albumArtistIds` matches through `album_artists`, so filtering by an artist finds
+ * the albums they are credited on rather than the ones whose `artistText` happens to
+ * contain their name.
+ *
+ * There is deliberately **no presence filter**. `albums` has no `present` column, and
+ * the honest album-level equivalent — "every song on this record is missing" — is a
+ * derived property that would cost an aggregate per row on every window. An album with
+ * missing tracks still shows in the grid; the missing tracks are marked on its detail
+ * page, which is where the user can act on them.
+ */
+export interface AlbumFilter {
+    albumArtistIds?: string[]
+    recordLabelIds?: string[]
+    genreIds?: string[]
+}
+
+/** A filter + sort + search, and the unit the albums grid passes around. */
+export interface AlbumQuery {
+    filter: AlbumFilter
+    sort: AlbumSort
+    /**
+     * Free-text search across album title, album artist and record label. Goes through
+     * the same single seam as {@link SongQuery.search} — `LIKE '%…%'` today, one file
+     * to swap for FTS5.
+     */
+    search: string
+}
+
+export const DEFAULT_ALBUM_SORT: AlbumSort = { field: AlbumSortField.title, direction: 'asc' }
+
+export const emptyAlbumQuery = (): AlbumQuery => ({
+    filter: {},
+    sort: { ...DEFAULT_ALBUM_SORT },
+    search: '',
+})
+
+/**
+ * One tile in the albums grid.
+ *
+ * **Expect visible duplicates.** `albumIdentityKey` hashes albumArtist, catalogNumber,
+ * date, record label, title and year, so one file with a missing `label` tag — or
+ * `2019-03` where its siblings say `2019-03-01` — becomes a second album. A real
+ * collection shows some records two or three times. That is a normalization problem
+ * (MAE-97), not a browsing one: nothing here merges rows at display time, because a
+ * heuristic that guesses which tiles are "really" one album would hide the very
+ * evidence MAE-97 needs.
+ */
+export interface AlbumRow {
+    id: string
+    title: string
+    /** Absolute filesystem path to cached cover art, rendered through a `file://` URL. */
+    coverPath: string | null
+    /** The album artist exactly as tagged; `null` when the files carry no album artist. */
+    albumArtistText: string | null
+    /**
+     * The album artists as entities, in credited order. Unlike a song's artist credit
+     * this is a plain list rather than reconstructable segments — an album's artist
+     * text is one tag on a group of files, not a credit line to be printed verbatim.
+     */
+    albumArtists: CatalogEntityRef[]
+    year: number | null
+    recordLabelId: string | null
+    recordLabelText: string | null
+    /** Songs in the library belonging to this album, missing ones included. */
+    trackCount: number
+}
+
+export type AlbumWindowResult = BrowseWindowResult<AlbumRow>
+
+export interface QueryAlbumsRequest {
+    query: AlbumQuery
+    window: BrowseWindow
+}
+
+export interface DescribeAlbumFilterRequest {
+    filter: AlbumFilter
+}
+
+export interface AlbumFilterDescription {
+    albumArtists: CatalogEntityRef[]
+    recordLabels: CatalogEntityRef[]
+    genres: CatalogEntityRef[]
+}
+
+// ---------------------------------------------------------------------------
+// Album detail
+// ---------------------------------------------------------------------------
+
+export interface GetAlbumDetailRequest {
+    albumId: string
+}
+
+/**
+ * One album's own attributes, everything the detail header shows.
+ *
+ * The tracks are **not** here: they are a windowed {@link SongQuery} like any other
+ * list, filtered to this album and sorted by {@link SongSortField.trackNumber}. A
+ * detail page that shipped its tracks inline would be the one browse surface that
+ * loads a whole result set, and a 200-track compilation is exactly where that stops
+ * being free.
+ */
+export interface AlbumDetail {
+    id: string
+    title: string
+    coverPath: string | null
+    albumArtistText: string | null
+    albumArtists: CatalogEntityRef[]
+    year: number | null
+    /** The full release date as tagged, when there was one — `2019-03-01`, or `2019-03`. */
+    date: string | null
+    catalogNumber: string | null
+    recordLabelId: string | null
+    recordLabelText: string | null
+    trackCount: number
+    /** Summed song durations in seconds; `null` when no song on the album has one. */
+    totalDuration: number | null
+    /** Distinct genres across the album's songs, for the header's genre line. */
+    genres: CatalogEntityRef[]
+}
+
+/** `null` when the id resolves to nothing — a stale link, or an album a rescan re-keyed. */
+export type AlbumDetailResult = AlbumDetail | null
 
 // ---------------------------------------------------------------------------
 // Selection — ADR 0004
