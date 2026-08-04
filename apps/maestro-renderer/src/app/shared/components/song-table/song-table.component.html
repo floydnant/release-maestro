@@ -1,0 +1,170 @@
+<div
+    #scroller
+    class="song-table | min-h-0 flex-1 overflow-auto outline-none"
+    role="grid"
+    tabindex="0"
+    aria-label="Tracks"
+    [attr.aria-rowcount]="total() + 1"
+    aria-multiselectable="true"
+    (scroll)="onScroll()"
+    (keydown)="onKeydown($event)"
+    (focus)="onGridFocus()"
+    [attr.aria-activedescendant]="activeDescendantId()"
+>
+    <!-- Widths come from `SONG_TABLE_COLUMN_WIDTHS`, which header and body share, so there is nothing to keep in step by hand. -->
+    <div
+        #header
+        class="song-table__header | sticky top-0 z-10 flex w-max min-w-full bg-background-canvas"
+        role="row"
+        aria-rowindex="1"
+    >
+        <span
+            class="shrink-0 border-b border-border-subtle"
+            role="columnheader"
+            [style.width.px]="columns.cover"
+        >
+            <span class="sr-only">Cover art</span>
+        </span>
+
+        <app-song-table-heading
+            class="shrink-0 grow"
+            [style.width.px]="columns.title"
+            field="title"
+            label="Title"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.artist"
+            field="artist"
+            label="Artist"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.album"
+            field="album"
+            label="Album"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.genre"
+            field="genre"
+            label="Genre"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.bpm"
+            field="bpm"
+            label="BPM"
+            [numeric]="true"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.musicalKey"
+            field="musicalKey"
+            label="Key"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.duration"
+            field="duration"
+            label="Time"
+            [numeric]="true"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.year"
+            field="year"
+            label="Year"
+            [numeric]="true"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.recordLabel"
+            field="recordLabel"
+            label="Record label"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+        <app-song-table-heading
+            class="shrink-0"
+            [style.width.px]="columns.dateAdded"
+            field="dateAdded"
+            label="Added"
+            [sort]="sort()"
+            (sortChange)="sortChange.emit($event)"
+        ></app-song-table-heading>
+    </div>
+
+    <!-- A spacer as tall as the whole result set gives the scrollbar its range; only
+         the loaded window is ever in the DOM, translated to where it belongs. -->
+    <!-- `min-h-full` so the canvas covers the viewport even when a handful of rows do
+         not, rather than leaving the empty space below them belonging to the scroller. -->
+    <!-- `role="presentation"` on both wrappers, and it is load-bearing rather than
+         decorative: `role="row"` has to be owned by the grid, and two untyped divs in
+         between detach every data row from it. Assistive tech then sees a grid with
+         one row in it — the header — and `aria-rowcount`, `aria-rowindex` and
+         `aria-activedescendant` describe a shape nothing can navigate. -->
+    <div
+        class="song-table__canvas | relative mb-22 mt-2 min-h-full w-max min-w-full"
+        role="presentation"
+        [style.height.px]="canvasHeight()"
+    >
+        <!-- `w-max min-w-full` rather than `inset-x-0`: the rows are the only thing
+             that knows how wide the table really is, and pinning them to the canvas
+             would stop a selected row's highlight at the viewport edge whenever the
+             table is scrolled sideways. -->
+        <div
+            class="song-table__window | absolute left-0 top-0 w-max min-w-full"
+            role="presentation"
+            [style.transform]="'translateY(' + windowTop() + 'px)'"
+        >
+            @for (row of rows(); track row.id; let rowIndex = $index) {
+                @let index = offset() + rowIndex;
+                @let selected = isRowSelected(row, index);
+
+                <div
+                    class="song-table__row | flex items-center"
+                    role="row"
+                    [id]="rowElementId(index)"
+                    [ngClass]="{
+                        'row-selected | bg-background-elevated': selected,
+                        'row-hover | hover:bg-background-surface': !selected,
+                        'row-missing | opacity-70': !row.present,
+                    }"
+                    [style.height.px]="rowHeight"
+                    [attr.aria-rowindex]="index + 2"
+                    [attr.aria-selected]="selected"
+                    [attr.aria-label]="rowLabel(row)"
+                    (mousedown)="onRowPointerDown($event, index, row)"
+                >
+                    <app-song-table-row
+                        [row]="row"
+                        [selected]="selected"
+                        (entityFilter)="entityFilter.emit($event)"
+                        (filterMissing)="filterMissing.emit()"
+                    ></app-song-table-row>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<p class="sr-only" role="status" aria-label="Selection">
+    {{ selectedCount() }} of {{ total() }} tracks selected
+</p>

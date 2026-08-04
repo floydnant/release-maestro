@@ -12,6 +12,13 @@ import type { AppSettings } from '../schemas/app-settings.schema'
 import type { EmailImportProgressUpdate } from '../schemas/email.schema'
 import type { HydratedFeedItem } from '../schemas/feed.schema'
 import {
+    LibraryBrowseIpcChannel,
+    type DescribeSongFilterRequest,
+    type QuerySongsRequest,
+    type SongFilterDescription,
+    type SongWindowResult,
+} from '../schemas/library-browse.schema'
+import {
     LibraryIpcChannel,
     type LibraryFolderValidation,
     type LibraryScanSnapshot,
@@ -85,6 +92,13 @@ export const MainIpcContract = defineIpcContract({
     [LibraryIpcChannel.startScan]: defineIpcRequest<StartLibraryScanRequest, LibraryScanStatus>(),
     [LibraryIpcChannel.cancelScan]: defineIpcEvent(),
     [LibraryIpcChannel.getScanStatus]: defineIpcRequest<void, LibraryScanSnapshot>(),
+
+    // library browsing (windowed read side, see ADR 0004)
+    [LibraryBrowseIpcChannel.querySongs]: defineIpcRequest<QuerySongsRequest, SongWindowResult>(),
+    [LibraryBrowseIpcChannel.describeSongFilter]: defineIpcRequest<
+        DescribeSongFilterRequest,
+        SongFilterDescription
+    >(),
 })
 export type MainIpcContract = typeof MainIpcContract
 

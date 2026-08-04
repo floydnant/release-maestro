@@ -204,6 +204,12 @@ export const songsTable = sqliteTable(
         codec: text('codec'),
 
         metadataHash: text('metadata_hash'),
+        /**
+         * Which revision of the normaliser produced this row's derived columns. Null
+         * for rows written before the column existed, which is why a version mismatch
+         * and a null both mean "re-read this file" — see `NORMALIZER_VERSION`.
+         */
+        normalizerVersion: integer('normalizer_version'),
         externalRefs: text('external_refs', { mode: 'json' }).$type<ExternalRefs>().notNull().default({}),
         albumId: text('album_id').references(() => albumsTable.id, {
             onDelete: 'set null',
@@ -215,6 +221,26 @@ export const songsTable = sqliteTable(
         index('songs_present_idx').on(table.present),
         index('songs_file_fingerprint_idx').on(table.fileFingerprint),
         index('songs_album_id_idx').on(table.albumId),
+
+        // One index per sortable browse column. Browse queries move windows through an
+        // indexed ORDER BY with a deep OFFSET (ADR 0004); without these, SQLite
+        // builds a temp B-tree over the whole table on every window. Adding a
+        // sortable column to a browse table is therefore a schema change.
+        //
+        // Each carries `id` as a second column because the browse ORDER BY ends in
+        // `id` to keep windows disjoint when sort values tie. Indexing the column
+        // alone would leave that last term to a temp B-tree and give back most of
+        // what the index was for.
+        index('songs_title_idx').on(table.title, table.id),
+        index('songs_artist_text_idx').on(table.artistText, table.id),
+        index('songs_album_title_idx').on(table.albumTitle, table.id),
+        index('songs_genre_text_idx').on(table.genreText, table.id),
+        index('songs_record_label_text_idx').on(table.recordLabelText, table.id),
+        index('songs_year_idx').on(table.year, table.id),
+        index('songs_bpm_idx').on(table.bpm, table.id),
+        index('songs_musical_key_idx').on(table.musicalKey, table.id),
+        index('songs_duration_idx').on(table.duration, table.id),
+        index('songs_created_at_idx').on(table.createdAt, table.id),
     ],
 )
 

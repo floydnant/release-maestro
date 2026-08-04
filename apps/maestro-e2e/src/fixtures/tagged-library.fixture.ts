@@ -24,6 +24,17 @@ export interface TaggedTrackSpec {
     title: string
     artist: string
     album: string
+    /**
+     * Album-level tags. They feed `albumIdentityKey`, so two tracks meant to sit on
+     * the same album must carry identical values — differing on one splits the album
+     * in two, which is the brittleness MAE-97 tracks.
+     */
+    year?: number
+    recordLabel?: string
+    /** Track-level tags, and what the browse table sorts and filters on. */
+    genre?: string
+    bpm?: number
+    musicalKey?: string
     cover?: keyof typeof coverPngs
     /**
      * Bytes appended after the PNG's IEND chunk (invisible to decoders) so covers
@@ -38,17 +49,76 @@ export interface TaggedTrackSpec {
  * 6 tracks, 4 albums, 3 distinct artworks: Daybreak (red), Afterglow (blue), and
  * Undertow + Filaments deliberately share one green artwork — the content-addressed
  * cover cache dedupes them to a single mosaic tile.
+ *
+ * Every value the track table can sort or filter by is distinct across the six, so
+ * one ordering never accidentally reproduces another: titles, years, BPMs, keys,
+ * durations-by-proxy, genres and record labels all disagree with each other.
+ *
+ * **Void is credited to two artists in one string.** Ingest does not split raw names
+ * — MAE-97 owns that — so it resolves to a single artist entity called
+ * `Night Cartel & Aurora Fields`, and the artist credit has exactly one segment.
+ * That is the case the browse table has to render verbatim, so the fixture carries
+ * it rather than only well-behaved single-artist strings.
  */
 export const DEFAULT_LIBRARY: TaggedTrackSpec[] = [
-    { fileName: '01-dawn.mp3', title: 'Dawn', artist: 'Aurora Fields', album: 'Daybreak', cover: 'red' },
-    { fileName: '02-noon.mp3', title: 'Noon', artist: 'Aurora Fields', album: 'Daybreak', cover: 'red' },
-    { fileName: '03-dusk.mp3', title: 'Dusk', artist: 'Night Cartel', album: 'Afterglow', cover: 'blue' },
-    { fileName: '04-void.mp3', title: 'Void', artist: 'Night Cartel', album: 'Afterglow', cover: 'blue' },
+    {
+        fileName: '01-dawn.mp3',
+        title: 'Dawn',
+        artist: 'Aurora Fields',
+        album: 'Daybreak',
+        year: 2019,
+        recordLabel: 'Kosmische',
+        genre: 'Ambient',
+        bpm: 120,
+        musicalKey: '8A',
+        cover: 'red',
+    },
+    {
+        fileName: '02-noon.mp3',
+        title: 'Noon',
+        artist: 'Aurora Fields',
+        album: 'Daybreak',
+        year: 2019,
+        recordLabel: 'Kosmische',
+        genre: 'Ambient',
+        bpm: 128,
+        musicalKey: '9A',
+        cover: 'red',
+    },
+    {
+        fileName: '03-dusk.mp3',
+        title: 'Dusk',
+        artist: 'Night Cartel',
+        album: 'Afterglow',
+        year: 2021,
+        recordLabel: 'Hardwire',
+        genre: 'Techno',
+        bpm: 140,
+        musicalKey: '4A',
+        cover: 'blue',
+    },
+    {
+        fileName: '04-void.mp3',
+        title: 'Void',
+        artist: 'Night Cartel & Aurora Fields',
+        album: 'Afterglow',
+        year: 2021,
+        recordLabel: 'Hardwire',
+        genre: 'Techno',
+        bpm: 134,
+        musicalKey: '11B',
+        cover: 'blue',
+    },
     {
         fileName: '05-tide.mp3',
         title: 'Tide',
         artist: 'Seafoam',
         album: 'Undertow',
+        year: 2017,
+        recordLabel: 'Saltmarsh',
+        genre: 'Dub',
+        bpm: 96,
+        musicalKey: '1A',
         cover: 'green',
         coverSalt: 'shared-artwork',
     },
@@ -57,6 +127,11 @@ export const DEFAULT_LIBRARY: TaggedTrackSpec[] = [
         title: 'Gleam',
         artist: 'Brasswork',
         album: 'Filaments',
+        year: 2023,
+        recordLabel: 'Saltmarsh',
+        genre: 'Jazz',
+        bpm: 174,
+        musicalKey: '12B',
         cover: 'green',
         coverSalt: 'shared-artwork',
     },
@@ -95,11 +170,20 @@ const coverFrame = (pngBase64: string, salt: string): Buffer => {
     ])
 }
 
+/** An optional ID3v2.3 text frame, omitted entirely when the spec leaves it out. */
+const optionalTextFrame = (id: string, value: string | number | undefined): Buffer[] =>
+    value == null ? [] : [textFrame(id, String(value))]
+
 const buildId3Tag = (spec: TaggedTrackSpec): Buffer => {
     const frames = Buffer.concat([
         textFrame('TIT2', spec.title),
         textFrame('TPE1', spec.artist),
         textFrame('TALB', spec.album),
+        ...optionalTextFrame('TCON', spec.genre),
+        ...optionalTextFrame('TPUB', spec.recordLabel),
+        ...optionalTextFrame('TYER', spec.year),
+        ...optionalTextFrame('TBPM', spec.bpm),
+        ...optionalTextFrame('TKEY', spec.musicalKey),
         ...(spec.cover ? [coverFrame(coverPngs[spec.cover], spec.coverSalt ?? spec.album)] : []),
     ])
     return Buffer.concat([Buffer.from('ID3\x03\x00\x00', 'latin1'), syncsafe(frames.length), frames])

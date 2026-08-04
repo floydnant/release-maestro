@@ -50,6 +50,24 @@ export const formatDateRelative = (date: Date, referenceDate: Date = new Date())
     return relativeTimeFormatter.format(roundedDifference, unit)
 }
 
+const shortDateFormatter = new Intl.DateTimeFormat('en', { year: 'numeric', month: 'short', day: 'numeric' })
+
+/**
+ * An absolute short date, for table columns where rows are compared against each
+ * other rather than against now — "12 Mar 2024" sorts and scans; "8 months ago"
+ * does neither.
+ */
+export const formatDateShort = (date: Date | number): string => shortDateFormatter.format(date)
+
+/**
+ * BPM to at most one decimal. Analysis tools write `128`, `128.0` and `127.996` for
+ * the same track, and a column of those is unreadable.
+ */
+export const formatBpm = (bpm: number | null): string => {
+    if (bpm == null || !Number.isFinite(bpm)) return ''
+    return Number.isInteger(bpm) ? String(bpm) : bpm.toFixed(1)
+}
+
 /** Split a filesystem path into the dimmable parent portion (incl. trailing separator) and the base name. */
 export const splitPathBaseName = (path: string): { parent: string; base: string } => {
     const trimmed = path.replace(/[/\\]+$/, '')

@@ -1,0 +1,1 @@
+ALTER TABLE `songs` ADD `normalizer_version` integer;

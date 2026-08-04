@@ -35,6 +35,11 @@ export const appRoutes: Route[] = [
         canActivate: [libraryOnboardingGuard],
     },
     {
+        path: 'tracks',
+        loadComponent: () => import('./pages/tracks/tracks.component').then(m => m.TracksComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
         path: 'import',
         loadComponent: () =>
             import('./pages/library-import/library-import.component').then(m => m.LibraryImportComponent),

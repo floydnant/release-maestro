@@ -70,6 +70,12 @@ yet know which it is. Use it only at the Bandcamp boundary, where it names their
 A Bandcamp music release that can appear in the feed. May carry cover art, artist and band
 information, a track listing, an embeddable player, and free-text "about" copy.
 
+The word is this context's alone. The music library models the same real-world thing from the user's
+own files and calls it an **album**, in code and copy alike — so "release" needs no qualifier to say
+which of the two is meant. A release is _announced_ and not necessarily owned; an album is _inferred_
+from a file on disk. Neither converts to the other. See
+[CONTEXT-MAP](../../../CONTEXT-MAP.md).
+
 **Release feed**:
 The browsable collection of imported and hydrated releases shown to the user.
 

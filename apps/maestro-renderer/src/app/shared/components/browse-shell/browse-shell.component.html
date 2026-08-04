@@ -1,0 +1,108 @@
+<header class="browse-shell__bar | flex shrink-0 flex-wrap items-center gap-3 px-4 py-3">
+    <h1 class="type-section-title mr-auto capitalize">{{ state().entityLabel }}</h1>
+
+    <!-- The count sits left of the search rather than at the end of the bar: it is the
+         one thing here whose width changes as you type, and at the end it pushed the
+         search and everything beside it around on every keystroke. -->
+    <p
+        class="type-body-sm shrink-0 tabular-nums text-content-secondary"
+        role="status"
+        aria-label="Result count"
+    >
+        @if (state().loaded) {
+            {{ state().total | number }} {{ countLabel() }}
+        }
+    </p>
+
+    <div class="browse-shell__search | relative flex shrink-0 items-center" role="search">
+        <app-icon
+            name="octSearch"
+            size="14"
+            color="content.muted"
+            class="pointer-events-none absolute left-3"
+        ></app-icon>
+        <input
+            #searchInput
+            type="search"
+            class="input w-64 pl-[2.25rem] pr-8"
+            placeholder="Search {{ state().entityLabel }}…"
+            [attr.aria-label]="'Search ' + state().entityLabel"
+            [value]="searchDraft()"
+            (input)="onSearchInput($event)"
+        />
+        @if (searchDraft()) {
+            <!-- Our own clear affordance. The native one is a WebKit-drawn control that
+                 ignores the token set entirely, so it is suppressed in styles.css. -->
+            <button
+                type="button"
+                class="btn absolute inset-y-0 right-0 grid place-items-center text-content-muted hover:text-content-primary"
+                aria-label="Clear search"
+                (click)="onClearSearch()"
+            >
+                <app-icon name="octX" size="14"></app-icon>
+            </button>
+        }
+    </div>
+</header>
+
+<!-- Shown for `hasFilter` and not only for resolved chips: when the names fail to
+     load there are no chips to draw, and "Clear all" is then the only way out of a
+     filter the user can otherwise neither see nor remove. -->
+@if (filters().chips.length || filters().hasFilter) {
+    <div class="browse-shell__chips | flex shrink-0 flex-wrap items-center gap-2 px-4 py-2">
+        @for (chip of filters().chips; track chip.kind + chip.id) {
+            <span class="badge relative gap-1 border-border-subtle bg-background-surface pr-[1.75rem]">
+                <span class="text-content-muted">{{ chip.kindLabel }}</span>
+                {{ chip.name }}
+                <button
+                    type="button"
+                    class="btn absolute inset-y-0 right-0 flex items-center rounded-full px-1.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
+                    [attr.aria-label]="'Remove ' + chip.kindLabel + ' filter ' + chip.name"
+                    (click)="chipRemove.emit(chip)"
+                >
+                    <app-icon name="octX" size="14"></app-icon>
+                </button>
+            </span>
+        }
+
+        <button type="button" class="btn-nkd-neutral" (click)="clearFilters.emit()">Clear all</button>
+    </div>
+}
+
+<div class="browse-shell__body | flex min-h-0 min-w-0 flex-1 flex-col">
+    @if (isFailed()) {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+            <app-icon name="octXCircleFill" size="28" color="content.danger"></app-icon>
+            <p class="type-body-md text-content-primary">Could not load your {{ state().entityLabel }}</p>
+            <p class="type-body-sm max-w-md text-content-secondary">
+                {{ state().error || 'The library did not answer.' }}
+            </p>
+            <button type="button" class="btn-primary" (click)="retry.emit()">Try again</button>
+        </div>
+    } @else if (isInitialLoad()) {
+        <div class="flex flex-1 items-center justify-center p-8" role="status">
+            <p class="type-body-sm text-content-secondary">Loading {{ state().entityLabel }}…</p>
+        </div>
+    } @else if (isEmpty()) {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+            @if (emptyReason() === 'filtered') {
+                <p class="type-body-md text-content-primary">
+                    No {{ state().entityLabel }} match these filters
+                </p>
+                <p class="type-body-sm max-w-md text-content-secondary">
+                    Try a broader search, or clear the filters to see everything again.
+                </p>
+                <button type="button" class="btn-neutral" (click)="clearFilters.emit()">Clear filters</button>
+            } @else {
+                <p class="type-body-md text-content-primary">No {{ state().entityLabel }} yet</p>
+                <p class="type-body-sm max-w-md text-content-secondary">
+                    Scan a library folder and your {{ state().entityLabel }} will show up here as they are
+                    read.
+                </p>
+                <a class="btn-primary" routerLink="/settings/library">Library settings</a>
+            }
+        </div>
+    } @else {
+        <ng-content></ng-content>
+    }
+</div>

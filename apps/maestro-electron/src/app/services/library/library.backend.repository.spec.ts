@@ -25,6 +25,7 @@ import {
     songGenresTable,
     songsTable,
 } from '../../database/drizzle.schema'
+import { NORMALIZER_VERSION } from './library-normalization'
 import { LibraryBackendRepository } from './library.backend.repository'
 
 const fact = {
@@ -74,6 +75,35 @@ describe('LibraryBackendRepository', () => {
         expect(second).toMatchObject({ new: 0, changed: 0, unchanged: 1 })
         expect(song?.lastSeenAt).toEqual(secondSeenAt)
         expect(song?.lastScannedAt).toBeNull()
+    })
+
+    it('re-reads an untouched file when the normalizer revision has moved on', () => {
+        const seenAt = new Date('2026-06-15T10:00:00Z')
+        repository.processPrescanBatch([fact], seenAt)
+        repository.ingestMetadata(newSongFixture({ artist: 'Alpha' }), fact, seenAt)
+
+        // Ingested at the current revision, so nothing is pending: the file has not
+        // changed and neither have the rules that were applied to it.
+        expect(repository.countSongsNeedingMetadata()).toBe(0)
+
+        // Exactly what an older build left behind. The file on disk is untouched, so
+        // the fingerprint gate alone would skip this row forever and it would keep
+        // whatever the previous rules derived.
+        db.update(songsTable)
+            .set({ normalizerVersion: NORMALIZER_VERSION - 1 })
+            .run()
+
+        expect(repository.countSongsNeedingMetadata()).toBe(1)
+        expect(repository.listSongsNeedingMetadata(null, 10)).toMatchObject([{ path: fact.path }])
+    })
+
+    it('treats a row that predates the normalizer version column as pending', () => {
+        const seenAt = new Date('2026-06-15T10:00:00Z')
+        repository.processPrescanBatch([fact], seenAt)
+        repository.ingestMetadata(newSongFixture({ artist: 'Alpha' }), fact, seenAt)
+        db.update(songsTable).set({ normalizerVersion: null }).run()
+
+        expect(repository.countSongsNeedingMetadata()).toBe(1)
     })
 
     it('ingests normalized relations while preserving raw artist text', () => {

@@ -9,11 +9,13 @@ import { diContainer } from '../di'
 import {
     asAppIpcMain,
     FeedLoadError,
+    LibraryBrowseIpcChannel,
     LibraryIpcChannel,
     MetadataIpcChannel,
     toRendererEmitter,
 } from '@release-maestro/core'
 import App from '../app'
+import { LibraryBrowseRepository } from '../services/library/library-browse.repository'
 import { LibraryFoldersService } from '../services/library/library-folders.service'
 import { LibraryScanService } from '../services/library/library-scan.service'
 import { MetadataBackendService } from '../services/metadata/metadata.backend.service'
@@ -177,4 +179,20 @@ ipc.on(LibraryIpcChannel.cancelScan, async () => {
 ipc.handle(LibraryIpcChannel.getScanStatus, async () => {
     const scanService = await diContainer.get(LibraryScanService)
     return scanService.getSnapshot()
+})
+
+// ---------------------------------------------------------------------------
+// Library browsing (windowed reads, see ADR 0004). One-shot request/response —
+// the renderer's own pipeline decides which window is still wanted, and a
+// superseded window is simply dropped there.
+// ---------------------------------------------------------------------------
+
+ipc.handle(LibraryBrowseIpcChannel.querySongs, async (_event, request) => {
+    const browseRepository = await diContainer.get(LibraryBrowseRepository)
+    return browseRepository.querySongs(request)
+})
+
+ipc.handle(LibraryBrowseIpcChannel.describeSongFilter, async (_event, request) => {
+    const browseRepository = await diContainer.get(LibraryBrowseRepository)
+    return browseRepository.describeSongFilter(request.filter)
 })

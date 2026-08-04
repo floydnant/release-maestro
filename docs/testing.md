@@ -20,6 +20,14 @@ two differ, this document wins.
   Electron IPC/backend responses to exercise complex UI states.
 - Electron E2E tests launch the full Electron app with Playwright and verify renderer, IPC, Electron
   services, SQLite, and the metadata-engine worker together.
+- Scale checks seed rows straight into SQLite — no scan, no metadata engine — and assert that a query
+  still holds up at library size. `library-browse.scale.spec.ts` is the worked example: it inserts
+  50k songs and asserts the **query plan**, because every correctness test passes just as happily
+  against a full table scan, so nothing else in the suite can catch a missing index. Assert the plan
+  rather than the clock; a wall-time budget belongs there only as a loose smoke check, since a loaded
+  CI machine must not turn a performance guard into a flaky failure. Browse surfaces are designed for
+  50k–500k songs ([ADR 0004](adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md)),
+  so adding a sortable column means adding an index and a case here.
 
 Both E2E layers live in `apps/maestro-e2e/`.
 
@@ -34,6 +42,9 @@ It installs a fake Electron bridge before Angular bootstraps:
 - `window.process.type = 'renderer'`, so the real renderer services take their Electron code paths.
 - `window.require('electron').ipcRenderer`, with mocked `invoke`, `send`, `on`, `off`, and `once`.
 - A browser-side scenario backend that tests can inspect and mutate through Playwright helpers.
+- `respond()`, for answers a fixed value cannot give — the responder runs in Node with the request,
+  so it can use the fixture creators and the real contract types. Reach for it when the answer
+  depends on what was asked, which in practice means anything windowed.
 
 Do not mock Node modules such as `fs` or `child_process` in renderer E2E. Renderer code should go
 through typed IPC for backend behavior; full Electron E2E covers the real Electron/Node integration.

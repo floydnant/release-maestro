@@ -1,11 +1,13 @@
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
 import { ExternalRefs, NormalizationIssueType } from '../../database/drizzle.schema'
 import {
+    albumIdentityKey,
     detectNormalizationIssues,
     extractExternalRefs,
     fileFingerprint,
     metadataHash,
     normalizeDisplayText,
+    yearFromMetadata,
 } from './library-normalization'
 
 describe('library normalization', () => {
@@ -85,5 +87,40 @@ describe('library normalization', () => {
             NormalizationIssueType.ArtistLooksMultiValue,
             NormalizationIssueType.ArtistEqualsLabel,
         ])
+    })
+
+    describe('yearFromMetadata', () => {
+        it('prefers the dedicated year field when a tag actually carries one', () => {
+            expect(yearFromMetadata({ year: 1998, date: '2019-05-01' })).toBe(1998)
+        })
+
+        it.each([
+            ['2019', 2019],
+            ['2019-05-01', 2019],
+            ['2019/05/01', 2019],
+            ['  2021  ', 2021],
+        ])('falls back to the leading year of %s', (date, expected) => {
+            // MP3s land here rather than in `year`: lofty upgrades ID3v2.3's TYER to
+            // TDRC, which is a date, so the year only ever arrives inside `date`.
+            expect(yearFromMetadata({ year: null, date })).toBe(expected)
+        })
+
+        it.each([[null], [''], ['unknown'], ['99'], ['May 2019']])(
+            'refuses to guess a year from %s',
+            date => {
+                expect(yearFromMetadata({ year: null, date })).toBeNull()
+            },
+        )
+    })
+
+    describe('albumIdentityKey', () => {
+        it('is stable for an unchanged tag, which is what keeps an album findable', () => {
+            // The key is stored under a unique index and is how an album is matched on
+            // the next scan. Anything that changes it re-keys every album already in
+            // the database and orphans its songs, so this pins it against drift.
+            const metadata = newSongFixture({ year: 2019, date: '2019-05-01' })
+
+            expect(albumIdentityKey(metadata)).toBe(albumIdentityKey(newSongFixture({ ...metadata })))
+        })
     })
 })

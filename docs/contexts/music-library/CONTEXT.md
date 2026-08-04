@@ -92,7 +92,65 @@ path, which works as a dedup key because the cover cache is content-addressed.
 
 ### Catalog
 
-The catalog entities — song, album, artist — carry no ambiguity and are not listed here. One does.
+**Song** (code) / **track** (user-facing copy):
+One audio file in the collection. The concept is identical in both registers; only the word changes.
+Say **song** in code, identifiers, schemas, tables and docs — `songs`, `songId`, `SongTable`,
+`SongQuery`. Say **track** in anything a user reads — "1,204 tracks", a "Tracks" tab, "no tracks
+match".
+
+"Track" is ambiguous — a track on a record, a track in a DAW, a position in a tracklist — while
+"song" universally names one thing. So code takes the unambiguous word and the UI takes the one users
+actually say. The same register split as _record label_ and as _discovery_, which is _prescan_ at the
+metadata-engine boundary.
+_Avoid_: `track` in any identifier; file, item, entry as synonyms for song
+
+**Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on an
+album, not a song. Do not "correct" it to `songNumber`.
+
+**Album**:
+A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,
+`albumArtists`, an "Albums" tab, "12 albums". It is what music players call this, and it is what
+users looking for it will say.
+
+There was a register split here — code _album_, copy _release_ — and it was dropped. A "Releases" tab
+reads like an inbox of things arriving rather than a collection of records already owned, which is
+precisely what the release feed is and this is not. Keeping the word for the feed alone is worth more
+than the split was.
+
+The cost, stated so it is not rediscovered as a bug: an album is not always an album. It may equally
+be an EP, a single or a compilation, and "release" covered those where "album" strains. The library
+does not distinguish them yet; when a `releaseType` attribute lands, the copy can say _EP_ or _single_
+where it knows, which is a better answer than a vaguer word everywhere.
+
+**Release** now belongs to the [release feed](../release-feed/CONTEXT.md) and to nothing here. The two
+were the same real-world concept modelled twice — the library's _inferred_ from tags on files the user
+owns, the feed's _announced_ by Bandcamp and not necessarily owned — and the word no longer has to be
+qualified to tell them apart. See [CONTEXT-MAP](../../../CONTEXT-MAP.md).
+_Avoid_: release, record, LP, disc
+
+**Artist credit**:
+How one song names the artists behind it, in the tag's own phrasing. An ordered list of segments —
+each an artist, the name they are credited as here, and the phrase that joins it to the next
+(`" & "`, `" feat. "`, `" vs. "`). Concatenating the segments in order reproduces the credit exactly
+as tagged, which is why the UI can show `Burial & Four Tet` verbatim while still linking each name to
+its own artist.
+
+A credit belongs to the **raw name**, not to the song: `artist_raw_names` is keyed by the raw tag
+string, so resolving one string resolves it for every song ever tagged that way. `song_artists` is a
+materialized projection of that resolution — anything that edits a raw-name resolution must
+re-project `song_artists` for every song carrying that raw name. A rescan is not required.
+_Avoid_: artist string, artist field, credit line
+
+Today every credit has exactly one segment spanning the whole string, because ingest does not split
+raw names on its own — splitting is a user-confirmed act (`confirmedByUser`). So `Burial & Four Tet`
+is currently one artist entity. Treat the single segment as the degenerate case, not as the model.
+
+**Appears on**:
+The albums an artist has songs on without being an album artist of them — compilations, VA
+collections, guest features, DJ mixes. Defined by exclusion, so it is strictly disjoint from that
+artist's own albums; the two together account for every album the artist touches. An artist's own
+album never shows up here.
+_Avoid_: featured on, guest appearances, other releases
 
 **Record label**:
 The company that released a record: Warp, Ninja Tune, Hyperdub. Always **two words**, never "label"
@@ -107,3 +165,17 @@ call it a **record label** everywhere upstream — the same split as _discovery_
 the metadata-engine boundary.
 
 Nothing in the triage or Linear sense of "label" belongs to this context.
+
+Artist and genre carry no ambiguity as entities and are not listed here.
+
+## Browsing
+
+The architecture is [ADR 0004](../../adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md),
+and the terms it defines are not repeated here. One word is worth pinning because the
+obvious synonym is wrong:
+
+**Window**:
+The slice of an ordering a surface currently holds — an offset and a limit, plus a fixed
+overscan margin. Never the result set.
+_Avoid_: **page**. Nothing here is paginated: the scrollbar is continuous, the window
+slides, and there is no page number for anything to be on.

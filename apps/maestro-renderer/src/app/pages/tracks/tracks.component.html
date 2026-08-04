@@ -1,0 +1,19 @@
+<app-browse-shell
+    [state]="shellState()"
+    [filters]="filterState()"
+    (searchChange)="onSearch($event)"
+    (chipRemove)="onChipRemove($event)"
+    (clearFilters)="onClearFilters()"
+    (retry)="onRetry()"
+>
+    <app-song-table
+        [result]="result()"
+        [query]="query()"
+        [selection]="selection()"
+        (sortChange)="onSort($event)"
+        (selectionChange)="onSelectionChange($event)"
+        (viewportChange)="onViewportChange($event)"
+        (entityFilter)="onEntityFilter($event)"
+        (filterMissing)="onFilterMissing()"
+    ></app-song-table>
+</app-browse-shell>

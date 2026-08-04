@@ -30,6 +30,15 @@ context.
 - **No coupling yet.** Nothing currently matches a library song to a feed release. If that link is
   built, it needs its own vocabulary and probably its own ADR — do not assume either context's terms
   carry over.
+- **"Release" belongs to the feed; the library says "album".** Both contexts model the same
+  real-world thing — a group of tracks issued together — differently, and share no table. The
+  library's is _inferred_ from the tags on files the user owns (`albums`); the feed's is _announced_
+  by Bandcamp and not necessarily owned (`feed_items`).
+
+    The library used to say "release" in its copy while saying "album" in code, which left the word
+    meaning two things and needing to be qualified whenever both contexts were in view. It now says
+    **album** in both registers, so the word is unambiguous by construction rather than by discipline.
+    Never pass one where the other is expected.
 
 ## Decisions
 
