@@ -45,6 +45,9 @@ const clickRow = (page: Page, title: string, modifiers?: ('Shift' | 'ControlOrMe
         .first()
         .click(modifiers ? { modifiers } : undefined)
 
+const rowSelection = (page: Page, titles: string[]): Promise<(string | null)[]> =>
+    Promise.all(titles.map(title => rowByTitle(page, title).getAttribute('aria-selected')))
+
 test.describe('rendering a window', () => {
     test('shows the tracks in the window and the total of the whole library', async ({ page }) => {
         await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 1_204 }).build())
@@ -558,10 +561,14 @@ test.describe('selection', () => {
         await clickRow(page, 'Row 5', ['ControlOrMeta'])
         await clickRow(page, 'Row 7', ['Shift'])
 
-        const selection = await Promise.all(
-            rows.map((_row, index) => rowByTitle(page, `Row ${index}`).getAttribute('aria-selected')),
-        )
-        expect(selection).toEqual(['false', 'true', 'true', 'true', 'false', 'true', 'true', 'true'])
+        await expect
+            .poll(() =>
+                rowSelection(
+                    page,
+                    rows.map((_row, index) => `Row ${index}`),
+                ),
+            )
+            .toEqual(['false', 'true', 'true', 'true', 'false', 'true', 'true', 'true'])
     })
 
     test('clears the selection when clicking the blank space below the rows', async ({ page }) => {
@@ -708,10 +715,14 @@ test.describe('selection', () => {
         await clickRow(page, 'Row 2', ['ControlOrMeta'])
         await clickRow(page, 'Row 5', ['ControlOrMeta', 'Shift'])
 
-        const selection = await Promise.all(
-            rows.map((_row, index) => rowByTitle(page, `Row ${index}`).getAttribute('aria-selected')),
-        )
-        expect(selection).toEqual(['true', 'true', 'false', 'false', 'false', 'false', 'true', 'true'])
+        await expect
+            .poll(() =>
+                rowSelection(
+                    page,
+                    rows.map((_row, index) => `Row ${index}`),
+                ),
+            )
+            .toEqual(['true', 'true', 'false', 'false', 'false', 'false', 'true', 'true'])
     })
 
     test('selects the whole library on cmd-A without loading it', async ({ page }) => {

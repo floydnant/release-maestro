@@ -9,6 +9,7 @@ import {
     ElementRef,
     inject,
     input,
+    model,
     output,
     untracked,
     viewChild,
@@ -39,9 +40,12 @@ import { SongTableRowComponent } from './song-table-row.component'
  * translated into place — so the DOM holds a screenful and memory holds one window.
  *
  * The component is presentational: it renders the window it is given and emits the
- * whole next selection. It holds no selection state of its own — the cursor and the
- * shift-anchor live in the selection value, because they are positions *within* it and
- * every rule for when they go stale is a rule the selection already has.
+ * whole next selection. The selection is a write-through model rather than a separate
+ * local copy: a gesture updates it synchronously before notifying the parent, so the
+ * next pointer or keyboard event cannot reduce against the previous selection while
+ * Angular is still rendering the parent binding. The cursor and shift-anchor live in
+ * that same selection value, because they are positions *within* it and every rule for
+ * when they go stale is a rule the selection already has.
  *
  * **There is one row state, not two.** Arrow keys move the selection rather than a
  * separate cursor, so the selected row is the current row and needs no ring of its
@@ -130,10 +134,9 @@ export class SongTableComponent {
      * scroll position from the old one has to go with it.
      */
     query = input.required<SongQuery>()
-    selection = input.required<SongSelectionState>()
+    selection = model.required<SongSelectionState>()
 
     sortChange = output<SongSortField>()
-    selectionChange = output<SongSelectionState>()
     viewportChange = output<BrowseWindow>()
     entityFilter = output<EntityFilterRequest>()
     /**
@@ -344,7 +347,7 @@ export class SongTableComponent {
         if (target.closest('[role="row"][aria-selected]')) return
         if (isEmptySelection(this.selection())) return
 
-        this.selectionChange.emit(clearSelection(this.selection()))
+        this.selection.set(clearSelection(this.selection()))
     }
 
     /**
@@ -360,14 +363,14 @@ export class SongTableComponent {
             event.preventDefault()
             // Replaces the selection wholesale, and `selectAll` resets the cursor and
             // anchor with it — there is no longer a row an extension could measure from.
-            this.selectionChange.emit(selectAll(this.selection().query, this.total()))
+            this.selection.set(selectAll(this.selection().query, this.total()))
             return
         }
 
         if (event.key == 'Escape') {
             event.preventDefault()
             this.focusGrid()
-            this.selectionChange.emit(clearSelection(this.selection()))
+            this.selection.set(clearSelection(this.selection()))
             return
         }
 
@@ -480,7 +483,7 @@ export class SongTableComponent {
         shiftKey: boolean
         toggleKey: boolean
     }): void {
-        this.selectionChange.emit(applySongSelectionGesture(this.selection(), gesture))
+        this.selection.set(applySongSelectionGesture(this.selection(), gesture))
     }
 
     private movedIndex(event: KeyboardEvent, lastIndex: number): number | null {
