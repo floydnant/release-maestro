@@ -1,3 +1,4 @@
+import { NgClass } from '@angular/common'
 import {
     afterNextRender,
     ChangeDetectionStrategy,
@@ -54,7 +55,7 @@ const TILE_GAP = 16
  * clamped to its two lines rather than allowed to push a tile taller than its
  * neighbours.
  */
-const TILE_TEXT_HEIGHT = 64
+const TILE_TEXT_HEIGHT = 44
 
 /**
  * Tile *rows* fetched beyond the viewport on each side.
@@ -90,7 +91,7 @@ const INITIAL_LAYOUT: GridLayout = {
     selector: 'app-album-grid',
     templateUrl: './album-grid.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent, RouterLink],
+    imports: [IconComponent, RouterLink, NgClass],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class AlbumGridComponent {

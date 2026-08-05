@@ -1,12 +1,12 @@
 @if (album().coverPath) {
     <img
-        class="album-detail__cover | size-32 shrink-0 rounded-md object-cover"
+        class="album-detail__cover | size-64 shrink-0 rounded-md object-cover"
         alt=""
         [src]="fileUrl(album().coverPath!)"
     />
 } @else {
     <span
-        class="album-detail__cover | grid size-32 shrink-0 place-items-center rounded-md bg-background-elevated"
+        class="album-detail__cover | grid size-64 shrink-0 place-items-center rounded-md bg-background-elevated"
     >
         <app-icon name="musicNote" size="40" color="content.muted"></app-icon>
     </span>
