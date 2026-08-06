@@ -7,6 +7,9 @@ import {
     sameAlbumQuery,
 } from './album-query-params'
 
+/** Whichever way the default column is *not* sorted, so these do not rot when it changes. */
+const OTHER_DIRECTION = DEFAULT_ALBUM_SORT.direction == 'asc' ? 'desc' : 'asc'
+
 describe('album query params', () => {
     describe('reading a URL', () => {
         it('falls back to the default query when there are no params', () => {
@@ -91,10 +94,10 @@ describe('album query params', () => {
         it('writes the direction when the default column is sorted the other way', () => {
             const params = albumQueryToParams({
                 ...emptyAlbumQuery(),
-                sort: { field: DEFAULT_ALBUM_SORT.field, direction: 'desc' },
+                sort: { field: DEFAULT_ALBUM_SORT.field, direction: OTHER_DIRECTION },
             })
 
-            expect(params).toMatchObject({ sort: null, dir: 'desc' })
+            expect(params).toMatchObject({ sort: null, dir: OTHER_DIRECTION })
         })
 
         it('round-trips a fully populated query', () => {
@@ -132,6 +135,7 @@ describe('album query params', () => {
             [AlbumSortField.recordLabel, 'asc'],
             [AlbumSortField.year, 'desc'],
             [AlbumSortField.trackCount, 'desc'],
+            [AlbumSortField.dateAdded, 'desc'],
         ])('starts %s in its natural direction', (field, expected) => {
             expect(nextAlbumSort({ field: AlbumSortField.title, direction: 'desc' }, field).direction).toBe(
                 expected,
@@ -164,7 +168,9 @@ describe('album query params', () => {
             expect(
                 sameAlbumQuery(base, { ...base, sort: { ...base.sort, field: AlbumSortField.year } }),
             ).toBe(false)
-            expect(sameAlbumQuery(base, { ...base, sort: { ...base.sort, direction: 'desc' } })).toBe(false)
+            expect(
+                sameAlbumQuery(base, { ...base, sort: { ...base.sort, direction: OTHER_DIRECTION } }),
+            ).toBe(false)
         })
     })
 })

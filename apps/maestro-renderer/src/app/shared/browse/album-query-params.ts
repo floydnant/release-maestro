@@ -108,12 +108,19 @@ export const nextAlbumSort = (current: AlbumQuery['sort'], field: AlbumSortField
 }
 
 /**
- * Which way a column reads first. Text starts A–Z; a year starts with the newest and a
- * track count with the longest, because that is what someone clicking either is looking
- * for — the records they just got, and the box sets rather than the singles.
+ * Which way a column reads first. Text starts A–Z; a date and a year start with the
+ * newest and a track count with the longest, because that is what someone clicking any
+ * of them is looking for — the records they just got, and the box sets rather than the
+ * singles.
  */
+const DESCENDING_FIRST = new Set<AlbumSortField>([
+    AlbumSortField.dateAdded,
+    AlbumSortField.year,
+    AlbumSortField.trackCount,
+])
+
 const naturalAlbumDirection = (field: AlbumSortField): SortDirection =>
-    field == AlbumSortField.year || field == AlbumSortField.trackCount ? 'desc' : 'asc'
+    DESCENDING_FIRST.has(field) ? 'desc' : 'asc'
 
 /** Value equality for an album query, so a rebuilt but identical one is not a change. */
 export const sameAlbumQuery = (left: AlbumQuery, right: AlbumQuery): boolean =>

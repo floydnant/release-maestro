@@ -68,6 +68,9 @@ const KEYS = ['1A', '4A', '8A', '9A', '11B', '12B']
 const GENRES = ['UK Garage', 'Dubstep', 'Ambient', 'Techno', 'Jungle']
 const LABELS = ['Hyperdub', 'Warp', 'Ninja Tune', 'Text', 'R&S']
 
+const DAY_MS = 24 * 60 * 60 * 1_000
+const ADDED_EPOCH_MS = Date.UTC(2024, 0, 1)
+
 describe('LibraryBrowseRepository at library scale', () => {
     let sqlite: Database.Database
     let db: ReturnType<typeof drizzle<typeof schema>>
@@ -248,6 +251,9 @@ describe('LibraryBrowseRepository albums at library scale', () => {
                     recordLabelText: LABELS[index % LABELS.length]!,
                     // A coarse grid, so plenty of albums tie and the id tiebreaker matters.
                     trackCount: 1 + (index % 20),
+                    // Shuffled like the title, and coarse enough that the deep window
+                    // lands inside a run of albums added on the same day.
+                    dateAdded: new Date(ADDED_EPOCH_MS + ((index * 7919) % 400) * DAY_MS),
                 } satisfies typeof albumsTable.$inferInsert
             },
         )

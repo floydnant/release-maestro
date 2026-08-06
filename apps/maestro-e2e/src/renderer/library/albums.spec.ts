@@ -142,13 +142,26 @@ test.describe('sorting', () => {
         await expect.poll(async () => (await lastQuery(controller))?.query.sort.direction).toBe('asc')
     })
 
+    test('opens on the newest additions, without saying so in the URL', async ({ page }) => {
+        const controller = await openAlbums(page)
+
+        await expect
+            .poll(async () => (await lastQuery(controller))?.query.sort)
+            .toEqual({ field: 'dateAdded', direction: 'desc' })
+        await expect(page.getByLabel('Sort by')).toHaveValue('dateAdded')
+        // A default is not state to carry — a bare `/albums` and the URL the page sits
+        // on afterwards have to be the same link.
+        expect(new URL(page.url()).searchParams.get('sort')).toBeNull()
+        expect(new URL(page.url()).searchParams.get('dir')).toBeNull()
+    })
+
     test('the direction toggle flips the current sort', async ({ page }) => {
         const controller = await openAlbums(page)
 
-        await page.getByRole('button', { name: /^Sorted ascending/ }).click()
+        await page.getByRole('button', { name: /^Sorted descending/ }).click()
 
-        await expect.poll(async () => (await lastQuery(controller))?.query.sort.direction).toBe('desc')
-        await expect(page.getByRole('button', { name: /^Sorted descending/ })).toBeVisible()
+        await expect.poll(async () => (await lastQuery(controller))?.query.sort.direction).toBe('asc')
+        await expect(page.getByRole('button', { name: /^Sorted ascending/ })).toBeVisible()
     })
 
     test('restores the sort from the URL, so a shared link opens the same order', async ({ page }) => {

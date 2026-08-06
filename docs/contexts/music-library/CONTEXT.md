@@ -138,6 +138,19 @@ live count, because the grid sorts by it — see
 [ADR 0005](../../adr/0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md). It counts what
 the library _has_, not what the record was pressed with: an album ripped in part reads the part.
 
+**Date added**:
+When something arrived in the collection. For a song it is the file's creation time on disk
+(`songs.created_at`) — a stand-in until MAE-116 lands a real one, and the reason a file copied today
+reads as new while one moved with its timestamps intact does not. For an album it is the **newest**
+date added across its songs, so finishing a part-ripped record brings the whole thing back to the top
+rather than leaving it where its oldest track put it. A stored column on `albums` for the same reason
+track count is — the grid sorts by it, and it is the sort the grid _opens_ on. See
+[ADR 0005](../../adr/0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md).
+
+Say **added** in copy — it is the column header on the track table and the sort option on the grid.
+_Avoid_: imported, created, ingested, scanned. The last two are scan vocabulary and name a different
+event: an album's date added does not move when a rescan re-reads its files.
+
 **Release** now belongs to the [release feed](../release-feed/CONTEXT.md) and to nothing here. The two
 were the same real-world concept modelled twice — the library's _inferred_ from tags on files the user
 owns, the feed's _announced_ by Bandcamp and not necessarily owned — and the word no longer has to be

@@ -164,6 +164,16 @@ export const albumsTable = sqliteTable(
          * still a song on the record.
          */
         trackCount: integer('track_count').notNull().default(0),
+        /**
+         * When the album arrived: the newest `songs.created_at` across its songs.
+         *
+         * Denormalized for the same reason as `track_count` and maintained in the same
+         * place — a `MAX` over the album's songs is an aggregate, and an `ORDER BY` that
+         * evaluates one per album cannot serve the first window without touching every
+         * record. Nullable because a song's `created_at` is, and an album whose files
+         * carry no creation time has no date to stand on.
+         */
+        dateAdded: integer('date_added', { mode: 'timestamp_ms' }),
     },
     table => [
         uniqueIndex('albums_identity_key_key').on(table.identityKey),
@@ -176,6 +186,7 @@ export const albumsTable = sqliteTable(
         index('albums_year_idx').on(table.year, table.id),
         index('albums_record_label_text_idx').on(table.recordLabelText, table.id),
         index('albums_track_count_idx').on(table.trackCount, table.id),
+        index('albums_date_added_idx').on(table.dateAdded, table.id),
     ],
 )
 

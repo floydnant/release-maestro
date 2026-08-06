@@ -621,6 +621,7 @@ const albumSortColumns: Record<AlbumSortField, AnySQLiteColumn> = {
     [AlbumSortField.year]: albumsTable.year,
     [AlbumSortField.recordLabel]: albumsTable.recordLabelText,
     [AlbumSortField.trackCount]: albumsTable.trackCount,
+    [AlbumSortField.dateAdded]: albumsTable.dateAdded,
 }
 
 /** Treat an omitted and an empty id list identically, so filters compare by value. */

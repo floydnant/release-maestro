@@ -66,6 +66,7 @@ type AlbumSeed = {
     recordLabelId?: string | null
     recordLabelText?: string | null
     trackCount?: number
+    dateAdded?: Date | null
 }
 
 describe('LibraryBrowseRepository', () => {
@@ -114,6 +115,7 @@ describe('LibraryBrowseRepository', () => {
                 recordLabelId: seed.recordLabelId ?? null,
                 recordLabelText: seed.recordLabelText ?? null,
                 trackCount: seed.trackCount ?? 0,
+                dateAdded: seed.dateAdded ?? null,
             })
             .run()
     }
@@ -501,6 +503,7 @@ describe('LibraryBrowseRepository', () => {
                 recordLabelId: 'label-hyperdub',
                 recordLabelText: 'Hyperdub',
                 trackCount: 13,
+                dateAdded: new Date('2026-05-01T00:00:00Z'),
             })
             seedAlbum({
                 id: 'album-selected',
@@ -510,6 +513,7 @@ describe('LibraryBrowseRepository', () => {
                 recordLabelId: 'label-warp',
                 recordLabelText: 'Warp',
                 trackCount: 2,
+                dateAdded: new Date('2026-02-01T00:00:00Z'),
             })
 
             db.insert(albumArtistsTable).values({ albumId: 'album-untrue', artistId: 'artist-burial' }).run()
@@ -525,31 +529,58 @@ describe('LibraryBrowseRepository', () => {
             expect(result.total).toBe(2)
         })
 
-        it('sorts by title ascending by default', () => {
+        it('sorts by the newest addition by default, not alphabetically', () => {
             const result = repository.queryAlbums({
                 query: albumQuery(),
+                window: { offset: 0, limit: 10 },
+            })
+
+            // Newest first. It is also the reverse of alphabetical, so the old
+            // title-ascending default could not have produced it.
+            expect(titlesOf(result)).toEqual(['Untrue', 'Selected Ambient Works'])
+        })
+
+        it('sorts by the denormalized date added', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery({ sort: { field: AlbumSortField.dateAdded, direction: 'asc' } }),
                 window: { offset: 0, limit: 10 },
             })
 
             expect(titlesOf(result)).toEqual(['Selected Ambient Works', 'Untrue'])
         })
 
-        it('sorts by the denormalized track count', () => {
+        it('puts an album with no date at the bottom of the newest-first order', () => {
+            // Reachable: `songs.created_at` is nullable, so a record whose files carry
+            // no creation time has no date to stand on.
+            seedAlbum({ id: 'album-undated', title: 'Untitled Tape', dateAdded: null })
+
             const result = repository.queryAlbums({
-                query: albumQuery({ sort: { field: AlbumSortField.trackCount, direction: 'desc' } }),
+                query: albumQuery(),
                 window: { offset: 0, limit: 10 },
             })
 
-            expect(titlesOf(result)).toEqual(['Untrue', 'Selected Ambient Works'])
+            expect(titlesOf(result).at(-1)).toBe('Untitled Tape')
+        })
+
+        it('sorts by the denormalized track count', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery({ sort: { field: AlbumSortField.trackCount, direction: 'asc' } }),
+                window: { offset: 0, limit: 10 },
+            })
+
+            // Ascending, so the order differs from the newest-first default — otherwise
+            // a query that ignored the sort entirely would pass this.
+            expect(titlesOf(result)).toEqual(['Selected Ambient Works', 'Untrue'])
         })
 
         it('sorts by the denormalized record label', () => {
             const result = repository.queryAlbums({
-                query: albumQuery({ sort: { field: AlbumSortField.recordLabel, direction: 'asc' } }),
+                query: albumQuery({ sort: { field: AlbumSortField.recordLabel, direction: 'desc' } }),
                 window: { offset: 0, limit: 10 },
             })
 
-            expect(titlesOf(result)).toEqual(['Untrue', 'Selected Ambient Works'])
+            // Descending — Warp before Hyperdub — so this differs from the default order.
+            expect(titlesOf(result)).toEqual(['Selected Ambient Works', 'Untrue'])
         })
 
         it('matches album artists through the join table, not through artist text', () => {

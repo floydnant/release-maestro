@@ -6,6 +6,7 @@
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import type { TestInfo } from '@playwright/test'
 
 const workspaceRoot = join(__dirname, '../../../..')
@@ -244,9 +245,21 @@ const stripId3 = (data: Buffer): Buffer => {
 }
 
 /**
+ * Long enough apart that each file lands in its own millisecond.
+ *
+ * "Date added" is the file's creation time (`songs.created_at`, until MAE-116), read at
+ * millisecond resolution — and six files written back to back share one. Spacing them
+ * makes the write order below a real ordering, which is what lets a test tell a sort by
+ * date added apart from the arbitrary id tiebreaker it would otherwise fall through to.
+ */
+const CREATION_SPACING_MS = 5
+
+/**
  * Writes the tagged library into the test's output dir and returns its path.
  * `audioBytes` optionally truncates the audio stream to keep large generated
  * libraries small and fast (readers tolerate a cut-off final frame).
+ *
+ * Files are written in `specs` order, oldest first — see {@link CREATION_SPACING_MS}.
  */
 export const buildTaggedLibrary = async (
     testInfo: TestInfo,
@@ -257,7 +270,8 @@ export const buildTaggedLibrary = async (
     await mkdir(libraryDir, { recursive: true })
     let audio = stripId3(await readFile(sourceFixturePath))
     if (audioBytes) audio = audio.subarray(0, audioBytes)
-    for (const spec of specs) {
+    for (const [index, spec] of specs.entries()) {
+        if (index > 0) await delay(CREATION_SPACING_MS)
         await writeFile(join(libraryDir, spec.fileName), Buffer.concat([buildId3Tag(spec), audio]))
     }
     return libraryDir

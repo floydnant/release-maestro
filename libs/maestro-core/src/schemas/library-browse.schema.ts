@@ -246,12 +246,12 @@ export interface SongFilterDescription {
  * Sortable album columns, each backed by an index on `albums` (see the
  * `mae-119-album-browse-sort-indexes` migration).
  *
- * Two of these are columns only because sorting needs them to be.
- * `recordLabel` and `trackCount` read naturally as a join and an aggregate, and
- * both are denormalized onto `albums` instead — an `ORDER BY (SELECT COUNT(*) …)`
- * has to count every album in the library before it can serve the first window,
- * which is the one thing ADR 0004 exists to prevent. The write side maintains
- * them; see `LibraryBackendRepository`.
+ * Three of these are columns only because sorting needs them to be.
+ * `recordLabel`, `trackCount` and `dateAdded` read naturally as a join and two
+ * aggregates, and all three are denormalized onto `albums` instead — an
+ * `ORDER BY (SELECT COUNT(*) …)` has to count every album in the library before it
+ * can serve the first window, which is the one thing ADR 0004 exists to prevent. The
+ * write side maintains them; see `LibraryBackendRepository`.
  */
 export const AlbumSortField = {
     title: 'title',
@@ -259,6 +259,18 @@ export const AlbumSortField = {
     year: 'year',
     recordLabel: 'recordLabel',
     trackCount: 'trackCount',
+    /**
+     * When the album arrived, taken as the newest {@link SongSortField.dateAdded} across
+     * its songs — a record is as new as the most recent file on it, so ripping the rest
+     * of a part-ripped album brings the whole record back to the top rather than leaving
+     * it where its oldest track put it.
+     *
+     * Named to match the song sort, and standing on the same footing: `songs.createdAt`
+     * until MAE-116 lands a real `addedAt`. An album whose files carry no creation time
+     * at all is `null`, which SQLite orders below every date — so it sits at the bottom
+     * under the newest-first default, which is where an unknown date belongs.
+     */
+    dateAdded: 'dateAdded',
 } as const
 
 export type AlbumSortField = (typeof AlbumSortField)[keyof typeof AlbumSortField]
@@ -298,7 +310,11 @@ export interface AlbumQuery {
     search: string
 }
 
-export const DEFAULT_ALBUM_SORT: AlbumSort = { field: AlbumSortField.title, direction: 'asc' }
+/**
+ * Newest first, matching the track list's own default: opening either surface should
+ * show what the user just added rather than whatever happens to start with "A".
+ */
+export const DEFAULT_ALBUM_SORT: AlbumSort = { field: AlbumSortField.dateAdded, direction: 'desc' }
 
 export const emptyAlbumQuery = (): AlbumQuery => ({
     filter: {},

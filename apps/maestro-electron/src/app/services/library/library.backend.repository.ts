@@ -510,26 +510,33 @@ export class LibraryBackendRepository {
                     .run()
             }
 
-            // `albums.track_count` is denormalized so the grid can sort on it (ADR
-            // 0004), which makes it this transaction's job to keep true. Both ends of a
-            // move are recounted: re-tagging a file can re-key its album, and counting
-            // only the new one would leave the old inflated forever.
+            // `albums.track_count` and `albums.date_added` are denormalized so the grid
+            // can sort on them (ADR 0004, ADR 0005), which makes it this transaction's
+            // job to keep them true. Both ends of a move are recomputed: re-tagging a
+            // file can re-key its album, and doing only the new one would leave the old
+            // inflated and dated by a song it no longer has.
             //
-            // Recounted rather than incremented, because an increment has to be right
+            // Recomputed rather than adjusted, because an adjustment has to be right
             // about whether this song was already on the album — and it is not, when a
-            // re-read leaves the album unchanged. A `COUNT` over `songs_album_id_idx`
-            // is cheap and cannot drift.
+            // re-read leaves the album unchanged. Both aggregates run over
+            // `songs_album_id_idx`, which is cheap and cannot drift.
             for (const affectedAlbumId of new Set(
                 [existingSong?.albumId, albumId].filter((id): id is string => id != null),
             )) {
+                const aggregates = tx
+                    .select({ trackCount: count(), dateAdded: max(songsTable.createdAt) })
+                    .from(songsTable)
+                    .where(eq(songsTable.albumId, affectedAlbumId))
+                    .get()
+
                 tx.update(albumsTable)
                     .set({
-                        trackCount:
-                            tx
-                                .select({ value: count() })
-                                .from(songsTable)
-                                .where(eq(songsTable.albumId, affectedAlbumId))
-                                .get()?.value ?? 0,
+                        trackCount: aggregates?.trackCount ?? 0,
+                        // An album is as new as the most recent file on it, so ripping
+                        // the rest of a part-ripped record brings the whole thing back to
+                        // the top rather than leaving it where its oldest track put it.
+                        // `null` when no song on the album has a creation time.
+                        dateAdded: aggregates?.dateAdded ?? null,
                     })
                     .where(eq(albumsTable.id, affectedAlbumId))
                     .run()

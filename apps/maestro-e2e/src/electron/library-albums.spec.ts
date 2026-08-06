@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { _electron as electron, ElectronApplication, Page } from 'playwright'
-import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
+import { buildTaggedLibrary, type TaggedTrackSpec } from '../fixtures/tagged-library.fixture'
 
 /**
  * The albums grid and the album detail page over a real scan.
@@ -13,10 +13,10 @@ import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
  * maintains, the browse query, the grid — and come back out as the right records with
  * the right track counts.
  *
- * Two of the grid's sortable columns are denormalized onto `albums` rather than counted
- * or joined per query (`track_count`, `record_label_text`), so this is also the only test
- * that can catch the write side failing to keep them true: a repository unit test seeds
- * them, and a scale check only explains the plan.
+ * Three of the grid's sortable columns are denormalized onto `albums` rather than counted
+ * or joined per query (`track_count`, `record_label_text`, `date_added`), so this is also
+ * the only test that can catch the write side failing to keep them true: a repository unit
+ * test seeds them, and a scale check only explains the plan.
  */
 
 const workspaceRoot = join(__dirname, '../../../..')
@@ -58,8 +58,12 @@ test.afterEach(async () => {
     electronApp = undefined
 })
 
-/** Onboard through a real scan of the tagged fixture and land on `/albums`. */
-const scanAndOpenAlbums = async (appDataDir: string, libraryDir: string): Promise<void> => {
+/** Onboard through a real scan of a library folder and land in the app. */
+const onboardAndScan = async (
+    appDataDir: string,
+    libraryDir: string,
+    importedTracks: string,
+): Promise<void> => {
     electronApp = await launchReleaseMaestro(appDataDir)
     page = await electronApp.firstWindow()
 
@@ -69,12 +73,27 @@ const scanAndOpenAlbums = async (appDataDir: string, libraryDir: string): Promis
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
-    await expect(page.getByLabel('Imported tracks')).toHaveText('6')
+    await expect(page.getByLabel('Imported tracks')).toHaveText(importedTracks)
     await page.getByRole('button', { name: 'Take me to my library' }).click()
+}
 
+const openAlbums = async (): Promise<void> => {
     await page.getByRole('link', { name: 'Albums' }).click()
     await expect(page).toHaveURL(/\/albums/)
     await expect(page.getByRole('grid', { name: 'Albums' })).toBeVisible()
+}
+
+/** Onboard through a real scan of the tagged fixture and land on `/albums`, in title order. */
+const scanAndOpenAlbums = async (appDataDir: string, libraryDir: string): Promise<void> => {
+    await onboardAndScan(appDataDir, libraryDir, '6')
+    await openAlbums()
+
+    // Off the default and onto title order, so everything downstream has a stable one to
+    // assert. The default is date added, which comes from filesystem creation times —
+    // real, but not what these tests are about. The one test that *is* about it puts the
+    // grid back on it, and the track list's assertions sort for the same reason.
+    await page.getByLabel('Sort by').selectOption('title')
+    await expect.poll(albumTitles).toEqual(['Afterglow', 'Daybreak', 'Filaments', 'Undertow'])
 }
 
 /**
@@ -145,6 +164,64 @@ test('a scanned library becomes a browsable, sortable albums grid', async ({}, t
     await page.getByLabel('Sort by').selectOption('recordLabel')
     await expect.poll(async () => (await albumTitles()).slice(0, 2)).toEqual(['Afterglow', 'Daybreak'])
     expect((await albumTitles()).slice(2).sort()).toEqual(['Filaments', 'Undertow'])
+})
+
+/**
+ * Two albums, three tracks, written **interleaved** — Ember, Cinder, Ember.
+ *
+ * The interleaving is the whole point. Ember's tracks bracket Cinder's one, so an album
+ * dated by its *newest* track opens Ember first while one dated by its oldest opens
+ * Cinder. The default fixture cannot tell those apart: its albums are written in
+ * contiguous runs, so `MAX` and `MIN` produce the same order.
+ *
+ * `Cinder` before `Ember` alphabetically, so the expected order also rules out a grid
+ * that quietly fell back to title.
+ */
+const INTERLEAVED_LIBRARY: TaggedTrackSpec[] = [
+    {
+        fileName: 'a-first.mp3',
+        title: 'First',
+        artist: 'Kiln',
+        album: 'Ember',
+        albumArtist: 'Kiln',
+        year: 2020,
+    },
+    {
+        fileName: 'b-only.mp3',
+        title: 'Only',
+        artist: 'Hearth',
+        album: 'Cinder',
+        albumArtist: 'Hearth',
+        year: 2020,
+    },
+    {
+        fileName: 'c-last.mp3',
+        title: 'Last',
+        artist: 'Kiln',
+        album: 'Ember',
+        albumArtist: 'Kiln',
+        year: 2020,
+    },
+]
+
+test('the grid opens on the album whose newest track arrived last', async ({}, testInfo) => {
+    const appDataDir = testInfo.outputPath('app-data')
+    await mkdir(appDataDir, { recursive: true })
+    // Creation times, spaced by the fixture so each file lands in its own millisecond.
+    // This is the one test here that leans on them; see `scanAndOpenAlbums`.
+    const libraryDir = await buildTaggedLibrary(testInfo, INTERLEAVED_LIBRARY)
+
+    await onboardAndScan(appDataDir, libraryDir, '3')
+    await openAlbums()
+
+    // No sort was chosen — this is the default, and it is `albums.date_added`, which
+    // only exists because the ingest transaction wrote it. Nothing else in the suite
+    // runs that code.
+    await expect.poll(albumTitles).toEqual(['Ember', 'Cinder'])
+    expect(new URL(page.url()).searchParams.get('sort')).toBeNull()
+
+    await page.getByRole('button', { name: /^Sorted descending/ }).click()
+    await expect.poll(albumTitles).toEqual(['Cinder', 'Ember'])
 })
 
 test('searching and filtering an albums grid runs against real SQL', async ({}, testInfo) => {
@@ -227,15 +304,7 @@ test('the track list reaches an album detail page through its album cell', async
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    electronApp = await launchReleaseMaestro(appDataDir)
-    page = await electronApp.firstWindow()
-
-    await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
-    await stubFolderPicker(electronApp, libraryDir)
-    await page.getByRole('button', { name: 'Add folders' }).click()
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
-    await page.getByRole('button', { name: 'Take me to my library' }).click()
+    await onboardAndScan(appDataDir, libraryDir, '6')
 
     await page.getByRole('link', { name: 'Tracks' }).click()
     await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()

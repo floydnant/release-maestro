@@ -20,7 +20,13 @@ interface SortOption {
     label: string
 }
 
+/**
+ * Added first, because it is the default and a list whose first option is not the one
+ * in force reads as though something has already been changed. "Added" rather than
+ * "Date added" — it is the word the track table's own column header uses.
+ */
 const SORT_OPTIONS: SortOption[] = [
+    { field: AlbumSortField.dateAdded, label: 'Added' },
     { field: AlbumSortField.title, label: 'Title' },
     { field: AlbumSortField.albumArtist, label: 'Album artist' },
     { field: AlbumSortField.year, label: 'Year' },
