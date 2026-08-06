@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import type { ArtistCreditSegment, SongRow } from '@release-maestro/core'
 import { isSelectionModifierHeld } from '../../browse/song-selection'
@@ -9,6 +9,7 @@ import {
     SONG_TABLE_COLUMN_WIDTHS,
     type EntityFilterKind,
     type EntityFilterRequest,
+    type SongTableColumn,
 } from './song-table.component'
 
 /**
@@ -40,9 +41,13 @@ export class SongTableRowComponent {
     row = input.required<SongRow>()
     /** Only the empty-cover placeholder needs it — the row's own styling is the parent's. */
     selected = input.required<boolean>()
+    /** Passed straight down from the table, so a hidden column loses both its heading and its cells. */
+    hiddenColumns = input<readonly SongTableColumn[]>([])
 
     /** Shared with the header, so a column has one width — see the constant. */
     protected readonly columns = SONG_TABLE_COLUMN_WIDTHS
+
+    protected hidden = computed(() => new Set(this.hiddenColumns()))
 
     entityFilter = output<EntityFilterRequest>()
     filterMissing = output<void>()

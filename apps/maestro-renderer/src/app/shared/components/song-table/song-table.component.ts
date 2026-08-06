@@ -94,6 +94,9 @@ export const SONG_TABLE_COLUMN_WIDTHS = {
     dateAdded: 128,
 } as const
 
+/** One of the table's columns, named as {@link SONG_TABLE_COLUMN_WIDTHS} names it. */
+export type SongTableColumn = keyof typeof SONG_TABLE_COLUMN_WIDTHS
+
 /** Rows fetched beyond the viewport on each side, so scrolling does not chase the data. */
 const OVERSCAN_ROWS = 20
 
@@ -135,6 +138,15 @@ export class SongTableComponent {
      */
     query = input.required<SongQuery>()
     selection = model.required<SongSelectionState>()
+    /**
+     * Columns the surface leaves out because its own chrome already says them — an
+     * album's tracks under an album header repeat one title down the whole column.
+     *
+     * A list rather than a flag per column, because slices 3–5 bring an artist, a record
+     * label and a genre page and each one suppresses its own; four booleans would say
+     * the same thing four times.
+     */
+    hiddenColumns = input<readonly SongTableColumn[]>([])
 
     sortChange = output<SongSortField>()
     viewportChange = output<BrowseWindow>()
@@ -150,6 +162,9 @@ export class SongTableComponent {
 
     protected readonly rowHeight = ROW_HEIGHT
     protected readonly columns = SONG_TABLE_COLUMN_WIDTHS
+
+    /** Asked once per heading and once per cell, so it is a set rather than a scan. */
+    protected hidden = computed(() => new Set(this.hiddenColumns()))
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
     /**

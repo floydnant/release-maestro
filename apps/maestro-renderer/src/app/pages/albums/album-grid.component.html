@@ -16,19 +16,32 @@
              decorative: `role="row"` has to be owned by the grid, and an untyped div in
              between detaches every row from it — assistive tech then sees an empty grid
              and `aria-rowcount` describes a shape nothing can navigate. -->
+        <!-- The rows carry the vertical gap between themselves, so a row is exactly as
+             tall as the tile in it and the pitch the scroll maths steps in is
+             `tileHeight + gap`. A row as tall as the whole pitch would give the tile the
+             gap to fill, and there would be no space between one row of covers and the
+             next. -->
         <div
-            class="album-grid__window | absolute inset-x-4 top-0"
+            class="album-grid__window | absolute inset-x-4 top-0 flex flex-col"
             role="presentation"
+            [style.gap.px]="gap"
             [style.transform]="'translateY(' + windowTop() + 'px)'"
         >
             @for (rowStart of windowRowStarts(); track rowStart) {
+                <!-- `minmax(minTileWidth, 1fr)` rather than `minmax(0, 1fr)`: the column
+                     count is measured, and between a resize and the measurement landing
+                     the row is briefly laid out at the new width under the old count.
+                     With a floor of zero CSS answers that by shrinking every tile, which
+                     looks exactly like a grid that has stopped re-measuring. -->
                 <div
-                    class="album-grid__row | grid"
+                    class="album-grid__row | grid shrink-0"
                     role="row"
                     [attr.aria-rowindex]="rowStart / layout().columns + 1"
                     [style.gap.px]="gap"
-                    [style.height.px]="layout().rowHeight"
-                    [style.gridTemplateColumns]="'repeat(' + layout().columns + ', minmax(0, 1fr))'"
+                    [style.height.px]="layout().tileHeight"
+                    [style.gridTemplateColumns]="
+                        'repeat(' + layout().columns + ', minmax(' + minTileWidth + 'px, 1fr))'
+                    "
                 >
                     @for (columnIndex of columnIndices(); track columnIndex) {
                         @let index = rowStart + columnIndex;
@@ -75,9 +88,6 @@
                                         >
                                             {{ album.albumArtistText || '—' }}
                                         </span>
-                                        <!-- `content-secondary` rather than `content-muted`:
-                                             muted does not clear AA against the canvas, and
-                                             the smaller type carries the hierarchy anyway. -->
                                         <span class="type-label-sm truncate tabular-nums text-content-muted">
                                             @if (album.year) {
                                                 {{ album.year }} ·

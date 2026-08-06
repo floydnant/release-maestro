@@ -33,9 +33,10 @@ import { fileUrl } from '../../shared/utils/file-url.util'
  * What a grid adds over a table is that **the row height is not a constant**. A tile is
  * a square cover plus a fixed text block, so its height follows the column width, which
  * follows the container. So the geometry is measured rather than declared, and every
- * scroll calculation reads it from {@link layout} — one `ResizeObserver` recomputes the
- * lot, and a window is always requested on a whole-row boundary so the translated block
- * lines up with the rows the spacer accounts for.
+ * scroll calculation reads it from {@link layout} — a `ResizeObserver` and the scroll
+ * event both go through `onScroll`, which re-measures and then asks for the window that
+ * position means. A window is always requested on a whole-row boundary, so the
+ * translated block lines up with the rows the spacer accounts for.
  *
  * There is no selection here. ADR 0004's selection model exists so that actions can
  * address 500k songs without listing them, and the grid has no action to address: a tile
@@ -44,18 +45,36 @@ import { fileUrl } from '../../shared/utils/file-url.util'
  */
 
 /** Narrowest a tile may be before the grid drops a column. */
-const MIN_TILE_WIDTH = 156
+const MIN_TILE_WIDTH = 170
 
-/** The gap between tiles, matching the `gap-4` the template applies. */
+/** The gap between tiles, in both directions — what the template puts between them. */
 const TILE_GAP = 16
 
+/** The canvas's own horizontal padding, `px-4` on each side in the template. */
+const CANVAS_PADDING = 16
+
+/** A tile's padding (`p-2`), and the gap between its cover and its text (`gap-2`). */
+const TILE_PADDING = 8
+const TILE_COVER_GAP = 8
+
 /**
- * Height of the text below a tile's cover: title, album artist, and the meta line.
- * Fixed, because virtualisation has to map a scroll offset to a row — so the text is
- * clamped to its two lines rather than allowed to push a tile taller than its
- * neighbours.
+ * Height of the text below a tile's cover: title and album artist in `type-body-sm`
+ * (14px × 1.5), the meta line in `type-label-sm` (12px × 1.3).
+ *
+ * Fixed, because virtualisation has to map a scroll offset to a row — so each line is
+ * truncated rather than allowed to wrap and push a tile taller than its neighbours.
  */
-const TILE_TEXT_HEIGHT = 44
+const TILE_TEXT_HEIGHT = 58
+
+/**
+ * How tall a tile is at a given column width — its padding, a square cover inset by
+ * that padding, the gap, the text block, and the padding again.
+ *
+ * Spelled out rather than folded to a constant offset, because every term is a class
+ * in the template and this is the only place the two are kept in step.
+ */
+const tileHeight = (columnWidth: number): number =>
+    TILE_PADDING + (columnWidth - TILE_PADDING * 2) + TILE_COVER_GAP + TILE_TEXT_HEIGHT + TILE_PADDING
 
 /**
  * Tile *rows* fetched beyond the viewport on each side.
@@ -76,16 +95,34 @@ let nextGridId = 0
 interface GridLayout {
     columns: number
     columnWidth: number
+    /** A tile's own height, which is the height of the row that holds one. */
+    tileHeight: number
     /** A tile plus the gap beneath it — the pitch the scroll maths steps in. */
     rowHeight: number
 }
 
+const layoutFor = (columns: number, columnWidth: number): GridLayout => ({
+    columns,
+    columnWidth,
+    tileHeight: tileHeight(columnWidth),
+    rowHeight: tileHeight(columnWidth) + TILE_GAP,
+})
+
 /** Before the grid has been measured. One column, so nothing divides by zero. */
-const INITIAL_LAYOUT: GridLayout = {
-    columns: 1,
-    columnWidth: MIN_TILE_WIDTH,
-    rowHeight: MIN_TILE_WIDTH + TILE_TEXT_HEIGHT + TILE_GAP,
-}
+const INITIAL_LAYOUT: GridLayout = layoutFor(1, MIN_TILE_WIDTH)
+
+/**
+ * Whether two measurements describe the same grid.
+ *
+ * The column count and the column width are the only measured terms — everything else
+ * in a {@link GridLayout} is derived from them — so comparing the pair compares the
+ * whole thing. It is what keeps a resize notification that changed nothing (a height
+ * change, a re-attachment, the scrollbar coming and going) from writing the signal at
+ * all: an unchanged measurement would otherwise run change detection and re-request the
+ * window it already has, once per notification, which is most of them.
+ */
+const sameLayout = (a: GridLayout, b: GridLayout): boolean =>
+    a.columns == b.columns && a.columnWidth == b.columnWidth
 
 @Component({
     selector: 'app-album-grid',
@@ -107,10 +144,11 @@ export class AlbumGridComponent {
 
     protected readonly fileUrl = fileUrl
     protected readonly gap = TILE_GAP
+    protected readonly minTileWidth = MIN_TILE_WIDTH
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
 
-    protected layout = signal<GridLayout>(INITIAL_LAYOUT)
+    protected layout = signal<GridLayout>(INITIAL_LAYOUT, { equal: sameLayout })
 
     /** The last window emitted, so an unchanged one never reaches the signal graph. */
     private lastWindow: BrowseWindow | null = null
@@ -205,7 +243,7 @@ export class AlbumGridComponent {
             const element = this.scroller()?.nativeElement
             if (!element) return
 
-            const observer = new ResizeObserver(() => this.measure())
+            const observer = new ResizeObserver(() => this.onScroll())
             observer.observe(element)
             this.destroyRef.onDestroy(() => observer.disconnect())
         })
@@ -225,40 +263,45 @@ export class AlbumGridComponent {
     }
 
     /**
-     * Derive the grid geometry from the container, then re-request a window against it.
+     * Derive the grid geometry from the container.
      *
      * The column count is what a `repeat(auto-fill, minmax(…))` would pick, computed
      * here instead because virtualisation has to know it: the row height, the canvas
      * height and every scroll-offset-to-index conversion are all functions of it, and
-     * CSS will not say what it chose.
+     * CSS will not say what it chose. The template still declares the minimum, so a
+     * measurement that has not caught up yet cannot shrink the tiles past it — see the
+     * track definition there.
+     *
+     * Writing the same measurement twice is not a change; {@link sameLayout} is what
+     * makes that true.
      */
     private measure(): void {
         const element = this.scroller()?.nativeElement
         if (!element) return
 
-        const available = element.clientWidth - TILE_GAP * 2
+        const available = element.clientWidth - CANVAS_PADDING * 2
         if (available <= 0) return
 
         const columns = Math.max(1, Math.floor((available + TILE_GAP) / (MIN_TILE_WIDTH + TILE_GAP)))
         const columnWidth = (available - TILE_GAP * (columns - 1)) / columns
 
-        this.layout.set({
-            columns,
-            columnWidth,
-            rowHeight: columnWidth + TILE_TEXT_HEIGHT + TILE_GAP,
-        })
-
-        this.onScroll()
+        this.layout.set(layoutFor(columns, columnWidth))
     }
 
     /**
-     * Translate a scroll position into the window to fetch.
+     * Re-measure the container, then translate the scroll position into the window to
+     * fetch. Both the scroll event and the `ResizeObserver` land here, because the
+     * window a scroll position means depends on the geometry a resize changes — and
+     * measuring first means a scroll also re-syncs a layout that somehow went stale,
+     * rather than computing a window against a column count that is no longer true.
      *
      * The offset is always a multiple of the column count. It has to be: the loaded
      * block is positioned by whole rows, so a window starting mid-row would draw its
      * first tiles in the wrong column and shift every tile after them.
      */
     protected onScroll(): void {
+        this.measure()
+
         const element = this.scroller()?.nativeElement
         if (!element) return
 

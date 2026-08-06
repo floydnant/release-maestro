@@ -12,10 +12,10 @@
     </span>
 }
 
-<div class="album-detail__meta | flex min-w-0 flex-col justify-end gap-1 pb-1">
-    <h1 class="type-hero-title truncate" [title]="album().title">{{ album().title }}</h1>
+<div class="flex min-w-0 flex-col justify-end gap-1 pb-1">
+    <h1 class="album-title | type-hero-title truncate" [title]="album().title">{{ album().title }}</h1>
 
-    <p class="type-body-md min-w-0 truncate text-content-secondary">
+    <p class="album-artist | type-section-title min-w-0 truncate text-content-secondary">
         @if (album().albumArtists.length) {
             @for (artist of album().albumArtists; track artist.id; let last = $last) {
                 <a
@@ -41,17 +41,17 @@
         <span class="tabular-nums">{{ trackCount() }} {{ trackCountLabel() }}</span>
 
         @if (duration()) {
-            <span aria-hidden="true">·</span>
+            <span aria-hidden="true">•</span>
             <span class="tabular-nums">{{ duration() }}</span>
         }
 
         @if (releaseDate()) {
-            <span aria-hidden="true">·</span>
+            <span aria-hidden="true">•</span>
             <span class="tabular-nums">{{ releaseDate() }}</span>
         }
 
         @if (album().recordLabelId && album().recordLabelText) {
-            <span aria-hidden="true">·</span>
+            <span aria-hidden="true">•</span>
             <a
                 class="rounded-sm underline-offset-2 hover:text-content-action hover:underline"
                 [routerLink]="['/tracks']"
@@ -60,12 +60,12 @@
                 {{ album().recordLabelText }}
             </a>
         } @else if (album().recordLabelText) {
-            <span aria-hidden="true">·</span>
+            <span aria-hidden="true">•</span>
             <span>{{ album().recordLabelText }}</span>
         }
 
         @if (album().catalogNumber) {
-            <span aria-hidden="true">·</span>
+            <span aria-hidden="true">•</span>
             <span>{{ album().catalogNumber }}</span>
         }
     </p>
@@ -74,7 +74,7 @@
         <p class="album-detail__genres | flex min-w-0 flex-wrap items-center gap-1.5 pt-1">
             @for (genre of album().genres; track genre.id) {
                 <a
-                    class="badge hover:border-border-focus"
+                    class="badge !no-underline transition-colors hover:border-border-default hover:bg-background-elevated"
                     [routerLink]="['/tracks']"
                     [queryParams]="{ genre: genre.id }"
                 >

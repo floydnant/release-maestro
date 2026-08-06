@@ -42,6 +42,23 @@ const lastSongQuery = async (
 const grid = (page: Page) => page.getByRole('grid', { name: 'Albums' })
 const tile = (page: Page, name: string) => page.getByRole('link', { name: new RegExp(`^${name}`) })
 
+/** Narrowest a tile may be before the grid drops a column — `MIN_TILE_WIDTH` in the component. */
+const MIN_TILE_WIDTH = 156
+
+const tileWidth = (page: Page) =>
+    grid(page).evaluate(
+        element =>
+            element.querySelector<HTMLElement>('[role="gridcell"]')?.getBoundingClientRect().width ?? 0,
+    )
+
+/** One row of tiles plus the gap beneath it — the step every scroll calculation takes. */
+const rowPitchOf = (page: Page) =>
+    grid(page).evaluate(element => {
+        const [first, second] = element.querySelectorAll<HTMLElement>('[role="row"]')
+        if (!first || !second) return 0
+        return second.getBoundingClientRect().top - first.getBoundingClientRect().top
+    })
+
 test.describe('rendering a window', () => {
     test('shows the albums in the window and the total of the whole library', async ({ page }) => {
         await openAlbums(page, scenarioBuilder().albums(createAlbumRows(), { total: 428 }).build())
@@ -274,15 +291,15 @@ test.describe('virtual scrolling', () => {
         await expect(tile(page, 'Album 0')).toBeVisible()
 
         const columns = Number(await grid(page).getAttribute('aria-colcount'))
-        const rowHeight = await grid(page).evaluate(
-            element => element.querySelector<HTMLElement>('[role="row"]')?.clientHeight ?? 0,
-        )
-        expect(rowHeight).toBeGreaterThan(0)
+        // The pitch, not a row's height: the gap between rows sits between them rather
+        // than inside them, so one row is a tile tall and the next starts a gap later.
+        const rowPitch = await rowPitchOf(page)
+        expect(rowPitch).toBeGreaterThan(0)
 
         await grid(page).evaluate(top => window.scrollTo(0, 0) ?? top, 0)
         await grid(page).evaluate(
             (element, offsetTop) => element.scrollTo({ top: offsetTop }),
-            rowHeight * 100,
+            rowPitch * 100,
         )
 
         // Row 100 holds albums `100 * columns` onwards — the tile the maths says is there.
@@ -323,6 +340,36 @@ test.describe('virtual scrolling', () => {
             .toBeLessThan(wideColumns)
         // And the window it asks for follows the new geometry.
         await expect.poll(async () => (await lastQuery(controller))?.window.limit).toBeGreaterThan(0)
+    })
+
+    test('drops a column rather than letting the tiles shrink past their minimum', async ({ page }) => {
+        // The measured column count and the CSS track both carry the minimum, so a
+        // measurement that has not landed yet cannot silently shrink every tile — which
+        // is what a grid that has stopped re-measuring looks like.
+        await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
+        await expect(tile(page, 'Album 0')).toBeVisible()
+
+        for (const width of [1360, 940, 1180, 760, 1040, 620, 1440]) {
+            await page.setViewportSize({ width, height: 720 })
+            await expect.poll(() => tileWidth(page)).toBeGreaterThanOrEqual(MIN_TILE_WIDTH)
+        }
+    })
+
+    test('leaves a gap between one row of tiles and the next', async ({ page }) => {
+        // The row is exactly as tall as the tile in it and the gap sits between rows. A
+        // row as tall as the whole pitch would hand the gap to the tile to fill, and the
+        // covers would run into each other down the grid.
+        await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
+        await expect(tile(page, 'Album 0')).toBeVisible()
+
+        const pitch = await rowPitchOf(page)
+        const rowHeight = await grid(page).evaluate(
+            element =>
+                element.querySelector<HTMLElement>('[role="row"]')?.getBoundingClientRect().height ?? 0,
+        )
+
+        expect(rowHeight).toBeGreaterThan(0)
+        expect(pitch - rowHeight).toBeGreaterThan(8)
     })
 })
 
@@ -454,6 +501,15 @@ test.describe('the album detail page', () => {
         await expect
             .poll(async () => (await lastSongQuery(controller))?.query.filter.albumIds)
             .toEqual(['album-1'])
+    })
+
+    test('leaves out the album column, which the header above the table already says', async ({ page }) => {
+        await openDetail(page)
+        await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()
+
+        await expect(page.getByRole('button', { name: 'Sort by Album' })).toBeHidden()
+        // Every other column is still there — this is one column dropped, not a different table.
+        await expect(page.getByRole('button', { name: 'Sort by Artist' })).toBeVisible()
     })
 
     test('orders the tracks by track number', async ({ page }) => {

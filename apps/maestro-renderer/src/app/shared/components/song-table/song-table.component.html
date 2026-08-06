@@ -42,14 +42,16 @@
             [sort]="sort()"
             (sortChange)="sortChange.emit($event)"
         ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.album"
-            field="album"
-            label="Album"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
+        @if (!hidden().has('album')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="columns.album"
+                field="album"
+                label="Album"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
         <app-song-table-heading
             class="shrink-0"
             [style.width.px]="columns.genre"
@@ -156,6 +158,7 @@
                     <app-song-table-row
                         [row]="row"
                         [selected]="selected"
+                        [hiddenColumns]="hiddenColumns()"
                         (entityFilter)="entityFilter.emit($event)"
                         (filterMissing)="filterMissing.emit()"
                     ></app-song-table-row>

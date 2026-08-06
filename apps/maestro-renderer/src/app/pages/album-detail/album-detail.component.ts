@@ -24,7 +24,7 @@ import {
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
-import { nextSort, songSortFromParams, SongQueryParam } from '../../shared/browse/song-query-params'
+import { SongQueryParam, nextSort, songSortFromParams } from '../../shared/browse/song-query-params'
 import {
     emptySelection,
     sameQuery,
@@ -35,6 +35,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component'
 import {
     SongTableComponent,
     type EntityFilterRequest,
+    type SongTableColumn,
 } from '../../shared/components/song-table/song-table.component'
 import { AlbumDetailHeaderComponent } from './album-detail-header.component'
 
@@ -209,7 +210,18 @@ export class AlbumDetailComponent {
     protected trackCountLabel = computed(() => (this.result().total == 1 ? TRACK_LABEL : TRACKS_LABEL))
 
     /**
-     * Selection, on the same ADR 0004 rules as the track list: a refetch that changes
+     * The album column, left out here. The query is filtered to one album and the header
+     * above the table names it, so the column is the same title repeated down every row
+     * — 208px of width saying what the page already said. Its sort heading goes with it,
+     * which is no loss: sorting one album's tracks by album title orders nothing.
+     *
+     * A field rather than a literal in the template, so the binding is one stable
+     * reference instead of a new array on every change detection pass.
+     */
+    protected readonly hiddenColumns: readonly SongTableColumn[] = ['album']
+
+    /**
+     * Selection, on the same ADR 0004 rules as the track list: a refetch that change
      * the row count re-points any range, so a ranged selection clears and an id-only one
      * survives. The sort here is fixed, so only the refetch case can ever fire.
      */
