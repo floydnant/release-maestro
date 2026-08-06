@@ -14,14 +14,14 @@
 
 <button
     type="button"
-    class="btn-nkd-neutral gap-1"
+    class="btn-nkd-neutral gap-1 px-1.5"
     [attr.aria-label]="directionLabel()"
     [title]="directionLabel()"
     (click)="directionToggle.emit()"
 >
     <app-icon
         [name]="isAscending() ? 'octTriangleUp' : 'octTriangleDown'"
-        size="12"
+        size="14"
         color="content.action"
     ></app-icon>
 </button>
