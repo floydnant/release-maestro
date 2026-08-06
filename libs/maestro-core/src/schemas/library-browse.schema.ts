@@ -246,19 +246,23 @@ export interface SongFilterDescription {
  * Sortable album columns, each backed by an index on `albums` (see the
  * `mae-119-album-browse-sort-indexes` migration).
  *
- * Three of these are columns only because sorting needs them to be.
- * `recordLabel`, `trackCount` and `dateAdded` read naturally as a join and two
- * aggregates, and all three are denormalized onto `albums` instead — an
- * `ORDER BY (SELECT COUNT(*) …)` has to count every album in the library before it
- * can serve the first window, which is the one thing ADR 0004 exists to prevent. The
- * write side maintains them; see `LibraryBackendRepository`.
+ * Two of these are columns only because sorting needs them to be. `recordLabel` and
+ * `dateAdded` read naturally as a join and an aggregate, and both are denormalized
+ * onto `albums` instead — an `ORDER BY (SELECT MAX(…) …)` has to evaluate the
+ * aggregate for every album in the library before it can serve the first window,
+ * which is the one thing ADR 0004 exists to prevent. The write side maintains them;
+ * see `LibraryBackendRepository`.
+ *
+ * **Track count is deliberately not sortable.** A grid ordered by how many tracks a
+ * record has answers no question anyone asks of a music library, and being sortable
+ * was the only reason it was ever a column — see ADR 0005. It is still shown on every
+ * tile; it is counted per window now.
  */
 export const AlbumSortField = {
     title: 'title',
     albumArtist: 'albumArtist',
     year: 'year',
     recordLabel: 'recordLabel',
-    trackCount: 'trackCount',
     /**
      * When the album arrived, taken as the newest {@link SongSortField.dateAdded} across
      * its songs — a record is as new as the most recent file on it, so ripping the rest
@@ -349,7 +353,13 @@ export interface AlbumRow {
     year: number | null
     recordLabelId: string | null
     recordLabelText: string | null
-    /** Songs in the library belonging to this album, missing ones included. */
+    /**
+     * Songs in the library belonging to this album, missing ones included.
+     *
+     * Counted per window rather than stored, because nothing orders by it — see
+     * {@link AlbumSortField}. The count is over the tiles on screen, not over the
+     * catalog, which is what keeps it inside ADR 0004's budget.
+     */
     trackCount: number
 }
 

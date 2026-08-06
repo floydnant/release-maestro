@@ -168,16 +168,16 @@ test.describe('sorting', () => {
         const controller = await createRendererScenario(
             page,
             rendererScenarios.albums.withAlbums(),
-            '/albums?sort=trackCount&dir=asc',
+            '/albums?sort=recordLabel&dir=desc',
         )
 
         await expect
             .poll(async () => (await lastQuery(controller))?.query.sort)
             .toEqual({
-                field: 'trackCount',
-                direction: 'asc',
+                field: 'recordLabel',
+                direction: 'desc',
             })
-        await expect(page.getByLabel('Sort by')).toHaveValue('trackCount')
+        await expect(page.getByLabel('Sort by')).toHaveValue('recordLabel')
     })
 })
 

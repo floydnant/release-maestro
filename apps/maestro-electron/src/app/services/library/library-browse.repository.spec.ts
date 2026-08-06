@@ -65,7 +65,6 @@ type AlbumSeed = {
     coverPath?: string | null
     recordLabelId?: string | null
     recordLabelText?: string | null
-    trackCount?: number
     dateAdded?: Date | null
 }
 
@@ -114,7 +113,6 @@ describe('LibraryBrowseRepository', () => {
                 coverPath: seed.coverPath ?? null,
                 recordLabelId: seed.recordLabelId ?? null,
                 recordLabelText: seed.recordLabelText ?? null,
-                trackCount: seed.trackCount ?? 0,
                 dateAdded: seed.dateAdded ?? null,
             })
             .run()
@@ -502,7 +500,6 @@ describe('LibraryBrowseRepository', () => {
                 year: 2007,
                 recordLabelId: 'label-hyperdub',
                 recordLabelText: 'Hyperdub',
-                trackCount: 13,
                 dateAdded: new Date('2026-05-01T00:00:00Z'),
             })
             seedAlbum({
@@ -512,7 +509,6 @@ describe('LibraryBrowseRepository', () => {
                 year: 1992,
                 recordLabelId: 'label-warp',
                 recordLabelText: 'Warp',
-                trackCount: 2,
                 dateAdded: new Date('2026-02-01T00:00:00Z'),
             })
 
@@ -562,15 +558,29 @@ describe('LibraryBrowseRepository', () => {
             expect(titlesOf(result).at(-1)).toBe('Untitled Tape')
         })
 
-        it('sorts by the denormalized track count', () => {
+        it('counts each tile’s tracks over the window rather than reading a stored column', () => {
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue' })
+            seedSong({ id: 'c', title: 'Xtal', albumId: 'album-selected' })
+
             const result = repository.queryAlbums({
-                query: albumQuery({ sort: { field: AlbumSortField.trackCount, direction: 'asc' } }),
+                query: albumQuery(),
                 window: { offset: 0, limit: 10 },
             })
 
-            // Ascending, so the order differs from the newest-first default — otherwise
-            // a query that ignored the sort entirely would pass this.
-            expect(titlesOf(result)).toEqual(['Selected Ambient Works', 'Untrue'])
+            expect(result.rows.map(row => [row.title, row.trackCount])).toEqual([
+                ['Untrue', 2],
+                ['Selected Ambient Works', 1],
+            ])
+        })
+
+        it('reports zero for an album no song points at any more', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery(),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(result.rows.map(row => row.trackCount)).toEqual([0, 0])
         })
 
         it('sorts by the denormalized record label', () => {
@@ -705,7 +715,6 @@ describe('LibraryBrowseRepository', () => {
                 coverPath: '/covers/untrue.png',
                 recordLabelId: 'label-hyperdub',
                 recordLabelText: 'Hyperdub',
-                trackCount: 2,
             })
             db.insert(albumArtistsTable).values({ albumId: 'album-untrue', artistId: 'artist-burial' }).run()
 

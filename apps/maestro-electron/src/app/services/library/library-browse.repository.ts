@@ -349,7 +349,9 @@ export class LibraryBrowseRepository {
         if (offset >= total) return { rows: [], offset, total }
 
         const rows = this.albumWindowQuery({ query, window }).all()
-        const artistsByAlbum = this.albumArtists(rows.map(row => row.id))
+        const albumIds = rows.map(row => row.id)
+        const artistsByAlbum = this.albumArtists(albumIds)
+        const trackCountByAlbum = this.albumTrackCounts(albumIds)
 
         return {
             rows: rows.map(row => ({
@@ -361,7 +363,7 @@ export class LibraryBrowseRepository {
                 year: row.year,
                 recordLabelId: row.recordLabelId,
                 recordLabelText: row.recordLabelText,
-                trackCount: row.trackCount,
+                trackCount: trackCountByAlbum.get(row.id) ?? 0,
             })),
             offset,
             total,
@@ -374,9 +376,9 @@ export class LibraryBrowseRepository {
     }
 
     /**
-     * One window of the grid. No join at all: every column a tile shows lives on
-     * `albums`, including the two the write side denormalizes there so this ordering
-     * can be index-backed rather than an aggregate over the whole table.
+     * One window of the grid. No join at all: every attribute this orders or filters by
+     * lives on `albums`, including the two the write side denormalizes there so the
+     * ordering can be index-backed rather than an aggregate over the whole table.
      */
     private albumWindowQuery({ query, window }: QueryAlbumsRequest) {
         const { offset, limit } = normalizeWindow(window)
@@ -390,13 +392,38 @@ export class LibraryBrowseRepository {
                 year: albumsTable.year,
                 recordLabelId: albumsTable.recordLabelId,
                 recordLabelText: albumsTable.recordLabelText,
-                trackCount: albumsTable.trackCount,
             })
             .from(albumsTable)
             .where(this.albumConditions(query))
             .orderBy(...albumOrdering(query.sort))
             .limit(limit)
             .offset(offset)
+    }
+
+    /**
+     * How many songs each album in the window has, missing ones included.
+     *
+     * A live `COUNT`, and affordable precisely because it runs *after* the window —
+     * one grouped seek per tile on screen over `songs_album_id_idx`, not one per album
+     * in the library. That is the whole difference between this and the
+     * `ORDER BY (SELECT COUNT(*) …)` ADR 0005 rejected: an ordering has to evaluate the
+     * aggregate for every candidate row before it knows which ones the window holds.
+     *
+     * An album with no songs is absent from the result rather than present as zero;
+     * the caller defaults it.
+     */
+    private albumTrackCounts(albumIds: string[]): Map<string, number> {
+        if (albumIds.length == 0) return new Map()
+
+        return new Map(
+            this.database.db
+                .select({ albumId: songsTable.albumId, value: count() })
+                .from(songsTable)
+                .where(inArray(songsTable.albumId, albumIds))
+                .groupBy(songsTable.albumId)
+                .all()
+                .flatMap(row => (row.albumId == null ? [] : [[row.albumId, row.value] as const])),
+        )
     }
 
     /**
@@ -480,7 +507,6 @@ export class LibraryBrowseRepository {
                 catalogNumber: albumsTable.catalogNumber,
                 recordLabelId: albumsTable.recordLabelId,
                 recordLabelText: albumsTable.recordLabelText,
-                trackCount: albumsTable.trackCount,
             })
             .from(albumsTable)
             .where(eq(albumsTable.id, albumId))
@@ -488,12 +514,14 @@ export class LibraryBrowseRepository {
 
         if (!album) return null
 
-        const totalDuration =
-            this.database.db
-                .select({ value: sum(songsTable.duration) })
-                .from(songsTable)
-                .where(eq(songsTable.albumId, albumId))
-                .get()?.value ?? null
+        // One pass over this album's songs for both figures — the count is a live
+        // aggregate now, and it was already going to walk `songs_album_id_idx` for the
+        // duration.
+        const totals = this.database.db
+            .select({ trackCount: count(), totalDuration: sum(songsTable.duration) })
+            .from(songsTable)
+            .where(eq(songsTable.albumId, albumId))
+            .get()
 
         const genres = this.database.db
             .selectDistinct({ id: genresTable.id, name: genresTable.name })
@@ -515,10 +543,10 @@ export class LibraryBrowseRepository {
             catalogNumber: album.catalogNumber,
             recordLabelId: album.recordLabelId,
             recordLabelText: album.recordLabelText,
-            trackCount: album.trackCount,
+            trackCount: totals?.trackCount ?? 0,
             // `sum` returns a string from SQLite's numeric affinity, and null when no
             // song on the album carries a duration at all.
-            totalDuration: totalDuration == null ? null : Number(totalDuration),
+            totalDuration: totals?.totalDuration == null ? null : Number(totals.totalDuration),
             genres,
         }
     }
@@ -620,7 +648,6 @@ const albumSortColumns: Record<AlbumSortField, AnySQLiteColumn> = {
     [AlbumSortField.albumArtist]: albumsTable.artistText,
     [AlbumSortField.year]: albumsTable.year,
     [AlbumSortField.recordLabel]: albumsTable.recordLabelText,
-    [AlbumSortField.trackCount]: albumsTable.trackCount,
     [AlbumSortField.dateAdded]: albumsTable.dateAdded,
 }
 

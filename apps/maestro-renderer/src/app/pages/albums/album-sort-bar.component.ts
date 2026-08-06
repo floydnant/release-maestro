@@ -31,7 +31,6 @@ const SORT_OPTIONS: SortOption[] = [
     { field: AlbumSortField.albumArtist, label: 'Album artist' },
     { field: AlbumSortField.year, label: 'Year' },
     { field: AlbumSortField.recordLabel, label: 'Record label' },
-    { field: AlbumSortField.trackCount, label: 'Track count' },
 ]
 
 @Component({

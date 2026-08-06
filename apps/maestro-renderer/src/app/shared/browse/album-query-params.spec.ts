@@ -103,7 +103,7 @@ describe('album query params', () => {
         it('round-trips a fully populated query', () => {
             const query = {
                 search: 'untrue',
-                sort: { field: AlbumSortField.trackCount, direction: 'asc' as const },
+                sort: { field: AlbumSortField.recordLabel, direction: 'asc' as const },
                 filter: {
                     albumArtistIds: ['a1', 'a2'],
                     recordLabelIds: ['l1'],
@@ -134,7 +134,6 @@ describe('album query params', () => {
             [AlbumSortField.albumArtist, 'asc'],
             [AlbumSortField.recordLabel, 'asc'],
             [AlbumSortField.year, 'desc'],
-            [AlbumSortField.trackCount, 'desc'],
             [AlbumSortField.dateAdded, 'desc'],
         ])('starts %s in its natural direction', (field, expected) => {
             expect(nextAlbumSort({ field: AlbumSortField.title, direction: 'desc' }, field).direction).toBe(

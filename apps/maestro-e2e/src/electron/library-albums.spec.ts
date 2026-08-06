@@ -132,8 +132,8 @@ test('a scanned library becomes a browsable, sortable albums grid', async ({}, t
     const daybreak = page.getByRole('link', { name: /^Daybreak/ })
     await expect(daybreak).toContainText('Aurora Fields')
     await expect(daybreak).toContainText('2019')
-    // Two of the six tracks are on Daybreak — the denormalized count the write side
-    // maintains, which nothing else in the suite can prove is true.
+    // Two of the six tracks are on Daybreak — counted over the window against real
+    // ingested songs, which nothing else in the suite can prove comes out right.
     await expect(daybreak).toContainText('2 tracks')
     await expect(page.getByRole('link', { name: /^Undertow/ })).toContainText('1 track')
 
@@ -149,18 +149,13 @@ test('a scanned library becomes a browsable, sortable albums grid', async ({}, t
     await page.getByLabel('Sort by').selectOption('year')
     await expect.poll(albumTitles).toEqual(['Filaments', 'Afterglow', 'Daybreak', 'Undertow'])
 
-    // Track count is a real column on `albums`, not an aggregate computed per query: the
-    // two-track albums sort above the one-track albums.
+    // The record label is denormalized onto `albums` rather than joined per query, and the
+    // write side is what fills it: Hardwire, Kosmische, then the two Saltmarsh albums.
     //
-    // Each half is compared as a set. The ORDER BY breaks a tie on `albums.id`, which is a
-    // random UUID, so the order *within* a group of equal values is genuinely arbitrary —
-    // asserting it would pass or fail on which UUIDs a given scan happened to mint.
-    await page.getByLabel('Sort by').selectOption('trackCount')
-    await expect.poll(async () => (await albumTitles()).slice(0, 2).sort()).toEqual(['Afterglow', 'Daybreak'])
-    expect((await albumTitles()).slice(2).sort()).toEqual(['Filaments', 'Undertow'])
-
-    // And the record label is denormalized alongside it: Hardwire, Kosmische, then the two
-    // Saltmarsh albums — tied again, so again compared as a set.
+    // That last pair is compared as a set. The ORDER BY breaks a tie on `albums.id`, which
+    // is a random UUID, so the order *within* a group of equal values is genuinely
+    // arbitrary — asserting it would pass or fail on which UUIDs a given scan happened to
+    // mint.
     await page.getByLabel('Sort by').selectOption('recordLabel')
     await expect.poll(async () => (await albumTitles()).slice(0, 2)).toEqual(['Afterglow', 'Daybreak'])
     expect((await albumTitles()).slice(2).sort()).toEqual(['Filaments', 'Undertow'])

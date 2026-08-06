@@ -154,17 +154,6 @@ export const albumsTable = sqliteTable(
          */
         recordLabelText: text('record_label_text'),
         /**
-         * Songs in the library belonging to this album, missing ones included.
-         *
-         * Denormalized because it is sortable. Counted live it is an aggregate, and
-         * `ORDER BY (SELECT COUNT(*) …)` has to count every album before it can serve
-         * the first window — precisely the whole-catalog work ADR 0004 exists to
-         * prevent. Maintained by `LibraryBackendRepository` inside the song upsert
-         * transaction; reconciliation does not touch it, because a missing song is
-         * still a song on the record.
-         */
-        trackCount: integer('track_count').notNull().default(0),
-        /**
          * When the album arrived: the newest `songs.created_at` across its songs.
          *
          * Denormalized for the same reason as `track_count` and maintained in the same
@@ -185,7 +174,6 @@ export const albumsTable = sqliteTable(
         index('albums_artist_text_idx').on(table.artistText, table.id),
         index('albums_year_idx').on(table.year, table.id),
         index('albums_record_label_text_idx').on(table.recordLabelText, table.id),
-        index('albums_track_count_idx').on(table.trackCount, table.id),
         index('albums_date_added_idx').on(table.dateAdded, table.id),
     ],
 )

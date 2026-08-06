@@ -210,10 +210,10 @@ describe('LibraryBrowseRepository at library scale', () => {
 /**
  * The same check for the albums grid (MAE-119).
  *
- * Two of its sorts are the reason this exists. `recordLabel` and `trackCount` read
+ * Two of its sorts are the reason this exists. `recordLabel` and `dateAdded` read
  * naturally as a join and an aggregate, and both are denormalized onto `albums`
  * precisely so the ordering can come from an index — an assertion no correctness test
- * can make, because counting live returns identical rows.
+ * can make, because aggregating live returns identical rows.
  */
 describe('LibraryBrowseRepository albums at library scale', () => {
     let sqlite: Database.Database
@@ -249,10 +249,9 @@ describe('LibraryBrowseRepository albums at library scale', () => {
                     year: 1990 + (index % 36),
                     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                     recordLabelText: LABELS[index % LABELS.length]!,
-                    // A coarse grid, so plenty of albums tie and the id tiebreaker matters.
-                    trackCount: 1 + (index % 20),
                     // Shuffled like the title, and coarse enough that the deep window
-                    // lands inside a run of albums added on the same day.
+                    // lands inside a run of albums added on the same day — plenty of
+                    // ties, so the id tiebreaker matters.
                     dateAdded: new Date(ADDED_EPOCH_MS + ((index * 7919) % 400) * DAY_MS),
                 } satisfies typeof albumsTable.$inferInsert
             },
@@ -295,11 +294,11 @@ describe('LibraryBrowseRepository albums at library scale', () => {
     })
 
     it('keeps consecutive deep windows disjoint when sort values tie', () => {
-        // Track count has ~1,000 albums per value at this size, so the whole window sits
-        // inside one tie group — exactly where an unstable ordering repeats rows.
+        // Date added has ~50 albums per value at this size and the window holds 100, so
+        // it necessarily spans tie groups — where an unstable ordering repeats rows.
         const query: AlbumQuery = {
             ...emptyAlbumQuery(),
-            sort: { field: AlbumSortField.trackCount, direction: 'asc' },
+            sort: { field: AlbumSortField.dateAdded, direction: 'asc' },
         }
 
         const first = repository.queryAlbums({ query, window: { offset: DEEP_ALBUM_OFFSET, limit: 100 } })

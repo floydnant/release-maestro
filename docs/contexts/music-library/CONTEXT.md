@@ -133,10 +133,14 @@ _Avoid_: artist (unqualified, on an album), primary artist, band
 Part of `albumIdentityKey`, so two files that disagree on it are two albums.
 
 **Track count**:
-How many songs in the library belong to an album, missing ones included. A stored column rather than a
-live count, because the grid sorts by it — see
-[ADR 0005](../../adr/0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md). It counts what
-the library _has_, not what the record was pressed with: an album ripped in part reads the part.
+How many songs in the library belong to an album, missing ones included. It counts what the library
+_has_, not what the record was pressed with: an album ripped in part reads the part.
+
+Shown on every tile and in the detail header, and **not** something the grid can be ordered by — a
+library sorted by how many tracks a record has answers no question anyone asks of it. So it is a live
+count over the albums in the window rather than a stored column; only an attribute an _ordering_
+depends on earns one. See
+[ADR 0005](../../adr/0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md).
 
 **Date added**:
 When something arrived in the collection. For a song it is the file's creation time on disk
