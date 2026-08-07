@@ -29,7 +29,7 @@ import { IconComponent } from '../icon/icon.component'
             class="type-label-sm flex w-full items-center gap-1 p-2 text-content-muted"
             [class.justify-end]="numeric()"
             [class.text-content-primary]="isActive()"
-            [attr.aria-label]="'Sort by ' + label()"
+            [attr.aria-label]="'Sort by ' + (sortLabel() ?? label())"
             (click)="sortChange.emit(field())"
         >
             <span class="truncate">{{ label() }}</span>
@@ -46,6 +46,12 @@ import { IconComponent } from '../icon/icon.component'
 export class SongTableHeadingComponent {
     field = input.required<SongSortField>()
     label = input.required<string>()
+    /**
+     * What the sort button is *called*, when the visible label cannot be spoken. `#` is
+     * a symbol, and "Sort by #" is not a sentence; every other heading is already a word
+     * and leaves this alone.
+     */
+    sortLabel = input<string>()
     sort = input.required<SongSort>()
     /** Right-align the label, so it sits over the digits it describes. */
     numeric = input(false)

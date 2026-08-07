@@ -107,6 +107,14 @@ _Avoid_: `track` in any identifier; file, item, entry as synonyms for song
 **Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on an
 album, not a song. Do not "correct" it to `songNumber`.
 
+It is **always the tag and never a position in a list**. A file with no track number is `null`, and
+stays `null`: the one surface that shows the column — an album's track list — is sorted by this very
+field, so an untagged song's place in it is decided by the absence of the number, and printing that
+place as the number would be circular. On a half-tagged record it would also collide with a real one.
+Untagged reads as an em dash, labelled _No track number_ for assistive tech, which is a tagging gap
+the user can go and close. Multi-disc albums cannot be ordered correctly by this alone — there is no
+disc number in the system yet (MAE-123).
+
 **Album**:
 A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,
 `albumArtists`, an "Albums" tab, "12 albums". It is what music players call this, and it is what
@@ -121,6 +129,39 @@ The cost, stated so it is not rediscovered as a bug: an album is not always an a
 be an EP, a single or a compilation, and "release" covered those where "album" strains. The library
 does not distinguish them yet; when a `releaseType` attribute lands, the copy can say _EP_ or _single_
 where it knows, which is a better answer than a vaguer word everywhere.
+
+**Album artist**:
+Who a record is credited to as a whole (`TPE2`), as distinct from who played a given track on it
+(`TPE1`). A compilation's album artist is _Various Artists_ while every track has its own; a guest
+feature changes the track's credit and not the album's. Stored as `albums.artistText` plus the
+`album_artists` entities, and it is what the albums grid sorts, filters and links by — the track's
+own artist is a different question, asked on the track list.
+_Avoid_: artist (unqualified, on an album), primary artist, band
+
+Part of `albumIdentityKey`, so two files that disagree on it are two albums.
+
+**Track count**:
+How many songs in the library belong to an album, missing ones included. It counts what the library
+_has_, not what the record was pressed with: an album ripped in part reads the part.
+
+Shown on every tile and in the detail header, and **not** something the grid can be ordered by — a
+library sorted by how many tracks a record has answers no question anyone asks of it. So it is a live
+count over the albums in the window rather than a stored column; only an attribute an _ordering_
+depends on earns one. See
+[ADR 0005](../../adr/0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md).
+
+**Date added**:
+When something arrived in the collection. For a song it is the file's creation time on disk
+(`songs.created_at`) — a stand-in until MAE-116 lands a real one, and the reason a file copied today
+reads as new while one moved with its timestamps intact does not. For an album it is the **newest**
+date added across its songs, so finishing a part-ripped record brings the whole thing back to the top
+rather than leaving it where its oldest track put it. A stored column on `albums` for the same reason
+track count is — the grid sorts by it, and it is the sort the grid _opens_ on. See
+[ADR 0005](../../adr/0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md).
+
+Say **added** in copy — it is the column header on the track table and the sort option on the grid.
+_Avoid_: imported, created, ingested, scanned. The last two are scan vocabulary and name a different
+event: an album's date added does not move when a rescan re-reads its files.
 
 **Release** now belongs to the [release feed](../release-feed/CONTEXT.md) and to nothing here. The two
 were the same real-world concept modelled twice — the library's _inferred_ from tags on files the user
@@ -179,3 +220,12 @@ The slice of an ordering a surface currently holds — an offset and a limit, pl
 overscan margin. Never the result set.
 _Avoid_: **page**. Nothing here is paginated: the scrollbar is continuous, the window
 slides, and there is no page number for anything to be on.
+
+**Grid**:
+The albums browse surface — tiles of cover art, several per row. There is exactly **one** in the
+library, because `albums.coverPath` is the only artwork the database has; artists, record labels and
+genres are **lists**. So "the grid" unqualified means albums, and calling a list a grid is wrong rather
+than loose. A grid windows exactly as a list does, but by whole rows of tiles: its row height follows
+the measured column width, so the geometry is measured rather than declared.
+_Avoid_: gallery, tiles view, album view; **grid** for the track table, whose `role="grid"` is the ARIA
+pattern and not this word.

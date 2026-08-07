@@ -1,6 +1,11 @@
 import { inject, Injectable } from '@angular/core'
 import {
     LibraryBrowseIpcChannel,
+    type AlbumDetailResult,
+    type AlbumFilter,
+    type AlbumFilterDescription,
+    type AlbumQuery,
+    type AlbumWindowResult,
     type BrowseWindow,
     type SongFilter,
     type SongFilterDescription,
@@ -14,6 +19,12 @@ const EMPTY_FILTER_DESCRIPTION: SongFilterDescription = {
     genres: [],
     recordLabels: [],
     albums: [],
+}
+
+const EMPTY_ALBUM_FILTER_DESCRIPTION: AlbumFilterDescription = {
+    albumArtists: [],
+    recordLabels: [],
+    genres: [],
 }
 
 /**
@@ -49,5 +60,31 @@ export class LibraryBrowseService {
         return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.describeSongFilter, {
             filter,
         })
+    }
+
+    queryAlbums(query: AlbumQuery, window: BrowseWindow): Promise<AlbumWindowResult> {
+        if (!this.electronService.isElectron) {
+            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+        }
+
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryAlbums, {
+            query,
+            window,
+        })
+    }
+
+    describeAlbumFilter(filter: AlbumFilter): Promise<AlbumFilterDescription> {
+        if (!this.electronService.isElectron) return Promise.resolve(EMPTY_ALBUM_FILTER_DESCRIPTION)
+
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.describeAlbumFilter, {
+            filter,
+        })
+    }
+
+    /** `null` for an album that no longer exists — a stale link, or a rescan that re-keyed it. */
+    getAlbumDetail(albumId: string): Promise<AlbumDetailResult> {
+        if (!this.electronService.isElectron) return Promise.resolve(null)
+
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.getAlbumDetail, { albumId })
     }
 }

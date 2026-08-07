@@ -1,11 +1,16 @@
 import { Page } from '@playwright/test'
 import {
+    AlbumDetail,
+    AlbumFilterDescription,
+    AlbumRow,
+    AlbumWindowResult,
     AppSettings,
     FeedLoadError,
     HydratedFeedItem,
     MainIpcContract,
-    RendererIpcContract,
+    QueryAlbumsRequest,
     QuerySongsRequest,
+    RendererIpcContract,
     SongFilterDescription,
     SongRow,
     SongWindowResult,
@@ -151,6 +156,12 @@ const EMPTY_FILTER_DESCRIPTION: SongFilterDescription = {
     albums: [],
 }
 
+const EMPTY_ALBUM_FILTER_DESCRIPTION: AlbumFilterDescription = {
+    albumArtists: [],
+    recordLabels: [],
+    genres: [],
+}
+
 const defaultScenario = (): RendererScenario => ({
     handlers: {
         'window-minimize': { kind: 'resolve' },
@@ -190,6 +201,15 @@ const defaultScenario = (): RendererScenario => ({
             kind: 'resolve',
             value: EMPTY_FILTER_DESCRIPTION,
         },
+        'library:query-albums': {
+            kind: 'resolve',
+            value: { rows: [], offset: 0, total: 0 } satisfies AlbumWindowResult,
+        },
+        'library:describe-album-filter': {
+            kind: 'resolve',
+            value: EMPTY_ALBUM_FILTER_DESCRIPTION,
+        },
+        'library:get-album-detail': { kind: 'resolve', value: null },
     },
 })
 
@@ -275,6 +295,43 @@ export const scenarioBuilder = (scenario: Partial<RendererScenario> = {}) => {
             }
             return this
         },
+        /** One window of albums — the grid's counterpart to {@link songs}. */
+        albums(rows: AlbumRow[], options: { total?: number; offset?: number } = {}) {
+            current.handlers['library:query-albums'] = {
+                kind: 'resolve',
+                value: {
+                    rows,
+                    offset: options.offset ?? 0,
+                    total: options.total ?? rows.length,
+                } satisfies AlbumWindowResult,
+            }
+            return this
+        },
+        /**
+         * Serve whatever window is asked for, out of a catalog of `total` albums titled
+         * `Album 0`, `Album 1`, … Use this when the assertion is about which tiles the
+         * grid *renders* at a scroll position; `albums()` serves one fixed window and is
+         * right when the assertion is about what it *requests*.
+         */
+        albumCatalog(page: Page, total: number) {
+            current.handlers['library:query-albums'] = respond(
+                page,
+                'album-catalog',
+                albumCatalogResponder(total),
+            )
+            return this
+        },
+        albumFilterDescription(description: Partial<AlbumFilterDescription>) {
+            current.handlers['library:describe-album-filter'] = {
+                kind: 'resolve',
+                value: { ...EMPTY_ALBUM_FILTER_DESCRIPTION, ...description },
+            }
+            return this
+        },
+        albumDetail(detail: AlbumDetail | null) {
+            current.handlers['library:get-album-detail'] = { kind: 'resolve', value: detail }
+            return this
+        },
         build(): RendererScenario {
             return {
                 handlers: { ...current.handlers },
@@ -345,6 +402,7 @@ export const createSongRow = (overrides: Partial<SongRow> = {}): SongRow => {
         artistCredit: artistText ? [{ artistId: 'artist-1', creditedAs: artistText, joinPhrase: '' }] : [],
         albumId: 'album-1',
         albumTitle: 'Daybreak',
+        trackNumber: 1,
         genreText: 'Ambient',
         genres: [{ id: 'genre-1', name: 'Ambient' }],
         recordLabelId: 'label-1',
@@ -402,7 +460,117 @@ export const createSongRows = (): SongRow[] => [
     }),
 ]
 
+/**
+ * One album tile. No cover path by default: a `file://` src would 404 in a browser
+ * scenario, and the placeholder is what the tile renders instead.
+ */
+export const createAlbumRow = (overrides: Partial<AlbumRow> = {}): AlbumRow => ({
+    id: 'album-1',
+    title: 'Daybreak',
+    coverPath: null,
+    albumArtistText: 'Aurora Fields',
+    albumArtists: [{ id: 'artist-1', name: 'Aurora Fields' }],
+    year: 2019,
+    recordLabelId: 'label-1',
+    recordLabelText: 'Kosmische',
+    trackCount: 9,
+    ...overrides,
+})
+
+/** A handful of albums that disagree on every sortable column. */
+export const createAlbumRows = (): AlbumRow[] => [
+    createAlbumRow(),
+    createAlbumRow({
+        id: 'album-2',
+        title: 'Afterglow',
+        albumArtistText: 'Night Cartel',
+        albumArtists: [{ id: 'artist-2', name: 'Night Cartel' }],
+        year: 2021,
+        recordLabelId: 'label-2',
+        recordLabelText: 'Hardwire',
+        trackCount: 12,
+    }),
+    createAlbumRow({
+        id: 'album-3',
+        // Everything absent that can be, which is the row the tile's fallbacks are for.
+        title: 'Untitled Tape',
+        albumArtistText: null,
+        albumArtists: [],
+        year: null,
+        recordLabelId: null,
+        recordLabelText: null,
+        trackCount: 1,
+    }),
+]
+
+export const createAlbumDetail = (overrides: Partial<AlbumDetail> = {}): AlbumDetail => ({
+    id: 'album-1',
+    title: 'Daybreak',
+    coverPath: null,
+    albumArtistText: 'Aurora Fields',
+    albumArtists: [{ id: 'artist-1', name: 'Aurora Fields' }],
+    year: 2019,
+    date: '2019-03-01',
+    catalogNumber: 'KOS012',
+    recordLabelId: 'label-1',
+    recordLabelText: 'Kosmische',
+    trackCount: 2,
+    totalDuration: 617,
+    genres: [{ id: 'genre-1', name: 'Ambient' }],
+    ...overrides,
+})
+
 export const rendererScenarios = {
+    albums: {
+        empty: () => scenarioBuilder().albums([]).build(),
+        withAlbums: () => scenarioBuilder().albums(createAlbumRows()).build(),
+        loadPending: () => scenarioBuilder().handler('library:query-albums', { kind: 'pending' }).build(),
+        loadError: () =>
+            scenarioBuilder()
+                .handler('library:query-albums', {
+                    kind: 'reject',
+                    message: 'Backend failed to query the library',
+                    userFacingMessage: 'Could not reach the library',
+                })
+                .build(),
+        detail: () =>
+            scenarioBuilder()
+                .albumDetail(createAlbumDetail())
+                // Numbered against the *order they are served in*, so a page that showed
+                // a row's position instead of its tag would read 1, 2 and pass anyway.
+                .songs([
+                    createSongRow({
+                        id: 'song-1',
+                        title: 'Dawn',
+                        albumId: 'album-1',
+                        albumTitle: 'Daybreak',
+                        trackNumber: 2,
+                    }),
+                    createSongRow({
+                        id: 'song-2',
+                        title: 'Noon',
+                        albumId: 'album-1',
+                        albumTitle: 'Daybreak',
+                        trackNumber: 1,
+                    }),
+                ])
+                .build(),
+        /** The album row exists but every file it had is gone — see the detail page's empty state. */
+        detailWithoutTracks: () =>
+            scenarioBuilder()
+                .albumDetail(createAlbumDetail({ trackCount: 0 }))
+                .songs([])
+                .build(),
+        detailMissing: () => scenarioBuilder().albumDetail(null).build(),
+        detailError: () =>
+            scenarioBuilder()
+                .handler('library:get-album-detail', {
+                    kind: 'reject',
+                    message: 'Backend failed to load the album',
+                    userFacingMessage: 'Could not reach the library',
+                })
+                .build(),
+    },
     tracks: {
         empty: () => scenarioBuilder().songs([]).build(),
         withSongs: () => scenarioBuilder().songs(createSongRows()).build(),
@@ -574,6 +742,25 @@ export const songCatalogResponder =
                     path: `/scenario/music/row-${index}.mp3`,
                     title: `Row ${index}`,
                 })
+            }),
+            offset,
+            total,
+        }
+    }
+
+/**
+ * A responder serving `library:query-albums` out of a catalog of `total` albums titled
+ * `Album 0`, `Album 1`, … so a test can name the tiles it expects at a scroll position.
+ */
+export const albumCatalogResponder =
+    (total: number): ScenarioResponder<QueryAlbumsRequest, AlbumWindowResult> =>
+    request => {
+        const offset = Math.max(0, Math.min(request.window.offset, total))
+        const count = Math.max(0, Math.min(request.window.limit, total - offset))
+        return {
+            rows: Array.from({ length: count }, (_row, position) => {
+                const index = offset + position
+                return createAlbumRow({ id: `album-${index}`, title: `Album ${index}` })
             }),
             offset,
             total,

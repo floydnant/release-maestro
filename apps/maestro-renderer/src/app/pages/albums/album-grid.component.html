@@ -1,0 +1,139 @@
+<div
+    #scroller
+    class="album-grid | min-h-0 flex-1 overflow-y-auto overflow-x-hidden outline-none [scrollbar-gutter:stable]"
+    role="grid"
+    aria-label="Albums"
+    [attr.aria-rowcount]="rowCount()"
+    [attr.aria-colcount]="layout().columns"
+    (scroll)="onScroll()"
+>
+    <div class="album-grid__canvas | relative px-4 pb-8" role="presentation">
+        <!-- A spacer as tall as the whole result set gives the scrollbar its range; only
+             the loaded window is ever in the DOM, translated to where it belongs. It
+             waits for the measurement, like everything else that is a function of the row
+             height.
+             `scrollbar-gutter: stable` on the scroller is what makes waiting safe where
+             scrollbars take space: the measurement is taken before there is anything to
+             scroll, and a gutter appearing with the content would narrow the window and
+             re-measure the grid a column down. -->
+        @if (measured()) {
+            <div role="presentation" [style.height.px]="canvasHeight()"></div>
+        }
+
+        <!-- `role="presentation"` on the wrappers is load-bearing rather than decorative:
+             `role="row"` has to be owned by the grid, and an untyped div in between
+             detaches every row from it — assistive tech then sees an empty grid and
+             `aria-rowcount` describes a shape nothing can navigate. -->
+        <!-- The rows carry the vertical gap between themselves, so a row is exactly as
+             tall as the tile in it and the pitch the scroll maths steps in is
+             `tileHeight + gap`. A row as tall as the whole pitch would give the tile the
+             gap to fill, and there would be no space between one row of covers and the
+             next. -->
+        <!-- This element is what the grid measures its width against, so it is in the DOM
+             before the measurement is — and with it one tile, hidden, which is what a
+             tile's own box is read off. Until both have landed the grid is that one
+             invisible tile rather than a screen of full-width covers; see `measured`. -->
+        <div
+            #window
+            class="album-grid__window | absolute inset-x-4 top-0 flex flex-col"
+            role="presentation"
+            [class.invisible]="!measured()"
+            [style.gap.px]="gap"
+            [style.transform]="'translateY(' + windowTop() + 'px)'"
+        >
+            @for (rowStart of windowRowStarts(); track rowStart) {
+                <!-- `minmax(minTileWidth, 1fr)` rather than `minmax(0, 1fr)`: the column
+                     count is measured, and between a resize and the measurement landing
+                     the row is briefly laid out at the new width under the old count.
+                     With a floor of zero CSS answers that by shrinking every tile, which
+                     looks exactly like a grid that has stopped re-measuring. -->
+                <!-- No height until there is one to give it. The tile inside fills the row,
+                     so a row sized from a geometry the grid has not measured yet would
+                     squeeze the very text block it is about to measure. -->
+                <div
+                    class="album-grid__row | grid shrink-0"
+                    role="row"
+                    [attr.aria-rowindex]="rowStart / layout().columns + 1"
+                    [style.gap.px]="gap"
+                    [style.height.px]="measured() ? layout().tileHeight : null"
+                    [style.gridTemplateColumns]="
+                        'repeat(' + layout().columns + ', minmax(' + minTileWidth + 'px, 1fr))'
+                    "
+                >
+                    @for (columnIndex of columnIndices(); track columnIndex) {
+                        @let index = rowStart + columnIndex;
+                        @let album = rowAt(index);
+
+                        @if (album) {
+                            <div role="gridcell" [attr.aria-colindex]="columnIndex + 1">
+                                <!-- `#tile` is on every tile and the grid measures the
+                                     first: a view query answers with one, and one is all
+                                     it needs — the padding, the gap and the text block are
+                                     the same on all of them. -->
+                                <a
+                                    #tile
+                                    class="album-tile | flex size-full cursor-default flex-col gap-2 rounded-md p-2 !no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus hover:bg-background-surface"
+                                    [id]="tileElementId(index)"
+                                    [tabindex]="tabbableIndex() === index ? 0 : -1"
+                                    [routerLink]="['/albums', album.id]"
+                                    [attr.aria-label]="tileLabel(album)"
+                                    [title]="tileLabel(album)"
+                                    (focus)="onTileFocus(index)"
+                                    (keydown)="onKeydown($event)"
+                                >
+                                    <!-- One surface for both branches, so a cover that has
+                                         not decoded yet is the same calm square as an album
+                                         that has no cover at all rather than a hole in the
+                                         grid. A window is a screenful of images that arrive
+                                         one at a time; each fades up over its placeholder
+                                         instead of snapping in. -->
+                                    <span
+                                        class="album-tile__cover | grid aspect-square w-full place-items-center overflow-hidden rounded-sm bg-background-elevated shadow-lg"
+                                    >
+                                        @if (album.coverPath) {
+                                            <img
+                                                class="size-full object-cover opacity-0 transition-opacity duration-moderate ease-standard"
+                                                alt=""
+                                                [src]="fileUrl(album.coverPath)"
+                                                (load)="onCoverLoad($event)"
+                                            />
+                                        } @else {
+                                            <app-icon name="musicNote" size="28" color="content.muted">
+                                            </app-icon>
+                                        }
+                                    </span>
+
+                                    <!-- Three truncated lines rather than wrapped ones, so
+                                         that a tile is exactly as tall as its neighbours
+                                         whatever is in it — which is what lets one
+                                         measurement of this block stand for every tile. -->
+                                    <span #tileText class="album-tile__text | flex min-w-0 flex-col">
+                                        <span class="type-body-sm truncate text-content-primary">
+                                            {{ album.title }}
+                                        </span>
+                                        <span
+                                            class="type-body-sm truncate"
+                                            [ngClass]="{
+                                                'text-content-secondary': album.albumArtistText,
+                                                'text-content-muted': !album.albumArtistText,
+                                            }"
+                                        >
+                                            {{ album.albumArtistText || '—' }}
+                                        </span>
+                                        <span class="type-label-sm truncate tabular-nums text-content-muted">
+                                            @if (album.year) {
+                                                {{ album.year }} ·
+                                            }
+                                            {{ album.trackCount }}
+                                            {{ album.trackCount === 1 ? 'track' : 'tracks' }}
+                                        </span>
+                                    </span>
+                                </a>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
