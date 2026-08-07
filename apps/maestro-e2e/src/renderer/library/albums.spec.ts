@@ -641,6 +641,15 @@ test.describe('the album detail page', () => {
         await expect(page.getByText('2019-03-01')).toBeVisible()
     })
 
+    test('gives the running time in words, not as a timecode', async ({ page }) => {
+        // A sum, beside a track count. `10:17` there reads as a position in something
+        // playing, and the seconds of a whole record are noise.
+        await openDetail(page)
+
+        await expect(page.getByText('10 min')).toBeVisible()
+        await expect(page.getByText('10:17')).toHaveCount(0)
+    })
+
     test('shows the tracks in the shared table, asking for them by album', async ({ page }) => {
         const controller = await openDetail(page)
 

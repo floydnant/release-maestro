@@ -21,6 +21,30 @@ export const formatDuration = (duration: number): string => {
     return str
 }
 
+/**
+ * A running time in words — `1 hr 10 min`, `47 min`, `38 sec`.
+ *
+ * For a *sum* of durations rather than one of them. `1:10:30` is a timecode: it reads
+ * as a position in something playing, and the seconds in it are noise when the figure
+ * describes a whole record. A track's own duration keeps {@link formatDuration}, where
+ * the colon form is exactly right and the seconds are the point.
+ *
+ * Seconds in, matching `songs.duration` and the totals summed from it. Deliberately
+ * without {@link formatDuration}'s milliseconds heuristic: a total crosses ten hours
+ * legitimately — a boxed set does it on its own — and guessing at the unit there would
+ * report a twelve-hour compilation as three quarters of a minute.
+ */
+export const formatTotalDuration = (duration: number): string => {
+    const total = Math.max(0, Math.round(duration))
+    const hours = Math.floor(total / 3600)
+    const minutes = Math.floor((total % 3600) / 60)
+
+    if (hours && minutes) return `${hours} hr ${minutes} min`
+    if (hours) return `${hours} hr`
+    if (minutes) return `${minutes} min`
+    return `${total} sec`
+}
+
 const relativeTimeFormatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 /** to millis i.e. `<unit> * <factor> = milliseconds` */
 const conversionFactorMap = {

@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router'
 import type { AlbumDetail } from '@release-maestro/core'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { fileUrl } from '../../shared/utils/file-url.util'
-import { formatDuration } from '../../shared/utils/formatting.utils'
+import { formatTotalDuration } from '../../shared/utils/formatting.utils'
 
 /**
  * The album detail header: cover, title, and the album's own attributes.
@@ -36,9 +36,13 @@ export class AlbumDetailHeaderComponent {
 
     protected readonly fileUrl = fileUrl
 
+    /**
+     * The album's running time, in words rather than as a timecode — this is a sum, and
+     * `1:10:30` beside a track count reads like a playhead.
+     */
     protected duration = computed(() => {
         const total = this.album().totalDuration
-        return total == null ? null : formatDuration(total)
+        return total == null ? null : formatTotalDuration(total)
     })
 
     /**
