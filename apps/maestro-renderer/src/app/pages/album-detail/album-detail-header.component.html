@@ -19,7 +19,7 @@
         @if (album().albumArtists.length) {
             @for (artist of album().albumArtists; track artist.id; let last = $last) {
                 <a
-                    class="rounded-sm underline-offset-2 hover:text-content-action hover:underline"
+                    class="text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                     [routerLink]="['/tracks']"
                     [queryParams]="{ artist: artist.id }"
                 >
