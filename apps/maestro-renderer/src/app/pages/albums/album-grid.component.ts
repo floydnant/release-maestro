@@ -1,6 +1,7 @@
 import { NgClass } from '@angular/common'
 import {
     afterNextRender,
+    afterRenderEffect,
     ChangeDetectionStrategy,
     Component,
     computed,
@@ -44,37 +45,17 @@ import { fileUrl } from '../../shared/utils/file-url.util'
  * album detail page's track table brings the song one with it.
  */
 
-/** Narrowest a tile may be before the grid drops a column. */
+/**
+ * Narrowest a tile may be before the grid drops a column, and the gap between tiles in
+ * both directions.
+ *
+ * The only two numbers here that the CSS does not own. **The template reads them from
+ * this file** — the row's track definition and both gaps are bindings — so they are a
+ * single source rather than a pair kept in step by hand. Everything else about a tile's
+ * box is measured off the rendered thing; see {@link TileChrome}.
+ */
 const MIN_TILE_WIDTH = 170
-
-/** The gap between tiles, in both directions — what the template puts between them. */
 const TILE_GAP = 16
-
-/** The canvas's own horizontal padding, `px-4` on each side in the template. */
-const CANVAS_PADDING = 16
-
-/** A tile's padding (`p-2`), and the gap between its cover and its text (`gap-2`). */
-const TILE_PADDING = 8
-const TILE_COVER_GAP = 8
-
-/**
- * Height of the text below a tile's cover: title and album artist in `type-body-sm`
- * (14px × 1.5), the meta line in `type-label-sm` (12px × 1.3).
- *
- * Fixed, because virtualisation has to map a scroll offset to a row — so each line is
- * truncated rather than allowed to wrap and push a tile taller than its neighbours.
- */
-const TILE_TEXT_HEIGHT = 58
-
-/**
- * How tall a tile is at a given column width — its padding, a square cover inset by
- * that padding, the gap, the text block, and the padding again.
- *
- * Spelled out rather than folded to a constant offset, because every term is a class
- * in the template and this is the only place the two are kept in step.
- */
-const tileHeight = (columnWidth: number): number =>
-    TILE_PADDING + (columnWidth - TILE_PADDING * 2) + TILE_COVER_GAP + TILE_TEXT_HEIGHT + TILE_PADDING
 
 /**
  * An upper bound on the tiles one screenful of grid can hold, for the window the page
@@ -83,8 +64,12 @@ const tileHeight = (columnWidth: number): number =>
  * The page has to ask for *something* first: the grid is only created once a window has
  * landed, so it cannot be the one to size that window. Bounding it by the browser window
  * rather than by a constant is what keeps the first painted grid complete on a display of
- * any size, and it cannot under-fill: the sidebar and the shell's own chrome only make
- * the real grid smaller, and a row is at least as tall as one at {@link MIN_TILE_WIDTH}.
+ * any size.
+ *
+ * It cannot under-fill in either direction. The sidebar and the shell's own chrome only
+ * make the real grid narrower than the browser window, and a real row is *taller* than
+ * the square this assumes, because a tile is a cover plus a text block — so this
+ * over-counts rows, which is the safe way to be wrong.
  *
  * Overscan is left out on purpose. This window is replaced by a measured one within a
  * frame or two of the grid appearing; what it has to cover is the part of it the user can
@@ -92,7 +77,7 @@ const tileHeight = (columnWidth: number): number =>
  */
 export const initialWindowLimit = (width: number, height: number): number => {
     const columns = Math.max(1, Math.floor((width + TILE_GAP) / (MIN_TILE_WIDTH + TILE_GAP)))
-    const rows = Math.max(1, Math.ceil(height / (tileHeight(MIN_TILE_WIDTH) + TILE_GAP)))
+    const rows = Math.max(1, Math.ceil(height / (MIN_TILE_WIDTH + TILE_GAP)))
     return columns * rows
 }
 
@@ -112,42 +97,69 @@ const SCROLL_PADDING_ROWS = 1
 
 let nextGridId = 0
 
-interface GridLayout {
+/** How the window divides into columns, measured off the element the rows lay out in. */
+interface GridMeasurement {
     columns: number
     columnWidth: number
+}
+
+/**
+ * What a tile's box costs, over and above the cover inside it — **measured off a
+ * rendered tile rather than restated here from its classes.**
+ *
+ * This is the part that used to be four constants mirroring the template: the tile's
+ * padding, the gap between its cover and its text, and the height of three lines of
+ * type. Every scroll offset and the canvas height are functions of them, and editing a
+ * class silently made all of them wrong — the tiles overflowed their rows and nothing
+ * failed. Reading them back off the thing the browser actually laid out means the
+ * template is the single source for its own box, which is where it belongs.
+ *
+ * Both terms are invariant to the column width, which is what makes one measurement
+ * enough for every geometry: the padding is fixed, and each line of text is truncated
+ * rather than wrapped precisely so a narrower tile is not a taller one.
+ */
+interface TileChrome {
+    /** Horizontal padding — the difference between a column's width and its cover's. */
+    inset: number
+    /** Everything in a tile's height that is not the cover: padding, gap, text. */
+    height: number
+}
+
+interface GridLayout extends GridMeasurement {
     /** A tile's own height, which is the height of the row that holds one. */
     tileHeight: number
     /** A tile plus the gap beneath it — the pitch the scroll maths steps in. */
     rowHeight: number
 }
 
-const layoutFor = (columns: number, columnWidth: number): GridLayout => ({
-    columns,
-    columnWidth,
-    tileHeight: tileHeight(columnWidth),
-    rowHeight: tileHeight(columnWidth) + TILE_GAP,
-})
+/**
+ * Before either measurement has landed. One column, so nothing divides by zero.
+ *
+ * A placeholder, not a geometry: **nothing is rendered or requested against it** except
+ * the one hidden tile the grid measures itself with — see
+ * {@link AlbumGridComponent.measured}.
+ */
+const PLACEHOLDER_MEASUREMENT: GridMeasurement = { columns: 1, columnWidth: MIN_TILE_WIDTH }
 
 /**
- * Before the grid has been measured. One column, so nothing divides by zero.
+ * Whether two measurements describe the same grid, so that one which changed nothing
+ * is not a signal write.
  *
- * It is a placeholder, not a geometry, and **nothing is rendered or requested against
- * it** — see {@link AlbumGridComponent.measured}.
+ * It is what keeps a resize notification that changed nothing (a height change, a
+ * re-attachment, the scrollbar coming and going) from running change detection and
+ * re-requesting the window it already has, once per notification, which is most of them.
  */
-const INITIAL_LAYOUT: GridLayout = layoutFor(1, MIN_TILE_WIDTH)
+const sameMeasurement = (a: GridMeasurement | null, b: GridMeasurement | null): boolean =>
+    a?.columns == b?.columns && a?.columnWidth == b?.columnWidth
 
-/**
- * Whether two measurements describe the same grid.
- *
- * The column count and the column width are the only measured terms — everything else
- * in a {@link GridLayout} is derived from them — so comparing the pair compares the
- * whole thing. It is what keeps a resize notification that changed nothing (a height
- * change, a re-attachment, the scrollbar coming and going) from writing the signal at
- * all: an unchanged measurement would otherwise run change detection and re-request the
- * window it already has, once per notification, which is most of them.
- */
-const sameLayout = (a: GridLayout, b: GridLayout): boolean =>
-    a.columns == b.columns && a.columnWidth == b.columnWidth
+const sameChrome = (a: TileChrome | null, b: TileChrome | null): boolean =>
+    a?.inset == b?.inset && a?.height == b?.height
+
+/** A computed length in pixels, or zero for `normal`, `auto` and anything unparseable. */
+const pixels = (value: string): number => {
+    const length = Number.parseFloat(value)
+    return Number.isFinite(length) ? length : 0
+}
 
 @Component({
     selector: 'app-album-grid',
@@ -172,23 +184,54 @@ export class AlbumGridComponent {
     protected readonly minTileWidth = MIN_TILE_WIDTH
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
+    /**
+     * The element the rows lay out in, and so the one whose width *is* the width a row
+     * has to divide. Measured rather than derived from the scroller and the canvas's
+     * padding, which was one more class this file had to know about.
+     */
+    private window = viewChild<ElementRef<HTMLElement>>('window')
+    /**
+     * The first rendered tile and its text block, which is what the grid measures its own
+     * geometry with. Every tile carries the reference; a view query answers with the
+     * first, and any of them would do — see {@link TileChrome}.
+     */
+    private tile = viewChild<ElementRef<HTMLElement>>('tile')
+    private tileText = viewChild<ElementRef<HTMLElement>>('tileText')
 
-    protected layout = signal<GridLayout>(INITIAL_LAYOUT, { equal: sameLayout })
+    private measurement = signal<GridMeasurement | null>(null, { equal: sameMeasurement })
+    private chrome = signal<TileChrome | null>(null, { equal: sameChrome })
 
     /**
-     * Whether {@link layout} describes the container rather than {@link INITIAL_LAYOUT}.
+     * Whether both measurements have landed.
      *
      * The grid is created by the shell only once the first window has landed, and it is
-     * laid out before a `ResizeObserver` can tell it how wide it is — so its first paint
-     * would otherwise be one column of full-width covers, and the first window it asked
-     * for would be one screenful of a grid one column wide. Both were visible: a screen
-     * of enormous covers, then a single row, then the real grid.
+     * laid out before it can be measured — so its first paint would otherwise be one
+     * column of full-width covers, and the first window it asked for would be one
+     * screenful of a grid one column wide. Both were visible: a screen of enormous
+     * covers, then a single row, then the real grid.
      *
-     * So this gates **both** sides. Nothing renders and no window is requested until the
-     * container has a size, which costs a frame of empty space where the shell's loading
-     * line just was, and buys a grid that arrives once, whole, at its final geometry.
+     * So this gates **both** sides. Nothing is shown and no window is requested until the
+     * grid knows its own shape. What renders in the meantime is one tile, hidden and
+     * unsized — the thing {@link chrome} is read off. It costs a frame where the shell's
+     * loading line just was, and buys a grid that arrives once, whole, at its final
+     * geometry.
      */
-    protected measured = signal(false)
+    protected measured = computed(() => this.measurement() != null && this.chrome() != null)
+
+    /**
+     * The geometry every scroll calculation reads.
+     *
+     * A tile is its cover — a square as wide as the column, inset by the tile's own
+     * padding — plus everything else in its box. Both terms come from the DOM, so this
+     * file states no length the stylesheet also states.
+     */
+    protected layout = computed<GridLayout>(() => {
+        const { columns, columnWidth } = this.measurement() ?? PLACEHOLDER_MEASUREMENT
+        const chrome = this.chrome()
+        const tileHeight = chrome ? columnWidth - chrome.inset + chrome.height : columnWidth
+
+        return { columns, columnWidth, tileHeight, rowHeight: tileHeight + TILE_GAP }
+    })
 
     /** The last window emitted, so an unchanged one never reaches the signal graph. */
     private lastWindow: BrowseWindow | null = null
@@ -228,7 +271,11 @@ export class AlbumGridComponent {
         const count = this.rows().length
         const starts: number[] = []
         for (let index = 0; index < count; index += columns) starts.push(first + index)
-        return starts
+
+        // Until the grid has measured itself there is one hidden row of one tile, which
+        // is the tile it measures. Laying out the whole window against a placeholder
+        // geometry, only to throw it away a frame later, is work nobody sees.
+        return this.measured() ? starts : starts.slice(0, 1)
     })
 
     protected columnIndices = computed(() =>
@@ -283,9 +330,22 @@ export class AlbumGridComponent {
             const element = this.scroller()?.nativeElement
             if (!element) return
 
-            const observer = new ResizeObserver(() => this.onScroll())
+            const observer = new ResizeObserver(() => this.onResize())
             observer.observe(element)
             this.destroyRef.onDestroy(() => observer.disconnect())
+        })
+
+        // The tile the geometry is read off only exists once there are rows to render, and
+        // a `ResizeObserver` on the scroller has nothing to say about rows arriving. The
+        // shell only creates this grid once a window has landed, so in practice there is
+        // always one — but a grid that came up empty and stayed hidden after its rows
+        // arrived is not a failure worth leaving to that. Once measured this is a read of
+        // one signal and a comparison.
+        afterRenderEffect(() => {
+            this.rows()
+            untracked(() => {
+                if (this.chrome() == null) this.onResize()
+            })
         })
 
         // A new query is a new result set. Scroll position and focus both belong to the
@@ -303,7 +363,7 @@ export class AlbumGridComponent {
     }
 
     /**
-     * Derive the grid geometry from the container.
+     * How the width divides into columns.
      *
      * The column count is what a `repeat(auto-fill, minmax(…))` would pick, computed
      * here instead because virtualisation has to know it: the row height, the canvas
@@ -312,46 +372,86 @@ export class AlbumGridComponent {
      * measurement that has not caught up yet cannot shrink the tiles past it — see the
      * track definition there.
      *
-     * Writing the same measurement twice is not a change; {@link sameLayout} is what
-     * makes that true.
+     * Read off the element the rows actually lay out in, so no padding or inset in the
+     * template has to be restated here. Writing the same measurement twice is not a
+     * change; {@link sameMeasurement} is what makes that true.
      *
      * **A container with no size is not a measurement.** The first `ResizeObserver`
      * delivery routinely arrives at 0×0 — that is what the observer is for — and both
-     * dimensions have to be real before the layout is: a width of zero says nothing about
-     * the column count, and a height of zero makes the window a fraction of a screenful.
+     * dimensions have to be real: a width of zero says nothing about the column count,
+     * and a height of zero makes the window a fraction of a screenful.
      */
-    private measure(): void {
-        const element = this.scroller()?.nativeElement
-        if (!element) return
-
-        const available = element.clientWidth - CANVAS_PADDING * 2
-        if (available <= 0 || element.clientHeight <= 0) return
+    private measureGrid(): void {
+        const available = this.window()?.nativeElement.clientWidth ?? 0
+        const height = this.scroller()?.nativeElement.clientHeight ?? 0
+        if (available <= 0 || height <= 0) return
 
         const columns = Math.max(1, Math.floor((available + TILE_GAP) / (MIN_TILE_WIDTH + TILE_GAP)))
         const columnWidth = (available - TILE_GAP * (columns - 1)) / columns
 
-        this.layout.set(layoutFor(columns, columnWidth))
-        this.measured.set(true)
+        this.measurement.set({ columns, columnWidth })
     }
 
     /**
-     * Re-measure the container, then translate the scroll position into the window to
-     * fetch. Both the scroll event and the `ResizeObserver` land here, because the
-     * window a scroll position means depends on the geometry a resize changes — and
-     * measuring first means a scroll also re-syncs a layout that somehow went stale,
-     * rather than computing a window against a column count that is no longer true.
+     * Read a tile's own box back off the rendered thing — see {@link TileChrome} for why
+     * this is measured rather than declared.
+     *
+     * The padding and the gap come from the computed style rather than from a rectangle
+     * because a rectangle would answer with the height this component just *set*: the row
+     * is sized from {@link layout}, and the tile fills it. The text block's height is its
+     * own — flex does not stretch it vertically — which is exactly the term that used to
+     * be a hand-counted constant, and the one that was wrong.
+     */
+    private measureTile(): void {
+        const tile = this.tile()?.nativeElement
+        const text = this.tileText()?.nativeElement
+        if (!tile || !text) return
+
+        const style = getComputedStyle(tile)
+        const inset = pixels(style.paddingLeft) + pixels(style.paddingRight)
+        const height =
+            pixels(style.paddingTop) +
+            pixels(style.paddingBottom) +
+            pixels(style.rowGap) +
+            text.getBoundingClientRect().height
+
+        if (height <= 0) return
+
+        this.chrome.set({ inset, height })
+    }
+
+    /**
+     * Re-measure and ask for the window the scroll position means. The `ResizeObserver`
+     * lands here too, because the window a scroll position means depends on the geometry
+     * a resize changes — and measuring first means a scroll also re-syncs a layout that
+     * somehow went stale, rather than computing a window against a column count that is
+     * no longer true.
+     *
+     * A tile's own box does not follow the container, so a scroll does not re-read it —
+     * only the resize does, which is what a zoom or a late-loading font arrives as, and
+     * the first pass, which is what there is not one yet.
      *
      * The offset is always a multiple of the column count. It has to be: the loaded
      * block is positioned by whole rows, so a window starting mid-row would draw its
      * first tiles in the wrong column and shift every tile after them.
      *
      * An unmeasured grid asks for nothing. The window a scroll position means is a
-     * function of the geometry, and against {@link INITIAL_LAYOUT} it is a guess that
-     * *overwrites the one the page opened with* — the shell's own opening window is a
-     * better guess than a screenful of a one-column grid, which is a handful of albums.
+     * function of the geometry, and against {@link PLACEHOLDER_MEASUREMENT} it is a guess
+     * that *overwrites the one the page opened with* — the shell's own opening window is
+     * a better guess than a screenful of a one-column grid, which is a handful of albums.
      */
     protected onScroll(): void {
-        this.measure()
+        this.sync({ remeasureTile: false })
+    }
+
+    /** A resize is also how a zoom and a late-loading font arrive, so the tile is re-read. */
+    private onResize(): void {
+        this.sync({ remeasureTile: true })
+    }
+
+    private sync({ remeasureTile }: { remeasureTile: boolean }): void {
+        this.measureGrid()
+        if (remeasureTile || this.chrome() == null) this.measureTile()
         if (!this.measured()) return
 
         const element = this.scroller()?.nativeElement

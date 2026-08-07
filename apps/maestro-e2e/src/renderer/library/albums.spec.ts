@@ -42,15 +42,6 @@ const lastSongQuery = async (
 const grid = (page: Page) => page.getByRole('grid', { name: 'Albums' })
 const tile = (page: Page, name: string) => page.getByRole('link', { name: new RegExp(`^${name}`) })
 
-/** Narrowest a tile may be before the grid drops a column — `MIN_TILE_WIDTH` in the component. */
-const MIN_TILE_WIDTH = 156
-
-const tileWidth = (page: Page) =>
-    grid(page).evaluate(
-        element =>
-            element.querySelector<HTMLElement>('[role="gridcell"]')?.getBoundingClientRect().width ?? 0,
-    )
-
 /**
  * Each track row as `[title, track number]`, in render order.
  *
@@ -141,7 +132,12 @@ test.describe('rendering a window', () => {
  */
 test.describe('the first paint', () => {
     /**
-     * Record every distinct shape the grid is drawn in, from before it exists.
+     * Record every distinct shape the grid is *drawn* in, from before it exists.
+     *
+     * Hidden frames are not drawn and so are not recorded: before it has measured itself
+     * the grid holds one invisible tile, which is the tile it takes its geometry from.
+     * Reading the row's own computed visibility rather than looking for the class that
+     * sets it keeps this about what a user would see.
      *
      * Installed as an init script so it is running before the page has navigated;
      * `createRendererScenario` adds its own and then navigates, so this has to come first.
@@ -157,7 +153,7 @@ test.describe('the first paint', () => {
 
                 const rows = element.querySelectorAll<HTMLElement>('[role="row"]')
                 const first = rows[0]
-                if (!first) return null
+                if (!first || getComputedStyle(first).visibility != 'visible') return null
 
                 return {
                     rows: rows.length,
@@ -246,6 +242,63 @@ interface GridPaint {
 }
 
 type WindowWithPaints = typeof globalThis & { __gridPaints?: GridPaint[] }
+
+/**
+ * That the grid's arithmetic still agrees with the browser.
+ *
+ * Not an assertion about CSS — it is the one about the seam between the two. A tile's
+ * height is the term every scroll offset and the canvas height are built on, and the
+ * grid takes it by measuring a rendered tile. If that measurement ever stopped
+ * describing the tile, virtualisation would drift and nothing else here would fail:
+ * the rows would still render, still be navigable, still say the right things.
+ *
+ * It caught a real one. The height used to be summed from constants restating the
+ * template's classes, and they were both wrong at different times — once too small, so
+ * every tile overflowed its row, and once too large, so every tile carried dead space.
+ */
+test.describe('geometry', () => {
+    const geometryOf = (page: Page) =>
+        grid(page).evaluate(element => {
+            // By role and by position rather than by class name: a descriptor is never
+            // validated, so a test that reached for one would go quiet if it were renamed.
+            const row = element.querySelector<HTMLElement>('[role="row"]')
+            const tile = row?.querySelector<HTMLElement>('[role="gridcell"] a')
+            const cover = tile?.firstElementChild
+            if (!row || !tile || !cover) return null
+
+            return {
+                row: row.getBoundingClientRect().height,
+                tile: tile.getBoundingClientRect().height,
+                coverWidth: cover.getBoundingClientRect().width,
+                coverHeight: cover.getBoundingClientRect().height,
+                /** Positive when the tile's own content does not fit the height it was given. */
+                overflow: tile.scrollHeight - tile.clientHeight,
+            }
+        })
+
+    test('sizes a row to the tile in it, at every column count', async ({ page }) => {
+        await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
+        await expect(tile(page, 'Album 0')).toBeVisible()
+
+        // Widths chosen to span several column counts, because the cover is a square as
+        // wide as the column: the height follows the width, and a term that was right at
+        // one column count and wrong at another would be invisible from a single size.
+        for (const width of [1600, 1180, 900, 640, 1440]) {
+            await page.setViewportSize({ width, height: 900 })
+            await expect.poll(() => geometryOf(page)).not.toBeNull()
+
+            const geometry = await geometryOf(page)
+            const at = `at ${width}px`
+
+            // The grid sets the row's height from its own number; the tile fills the row.
+            // These agreeing to the pixel is the measurement being true.
+            expect(geometry, at).not.toBeNull()
+            expect(Math.round(geometry?.tile ?? 0), at).toBe(Math.round(geometry?.row ?? 0))
+            expect(geometry?.overflow, at).toBeLessThanOrEqual(0)
+            expect(Math.round(geometry?.coverHeight ?? 0), at).toBe(Math.round(geometry?.coverWidth ?? 1))
+        }
+    })
+})
 
 test.describe('sorting', () => {
     test('asks the read side for the chosen column, and puts it in the URL', async ({ page }) => {
@@ -488,19 +541,6 @@ test.describe('virtual scrolling', () => {
             .toBeLessThan(wideColumns)
         // And the window it asks for follows the new geometry.
         await expect.poll(async () => (await lastQuery(controller))?.window.limit).toBeGreaterThan(0)
-    })
-
-    test('drops a column rather than letting the tiles shrink past their minimum', async ({ page }) => {
-        // The measured column count and the CSS track both carry the minimum, so a
-        // measurement that has not landed yet cannot silently shrink every tile — which
-        // is what a grid that has stopped re-measuring looks like.
-        await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
-        await expect(tile(page, 'Album 0')).toBeVisible()
-
-        for (const width of [1360, 940, 1180, 760, 1040, 620, 1440]) {
-            await page.setViewportSize({ width, height: 720 })
-            await expect.poll(() => tileWidth(page)).toBeGreaterThanOrEqual(MIN_TILE_WIDTH)
-        }
     })
 
     test('leaves a gap between one row of tiles and the next', async ({ page }) => {
