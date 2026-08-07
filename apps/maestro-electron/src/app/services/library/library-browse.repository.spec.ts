@@ -657,10 +657,51 @@ describe('LibraryBrowseRepository', () => {
             expect(titlesOf(repository.queryAlbums(albumSearch('hyperdub')))).toEqual(['Untrue'])
         })
 
+        it('searches the catalogue number, which is how a record is often asked for', () => {
+            seedAlbum({ id: 'album-cat', title: 'Angels & Devils', catalogNumber: 'HDBLP009' })
+
+            expect(titlesOf(repository.queryAlbums(albumSearch('hdblp009')))).toEqual(['Angels & Devils'])
+        })
+
+        it('reaches the track artists of the album’s songs, not just the sleeve credit', () => {
+            // The point of the reach: on a compilation the artists are the record, and
+            // none of them is the album artist.
+            seedAlbum({ id: 'album-va', title: 'Hyperdub 5', artistText: 'Various Artists' })
+            seedSong({ id: 'a', title: 'Kingdom', artistText: 'Cooly G', albumId: 'album-va' })
+
+            expect(titlesOf(repository.queryAlbums(albumSearch('cooly')))).toEqual(['Hyperdub 5'])
+        })
+
+        it('reaches the genres of the album’s songs, which is the only place a genre is tagged', () => {
+            seedSong({ id: 'a', title: 'Archangel', genreText: 'UK Garage', albumId: 'album-untrue' })
+
+            expect(titlesOf(repository.queryAlbums(albumSearch('garage')))).toEqual(['Untrue'])
+        })
+
+        it('counts an album once when several of its songs match the term', () => {
+            // The reach is an EXISTS rather than a join for this reason: a join would
+            // return the album once per matching song and corrupt the total.
+            seedSong({ id: 'a', title: 'Archangel', artistText: 'Burial', albumId: 'album-untrue' })
+            seedSong({ id: 'b', title: 'Near Dark', artistText: 'Burial', albumId: 'album-untrue' })
+
+            const result = repository.queryAlbums(albumSearch('burial'))
+
+            expect(result.total).toBe(1)
+            expect(result.rows).toHaveLength(1)
+        })
+
         it('does not search the titles of the album’s songs', () => {
             seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
 
             expect(repository.queryAlbums(albumSearch('archangel')).total).toBe(0)
+        })
+
+        it('does not match a song on another album, or one on no album at all', () => {
+            seedSong({ id: 'a', title: 'Kingdom', artistText: 'Cooly G', albumId: 'album-selected' })
+            seedSong({ id: 'b', title: 'Stray', artistText: 'Ikonika', albumId: null })
+
+            expect(titlesOf(repository.queryAlbums(albumSearch('cooly')))).toEqual(['Selected Ambient Works'])
+            expect(repository.queryAlbums(albumSearch('ikonika')).total).toBe(0)
         })
 
         it('carries the album artists as entities', () => {

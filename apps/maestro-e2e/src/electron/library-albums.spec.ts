@@ -237,8 +237,16 @@ test('searching and filtering an albums grid runs against real SQL', async ({}, 
     await page.getByRole('searchbox', { name: 'Search albums' }).fill('saltmarsh')
     await expect.poll(albumTitles).toEqual(['Filaments', 'Undertow'])
 
+    // And the track artists of its own songs, not only the credit on the sleeve.
+    // `Void` on Afterglow is credited to "Night Cartel & Aurora Fields" while the album
+    // is Night Cartel's, so Aurora Fields finds both the record she is the artist of and
+    // the record she appears on — which is what someone typing a name is asking for.
     await page.getByRole('searchbox', { name: 'Search albums' }).fill('aurora')
-    await expect.poll(albumTitles).toEqual(['Daybreak'])
+    await expect.poll(albumTitles).toEqual(['Afterglow', 'Daybreak'])
+
+    // And a genre, which is tagged per file and so reaches the record only this way.
+    await page.getByRole('searchbox', { name: 'Search albums' }).fill('techno')
+    await expect.poll(albumTitles).toEqual(['Afterglow'])
 
     // A song title is deliberately not searched — `Dawn` is a track on Daybreak, and
     // returning whole records for one track on them gives no clue which one matched.

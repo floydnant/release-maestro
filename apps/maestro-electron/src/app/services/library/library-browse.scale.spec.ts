@@ -53,6 +53,18 @@ const DEEP_OFFSET = 45_000
 const ALBUM_COUNT = 20_000
 const DEEP_ALBUM_OFFSET = 18_000
 
+/**
+ * Songs hung off those albums, because album *search* reaches through them: the track
+ * artists and genres of an album's own songs are searchable, and that predicate is a
+ * correlated subquery run per candidate album. Without songs in the table there would
+ * be nothing to assert it against.
+ *
+ * Thinner than a real record deliberately — every row here is seed time, and a thin
+ * table is the conservative direction for the assertion this supports: the more songs
+ * an album has, the *more* attractive the index seek the plan is checked for becomes.
+ */
+const SONGS_PER_ALBUM = 2
+
 const migrationsFolderCandidates = [
     join(process.cwd(), 'drizzle'),
     join(__dirname, '../../../../../../drizzle'),
@@ -264,6 +276,39 @@ describe('LibraryBrowseRepository albums at library scale', () => {
                     .run()
             }
         })
+
+        const songs: (typeof songsTable.$inferInsert)[] = Array.from(
+            { length: ALBUM_COUNT * SONGS_PER_ALBUM },
+            (_song, index) => {
+                const id = `album-song-${index.toString().padStart(6, '0')}`
+                const albumIndex = Math.floor(index / SONGS_PER_ALBUM)
+                return {
+                    id,
+                    path: `/music/${id}.flac`,
+                    fileName: `${id}.flac`,
+                    size: 1_024,
+                    modifiedAt: new Date(1_750_000_000_000),
+                    lastSeenAt: new Date(1_750_000_000_000),
+                    fileFingerprint: `fingerprint-${id}`,
+                    present: true,
+                    title: `Track ${index % SONGS_PER_ALBUM}`,
+                    albumId: `album-${albumIndex.toString().padStart(6, '0')}`,
+                    // The track artist differs from the album's own credit, which is the
+                    // case the search reaches for — a compilation nobody is credited on.
+                    artistText: `Track Artist ${index % 2_000}`,
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    genreText: GENRES[index % GENRES.length]!,
+                } satisfies typeof songsTable.$inferInsert
+            },
+        )
+
+        db.transaction(tx => {
+            for (let start = 0; start < songs.length; start += 500) {
+                tx.insert(songsTable)
+                    .values(songs.slice(start, start + 500))
+                    .run()
+            }
+        })
         sqlite.exec('ANALYZE')
 
         repository = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
@@ -291,6 +336,32 @@ describe('LibraryBrowseRepository albums at library scale', () => {
 
         expect(result.total).toBe(ALBUM_COUNT)
         expect(result.rows).toHaveLength(100)
+    })
+
+    it('reaches the album’s songs through an index, not a scan per album', () => {
+        // Album search reaches through `songs` for the track artists and genres of an
+        // album's own songs, as a correlated subquery evaluated per candidate album.
+        // Seeking `songs_album_id_idx` is the whole reason that is affordable — a scan
+        // of `songs` per album would be albums × songs row visits, and every
+        // correctness test passes just as happily against it.
+        const plan = queryPlan({ ...emptyAlbumQuery(), search: 'Track Artist 42' })
+
+        // Either album_id-leading index will do; which one SQLite picks is its business
+        // and it has changed with the seed. What is being asserted is the seek.
+        expect(plan).toMatch(/SEARCH songs USING (COVERING )?INDEX songs_album_id\w* \(album_id=\?\)/)
+        expect(plan).not.toMatch(/SCAN songs/)
+        // The outer scan of `albums` is the accepted `LIKE '%…%'` cost (ADR 0004); what
+        // must not join it is the ordering falling back to a sort of every match.
+        expect(plan).not.toMatch(/TEMP B-TREE/i)
+    })
+
+    it('serves a searched album window without loading the matches into memory', () => {
+        const query: AlbumQuery = { ...emptyAlbumQuery(), search: 'Track Artist 42' }
+
+        const result = repository.queryAlbums({ query, window: { offset: 0, limit: 50 } })
+
+        expect(result.total).toBeGreaterThan(50)
+        expect(result.rows).toHaveLength(50)
     })
 
     it('keeps consecutive deep windows disjoint when sort values tie', () => {
