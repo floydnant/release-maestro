@@ -37,7 +37,7 @@ import {
     type BrowseFilterState,
     type BrowseShellState,
 } from '../../shared/components/browse-shell/browse-shell.component'
-import { AlbumGridComponent } from './album-grid.component'
+import { AlbumGridComponent, initialWindowLimit } from './album-grid.component'
 import { AlbumSortBarComponent } from './album-sort-bar.component'
 
 /**
@@ -58,8 +58,15 @@ const SCAN_REFETCH_INTERVAL_MS = 1_500
 /** How long typing settles before a search reaches the URL and the read side. */
 const SEARCH_DEBOUNCE_MS = 200
 
-/** A guess, used only until the grid has measured its own geometry. */
-const INITIAL_WINDOW_LIMIT = 60
+/**
+ * The window the page opens with, until the grid has measured its own geometry.
+ *
+ * Derived from the browser window rather than guessed at, because the grid renders
+ * nothing until it is measured and this is what it renders when it does — a constant
+ * that suits one display fills a bigger one two rows at a time. See
+ * {@link initialWindowLimit}.
+ */
+const initialLimit = (): number => initialWindowLimit(window.innerWidth, window.innerHeight)
 
 /** Album is one word in code and in copy alike — see the glossary. */
 const ALBUMS_LABEL = 'albums'
@@ -101,7 +108,7 @@ export class AlbumsComponent {
         computation: (_query, previous) => ({
             offset: 0,
             // Keep whatever the grid measured; only the offset is stale.
-            limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
+            limit: previous?.value.limit ?? initialLimit(),
         }),
     })
 

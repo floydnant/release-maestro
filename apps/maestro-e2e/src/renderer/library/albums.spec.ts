@@ -128,6 +128,125 @@ test.describe('rendering a window', () => {
     })
 })
 
+/**
+ * What the grid does between being created and standing still.
+ *
+ * The grid is measured rather than declared, and it is created by the shell only once a
+ * window has landed — so there is a moment where it exists, has been handed rows, and
+ * does not yet know how wide it is. Everything here is about that moment: it used to be
+ * visible as a screen of full-width covers, then a single row, then the real grid.
+ *
+ * These assert over *every frame*, not the settled state, because the settled state was
+ * always right.
+ */
+test.describe('the first paint', () => {
+    /**
+     * Record every distinct shape the grid is drawn in, from before it exists.
+     *
+     * Installed as an init script so it is running before the page has navigated;
+     * `createRendererScenario` adds its own and then navigates, so this has to come first.
+     */
+    const recordPaints = (page: Page) =>
+        page.addInitScript(() => {
+            const paints: GridPaint[] = []
+            ;(window as WindowWithPaints).__gridPaints = paints
+
+            const measurePaint = (): GridPaint | null => {
+                const element = document.querySelector('[role="grid"]')
+                if (!element) return null
+
+                const rows = element.querySelectorAll<HTMLElement>('[role="row"]')
+                const first = rows[0]
+                if (!first) return null
+
+                return {
+                    rows: rows.length,
+                    columns: getComputedStyle(first).gridTemplateColumns.split(' ').length,
+                    tiles: element.querySelectorAll('[role="gridcell"]').length,
+                    rowHeight: first.getBoundingClientRect().height,
+                    viewportHeight: element.clientHeight,
+                }
+            }
+
+            const samePaint = (left: GridPaint | undefined, right: GridPaint) =>
+                left != null &&
+                (Object.keys(right) as (keyof GridPaint)[]).every(key => left[key] == right[key])
+
+            const sample = () => {
+                const paint = measurePaint()
+                if (paint && !samePaint(paints.at(-1), paint)) paints.push(paint)
+                requestAnimationFrame(sample)
+            }
+            requestAnimationFrame(sample)
+        })
+
+    const paintsOf = (page: Page): Promise<GridPaint[]> =>
+        page.evaluate(() => (window as WindowWithPaints).__gridPaints ?? [])
+
+    test('is at the measured column count, never at the placeholder geometry', async ({ page }) => {
+        // The grid opens against a one-column placeholder so the scroll maths never
+        // divides by zero. Drawing anything against it puts one enormous cover per row on
+        // screen for a frame or two, which is what this catches.
+        await page.setViewportSize({ width: 1600, height: 1000 })
+        await recordPaints(page)
+        await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
+        await expect(tile(page, 'Album 0')).toBeVisible()
+
+        const paints = await paintsOf(page)
+        const settledColumns = Number(await grid(page).getAttribute('aria-colcount'))
+
+        expect(settledColumns).toBeGreaterThan(1)
+        expect(paints.length).toBeGreaterThan(0)
+        expect(paints.map(paint => paint.columns)).toEqual(paints.map(() => settledColumns))
+    })
+
+    test('arrives full, rather than filling the viewport a few rows at a time', async ({ page }) => {
+        // The window the page opens with is sized to the browser window, so the rows the
+        // grid is handed already cover the screen when it first draws them. A fixed guess
+        // covers a small display and fills a large one in two waves.
+        await page.setViewportSize({ width: 1600, height: 1000 })
+        await recordPaints(page)
+        await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
+        await expect(tile(page, 'Album 0')).toBeVisible()
+
+        const paints = await paintsOf(page)
+        const fillsTheViewport = paints.map(paint => paint.rows * paint.rowHeight >= paint.viewportHeight)
+
+        expect(paints.length).toBeGreaterThan(0)
+        expect(fillsTheViewport).toEqual(paints.map(() => true))
+    })
+
+    test('asks for nothing until it knows its own geometry', async ({ page }) => {
+        // A window computed against the placeholder is a screenful of a one-column grid —
+        // a handful of albums — and it *replaces* the one the page opened with. That is
+        // what left a single row of tiles on screen with empty space below it.
+        await page.setViewportSize({ width: 1600, height: 1000 })
+        const controller = await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
+        await expect(tile(page, 'Album 0')).toBeVisible()
+
+        const columns = Number(await grid(page).getAttribute('aria-colcount'))
+        const pitch = await rowPitchOf(page)
+        const visibleRows = Math.ceil((await grid(page).evaluate(element => element.clientHeight)) / pitch)
+
+        const limits = (await controller.calls('library:query-albums')).map(
+            call => (call.payload as QueryAlbumsRequest).window.limit,
+        )
+
+        expect(limits.length).toBeGreaterThan(0)
+        for (const limit of limits) expect(limit).toBeGreaterThanOrEqual(columns * visibleRows)
+    })
+})
+
+interface GridPaint {
+    rows: number
+    columns: number
+    tiles: number
+    rowHeight: number
+    viewportHeight: number
+}
+
+type WindowWithPaints = typeof globalThis & { __gridPaints?: GridPaint[] }
+
 test.describe('sorting', () => {
     test('asks the read side for the chosen column, and puts it in the URL', async ({ page }) => {
         const controller = await openAlbums(page)

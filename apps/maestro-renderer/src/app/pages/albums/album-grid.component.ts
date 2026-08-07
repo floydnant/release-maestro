@@ -77,6 +77,26 @@ const tileHeight = (columnWidth: number): number =>
     TILE_PADDING + (columnWidth - TILE_PADDING * 2) + TILE_COVER_GAP + TILE_TEXT_HEIGHT + TILE_PADDING
 
 /**
+ * An upper bound on the tiles one screenful of grid can hold, for the window the page
+ * opens with — before there is a grid to measure.
+ *
+ * The page has to ask for *something* first: the grid is only created once a window has
+ * landed, so it cannot be the one to size that window. Bounding it by the browser window
+ * rather than by a constant is what keeps the first painted grid complete on a display of
+ * any size, and it cannot under-fill: the sidebar and the shell's own chrome only make
+ * the real grid smaller, and a row is at least as tall as one at {@link MIN_TILE_WIDTH}.
+ *
+ * Overscan is left out on purpose. This window is replaced by a measured one within a
+ * frame or two of the grid appearing; what it has to cover is the part of it the user can
+ * already see.
+ */
+export const initialWindowLimit = (width: number, height: number): number => {
+    const columns = Math.max(1, Math.floor((width + TILE_GAP) / (MIN_TILE_WIDTH + TILE_GAP)))
+    const rows = Math.max(1, Math.ceil(height / (tileHeight(MIN_TILE_WIDTH) + TILE_GAP)))
+    return columns * rows
+}
+
+/**
  * Tile *rows* fetched beyond the viewport on each side.
  *
  * Far smaller than the track table's twenty, and not because a grid scrolls
@@ -108,7 +128,12 @@ const layoutFor = (columns: number, columnWidth: number): GridLayout => ({
     rowHeight: tileHeight(columnWidth) + TILE_GAP,
 })
 
-/** Before the grid has been measured. One column, so nothing divides by zero. */
+/**
+ * Before the grid has been measured. One column, so nothing divides by zero.
+ *
+ * It is a placeholder, not a geometry, and **nothing is rendered or requested against
+ * it** — see {@link AlbumGridComponent.measured}.
+ */
 const INITIAL_LAYOUT: GridLayout = layoutFor(1, MIN_TILE_WIDTH)
 
 /**
@@ -149,6 +174,21 @@ export class AlbumGridComponent {
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
 
     protected layout = signal<GridLayout>(INITIAL_LAYOUT, { equal: sameLayout })
+
+    /**
+     * Whether {@link layout} describes the container rather than {@link INITIAL_LAYOUT}.
+     *
+     * The grid is created by the shell only once the first window has landed, and it is
+     * laid out before a `ResizeObserver` can tell it how wide it is — so its first paint
+     * would otherwise be one column of full-width covers, and the first window it asked
+     * for would be one screenful of a grid one column wide. Both were visible: a screen
+     * of enormous covers, then a single row, then the real grid.
+     *
+     * So this gates **both** sides. Nothing renders and no window is requested until the
+     * container has a size, which costs a frame of empty space where the shell's loading
+     * line just was, and buys a grid that arrives once, whole, at its final geometry.
+     */
+    protected measured = signal(false)
 
     /** The last window emitted, so an unchanged one never reaches the signal graph. */
     private lastWindow: BrowseWindow | null = null
@@ -274,18 +314,24 @@ export class AlbumGridComponent {
      *
      * Writing the same measurement twice is not a change; {@link sameLayout} is what
      * makes that true.
+     *
+     * **A container with no size is not a measurement.** The first `ResizeObserver`
+     * delivery routinely arrives at 0×0 — that is what the observer is for — and both
+     * dimensions have to be real before the layout is: a width of zero says nothing about
+     * the column count, and a height of zero makes the window a fraction of a screenful.
      */
     private measure(): void {
         const element = this.scroller()?.nativeElement
         if (!element) return
 
         const available = element.clientWidth - CANVAS_PADDING * 2
-        if (available <= 0) return
+        if (available <= 0 || element.clientHeight <= 0) return
 
         const columns = Math.max(1, Math.floor((available + TILE_GAP) / (MIN_TILE_WIDTH + TILE_GAP)))
         const columnWidth = (available - TILE_GAP * (columns - 1)) / columns
 
         this.layout.set(layoutFor(columns, columnWidth))
+        this.measured.set(true)
     }
 
     /**
@@ -298,9 +344,15 @@ export class AlbumGridComponent {
      * The offset is always a multiple of the column count. It has to be: the loaded
      * block is positioned by whole rows, so a window starting mid-row would draw its
      * first tiles in the wrong column and shift every tile after them.
+     *
+     * An unmeasured grid asks for nothing. The window a scroll position means is a
+     * function of the geometry, and against {@link INITIAL_LAYOUT} it is a guess that
+     * *overwrites the one the page opened with* — the shell's own opening window is a
+     * better guess than a screenful of a one-column grid, which is a handful of albums.
      */
     protected onScroll(): void {
         this.measure()
+        if (!this.measured()) return
 
         const element = this.scroller()?.nativeElement
         if (!element) return
@@ -339,6 +391,19 @@ export class AlbumGridComponent {
 
     protected onTileFocus(index: number): void {
         this.focusedIndex.set(index)
+    }
+
+    /**
+     * Fade a cover up once it has decoded.
+     *
+     * The one place this component touches the DOM directly instead of a signal, and
+     * deliberately: whether a bitmap has painted is the image element's own business,
+     * not the grid's state. A signal per tile would put a change-detection run behind
+     * every cover in the window — a hundred of them on the first paint, for a class the
+     * element could set on itself — and would have to be evicted as tiles scroll away.
+     */
+    protected onCoverLoad(event: Event): void {
+        ;(event.target as HTMLElement).classList.remove('opacity-0')
     }
 
     /**
