@@ -51,6 +51,22 @@ const tileWidth = (page: Page) =>
             element.querySelector<HTMLElement>('[role="gridcell"]')?.getBoundingClientRect().width ?? 0,
     )
 
+/**
+ * Each track row as `[title, track number]`, in render order.
+ *
+ * Read off the cells rather than the row's `aria-label`, which carries the title and the
+ * artist and not the number — so the pairing is what the user actually sees lined up.
+ */
+const trackNumbersByTitle = (page: Page): Promise<[string, string][]> =>
+    page
+        .getByRole('grid', { name: 'Tracks' })
+        .evaluate(element =>
+            [...element.querySelectorAll('[role="row"][aria-selected]')].map(row => [
+                row.querySelector('.song-table__title')?.textContent?.trim() ?? '',
+                row.querySelector('.song-table__track-number')?.textContent?.trim() ?? '',
+            ]),
+        ) as Promise<[string, string][]>
+
 /** One row of tiles plus the gap beneath it — the step every scroll calculation takes. */
 const rowPitchOf = (page: Page) =>
     grid(page).evaluate(element => {
@@ -514,6 +530,39 @@ test.describe('the album detail page', () => {
         await expect
             .poll(async () => (await lastSongQuery(controller))?.query.filter.albumIds)
             .toEqual(['album-1'])
+    })
+
+    test('numbers each track from its own tag, not from where it sits in the list', async ({ page }) => {
+        const controller = await openDetail(page)
+        await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()
+
+        // The scenario serves Dawn first and tags it track 2, so a page reading positions
+        // would show 1 here. Only the tag can produce this.
+        await expect(trackNumbersByTitle(page)).resolves.toEqual([
+            ['Dawn', '2'],
+            ['Noon', '1'],
+        ])
+        await expect(controller.lastCall('library:query-songs')).resolves.toBeDefined()
+    })
+
+    test('marks a track whose file carries no number rather than inventing one', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .albumDetail(createAlbumDetail())
+            .songs([
+                createSongRow({ id: 'song-1', title: 'Dawn', trackNumber: null }),
+                createSongRow({ id: 'song-2', title: 'Noon', trackNumber: 2 }),
+            ])
+            .build()
+        await openDetail(page, scenario)
+        await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()
+
+        await expect(trackNumbersByTitle(page)).resolves.toEqual([
+            ['Dawn', '—'],
+            ['Noon', '2'],
+        ])
+        // And it says so, rather than leaving a bare dash for a screen reader to read out
+        // as whatever a dash is.
+        await expect(page.getByRole('gridcell', { name: 'No track number' })).toBeVisible()
     })
 
     test('leaves out the album column, which the header above the table already says', async ({ page }) => {

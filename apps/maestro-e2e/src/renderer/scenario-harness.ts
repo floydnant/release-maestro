@@ -402,6 +402,7 @@ export const createSongRow = (overrides: Partial<SongRow> = {}): SongRow => {
         artistCredit: artistText ? [{ artistId: 'artist-1', creditedAs: artistText, joinPhrase: '' }] : [],
         albumId: 'album-1',
         albumTitle: 'Daybreak',
+        trackNumber: 1,
         genreText: 'Ambient',
         genres: [{ id: 'genre-1', name: 'Ambient' }],
         recordLabelId: 'label-1',
@@ -535,18 +536,22 @@ export const rendererScenarios = {
         detail: () =>
             scenarioBuilder()
                 .albumDetail(createAlbumDetail())
+                // Numbered against the *order they are served in*, so a page that showed
+                // a row's position instead of its tag would read 1, 2 and pass anyway.
                 .songs([
                     createSongRow({
                         id: 'song-1',
                         title: 'Dawn',
                         albumId: 'album-1',
                         albumTitle: 'Daybreak',
+                        trackNumber: 2,
                     }),
                     createSongRow({
                         id: 'song-2',
                         title: 'Noon',
                         albumId: 'album-1',
                         albumTitle: 'Daybreak',
+                        trackNumber: 1,
                     }),
                 ])
                 .build(),

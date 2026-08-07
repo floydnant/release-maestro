@@ -197,6 +197,16 @@ export interface SongRow {
     artistCredit: ArtistCreditSegment[]
     albumId: string | null
     albumTitle: string | null
+    /**
+     * The song's position on its album, exactly as tagged; `null` when the file carries
+     * no track number.
+     *
+     * Never inferred. A row's position in a list is not a track number — on an album
+     * sorted by this very field, an untagged song's position is decided by the absence
+     * of the number, so presenting it as one would be circular. A surface that shows
+     * this renders the `null` as unknown rather than filling it in.
+     */
+    trackNumber: number | null
     genreText: string | null
     genres: CatalogEntityRef[]
     recordLabelId: string | null

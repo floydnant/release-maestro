@@ -81,6 +81,8 @@ export const ROW_HEIGHT = 40
  * that survives.
  */
 export const SONG_TABLE_COLUMN_WIDTHS = {
+    /** Wide enough for three digits inside its padding — a track number never needs more. */
+    trackNumber: 56,
     cover: 64,
     title: 256,
     artist: 208,
@@ -96,6 +98,28 @@ export const SONG_TABLE_COLUMN_WIDTHS = {
 
 /** One of the table's columns, named as {@link SONG_TABLE_COLUMN_WIDTHS} names it. */
 export type SongTableColumn = keyof typeof SONG_TABLE_COLUMN_WIDTHS
+
+/**
+ * What a surface shows unless it says otherwise: the whole library's worth of columns,
+ * minus `trackNumber`.
+ *
+ * A track number only means something inside one album. Down a list that spans the
+ * catalog it is a column of `1, 3, 1, 1, 2` — every record's opening track sharing a
+ * value with every other record's. So it is opt-in, and a surface that wants it says so.
+ */
+export const DEFAULT_SONG_TABLE_COLUMNS: readonly SongTableColumn[] = [
+    'cover',
+    'title',
+    'artist',
+    'album',
+    'genre',
+    'bpm',
+    'musicalKey',
+    'duration',
+    'year',
+    'recordLabel',
+    'dateAdded',
+]
 
 /** Rows fetched beyond the viewport on each side, so scrolling does not chase the data. */
 const OVERSCAN_ROWS = 20
@@ -139,14 +163,16 @@ export class SongTableComponent {
     query = input.required<SongQuery>()
     selection = model.required<SongSelectionState>()
     /**
-     * Columns the surface leaves out because its own chrome already says them — an
-     * album's tracks under an album header repeat one title down the whole column.
+     * The columns this surface shows, in place of {@link DEFAULT_SONG_TABLE_COLUMNS}.
      *
-     * A list rather than a flag per column, because slices 3–5 bring an artist, a record
-     * label and a genre page and each one suppresses its own; four booleans would say
-     * the same thing four times.
+     * A surface states its own set rather than subtracting from a fixed one, because the
+     * differences run both ways: an album page drops the album column its header already
+     * says, and adds the track number that only means something inside one record. The
+     * *order* is not this list's to decide — the markup is hand-written and fixed, and
+     * every surface reading its columns in the same order is what lets someone move
+     * between them without relearning the table.
      */
-    hiddenColumns = input<readonly SongTableColumn[]>([])
+    columns = input<readonly SongTableColumn[]>(DEFAULT_SONG_TABLE_COLUMNS)
 
     sortChange = output<SongSortField>()
     viewportChange = output<BrowseWindow>()
@@ -161,10 +187,10 @@ export class SongTableComponent {
     filterMissing = output<void>()
 
     protected readonly rowHeight = ROW_HEIGHT
-    protected readonly columns = SONG_TABLE_COLUMN_WIDTHS
+    protected readonly widths = SONG_TABLE_COLUMN_WIDTHS
 
-    /** Asked once per heading and once per cell, so it is a set rather than a scan. */
-    protected hidden = computed(() => new Set(this.hiddenColumns()))
+    /** Asked once per heading, so it is a set rather than a scan. */
+    protected shown = computed(() => new Set(this.columns()))
 
     private scroller = viewChild<ElementRef<HTMLElement>>('scroller')
     /**

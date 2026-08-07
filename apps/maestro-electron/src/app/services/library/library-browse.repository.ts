@@ -76,6 +76,7 @@ export class LibraryBrowseRepository {
                 artistCredit: creditsBySong.get(row.id) ?? [],
                 albumId: row.albumId,
                 albumTitle: row.albumTitle,
+                trackNumber: row.trackNumber,
                 genreText: row.genreText,
                 genres: genresBySong.get(row.id) ?? [],
                 recordLabelId: row.recordLabelId,
@@ -104,7 +105,7 @@ export class LibraryBrowseRepository {
     }
 
     /**
-     * The window's rows: 16 columns, the album left-join behind cover art and the
+     * The window's rows: 17 columns, the album left-join behind cover art and the
      * record label, and the filter's `WHERE`.
      *
      * The album join is `LEFT` on purpose — a song need not belong to one, and an
@@ -124,6 +125,7 @@ export class LibraryBrowseRepository {
                 artistText: songsTable.artistText,
                 albumId: songsTable.albumId,
                 albumTitle: songsTable.albumTitle,
+                trackNumber: songsTable.trackNumber,
                 genreText: songsTable.genreText,
                 recordLabelId: albumsTable.recordLabelId,
                 recordLabelText: songsTable.recordLabelText,

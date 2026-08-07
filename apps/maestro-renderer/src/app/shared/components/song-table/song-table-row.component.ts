@@ -6,6 +6,7 @@ import { fileUrl } from '../../utils/file-url.util'
 import { formatBpm, formatDateShort, formatDuration } from '../../utils/formatting.utils'
 import { IconComponent } from '../icon/icon.component'
 import {
+    DEFAULT_SONG_TABLE_COLUMNS,
     SONG_TABLE_COLUMN_WIDTHS,
     type EntityFilterKind,
     type EntityFilterRequest,
@@ -41,13 +42,13 @@ export class SongTableRowComponent {
     row = input.required<SongRow>()
     /** Only the empty-cover placeholder needs it — the row's own styling is the parent's. */
     selected = input.required<boolean>()
-    /** Passed straight down from the table, so a hidden column loses both its heading and its cells. */
-    hiddenColumns = input<readonly SongTableColumn[]>([])
+    /** Passed straight down from the table, so a column keeps its heading and its cells in step. */
+    columns = input<readonly SongTableColumn[]>(DEFAULT_SONG_TABLE_COLUMNS)
 
     /** Shared with the header, so a column has one width — see the constant. */
-    protected readonly columns = SONG_TABLE_COLUMN_WIDTHS
+    protected readonly widths = SONG_TABLE_COLUMN_WIDTHS
 
-    protected hidden = computed(() => new Set(this.hiddenColumns()))
+    protected shown = computed(() => new Set(this.columns()))
 
     entityFilter = output<EntityFilterRequest>()
     filterMissing = output<void>()

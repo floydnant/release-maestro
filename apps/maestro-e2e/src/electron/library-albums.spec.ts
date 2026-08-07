@@ -106,6 +106,12 @@ const albumTitles = (): Promise<string[]> =>
         .locator('[role="gridcell"] a')
         .evaluateAll(tiles => tiles.map(tile => tile.querySelector('span > span')?.textContent?.trim() ?? ''))
 
+/** The `#` cell of each track row, in render order. An em dash means the file carries none. */
+const trackNumbers = (): Promise<string[]> =>
+    page
+        .locator('[role="row"][aria-selected] .song-table__track-number')
+        .evaluateAll(cells => cells.map(cell => cell.textContent?.trim() ?? ''))
+
 /** Track titles in render order, from the SongTable's row labels (`<title> by <artist>`). */
 const trackTitles = (): Promise<string[]> =>
     page.getByRole('row').evaluateAll(rows =>
@@ -261,6 +267,10 @@ test('an album detail page lists its own tracks in album order', async ({}, test
     // names on purpose, so this ordering can only come from `trackNumber` — by path,
     // by title or by insertion order it would be Dawn first.
     await expect.poll(trackTitles).toEqual(['Noon', 'Dawn'])
+
+    // And the numbers themselves, off the `TRCK` frames the fixture wrote — the whole
+    // path from an ID3 tag to a cell, which only this layer runs.
+    await expect.poll(trackNumbers).toEqual(['1', '2'])
 
     // The header's facts are the album's own, summed and collected over its songs.
     // `exact` because the table also keeps an sr-only "0 of 2 tracks selected" status.

@@ -107,6 +107,14 @@ _Avoid_: `track` in any identifier; file, item, entry as synonyms for song
 **Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on an
 album, not a song. Do not "correct" it to `songNumber`.
 
+It is **always the tag and never a position in a list**. A file with no track number is `null`, and
+stays `null`: the one surface that shows the column — an album's track list — is sorted by this very
+field, so an untagged song's place in it is decided by the absence of the number, and printing that
+place as the number would be circular. On a half-tagged record it would also collide with a real one.
+Untagged reads as an em dash, labelled _No track number_ for assistive tech, which is a tagging gap
+the user can go and close. Multi-disc albums cannot be ordered correctly by this alone — there is no
+disc number in the system yet (MAE-123).
+
 **Album**:
 A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,
 `albumArtists`, an "Albums" tab, "12 albums". It is what music players call this, and it is what

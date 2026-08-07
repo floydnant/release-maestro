@@ -210,15 +210,33 @@ export class AlbumDetailComponent {
     protected trackCountLabel = computed(() => (this.result().total == 1 ? TRACK_LABEL : TRACKS_LABEL))
 
     /**
-     * The album column, left out here. The query is filtered to one album and the header
-     * above the table names it, so the column is the same title repeated down every row
-     * — 208px of width saying what the page already said. Its sort heading goes with it,
+     * This page's columns, which differ from the default in both directions.
+     *
+     * **The track number is in**, first, because this is the one list where it means
+     * something: every row is the same record, so the numbers are that record's running
+     * order rather than a column of unrelated positions.
+     *
+     * **The album is out.** The query is filtered to one album and the header above the
+     * table names it, so the column would be the same title repeated down every row —
+     * 208px of width saying what the page already said. Its sort heading goes with it,
      * which is no loss: sorting one album's tracks by album title orders nothing.
      *
      * A field rather than a literal in the template, so the binding is one stable
      * reference instead of a new array on every change detection pass.
      */
-    protected readonly hiddenColumns: readonly SongTableColumn[] = ['album']
+    protected readonly columns: readonly SongTableColumn[] = [
+        'trackNumber',
+        'cover',
+        'title',
+        'artist',
+        'genre',
+        'bpm',
+        'musicalKey',
+        'duration',
+        'year',
+        'recordLabel',
+        'dateAdded',
+    ]
 
     /**
      * Selection, on the same ADR 0004 rules as the track list: a refetch that change
