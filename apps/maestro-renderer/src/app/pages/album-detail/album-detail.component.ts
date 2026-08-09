@@ -207,7 +207,32 @@ export class AlbumDetailComponent {
 
     protected result = this.browse.result
 
-    protected trackCountLabel = computed(() => (this.result().total == 1 ? TRACK_LABEL : TRACKS_LABEL))
+    /**
+     * Whether the retained browse window can be shown beneath the current album header.
+     *
+     * `createBrowseQuery` deliberately keeps the previous rows while a new query loads.
+     * That is useful for a sort, scroll or scan refresh within one album, but same-route
+     * navigation changes the album id while reusing this component. Non-empty rows carry
+     * the identity needed to distinguish those cases. A retained empty result is current
+     * only when the live detail count also says this album is empty.
+     */
+    protected trackWindowMatchesAlbum = computed(() => {
+        const album = this.album()
+        if (!album) return false
+
+        const result = this.result()
+        if (result.rows.some(song => song.albumId != album.id)) return false
+        if (result.status == 'ready') return true
+
+        return result.loaded && (result.rows.length > 0 || (result.total == 0 && album.trackCount == 0))
+    })
+
+    /** Never let a retained window from the previous route supply the new header's count. */
+    protected headerTrackCount = computed(() =>
+        this.trackWindowMatchesAlbum() ? this.result().total : (this.album()?.trackCount ?? 0),
+    )
+
+    protected trackCountLabel = computed(() => (this.headerTrackCount() == 1 ? TRACK_LABEL : TRACKS_LABEL))
 
     /**
      * This page's columns, which differ from the default in both directions.

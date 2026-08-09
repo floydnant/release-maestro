@@ -555,7 +555,7 @@ export const rendererScenarios = {
                     }),
                 ])
                 .build(),
-        /** The album row exists but every file it had is gone — see the detail page's empty state. */
+        /** The album row remains after all its songs were re-keyed — see the detail page's empty state. */
         detailWithoutTracks: () =>
             scenarioBuilder()
                 .albumDetail(createAlbumDetail({ trackCount: 0 }))

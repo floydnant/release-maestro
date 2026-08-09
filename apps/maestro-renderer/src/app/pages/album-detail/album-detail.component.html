@@ -35,14 +35,14 @@
         @if (album(); as loadedAlbum) {
             <app-album-detail-header
                 [album]="loadedAlbum"
-                [trackCount]="result().total"
+                [trackCount]="headerTrackCount()"
                 [trackCountLabel]="trackCountLabel()"
             ></app-album-detail-header>
 
             <!-- The table's own error branch. The shell used to own this, and an album's
                  tracks failing while its header loaded fine is a state the header cannot
                  speak for. -->
-            @if (result().status === 'error' && !result().loaded) {
+            @if (result().status === 'error' && (!result().loaded || !trackWindowMatchesAlbum())) {
                 <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
                     <app-icon name="octXCircleFill" size="28" color="content.danger"></app-icon>
                     <p class="type-body-md text-content-primary">Could not load this album’s tracks</p>
@@ -51,14 +51,17 @@
                     </p>
                     <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
                 </div>
+            } @else if (!trackWindowMatchesAlbum()) {
+                <div class="flex flex-1 items-center justify-center p-8" role="status">
+                    <p class="type-body-sm text-content-secondary">Loading tracks…</p>
+                </div>
             } @else if (result().loaded && result().total === 0) {
-                <!-- Reachable: the album row exists because a file claimed it, and a
-                     later scan can find every one of those files gone. -->
+                <!-- Reachable when ingest re-keys every song to another album but the
+                     old album row remains. Missing songs still belong to their album. -->
                 <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-                    <p class="type-body-md text-content-primary">No tracks on this album</p>
+                    <p class="type-body-md text-content-primary">No tracks linked to this album</p>
                     <p class="type-body-sm max-w-md text-content-secondary">
-                        Every file the library had for this album is gone. It will come back on the next scan
-                        that reaches them.
+                        Their tags changed, so the library moved them to another album during a later scan.
                     </p>
                 </div>
             } @else {

@@ -737,6 +737,56 @@ test.describe('the album detail page', () => {
             .toEqual(['album-1'])
     })
 
+    test('does not show the previous album’s tracks during same-route navigation', async ({ page }) => {
+        const firstTrack = createSongRow({
+            id: 'song-first',
+            title: 'First album track',
+            albumId: 'album-1',
+            albumTitle: 'Daybreak',
+        })
+        const controller = await openDetail(
+            page,
+            scenarioBuilder().albumDetail(createAlbumDetail()).songs([firstTrack]).build(),
+        )
+        await expect(page.getByText('First album track', { exact: true })).toBeVisible()
+
+        const secondAlbum = createAlbumDetail({
+            id: 'album-2',
+            title: 'Afterglow',
+            trackCount: 1,
+        })
+        await controller.updateState({
+            'library:get-album-detail': { kind: 'resolve', value: secondAlbum },
+            'library:query-songs': { kind: 'pending' },
+        })
+
+        // This is the browser event Angular receives for back/forward navigation between
+        // two URLs handled by the same route config, where it reuses this component.
+        await page.evaluate(() => {
+            window.history.pushState(null, '', '/albums/album-2')
+            window.dispatchEvent(new PopStateEvent('popstate'))
+        })
+
+        await expect(page.getByRole('heading', { name: 'Afterglow', level: 1 })).toBeVisible()
+        await expect(page.getByText('First album track', { exact: true })).toBeHidden()
+        await expect(page.getByText('Loading tracks…')).toBeVisible()
+
+        await controller.resolveAllPending('library:query-songs', {
+            rows: [
+                createSongRow({
+                    id: 'song-second',
+                    title: 'Second album track',
+                    albumId: 'album-2',
+                    albumTitle: 'Afterglow',
+                }),
+            ],
+            offset: 0,
+            total: 1,
+        })
+
+        await expect(page.getByText('Second album track', { exact: true })).toBeVisible()
+    })
+
     test('numbers each track from its own tag, not from where it sits in the list', async ({ page }) => {
         const controller = await openDetail(page)
         await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()
@@ -824,12 +874,11 @@ test.describe('the album detail page', () => {
         await expect.poll(() => new URL(page.url()).pathname).toBe('/tracks')
     })
 
-    test('explains an album whose files have all gone, rather than showing an empty table', async ({
-        page,
-    }) => {
+    test('explains an orphaned album row rather than claiming its files are gone', async ({ page }) => {
         await openDetail(page, rendererScenarios.albums.detailWithoutTracks())
 
-        await expect(page.getByText('No tracks on this album')).toBeVisible()
+        await expect(page.getByText('No tracks linked to this album')).toBeVisible()
+        await expect(page.getByText(/moved them to another album/)).toBeVisible()
     })
 
     test('explains a link to an album that no longer exists', async ({ page }) => {
