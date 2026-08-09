@@ -414,7 +414,7 @@ export interface AlbumDetail {
     albumArtistText: string | null
     albumArtists: CatalogEntityRef[]
     year: number | null
-    /** The full release date as tagged, when there was one — `2019-03-01`, or `2019-03`. */
+    /** The full album date as tagged, when there was one — `2019-03-01`, or `2019-03`. */
     date: string | null
     catalogNumber: string | null
     recordLabelId: string | null

@@ -45,9 +45,9 @@
             <span class="tabular-nums">{{ duration() }}</span>
         }
 
-        @if (releaseDate()) {
+        @if (albumDate()) {
             <span aria-hidden="true">•</span>
-            <span class="tabular-nums">{{ releaseDate() }}</span>
+            <span class="tabular-nums">{{ albumDate() }}</span>
         }
 
         @if (album().recordLabelId && album().recordLabelText) {

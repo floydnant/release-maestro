@@ -27,9 +27,9 @@ export class AlbumDetailHeaderComponent {
     album = input.required<AlbumDetail>()
     /**
      * The track count the *table* is showing, which is the one the user can count on
-     * screen. `album().trackCount` is the write side's denormalized copy, and during a
-     * scan the two legitimately disagree for a moment — showing the table's keeps the
-     * header honest about what is actually below it.
+     * screen. `album().trackCount` is also a live count, but the detail and window
+     * requests settle independently during a scan — showing the table's keeps the header
+     * honest about what is actually below it.
      */
     trackCount = input.required<number>()
     trackCountLabel = input.required<string>()
@@ -46,7 +46,7 @@ export class AlbumDetailHeaderComponent {
     })
 
     /**
-     * The release date, preferring the full one the tag carried.
+     * The album date, preferring the full one the tag carried.
      *
      * `date` can legitimately be coarser than a day — `2019-03` — so it is shown
      * verbatim rather than parsed and reformatted, which would either invent a day or
@@ -54,7 +54,7 @@ export class AlbumDetailHeaderComponent {
      * year stands alone. Note that this exact difference splits an album in two on
      * ingest; see the `albumIdentityKey` caveat on the grid.
      */
-    protected releaseDate = computed(() => {
+    protected albumDate = computed(() => {
         const album = this.album()
         if (album.date) return album.date
         return album.year == null ? null : String(album.year)

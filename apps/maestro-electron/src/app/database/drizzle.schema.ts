@@ -156,11 +156,11 @@ export const albumsTable = sqliteTable(
         /**
          * When the album arrived: the newest `songs.created_at` across its songs.
          *
-         * Denormalized for the same reason as `track_count` and maintained in the same
-         * place — a `MAX` over the album's songs is an aggregate, and an `ORDER BY` that
-         * evaluates one per album cannot serve the first window without touching every
-         * record. Nullable because a song's `created_at` is, and an album whose files
-         * carry no creation time has no date to stand on.
+         * Denormalized because the grid orders by it: a `MAX` over the album's songs is
+         * an aggregate, and an `ORDER BY` that evaluates one per album cannot serve the
+         * first window without touching every record. Nullable because a song's
+         * `created_at` is, and an album whose files carry no creation time has no date to
+         * stand on.
          */
         dateAdded: integer('date_added', { mode: 'timestamp_ms' }),
     },

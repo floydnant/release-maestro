@@ -155,8 +155,8 @@ When something arrived in the collection. For a song it is the file's creation t
 (`songs.created_at`) — a stand-in until MAE-116 lands a real one, and the reason a file copied today
 reads as new while one moved with its timestamps intact does not. For an album it is the **newest**
 date added across its songs, so finishing a part-ripped record brings the whole thing back to the top
-rather than leaving it where its oldest track put it. A stored column on `albums` for the same reason
-track count is — the grid sorts by it, and it is the sort the grid _opens_ on. See
+rather than leaving it where its oldest track put it. Stored on `albums` because the grid sorts by it,
+and it is the sort the grid _opens_ on. See
 [ADR 0005](../../adr/0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md).
 
 Say **added** in copy — it is the column header on the track table and the sort option on the grid.
