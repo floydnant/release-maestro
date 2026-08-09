@@ -39,6 +39,11 @@ const lastSongQuery = async (
     return call?.payload as QuerySongsRequest | undefined
 }
 
+const required = <T>(value: T | undefined, message: string): T => {
+    if (value === undefined) throw new Error(message)
+    return value
+}
+
 const grid = (page: Page) => page.getByRole('grid', { name: 'Albums' })
 const tile = (page: Page, name: string) => page.getByRole('link', { name: new RegExp(`^${name}`) })
 
@@ -605,6 +610,38 @@ test.describe('keyboard', () => {
         await page.keyboard.press('ArrowDown')
 
         expect(await focusedIndex(page)).toBe(before + columns)
+    })
+
+    test('focuses a long-jump destination after its window renders', async ({ page }) => {
+        const total = 10_000
+        const controller = await openAlbums(page, scenarioBuilder().albumCatalog(page, total).build())
+        await expect(tile(page, 'Album 0')).toBeVisible()
+        await focusFirstTile(page)
+
+        // Keep the destination out of the DOM long enough to exercise the hand-off from
+        // keyboard movement to virtual-window rendering. Focusing only in the key handler
+        // leaves the old tile focused until that tile is removed, then loses focus entirely.
+        await controller.setHandler('library:query-albums', { kind: 'pending' })
+        await page.keyboard.press('End')
+        await expect.poll(async () => (await lastQuery(controller))?.window.offset).toBeGreaterThan(0)
+
+        const request = required(
+            await lastQuery(controller),
+            'The grid did not request the destination window',
+        )
+
+        const offset = Math.min(request.window.offset, total)
+        const count = Math.min(request.window.limit, total - offset)
+        await controller.resolveAllPending('library:query-albums', {
+            rows: Array.from({ length: count }, (_row, position) => {
+                const index = offset + position
+                return createAlbumRow({ id: `album-${index}`, title: `Album ${index}` })
+            }),
+            offset,
+            total,
+        })
+
+        await expect(tile(page, `Album ${total - 1}`)).toBeFocused()
     })
 
     test('opens the focused album on Enter, because a tile is a link', async ({ page }) => {

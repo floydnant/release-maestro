@@ -283,14 +283,17 @@ export class AlbumGridComponent {
     )
 
     /**
-     * The tile that currently has focus, which is where the next arrow key moves from.
+     * The tile that has focus, or the keyboard destination whose window is still loading.
      *
-     * Written by the tiles' own focus handler rather than inferred, so it always agrees
-     * with the document: a tile can take focus by being clicked or tabbed to as well as
-     * by being arrowed to, and a second copy of "where am I" that only movement updated
-     * would disagree with the focus ring the user can see.
+     * A tile's own focus handler keeps ordinary click and Tab movement in step with the
+     * document. A long keyboard jump writes the destination first, then
+     * {@link pendingFocusIndex} carries the one exceptional interval where that tile is
+     * not rendered yet.
      */
     protected focusedIndex = signal(NO_FOCUS)
+
+    /** A keyboard destination to focus as soon as its virtual window has rendered. */
+    private pendingFocusIndex = signal(NO_FOCUS)
 
     /**
      * The one tile in the tab order — a roving tabindex.
@@ -335,16 +338,22 @@ export class AlbumGridComponent {
             this.destroyRef.onDestroy(() => observer.disconnect())
         })
 
-        // The tile the geometry is read off only exists once there are rows to render, and
-        // a `ResizeObserver` on the scroller has nothing to say about rows arriving. The
-        // shell only creates this grid once a window has landed, so in practice there is
-        // always one — but a grid that came up empty and stayed hidden after its rows
-        // arrived is not a failure worth leaving to that. Once measured this is a read of
-        // one signal and a comparison.
+        // Rows arriving have two DOM-side consequences a `ResizeObserver` cannot handle:
+        // the first tile makes the grid measurable, and a virtual window can finally
+        // contain a keyboard destination that was not rendered when its key was pressed.
         afterRenderEffect(() => {
-            this.rows()
+            const rows = this.rows()
+            const offset = this.offset()
+            const pendingFocusIndex = this.pendingFocusIndex()
             untracked(() => {
                 if (this.chrome() == null) this.onResize()
+                if (
+                    pendingFocusIndex != NO_FOCUS &&
+                    pendingFocusIndex >= offset &&
+                    pendingFocusIndex < offset + rows.length
+                ) {
+                    this.focusRenderedTile(pendingFocusIndex)
+                }
             })
         })
 
@@ -357,6 +366,7 @@ export class AlbumGridComponent {
             untracked(() => {
                 this.lastWindow = null
                 this.focusedIndex.set(NO_FOCUS)
+                this.pendingFocusIndex.set(NO_FOCUS)
                 this.scroller()?.nativeElement?.scrollTo({ top: 0 })
             })
         })
@@ -491,6 +501,7 @@ export class AlbumGridComponent {
 
     protected onTileFocus(index: number): void {
         this.focusedIndex.set(index)
+        this.pendingFocusIndex.set(NO_FOCUS)
     }
 
     /**
@@ -571,12 +582,17 @@ export class AlbumGridComponent {
      */
     private moveFocusTo(index: number): void {
         this.focusedIndex.set(index)
+        this.pendingFocusIndex.set(index)
         this.scrollIndexIntoView(index)
         this.focusRenderedTile(index)
     }
 
     private focusRenderedTile(index: number): void {
-        document.getElementById(this.tileElementId(index))?.focus({ preventScroll: true })
+        const element = document.getElementById(this.tileElementId(index))
+        if (!element) return
+
+        element.focus({ preventScroll: true })
+        this.pendingFocusIndex.set(NO_FOCUS)
     }
 
     private scrollIndexIntoView(index: number): void {
