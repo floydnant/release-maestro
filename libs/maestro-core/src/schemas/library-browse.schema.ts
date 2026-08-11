@@ -254,7 +254,7 @@ export interface SongFilterDescription {
 
 /**
  * Sortable album columns, each backed by an index on `albums` (see the
- * `mae-119-album-browse-sort-indexes` migration).
+ * `mae-119-album-browse-read-model` and `album-date-added` migrations).
  *
  * Two of these are columns only because sorting needs them to be. `recordLabel` and
  * `dateAdded` read naturally as a join and an aggregate, and both are denormalized
@@ -263,7 +263,7 @@ export interface SongFilterDescription {
  * which is the one thing ADR 0004 exists to prevent. The write side maintains them;
  * see `LibraryBackendRepository`.
  *
- * **Track count is deliberately not sortable.** A grid ordered by how many tracks a
+ * **Song count is deliberately not sortable.** A grid ordered by how many tracks a
  * record has answers no question anyone asks of a music library, and being sortable
  * was the only reason it was ever a column — see ADR 0005. It is still shown on every
  * tile; it is counted per window now.
@@ -317,9 +317,11 @@ export interface AlbumQuery {
     filter: AlbumFilter
     sort: AlbumSort
     /**
-     * Free-text search across album title, album artist and record label. Goes through
-     * the same single seam as {@link SongQuery.search} — `LIKE '%…%'` today, one file
-     * to swap for FTS5.
+     * Free-text search across the album's own title, album artist, record label and
+     * catalogue number, plus the artists and genres of its songs — both attributes of the
+     * record that `albums` does not carry. Song *titles* are excluded; that search belongs
+     * on the track list. Goes through the same single seam as {@link SongQuery.search} —
+     * `LIKE '%…%'` today, one file to swap for FTS5.
      */
     search: string
 }
@@ -370,7 +372,7 @@ export interface AlbumRow {
      * {@link AlbumSortField}. The count is over the tiles on screen, not over the
      * catalog, which is what keeps it inside ADR 0004's budget.
      */
-    trackCount: number
+    songCount: number
 }
 
 export type AlbumWindowResult = BrowseWindowResult<AlbumRow>
@@ -419,7 +421,7 @@ export interface AlbumDetail {
     catalogNumber: string | null
     recordLabelId: string | null
     recordLabelText: string | null
-    trackCount: number
+    songCount: number
     /** Summed song durations in seconds; `null` when no song on the album has one. */
     totalDuration: number | null
     /** Distinct genres across the album's songs, for the header's genre line. */

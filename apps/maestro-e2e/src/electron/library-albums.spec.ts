@@ -13,10 +13,10 @@ import { buildTaggedLibrary, type TaggedTrackSpec } from '../fixtures/tagged-lib
  * maintains, the browse query, the grid — and come back out as the right records with
  * the right track counts.
  *
- * Three of the grid's sortable columns are denormalized onto `albums` rather than counted
- * or joined per query (`track_count`, `record_label_text`, `date_added`), so this is also
- * the only test that can catch the write side failing to keep them true: a repository unit
- * test seeds them, and a scale check only explains the plan.
+ * Two of the grid's sortable columns are denormalized onto `albums` rather than joined or
+ * aggregated per query (`record_label_text`, `date_added`), so this is also the only test
+ * that can catch the write side failing to keep them true: a repository unit test seeds
+ * them, and a scale check only explains the plan.
  */
 
 const workspaceRoot = join(__dirname, '../../../..')
