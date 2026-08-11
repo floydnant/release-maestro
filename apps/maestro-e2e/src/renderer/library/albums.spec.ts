@@ -95,7 +95,7 @@ test.describe('rendering a window', () => {
         await openAlbums(
             page,
             scenarioBuilder()
-                .albums([createAlbumRow({ trackCount: 1 })])
+                .albums([createAlbumRow({ songCount: 1 })])
                 .build(),
         )
 
@@ -753,7 +753,7 @@ test.describe('the album detail page', () => {
         const secondAlbum = createAlbumDetail({
             id: 'album-2',
             title: 'Afterglow',
-            trackCount: 1,
+            songCount: 1,
         })
         await controller.updateState({
             'library:get-album-detail': { kind: 'resolve', value: secondAlbum },

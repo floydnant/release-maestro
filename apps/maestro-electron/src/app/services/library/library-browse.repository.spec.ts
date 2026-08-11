@@ -568,7 +568,7 @@ describe('LibraryBrowseRepository', () => {
                 window: { offset: 0, limit: 10 },
             })
 
-            expect(result.rows.map(row => [row.title, row.trackCount])).toEqual([
+            expect(result.rows.map(row => [row.title, row.songCount])).toEqual([
                 ['Untrue', 2],
                 ['Selected Ambient Works', 1],
             ])
@@ -580,7 +580,7 @@ describe('LibraryBrowseRepository', () => {
                 window: { offset: 0, limit: 10 },
             })
 
-            expect(result.rows.map(row => row.trackCount)).toEqual([0, 0])
+            expect(result.rows.map(row => row.songCount)).toEqual([0, 0])
         })
 
         it('sorts by the denormalized record label', () => {
@@ -778,7 +778,7 @@ describe('LibraryBrowseRepository', () => {
                 coverPath: '/covers/untrue.png',
                 recordLabelId: 'label-hyperdub',
                 recordLabelText: 'Hyperdub',
-                trackCount: 2,
+                songCount: 2,
             })
         })
 

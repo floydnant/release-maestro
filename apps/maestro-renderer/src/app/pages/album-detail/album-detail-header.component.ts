@@ -27,12 +27,12 @@ export class AlbumDetailHeaderComponent {
     album = input.required<AlbumDetail>()
     /**
      * The track count the *table* is showing, which is the one the user can count on
-     * screen. `album().trackCount` is also a live count, but the detail and window
+     * screen. `album().songCount` is also a live count, but the detail and window
      * requests settle independently during a scan — showing the table's keeps the header
      * honest about what is actually below it.
      */
-    trackCount = input.required<number>()
-    trackCountLabel = input.required<string>()
+    songCount = input.required<number>()
+    songCountLabel = input.required<string>()
 
     protected readonly fileUrl = fileUrl
 

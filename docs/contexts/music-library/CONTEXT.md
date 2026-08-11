@@ -140,9 +140,12 @@ _Avoid_: artist (unqualified, on an album), primary artist, band
 
 Part of `albumIdentityKey`, so two files that disagree on it are two albums.
 
-**Track count**:
+**Song count** (code) / **track count** (user-facing copy):
 How many songs in the library belong to an album, missing ones included. It counts what the library
 _has_, not what the record was pressed with: an album ripped in part reads the part.
+
+It takes the ordinary split above rather than **Track number**'s exception: this counts songs, so
+`songCount` is what the rule asks for, while a tile still reads "9 tracks".
 
 Shown on every tile and in the detail header, and **not** something the grid can be ordered by — a
 library sorted by how many tracks a record has answers no question anyone asks of it. So it is a live

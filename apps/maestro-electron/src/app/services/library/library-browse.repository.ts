@@ -353,7 +353,7 @@ export class LibraryBrowseRepository {
         const rows = this.albumWindowQuery({ query, window }).all()
         const albumIds = rows.map(row => row.id)
         const artistsByAlbum = this.albumArtists(albumIds)
-        const trackCountByAlbum = this.albumTrackCounts(albumIds)
+        const songCountByAlbum = this.albumSongCounts(albumIds)
 
         return {
             rows: rows.map(row => ({
@@ -365,7 +365,7 @@ export class LibraryBrowseRepository {
                 year: row.year,
                 recordLabelId: row.recordLabelId,
                 recordLabelText: row.recordLabelText,
-                trackCount: trackCountByAlbum.get(row.id) ?? 0,
+                songCount: songCountByAlbum.get(row.id) ?? 0,
             })),
             offset,
             total,
@@ -414,7 +414,7 @@ export class LibraryBrowseRepository {
      * An album with no songs is absent from the result rather than present as zero;
      * the caller defaults it.
      */
-    private albumTrackCounts(albumIds: string[]): Map<string, number> {
+    private albumSongCounts(albumIds: string[]): Map<string, number> {
         if (albumIds.length == 0) return new Map()
 
         return new Map(
@@ -520,7 +520,7 @@ export class LibraryBrowseRepository {
         // aggregate now, and it was already going to walk `songs_album_id_idx` for the
         // duration.
         const totals = this.database.db
-            .select({ trackCount: count(), totalDuration: sum(songsTable.duration) })
+            .select({ songCount: count(), totalDuration: sum(songsTable.duration) })
             .from(songsTable)
             .where(eq(songsTable.albumId, albumId))
             .get()
@@ -545,7 +545,7 @@ export class LibraryBrowseRepository {
             catalogNumber: album.catalogNumber,
             recordLabelId: album.recordLabelId,
             recordLabelText: album.recordLabelText,
-            trackCount: totals?.trackCount ?? 0,
+            songCount: totals?.songCount ?? 0,
             // `sum` returns a string from SQLite's numeric affinity, and null when no
             // song on the album carries a duration at all.
             totalDuration: totals?.totalDuration == null ? null : Number(totals.totalDuration),

@@ -35,14 +35,14 @@
         @if (album(); as loadedAlbum) {
             <app-album-detail-header
                 [album]="loadedAlbum"
-                [trackCount]="headerTrackCount()"
-                [trackCountLabel]="trackCountLabel()"
+                [songCount]="headerSongCount()"
+                [songCountLabel]="songCountLabel()"
             ></app-album-detail-header>
 
             <!-- The table's own error branch. The shell used to own this, and an album's
                  tracks failing while its header loaded fine is a state the header cannot
                  speak for. -->
-            @if (result().status === 'error' && (!result().loaded || !trackWindowMatchesAlbum())) {
+            @if (result().status === 'error' && (!result().loaded || !songWindowMatchesAlbum())) {
                 <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
                     <app-icon name="octXCircleFill" size="28" color="content.danger"></app-icon>
                     <p class="type-body-md text-content-primary">Could not load this album’s tracks</p>
@@ -51,7 +51,7 @@
                     </p>
                     <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
                 </div>
-            } @else if (!trackWindowMatchesAlbum()) {
+            } @else if (!songWindowMatchesAlbum()) {
                 <div class="flex flex-1 items-center justify-center p-8" role="status">
                     <p class="type-body-sm text-content-secondary">Loading tracks…</p>
                 </div>

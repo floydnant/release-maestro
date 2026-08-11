@@ -473,7 +473,7 @@ export const createAlbumRow = (overrides: Partial<AlbumRow> = {}): AlbumRow => (
     year: 2019,
     recordLabelId: 'label-1',
     recordLabelText: 'Kosmische',
-    trackCount: 9,
+    songCount: 9,
     ...overrides,
 })
 
@@ -488,7 +488,7 @@ export const createAlbumRows = (): AlbumRow[] => [
         year: 2021,
         recordLabelId: 'label-2',
         recordLabelText: 'Hardwire',
-        trackCount: 12,
+        songCount: 12,
     }),
     createAlbumRow({
         id: 'album-3',
@@ -499,7 +499,7 @@ export const createAlbumRows = (): AlbumRow[] => [
         year: null,
         recordLabelId: null,
         recordLabelText: null,
-        trackCount: 1,
+        songCount: 1,
     }),
 ]
 
@@ -514,7 +514,7 @@ export const createAlbumDetail = (overrides: Partial<AlbumDetail> = {}): AlbumDe
     catalogNumber: 'KOS012',
     recordLabelId: 'label-1',
     recordLabelText: 'Kosmische',
-    trackCount: 2,
+    songCount: 2,
     totalDuration: 617,
     genres: [{ id: 'genre-1', name: 'Ambient' }],
     ...overrides,
@@ -558,7 +558,7 @@ export const rendererScenarios = {
         /** The album row remains after all its songs were re-keyed — see the detail page's empty state. */
         detailWithoutTracks: () =>
             scenarioBuilder()
-                .albumDetail(createAlbumDetail({ trackCount: 0 }))
+                .albumDetail(createAlbumDetail({ songCount: 0 }))
                 .songs([])
                 .build(),
         detailMissing: () => scenarioBuilder().albumDetail(null).build(),

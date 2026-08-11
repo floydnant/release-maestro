@@ -216,7 +216,7 @@ export class AlbumDetailComponent {
      * the identity needed to distinguish those cases. A retained empty result is current
      * only when the live detail count also says this album is empty.
      */
-    protected trackWindowMatchesAlbum = computed(() => {
+    protected songWindowMatchesAlbum = computed(() => {
         const album = this.album()
         if (!album) return false
 
@@ -224,15 +224,15 @@ export class AlbumDetailComponent {
         if (result.rows.some(song => song.albumId != album.id)) return false
         if (result.status == 'ready') return true
 
-        return result.loaded && (result.rows.length > 0 || (result.total == 0 && album.trackCount == 0))
+        return result.loaded && (result.rows.length > 0 || (result.total == 0 && album.songCount == 0))
     })
 
     /** Never let a retained window from the previous route supply the new header's count. */
-    protected headerTrackCount = computed(() =>
-        this.trackWindowMatchesAlbum() ? this.result().total : (this.album()?.trackCount ?? 0),
+    protected headerSongCount = computed(() =>
+        this.songWindowMatchesAlbum() ? this.result().total : (this.album()?.songCount ?? 0),
     )
 
-    protected trackCountLabel = computed(() => (this.headerTrackCount() == 1 ? TRACK_LABEL : TRACKS_LABEL))
+    protected songCountLabel = computed(() => (this.headerSongCount() == 1 ? TRACK_LABEL : TRACKS_LABEL))
 
     /**
      * This page's columns, which differ from the default in both directions.

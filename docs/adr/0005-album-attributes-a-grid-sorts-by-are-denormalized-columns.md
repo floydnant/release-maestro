@@ -11,7 +11,7 @@ recorded here rather than in an ADR of its own. It did raise the stakes: it is t
 sort, so a stale or unpopulated column is what every user sees on opening the page rather than
 something they have to go looking for.
 
-**Track count was a third such column and is not one any more.** The grid no longer offers it as a
+**Song count was a third such column (`track_count`) and is not one any more.** The grid no longer offers it as a
 sort — ordering a music library by how many tracks a record has answers no question anyone asks of it
 — and being sortable was the only thing that made it a column. The tiles and the detail header still
 show it, so it went back to being an aggregate; see the last consequence below for the form that takes
@@ -54,7 +54,7 @@ and the table on one screen would visibly contradict each other.
   E2E over a real scan, which is the only layer that runs ingest. `date_added` needs a fixture written
   with its albums **interleaved** to be asserted at all: with each album's files written in one run,
   `MAX` and `MIN` over its songs produce the same ordering.
-- **An attribute that is only displayed is aggregated after the window, not stored.** Track count is
+- **An attribute that is only displayed is aggregated after the window, not stored.** Song count is
   the worked example: `queryAlbums` runs one grouped `COUNT` over `songs_album_id_idx` for the album
   ids the window returned, and the detail page counts one album. That is not the option rejected
   above. The rejected one puts the aggregate inside the `ORDER BY`, where it has to be evaluated for
