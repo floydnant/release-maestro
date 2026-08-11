@@ -42,7 +42,7 @@ body {
 
 @layer components {
     a:not(:where([class*='btn'])) {
-        @apply cursor-default text-content-action hover:underline;
+        @apply cursor-default text-content-action underline;
         text-underline-offset: 0.18em;
     }
 
