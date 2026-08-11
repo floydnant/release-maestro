@@ -292,8 +292,17 @@ export class AlbumGridComponent {
      */
     protected focusedIndex = signal(NO_FOCUS)
 
-    /** A keyboard destination to focus as soon as its virtual window has rendered. */
-    private pendingFocusIndex = signal(NO_FOCUS)
+    /**
+     * A keyboard destination to focus as soon as its virtual window has rendered.
+     *
+     * A plain field rather than a signal, like {@link lastWindow} above it and for the
+     * same reason: no template reads it and nothing derives from it. It is a one-shot
+     * instruction from a key handler to the next render, and every state change that can
+     * satisfy it — a window arriving — is already a dependency of the effect that acts on
+     * it. As a signal it would additionally be a signal that effect both read and wrote,
+     * which is the shape `angular-patterns` warns about.
+     */
+    private pendingFocusIndex = NO_FOCUS
 
     /**
      * The one tile in the tab order — a roving tabindex.
@@ -344,15 +353,12 @@ export class AlbumGridComponent {
         afterRenderEffect(() => {
             const rows = this.rows()
             const offset = this.offset()
-            const pendingFocusIndex = this.pendingFocusIndex()
             untracked(() => {
                 if (this.chrome() == null) this.onResize()
-                if (
-                    pendingFocusIndex != NO_FOCUS &&
-                    pendingFocusIndex >= offset &&
-                    pendingFocusIndex < offset + rows.length
-                ) {
-                    this.focusRenderedTile(pendingFocusIndex)
+
+                const pending = this.pendingFocusIndex
+                if (pending != NO_FOCUS && pending >= offset && pending < offset + rows.length) {
+                    this.focusRenderedTile(pending)
                 }
             })
         })
@@ -366,7 +372,7 @@ export class AlbumGridComponent {
             untracked(() => {
                 this.lastWindow = null
                 this.focusedIndex.set(NO_FOCUS)
-                this.pendingFocusIndex.set(NO_FOCUS)
+                this.pendingFocusIndex = NO_FOCUS
                 this.scroller()?.nativeElement?.scrollTo({ top: 0 })
             })
         })
@@ -495,13 +501,13 @@ export class AlbumGridComponent {
     protected tileLabel(row: AlbumRow): string {
         const artist = row.albumArtistText ? ` by ${row.albumArtistText}` : ''
         const year = row.year == null ? '' : `, ${row.year}`
-        const tracks = `, ${row.trackCount} ${row.trackCount == 1 ? 'track' : 'tracks'}`
+        const tracks = `, ${row.songCount} ${row.songCount == 1 ? 'track' : 'tracks'}`
         return `${row.title}${artist}${year}${tracks}`
     }
 
     protected onTileFocus(index: number): void {
         this.focusedIndex.set(index)
-        this.pendingFocusIndex.set(NO_FOCUS)
+        this.pendingFocusIndex = NO_FOCUS
     }
 
     /**
@@ -582,7 +588,7 @@ export class AlbumGridComponent {
      */
     private moveFocusTo(index: number): void {
         this.focusedIndex.set(index)
-        this.pendingFocusIndex.set(index)
+        this.pendingFocusIndex = index
         this.scrollIndexIntoView(index)
         this.focusRenderedTile(index)
     }
@@ -592,7 +598,7 @@ export class AlbumGridComponent {
         if (!element) return
 
         element.focus({ preventScroll: true })
-        this.pendingFocusIndex.set(NO_FOCUS)
+        this.pendingFocusIndex = NO_FOCUS
     }
 
     private scrollIndexIntoView(index: number): void {
