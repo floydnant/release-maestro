@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { _electron as electron, ElectronApplication, Page } from 'playwright'
+import { ElectronApplication, Page } from 'playwright'
 import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
+import { launchReleaseMaestro } from './launch-release-maestro'
 
 /**
  * The track list over a real scan.
@@ -12,28 +13,6 @@ import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
  * ingest, SQLite, the browse query, the table — and come back out as the right
  * values in the right cells, sorted and filtered by real SQL.
  */
-
-const workspaceRoot = join(__dirname, '../../../..')
-const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
-
-const cleanEnv = (): Record<string, string> => {
-    const env = Object.fromEntries(
-        Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] == 'string'),
-    )
-    delete env.ELECTRON_RUN_AS_NODE
-    return env
-}
-
-const launchReleaseMaestro = async (appDataDir: string): Promise<ElectronApplication> =>
-    electron.launch({
-        args: [electronMainPath],
-        cwd: workspaceRoot,
-        env: {
-            ...cleanEnv(),
-            ELECTRON_IS_DEV: '1',
-            RELEASE_MAESTRO_APP_DATA_DIR: appDataDir,
-        },
-    })
 
 const stubFolderPicker = (app: ElectronApplication, directory: string): Promise<void> =>
     app.evaluate(({ dialog }, dir) => {

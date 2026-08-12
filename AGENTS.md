@@ -43,6 +43,8 @@ intentional convenience summaries.
 - `make sure` formats, lints, builds, unit-tests, and runs renderer E2E. It mutates formatting.
   Full Electron E2E is intentionally separate (`make e2e`) because it repeatedly opens the app;
   run it when the changed user journey warrants the disruption.
+- `make e2e-production` packages the app for the host OS and runs the production-compatible Electron
+  suite. Use it for file-URL, lazy-loading, packaging, and cross-platform behavior.
 - `make affected` runs build, lint, unit tests, and both E2E targets for affected projects. It does
   not check or mutate formatting.
 - Never use `npm run` scripts.

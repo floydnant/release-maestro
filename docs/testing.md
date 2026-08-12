@@ -62,6 +62,7 @@ Repo-wide, through `make`:
 ```bash
 make test
 make e2e
+make e2e-production
 make e2e-renderer
 make lint
 make format-check
@@ -73,6 +74,13 @@ make affected      # build, lint, unit/E2E tests for affected projects; no forma
 repeatedly opens and closes the desktop app; run it when the changed user journey needs the real
 Electron, IPC, filesystem, database, or sidecar integration. `make affected` includes it when the
 affected-project graph selects the E2E project.
+
+`make e2e-production` packages the application and runs the production-compatible Electron specs
+against that app. It excludes the debug-console spec because that route is development-only. Use it
+for production-only behavior such as file-URL routing, lazy chunks, and packaging. The package target
+is cached, so unchanged inputs reuse the existing app bundle. The launcher resolves electron-builder's
+unpacked application layout for macOS, Windows, or Linux; CI runs this suite on all three operating
+systems.
 
 One project at a time, straight to nx:
 

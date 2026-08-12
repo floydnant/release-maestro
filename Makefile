@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-renderer e2e-show-report typecheck-e2e lint format f format-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -41,7 +41,7 @@ generate-icons: ## Generate app icon variants from app-icon.png
 package: ## Build and package as distributable (DMG/zip)
 	npx nx make maestro-electron
 package-dir: ## Build and package (directory only, no installer)
-	npx nx make maestro-electron --prepackageOnly
+	npx nx package maestro-electron
 run-packaged: package-dir ## Run the packaged app (macOS) and keep terminal attached for logs
 	dist/packages/mac-arm64/Release\ Maestro.app/Contents/MacOS/Release\ Maestro
 open-dmg: ## Open the generated DMG file (macOS)
@@ -77,6 +77,8 @@ test-engine: ## Run metadata-engine (Rust) tests
 
 e2e: ## Run full Electron end-to-end tests
 	npx nx run maestro-e2e:e2e
+e2e-production: package-dir ## Package and run Electron end-to-end tests for the current OS
+	npx nx run maestro-e2e:e2e-production
 e2e-renderer: ## Run renderer only end-to-end tests
 	npx nx run maestro-e2e:e2e-renderer
 e2e-show-report: ## Show the latest e2e test report

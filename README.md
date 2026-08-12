@@ -45,6 +45,7 @@ make sure          # format, lint, build, unit test, renderer E2E
 make affected      # build, lint, unit/E2E tests for affected projects; no formatting
 make format-check  # non-mutating formatting check
 make e2e           # opt-in full Electron E2E; repeatedly opens the desktop app
+make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
 ```
 

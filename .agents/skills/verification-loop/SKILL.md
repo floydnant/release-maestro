@@ -36,6 +36,8 @@ description: Verification loop using repository make targets.
 - `make e2e` — full Electron E2E. Run intentionally when the changed journey needs it: the suite
   repeatedly opens and closes the desktop app, so it is deliberately excluded from `make sure`.
   Both E2E suites type-check themselves first via their project's `typecheck` target.
+- `make e2e-production` — package the app for the host OS and run the production-compatible Electron
+  suite. Use it for file-URL routing, lazy chunks, packaging-only, and cross-platform behavior.
 - `make build-prod` — catches production-only build issues.
 - **A project's type gate is its `build`, unless it has no build.** Projects that compile — the
   renderer, electron, core — are type-checked by `npx nx build <project>`, `make build`, or

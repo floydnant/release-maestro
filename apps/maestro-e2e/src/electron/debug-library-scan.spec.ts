@@ -1,30 +1,10 @@
 import { expect, test, TestInfo } from '@playwright/test'
-import { _electron as electron, ElectronApplication, Page } from 'playwright'
+import { ElectronApplication, Page } from 'playwright'
 import { cp, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import { launchReleaseMaestro, workspaceRoot } from './launch-release-maestro'
 
-const workspaceRoot = join(__dirname, '../../../..')
-const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
 const sourceFixturePath = join(workspaceRoot, 'fixtures/06-karasu-ktmp3.mp3')
-
-const cleanEnv = (): Record<string, string> => {
-    const env = Object.fromEntries(
-        Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] == 'string'),
-    )
-    delete env.ELECTRON_RUN_AS_NODE
-    return env
-}
-
-const launchReleaseMaestro = async (appDataDir: string): Promise<ElectronApplication> =>
-    electron.launch({
-        args: [electronMainPath],
-        cwd: workspaceRoot,
-        env: {
-            ...cleanEnv(),
-            ELECTRON_IS_DEV: '1',
-            RELEASE_MAESTRO_APP_DATA_DIR: appDataDir,
-        },
-    })
 
 const openDebugConsole = async (page: Page): Promise<void> => {
     await expect(page).toHaveTitle(/Release Maestro/)
