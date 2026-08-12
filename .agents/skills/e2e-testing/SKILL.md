@@ -17,7 +17,9 @@ description: Playwright E2E readiness and test authoring guidance.
 - use web-first assertions (`await expect(locator).toBeVisible()`), avoid manual `isVisible()` checks
 - keep specs focused on critical user journeys and route-level navigation
 - use soft assertions only for known prototype gaps that should not block signal
-- keep traces/screenshots on failure and use trace viewer for CI/local debugging
+- use trace viewer for CI/local debugging. Electron contexts are traced explicitly by
+  `launch-release-maestro.ts`; do not add diagnostic `page.screenshot()` calls to Electron specs,
+  because hidden-window capture can hang on Windows
 - iterate on one spec or test title when useful, then widen to the relevant suite before handoff;
   use the target-specific commands in `docs/testing.md#fast-iteration`
 - all suites type-check before they run (`maestro-e2e:e2e`, `:e2e-production`, and `:e2e-renderer`

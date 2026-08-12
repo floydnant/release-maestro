@@ -14,8 +14,5 @@ export default defineConfig({
     expect: {
         timeout: 20_000,
     },
-    use: {
-        trace: 'retain-on-failure-and-retries',
-    },
     outputDir: `${workspaceRoot}/dist/.playwright/maestro-e2e-production/test-output`,
 })

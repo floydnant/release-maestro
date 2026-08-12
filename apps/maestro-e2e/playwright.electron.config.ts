@@ -11,9 +11,6 @@ export default defineConfig({
     expect: {
         timeout: 20_000,
     },
-    use: {
-        trace: 'retain-on-failure-and-retries',
-    },
     webServer: {
         command: 'npx nx serve maestro-renderer --port 4200',
         url: 'http://localhost:4200',

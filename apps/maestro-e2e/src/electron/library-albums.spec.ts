@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type TestInfo } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { ElectronApplication, Page } from 'playwright'
 import { buildTaggedLibrary, type TaggedTrackSpec } from '../fixtures/tagged-library.fixture'
@@ -38,11 +38,12 @@ test.afterEach(async () => {
 
 /** Onboard through a real scan of a library folder and land in the app. */
 const onboardAndScan = async (
+    testInfo: TestInfo,
     appDataDir: string,
     libraryDir: string,
     importedTracks: string,
 ): Promise<void> => {
-    electronApp = await launchReleaseMaestro(appDataDir)
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
 
     await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
@@ -62,8 +63,12 @@ const openAlbums = async (): Promise<void> => {
 }
 
 /** Onboard through a real scan of the tagged fixture and land on `/albums`, in title order. */
-const scanAndOpenAlbums = async (appDataDir: string, libraryDir: string): Promise<void> => {
-    await onboardAndScan(appDataDir, libraryDir, '6')
+const scanAndOpenAlbums = async (
+    testInfo: TestInfo,
+    appDataDir: string,
+    libraryDir: string,
+): Promise<void> => {
+    await onboardAndScan(testInfo, appDataDir, libraryDir, '6')
     await openAlbums()
 
     // Off the default and onto title order, so everything downstream has a stable one to
@@ -104,7 +109,7 @@ test('a scanned library becomes a browsable, sortable albums grid', async ({}, t
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    await scanAndOpenAlbums(appDataDir, libraryDir)
+    await scanAndOpenAlbums(testInfo, appDataDir, libraryDir)
 
     // Six tracks grouped into the fixture's four albums by `albumIdentityKey`.
     await expect(
@@ -127,8 +132,6 @@ test('a scanned library becomes a browsable, sortable albums grid', async ({}, t
     await expect
         .poll(async () => daybreak.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
         .toBeGreaterThan(0)
-    await page.screenshot({ path: testInfo.outputPath('albums-grid.png') })
-
     // Sorting runs in SQL, off the indexes the migration added.
     await page.getByLabel('Sort by').selectOption('year')
     await expect.poll(albumTitles).toEqual(['Filaments', 'Afterglow', 'Daybreak', 'Undertow'])
@@ -190,7 +193,7 @@ test('the grid opens on the album whose newest track arrived last', async ({}, t
     // This is the one test here that leans on them; see `scanAndOpenAlbums`.
     const libraryDir = await buildTaggedLibrary(testInfo, INTERLEAVED_LIBRARY)
 
-    await onboardAndScan(appDataDir, libraryDir, '3')
+    await onboardAndScan(testInfo, appDataDir, libraryDir, '3')
     await openAlbums()
 
     // No sort was chosen — this is the default, and it is `albums.date_added`, which
@@ -208,7 +211,7 @@ test('searching and filtering an albums grid runs against real SQL', async ({}, 
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    await scanAndOpenAlbums(appDataDir, libraryDir)
+    await scanAndOpenAlbums(testInfo, appDataDir, libraryDir)
     await expect.poll(albumTitles).toEqual(['Afterglow', 'Daybreak', 'Filaments', 'Undertow'])
 
     // Search reaches the album's title, its artist and its record label.
@@ -240,7 +243,7 @@ test('an album detail page lists its own tracks in album order', async ({}, test
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    await scanAndOpenAlbums(appDataDir, libraryDir)
+    await scanAndOpenAlbums(testInfo, appDataDir, libraryDir)
     await expect.poll(albumTitles).toEqual(['Afterglow', 'Daybreak', 'Filaments', 'Undertow'])
 
     await page.getByRole('link', { name: /^Daybreak/ }).click()
@@ -262,8 +265,6 @@ test('an album detail page lists its own tracks in album order', async ({}, test
     // `exact` because the table also keeps an sr-only "0 of 2 tracks selected" status.
     await expect(page.getByText('2 tracks', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Ambient' })).toBeVisible()
-    await page.screenshot({ path: testInfo.outputPath('album-detail.png') })
-
     // A column heading re-sorts the album's tracks rather than sitting inert.
     await page.getByRole('button', { name: 'Sort by Title' }).click()
     await expect.poll(trackTitles).toEqual(['Dawn', 'Noon'])
@@ -274,7 +275,7 @@ test('an album detail page links out to its artist and record label', async ({},
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    await scanAndOpenAlbums(appDataDir, libraryDir)
+    await scanAndOpenAlbums(testInfo, appDataDir, libraryDir)
     await page.getByRole('link', { name: /^Daybreak/ }).click()
     await expect(page.getByRole('heading', { name: 'Daybreak', level: 1 })).toBeVisible()
 
@@ -295,7 +296,7 @@ test('the track list reaches an album detail page through its album cell', async
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    await onboardAndScan(appDataDir, libraryDir, '6')
+    await onboardAndScan(testInfo, appDataDir, libraryDir, '6')
 
     await page.getByRole('link', { name: 'Tracks' }).click()
     await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()

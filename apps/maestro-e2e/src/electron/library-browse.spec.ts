@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type TestInfo } from '@playwright/test'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ElectronApplication, Page } from 'playwright'
@@ -32,8 +32,12 @@ test.afterEach(async () => {
 })
 
 /** Onboard through a real scan of the tagged fixture and land on `/tracks`. */
-const scanAndOpenTracks = async (appDataDir: string, libraryDir: string): Promise<void> => {
-    electronApp = await launchReleaseMaestro(appDataDir)
+const scanAndOpenTracks = async (
+    testInfo: TestInfo,
+    appDataDir: string,
+    libraryDir: string,
+): Promise<void> => {
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
 
     await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
@@ -71,7 +75,7 @@ test('a scanned library is browsable, sortable and filterable end to end', async
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    await scanAndOpenTracks(appDataDir, libraryDir)
+    await scanAndOpenTracks(testInfo, appDataDir, libraryDir)
 
     // Every scanned track is counted, and the tags made it through intact.
     await expect(
@@ -91,8 +95,6 @@ test('a scanned library is browsable, sortable and filterable end to end', async
     await expect
         .poll(async () => dawn.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
         .toBeGreaterThan(0)
-    await page.screenshot({ path: testInfo.outputPath('tracks-list.png') })
-
     // A two-name credit is one artist entity today (MAE-97 owns splitting), and the
     // table prints the tag verbatim rather than inventing a separator.
     await expect(
@@ -115,7 +117,7 @@ test('search and entity filters narrow a real library', async ({}, testInfo) => 
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    await scanAndOpenTracks(appDataDir, libraryDir)
+    await scanAndOpenTracks(testInfo, appDataDir, libraryDir)
 
     // Search reaches title, artist, album and record label alike.
     await page.getByRole('searchbox', { name: 'Search tracks' }).fill('afterglow')
@@ -155,7 +157,7 @@ test('a filter that matches nothing says so instead of looking empty', async ({}
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    await scanAndOpenTracks(appDataDir, libraryDir)
+    await scanAndOpenTracks(testInfo, appDataDir, libraryDir)
 
     await page.getByRole('searchbox', { name: 'Search tracks' }).fill('no such track exists')
 
@@ -172,7 +174,7 @@ test('tracks whose files went away stay listed, marked, and can be scoped to', a
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    await scanAndOpenTracks(appDataDir, libraryDir)
+    await scanAndOpenTracks(testInfo, appDataDir, libraryDir)
     await expect(
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '6 tracks' }),
     ).toBeVisible()
@@ -183,7 +185,7 @@ test('tracks whose files went away stay listed, marked, and can be scoped to', a
     await rm(join(libraryDir, '05-tide.mp3'))
     await rm(join(libraryDir, '06-gleam.mp3'))
 
-    electronApp = await launchReleaseMaestro(appDataDir)
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
     await page.getByRole('link', { name: 'Settings' }).click()
     await page.getByRole('link', { name: 'Library', exact: true }).click()
@@ -201,8 +203,6 @@ test('tracks whose files went away stay listed, marked, and can be scoped to', a
         'aria-label',
         /missing/i,
     )
-    await page.screenshot({ path: testInfo.outputPath('tracks-missing.png') })
-
     // The badge on a missing row is the entry point to the availability filter — it
     // exists exactly when there is something to filter for.
     await page.getByRole('button', { name: 'Missing — show only missing tracks' }).first().click()

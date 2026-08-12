@@ -1,10 +1,12 @@
 import { access } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import type { TestInfo } from '@playwright/test'
 import { _electron as electron, ElectronApplication } from 'playwright'
 
 export const workspaceRoot = join(__dirname, '../../../..')
 
 const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
+const traceCounts = new WeakMap<TestInfo, number>()
 
 /** Resolve electron-builder's unpacked executable for the host OS and architecture. */
 export const resolvePackagedExecutablePath = (
@@ -48,7 +50,10 @@ const cleanEnv = (): Record<string, string> => {
 }
 
 /** Launch the compiled development app, or the packaged app under the production Playwright config. */
-export const launchReleaseMaestro = async (appDataDir: string): Promise<ElectronApplication> => {
+export const launchReleaseMaestro = async (
+    appDataDir: string,
+    testInfo: TestInfo,
+): Promise<ElectronApplication> => {
     const packaged = process.env['MAESTRO_E2E_PACKAGED'] === '1'
     const configuredExecutablePath = process.env['MAESTRO_E2E_EXECUTABLE_PATH']
     const executablePath = configuredExecutablePath
@@ -63,7 +68,7 @@ export const launchReleaseMaestro = async (appDataDir: string): Promise<Electron
         })
     }
 
-    return electron.launch({
+    const app = await electron.launch({
         ...(packaged ? { executablePath } : { args: [electronMainPath] }),
         cwd: workspaceRoot,
         env: {
@@ -73,4 +78,40 @@ export const launchReleaseMaestro = async (appDataDir: string): Promise<Electron
             RELEASE_MAESTRO_E2E_BACKGROUND: process.env['RELEASE_MAESTRO_E2E_BACKGROUND'] ?? '1',
         },
     })
+
+    const traceIndex = traceCounts.get(testInfo) ?? 0
+    traceCounts.set(testInfo, traceIndex + 1)
+    const traceSuffix = traceIndex === 0 ? '' : `-${traceIndex + 1}`
+    const tracePath = testInfo.outputPath(`trace${traceSuffix}.zip`)
+    const originalClose = app.close.bind(app)
+    let closed = false
+
+    await app.context().tracing.start({
+        screenshots: true,
+        snapshots: true,
+        sources: true,
+        title: testInfo.title,
+    })
+
+    Object.defineProperty(app, 'close', {
+        configurable: true,
+        value: async (): Promise<void> => {
+            if (closed) return
+            closed = true
+
+            let traceError: unknown
+            try {
+                await app.context().tracing.stop({ path: tracePath })
+                await testInfo.attach('trace', { path: tracePath, contentType: 'application/zip' })
+            } catch (error) {
+                traceError = error
+            } finally {
+                await originalClose()
+            }
+
+            if (traceError) throw traceError
+        },
+    })
+
+    return app
 }
