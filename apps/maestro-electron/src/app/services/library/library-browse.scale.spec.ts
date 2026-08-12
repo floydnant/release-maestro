@@ -1,7 +1,11 @@
 import {
+    AlbumSortField,
+    emptyAlbumQuery,
     emptySongQuery,
     SongPresence,
     SongSortField,
+    type AlbumQuery,
+    type AlbumSort,
     type SongQuery,
     type SongSort,
 } from '@release-maestro/core'
@@ -12,7 +16,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
-import { songsTable } from '../../database/drizzle.schema'
+import { albumsTable, songsTable } from '../../database/drizzle.schema'
 import { LibraryBrowseRepository } from './library-browse.repository'
 
 /**
@@ -41,6 +45,26 @@ const SONG_COUNT = 50_000
 /** Deep enough that a table scan cannot fake it, and where a deep OFFSET actually hurts. */
 const DEEP_OFFSET = 45_000
 
+/**
+ * Albums are seeded fewer than songs because that is the real ratio — a 50k-song
+ * library is on the order of 5k records — and the plan assertion does not get sharper
+ * with more rows, only slower.
+ */
+const ALBUM_COUNT = 20_000
+const DEEP_ALBUM_OFFSET = 18_000
+
+/**
+ * Songs hung off those albums, because album *search* reaches through them: the track
+ * artists and genres of an album's own songs are searchable, and that predicate is a
+ * correlated subquery run per candidate album. Without songs in the table there would
+ * be nothing to assert it against.
+ *
+ * Thinner than a real record deliberately — every row here is seed time, and a thin
+ * table is the conservative direction for the assertion this supports: the more songs
+ * an album has, the *more* attractive the index seek the plan is checked for becomes.
+ */
+const SONGS_PER_ALBUM = 2
+
 const migrationsFolderCandidates = [
     join(process.cwd(), 'drizzle'),
     join(__dirname, '../../../../../../drizzle'),
@@ -55,6 +79,9 @@ if (!migrationsFolder) {
 const KEYS = ['1A', '4A', '8A', '9A', '11B', '12B']
 const GENRES = ['UK Garage', 'Dubstep', 'Ambient', 'Techno', 'Jungle']
 const LABELS = ['Hyperdub', 'Warp', 'Ninja Tune', 'Text', 'R&S']
+
+const DAY_MS = 24 * 60 * 60 * 1_000
+const ADDED_EPOCH_MS = Date.UTC(2024, 0, 1)
 
 describe('LibraryBrowseRepository at library scale', () => {
     let sqlite: Database.Database
@@ -189,5 +216,169 @@ describe('LibraryBrowseRepository at library scale', () => {
         expect(result.total).toBeGreaterThan(0)
         expect(result.rows.length).toBeLessThanOrEqual(50)
         expect(result.rows.length).toBeLessThanOrEqual(result.total)
+    })
+})
+
+/**
+ * The same check for the albums grid (MAE-119).
+ *
+ * Two of its sorts are the reason this exists. `recordLabel` and `dateAdded` read
+ * naturally as a join and an aggregate, and both are denormalized onto `albums`
+ * precisely so the ordering can come from an index — an assertion no correctness test
+ * can make, because aggregating live returns identical rows.
+ */
+describe('LibraryBrowseRepository albums at library scale', () => {
+    let sqlite: Database.Database
+    let db: ReturnType<typeof drizzle<typeof schema>>
+    let repository: LibraryBrowseRepository
+
+    const queryPlan = (query: AlbumQuery): string => {
+        const { sql, params } = repository.albumWindowSql({
+            query,
+            window: { offset: DEEP_ALBUM_OFFSET, limit: 100 },
+        })
+
+        const rows = sqlite.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as { detail: string }[]
+        return rows.map(row => row.detail).join('\n')
+    }
+
+    beforeAll(() => {
+        sqlite = new Database(':memory:')
+        sqlite.pragma('foreign_keys = ON')
+        db = drizzle(sqlite, { schema })
+        migrate(db, { migrationsFolder })
+
+        const rows: (typeof albumsTable.$inferInsert)[] = Array.from(
+            { length: ALBUM_COUNT },
+            (_row, index) => {
+                const id = `album-${index.toString().padStart(6, '0')}`
+                return {
+                    id,
+                    identityKey: `identity-${index}`,
+                    // Shuffled against the id, so nothing sorts in insertion order by luck.
+                    title: `Album ${(index * 7919) % ALBUM_COUNT}`,
+                    artistText: `Artist ${index % 2_000}`,
+                    year: 1990 + (index % 36),
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    recordLabelText: LABELS[index % LABELS.length]!,
+                    // Shuffled like the title, and coarse enough that the deep window
+                    // lands inside a run of albums added on the same day — plenty of
+                    // ties, so the id tiebreaker matters.
+                    dateAdded: new Date(ADDED_EPOCH_MS + ((index * 7919) % 400) * DAY_MS),
+                } satisfies typeof albumsTable.$inferInsert
+            },
+        )
+
+        db.transaction(tx => {
+            for (let start = 0; start < rows.length; start += 500) {
+                tx.insert(albumsTable)
+                    .values(rows.slice(start, start + 500))
+                    .run()
+            }
+        })
+
+        const songs: (typeof songsTable.$inferInsert)[] = Array.from(
+            { length: ALBUM_COUNT * SONGS_PER_ALBUM },
+            (_song, index) => {
+                const id = `album-song-${index.toString().padStart(6, '0')}`
+                const albumIndex = Math.floor(index / SONGS_PER_ALBUM)
+                return {
+                    id,
+                    path: `/music/${id}.flac`,
+                    fileName: `${id}.flac`,
+                    size: 1_024,
+                    modifiedAt: new Date(1_750_000_000_000),
+                    lastSeenAt: new Date(1_750_000_000_000),
+                    fileFingerprint: `fingerprint-${id}`,
+                    present: true,
+                    title: `Track ${index % SONGS_PER_ALBUM}`,
+                    albumId: `album-${albumIndex.toString().padStart(6, '0')}`,
+                    // The track artist differs from the album's own credit, which is the
+                    // case the search reaches for — a compilation nobody is credited on.
+                    artistText: `Track Artist ${index % 2_000}`,
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    genreText: GENRES[index % GENRES.length]!,
+                } satisfies typeof songsTable.$inferInsert
+            },
+        )
+
+        db.transaction(tx => {
+            for (let start = 0; start < songs.length; start += 500) {
+                tx.insert(songsTable)
+                    .values(songs.slice(start, start + 500))
+                    .run()
+            }
+        })
+        sqlite.exec('ANALYZE')
+
+        repository = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
+    })
+
+    afterAll(() => sqlite.close())
+
+    const albumSorts: AlbumSort[] = Object.values(AlbumSortField).flatMap(field => [
+        { field, direction: 'asc' as const },
+        { field, direction: 'desc' as const },
+    ])
+
+    it.each(albumSorts)('sorts by $field $direction from an index, not a temp B-tree', sort => {
+        const plan = queryPlan({ ...emptyAlbumQuery(), sort })
+
+        expect(plan).not.toMatch(/TEMP B-TREE/i)
+        expect(plan).toMatch(/USING (COVERING )?INDEX albums_/)
+    })
+
+    it.each(albumSorts)('serves a full deep window sorted by $field $direction', sort => {
+        const result = repository.queryAlbums({
+            query: { ...emptyAlbumQuery(), sort },
+            window: { offset: DEEP_ALBUM_OFFSET, limit: 100 },
+        })
+
+        expect(result.total).toBe(ALBUM_COUNT)
+        expect(result.rows).toHaveLength(100)
+    })
+
+    it('reaches the album’s songs through an index, not a scan per album', () => {
+        // Album search reaches through `songs` for the track artists and genres of an
+        // album's own songs, as a correlated subquery evaluated per candidate album.
+        // Seeking `songs_album_id_idx` is the whole reason that is affordable — a scan
+        // of `songs` per album would be albums × songs row visits, and every
+        // correctness test passes just as happily against it.
+        const plan = queryPlan({ ...emptyAlbumQuery(), search: 'Track Artist 42' })
+
+        // Either album_id-leading index will do; which one SQLite picks is its business
+        // and it has changed with the seed. What is being asserted is the seek.
+        expect(plan).toMatch(/SEARCH songs USING (COVERING )?INDEX songs_album_id\w* \(album_id=\?\)/)
+        expect(plan).not.toMatch(/SCAN songs/)
+        // The outer scan of `albums` is the accepted `LIKE '%…%'` cost (ADR 0004); what
+        // must not join it is the ordering falling back to a sort of every match.
+        expect(plan).not.toMatch(/TEMP B-TREE/i)
+    })
+
+    it('serves a searched album window without loading the matches into memory', () => {
+        const query: AlbumQuery = { ...emptyAlbumQuery(), search: 'Track Artist 42' }
+
+        const result = repository.queryAlbums({ query, window: { offset: 0, limit: 50 } })
+
+        expect(result.total).toBeGreaterThan(50)
+        expect(result.rows).toHaveLength(50)
+    })
+
+    it('keeps consecutive deep windows disjoint when sort values tie', () => {
+        // Date added has ~50 albums per value at this size and the window holds 100, so
+        // it necessarily spans tie groups — where an unstable ordering repeats rows.
+        const query: AlbumQuery = {
+            ...emptyAlbumQuery(),
+            sort: { field: AlbumSortField.dateAdded, direction: 'asc' },
+        }
+
+        const first = repository.queryAlbums({ query, window: { offset: DEEP_ALBUM_OFFSET, limit: 100 } })
+        const second = repository.queryAlbums({
+            query,
+            window: { offset: DEEP_ALBUM_OFFSET + 100, limit: 100 },
+        })
+
+        const ids = [...first.rows, ...second.rows].map(row => row.id)
+        expect(new Set(ids).size).toBe(200)
     })
 })

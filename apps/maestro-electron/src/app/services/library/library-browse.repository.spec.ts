@@ -1,4 +1,13 @@
-import { emptySongQuery, SongPresence, SongSortField, type SongQuery } from '@release-maestro/core'
+import {
+    AlbumSortField,
+    emptyAlbumQuery,
+    emptySongQuery,
+    SongPresence,
+    SongSortField,
+    type AlbumQuery,
+    type QueryAlbumsRequest,
+    type SongQuery,
+} from '@release-maestro/core'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
@@ -7,6 +16,7 @@ import { join } from 'path'
 import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
 import {
+    albumArtistsTable,
     albumsTable,
     artistsTable,
     genresTable,
@@ -45,6 +55,19 @@ type SongSeed = {
     coverPath?: string | null
 }
 
+type AlbumSeed = {
+    id: string
+    title: string
+    artistText?: string | null
+    year?: number | null
+    date?: string | null
+    catalogNumber?: string | null
+    coverPath?: string | null
+    recordLabelId?: string | null
+    recordLabelText?: string | null
+    dateAdded?: Date | null
+}
+
 describe('LibraryBrowseRepository', () => {
     let sqlite: Database.Database
     let db: ReturnType<typeof drizzle<typeof schema>>
@@ -77,7 +100,33 @@ describe('LibraryBrowseRepository', () => {
             .run()
     }
 
+    const seedAlbum = (seed: AlbumSeed) => {
+        db.insert(albumsTable)
+            .values({
+                id: seed.id,
+                identityKey: `identity-${seed.id}`,
+                title: seed.title,
+                artistText: seed.artistText ?? null,
+                year: seed.year ?? null,
+                date: seed.date ?? null,
+                catalogNumber: seed.catalogNumber ?? null,
+                coverPath: seed.coverPath ?? null,
+                recordLabelId: seed.recordLabelId ?? null,
+                recordLabelText: seed.recordLabelText ?? null,
+                dateAdded: seed.dateAdded ?? null,
+            })
+            .run()
+    }
+
     const query = (overrides: Partial<SongQuery> = {}): SongQuery => ({ ...emptySongQuery(), ...overrides })
+    const albumQuery = (overrides: Partial<AlbumQuery> = {}): AlbumQuery => ({
+        ...emptyAlbumQuery(),
+        ...overrides,
+    })
+    const albumSearch = (search: string): QueryAlbumsRequest => ({
+        query: albumQuery({ search }),
+        window: { offset: 0, limit: 10 },
+    })
     const titlesOf = (result: { rows: { title: string }[] }) => result.rows.map(row => row.title)
 
     beforeEach(() => {
@@ -429,6 +478,336 @@ describe('LibraryBrowseRepository', () => {
             const result = repository.querySongs({ query: query(), window: { offset: 0, limit: 10 } })
 
             expect(result.rows[0]?.coverPath).toBeNull()
+        })
+    })
+
+    // -----------------------------------------------------------------------
+    // Albums — MAE-119
+    // -----------------------------------------------------------------------
+
+    describe('queryAlbums', () => {
+        beforeEach(() => {
+            db.insert(artistsTable).values({ id: 'artist-burial', name: 'Burial' }).run()
+            db.insert(artistsTable).values({ id: 'artist-various', name: 'Various Artists' }).run()
+            db.insert(genresTable).values({ id: 'genre-garage', name: 'UK Garage' }).run()
+            db.insert(recordLabelsTable).values({ id: 'label-hyperdub', name: 'Hyperdub' }).run()
+            db.insert(recordLabelsTable).values({ id: 'label-warp', name: 'Warp' }).run()
+
+            seedAlbum({
+                id: 'album-untrue',
+                title: 'Untrue',
+                artistText: 'Burial',
+                year: 2007,
+                recordLabelId: 'label-hyperdub',
+                recordLabelText: 'Hyperdub',
+                dateAdded: new Date('2026-05-01T00:00:00Z'),
+            })
+            seedAlbum({
+                id: 'album-selected',
+                title: 'Selected Ambient Works',
+                artistText: 'Aphex Twin',
+                year: 1992,
+                recordLabelId: 'label-warp',
+                recordLabelText: 'Warp',
+                dateAdded: new Date('2026-02-01T00:00:00Z'),
+            })
+
+            db.insert(albumArtistsTable).values({ albumId: 'album-untrue', artistId: 'artist-burial' }).run()
+        })
+
+        it('returns a window of tiles and the total of the whole query', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery(),
+                window: { offset: 0, limit: 1 },
+            })
+
+            expect(result.rows).toHaveLength(1)
+            expect(result.total).toBe(2)
+        })
+
+        it('sorts by the newest addition by default, not alphabetically', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery(),
+                window: { offset: 0, limit: 10 },
+            })
+
+            // Newest first. It is also the reverse of alphabetical, so the old
+            // title-ascending default could not have produced it.
+            expect(titlesOf(result)).toEqual(['Untrue', 'Selected Ambient Works'])
+        })
+
+        it('sorts by the denormalized date added', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery({ sort: { field: AlbumSortField.dateAdded, direction: 'asc' } }),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(titlesOf(result)).toEqual(['Selected Ambient Works', 'Untrue'])
+        })
+
+        it('puts an album with no date at the bottom of the newest-first order', () => {
+            // Reachable: `songs.created_at` is nullable, so a record whose files carry
+            // no creation time has no date to stand on.
+            seedAlbum({ id: 'album-undated', title: 'Untitled Tape', dateAdded: null })
+
+            const result = repository.queryAlbums({
+                query: albumQuery(),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(titlesOf(result).at(-1)).toBe('Untitled Tape')
+        })
+
+        it('counts each tile’s tracks over the window rather than reading a stored column', () => {
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue' })
+            seedSong({ id: 'c', title: 'Xtal', albumId: 'album-selected' })
+
+            const result = repository.queryAlbums({
+                query: albumQuery(),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(result.rows.map(row => [row.title, row.songCount])).toEqual([
+                ['Untrue', 2],
+                ['Selected Ambient Works', 1],
+            ])
+        })
+
+        it('reports zero for an album no song points at any more', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery(),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(result.rows.map(row => row.songCount)).toEqual([0, 0])
+        })
+
+        it('sorts by the denormalized record label', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery({ sort: { field: AlbumSortField.recordLabel, direction: 'desc' } }),
+                window: { offset: 0, limit: 10 },
+            })
+
+            // Descending — Warp before Hyperdub — so this differs from the default order.
+            expect(titlesOf(result)).toEqual(['Selected Ambient Works', 'Untrue'])
+        })
+
+        it('matches album artists through the join table, not through artist text', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery({ filter: { albumArtistIds: ['artist-burial'] } }),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(titlesOf(result)).toEqual(['Untrue'])
+        })
+
+        it('counts an album once when it is credited to several of the selected artists', () => {
+            db.insert(albumArtistsTable)
+                .values({ albumId: 'album-untrue', artistId: 'artist-various', position: 1 })
+                .run()
+
+            const result = repository.queryAlbums({
+                query: albumQuery({ filter: { albumArtistIds: ['artist-burial', 'artist-various'] } }),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(result.total).toBe(1)
+            expect(result.rows).toHaveLength(1)
+        })
+
+        it('filters by record label entity', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery({ filter: { recordLabelIds: ['label-warp'] } }),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(titlesOf(result)).toEqual(['Selected Ambient Works'])
+        })
+
+        it('reaches a genre through the album’s songs', () => {
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            db.insert(songGenresTable).values({ songId: 'a', genreId: 'genre-garage' }).run()
+
+            const result = repository.queryAlbums({
+                query: albumQuery({ filter: { genreIds: ['genre-garage'] } }),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(titlesOf(result)).toEqual(['Untrue'])
+        })
+
+        it('counts an album once when several of its songs carry the selected genre', () => {
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue' })
+            db.insert(songGenresTable).values({ songId: 'a', genreId: 'genre-garage' }).run()
+            db.insert(songGenresTable).values({ songId: 'b', genreId: 'genre-garage' }).run()
+
+            const result = repository.queryAlbums({
+                query: albumQuery({ filter: { genreIds: ['genre-garage'] } }),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(result.total).toBe(1)
+        })
+
+        it('searches title, album artist and record label', () => {
+            expect(titlesOf(repository.queryAlbums(albumSearch('untr')))).toEqual(['Untrue'])
+            expect(titlesOf(repository.queryAlbums(albumSearch('aphex')))).toEqual(['Selected Ambient Works'])
+            expect(titlesOf(repository.queryAlbums(albumSearch('hyperdub')))).toEqual(['Untrue'])
+        })
+
+        it('searches the catalogue number, which is how a record is often asked for', () => {
+            seedAlbum({ id: 'album-cat', title: 'Angels & Devils', catalogNumber: 'HDBLP009' })
+
+            expect(titlesOf(repository.queryAlbums(albumSearch('hdblp009')))).toEqual(['Angels & Devils'])
+        })
+
+        it('reaches the track artists of the album’s songs, not just the sleeve credit', () => {
+            // The point of the reach: on a compilation the artists are the record, and
+            // none of them is the album artist.
+            seedAlbum({ id: 'album-va', title: 'Hyperdub 5', artistText: 'Various Artists' })
+            seedSong({ id: 'a', title: 'Kingdom', artistText: 'Cooly G', albumId: 'album-va' })
+
+            expect(titlesOf(repository.queryAlbums(albumSearch('cooly')))).toEqual(['Hyperdub 5'])
+        })
+
+        it('reaches the genres of the album’s songs, which is the only place a genre is tagged', () => {
+            seedSong({ id: 'a', title: 'Archangel', genreText: 'UK Garage', albumId: 'album-untrue' })
+
+            expect(titlesOf(repository.queryAlbums(albumSearch('garage')))).toEqual(['Untrue'])
+        })
+
+        it('counts an album once when several of its songs match the term', () => {
+            // The reach is an EXISTS rather than a join for this reason: a join would
+            // return the album once per matching song and corrupt the total.
+            seedSong({ id: 'a', title: 'Archangel', artistText: 'Burial', albumId: 'album-untrue' })
+            seedSong({ id: 'b', title: 'Near Dark', artistText: 'Burial', albumId: 'album-untrue' })
+
+            const result = repository.queryAlbums(albumSearch('burial'))
+
+            expect(result.total).toBe(1)
+            expect(result.rows).toHaveLength(1)
+        })
+
+        it('does not search the titles of the album’s songs', () => {
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+
+            expect(repository.queryAlbums(albumSearch('archangel')).total).toBe(0)
+        })
+
+        it('does not match a song on another album, or one on no album at all', () => {
+            seedSong({ id: 'a', title: 'Kingdom', artistText: 'Cooly G', albumId: 'album-selected' })
+            seedSong({ id: 'b', title: 'Stray', artistText: 'Ikonika', albumId: null })
+
+            expect(titlesOf(repository.queryAlbums(albumSearch('cooly')))).toEqual(['Selected Ambient Works'])
+            expect(repository.queryAlbums(albumSearch('ikonika')).total).toBe(0)
+        })
+
+        it('carries the album artists as entities', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery({ filter: { albumArtistIds: ['artist-burial'] } }),
+                window: { offset: 0, limit: 10 },
+            })
+
+            expect(result.rows[0]?.albumArtists).toEqual([{ id: 'artist-burial', name: 'Burial' }])
+        })
+
+        it('skips the row query when the window starts past the end', () => {
+            const result = repository.queryAlbums({
+                query: albumQuery(),
+                window: { offset: 50, limit: 10 },
+            })
+
+            expect(result).toEqual({ rows: [], offset: 50, total: 2 })
+        })
+    })
+
+    describe('describeAlbumFilter', () => {
+        it('resolves ids to names and drops the ones that no longer exist', () => {
+            db.insert(artistsTable).values({ id: 'artist-burial', name: 'Burial' }).run()
+            db.insert(recordLabelsTable).values({ id: 'label-hyperdub', name: 'Hyperdub' }).run()
+
+            const description = repository.describeAlbumFilter({
+                albumArtistIds: ['artist-burial', 'artist-gone'],
+                recordLabelIds: ['label-hyperdub'],
+            })
+
+            expect(description.albumArtists).toEqual([{ id: 'artist-burial', name: 'Burial' }])
+            expect(description.recordLabels).toEqual([{ id: 'label-hyperdub', name: 'Hyperdub' }])
+            expect(description.genres).toEqual([])
+        })
+    })
+
+    describe('getAlbumDetail', () => {
+        beforeEach(() => {
+            db.insert(artistsTable).values({ id: 'artist-burial', name: 'Burial' }).run()
+            db.insert(genresTable).values({ id: 'genre-garage', name: 'UK Garage' }).run()
+            db.insert(genresTable).values({ id: 'genre-dubstep', name: 'Dubstep' }).run()
+            db.insert(recordLabelsTable).values({ id: 'label-hyperdub', name: 'Hyperdub' }).run()
+
+            seedAlbum({
+                id: 'album-untrue',
+                title: 'Untrue',
+                artistText: 'Burial',
+                year: 2007,
+                date: '2007-11-05',
+                catalogNumber: 'HDBCD002',
+                coverPath: '/covers/untrue.png',
+                recordLabelId: 'label-hyperdub',
+                recordLabelText: 'Hyperdub',
+            })
+            db.insert(albumArtistsTable).values({ albumId: 'album-untrue', artistId: 'artist-burial' }).run()
+
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', duration: 240 })
+            seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue', duration: 180 })
+            db.insert(songGenresTable).values({ songId: 'a', genreId: 'genre-garage' }).run()
+            db.insert(songGenresTable).values({ songId: 'b', genreId: 'genre-dubstep' }).run()
+        })
+
+        it('returns the album’s own attributes', () => {
+            const detail = repository.getAlbumDetail('album-untrue')
+
+            expect(detail).toMatchObject({
+                id: 'album-untrue',
+                title: 'Untrue',
+                albumArtistText: 'Burial',
+                year: 2007,
+                date: '2007-11-05',
+                catalogNumber: 'HDBCD002',
+                coverPath: '/covers/untrue.png',
+                recordLabelId: 'label-hyperdub',
+                recordLabelText: 'Hyperdub',
+                songCount: 2,
+            })
+        })
+
+        it('sums the durations of its songs as a number', () => {
+            expect(repository.getAlbumDetail('album-untrue')?.totalDuration).toBe(420)
+        })
+
+        it('reports no total duration when no song on the album has one', () => {
+            seedAlbum({ id: 'album-bare', title: 'Bare' })
+            seedSong({ id: 'c', title: 'Untimed', albumId: 'album-bare', duration: null })
+
+            expect(repository.getAlbumDetail('album-bare')?.totalDuration).toBeNull()
+        })
+
+        it('collects the distinct genres across its songs', () => {
+            expect(repository.getAlbumDetail('album-untrue')?.genres).toEqual([
+                { id: 'genre-dubstep', name: 'Dubstep' },
+                { id: 'genre-garage', name: 'UK Garage' },
+            ])
+        })
+
+        it('carries the album artists as entities', () => {
+            expect(repository.getAlbumDetail('album-untrue')?.albumArtists).toEqual([
+                { id: 'artist-burial', name: 'Burial' },
+            ])
+        })
+
+        it('returns null for an id that resolves to nothing, rather than throwing', () => {
+            expect(repository.getAlbumDetail('album-gone')).toBeNull()
         })
     })
 })

@@ -107,6 +107,9 @@ _Avoid_: `track` in any identifier; file, item, entry as synonyms for song
 **Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on an
 album, not a song. Do not "correct" it to `songNumber`.
 
+It is **always the tag and never a position in a list**. A file with no track number is `null`, and
+stays `null`.
+
 **Album**:
 A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,
 `albumArtists`, an "Albums" tab, "12 albums". It is what music players call this, and it is what

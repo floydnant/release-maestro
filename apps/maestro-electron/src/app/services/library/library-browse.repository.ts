@@ -1,20 +1,28 @@
 import {
+    AlbumSortField,
     BROWSE_WINDOW_MAX_LIMIT,
     SongPresence,
     SongSortField,
+    type AlbumDetailResult,
+    type AlbumFilter,
+    type AlbumFilterDescription,
+    type AlbumQuery,
+    type AlbumWindowResult,
     type ArtistCreditSegment,
     type BrowseWindow,
     type CatalogEntityRef,
+    type QueryAlbumsRequest,
     type QuerySongsRequest,
     type SongFilter,
     type SongFilterDescription,
     type SongQuery,
     type SongWindowResult,
 } from '@release-maestro/core'
-import { and, asc, count, desc, eq, exists, inArray, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, inArray, sum, type SQL } from 'drizzle-orm'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { DatabaseClient } from '../../database/database.client'
 import {
+    albumArtistsTable,
     albumsTable,
     artistsTable,
     genresTable,
@@ -23,7 +31,7 @@ import {
     songGenresTable,
     songsTable,
 } from '../../database/drizzle.schema'
-import { songSearchCondition } from './song-search'
+import { albumSearchCondition, songSearchCondition } from './catalog-search'
 
 /**
  * The library read side: windowed catalog queries (ADR 0004).
@@ -68,6 +76,7 @@ export class LibraryBrowseRepository {
                 artistCredit: creditsBySong.get(row.id) ?? [],
                 albumId: row.albumId,
                 albumTitle: row.albumTitle,
+                trackNumber: row.trackNumber,
                 genreText: row.genreText,
                 genres: genresBySong.get(row.id) ?? [],
                 recordLabelId: row.recordLabelId,
@@ -96,7 +105,7 @@ export class LibraryBrowseRepository {
     }
 
     /**
-     * The window's rows: 16 columns, the album left-join behind cover art and the
+     * The window's rows: 17 columns, the album left-join behind cover art and the
      * record label, and the filter's `WHERE`.
      *
      * The album join is `LEFT` on purpose — a song need not belong to one, and an
@@ -116,6 +125,7 @@ export class LibraryBrowseRepository {
                 artistText: songsTable.artistText,
                 albumId: songsTable.albumId,
                 albumTitle: songsTable.albumTitle,
+                trackNumber: songsTable.trackNumber,
                 genreText: songsTable.genreText,
                 recordLabelId: albumsTable.recordLabelId,
                 recordLabelText: songsTable.recordLabelText,
@@ -327,6 +337,251 @@ export class LibraryBrowseRepository {
         return genres
     }
 
+    // -----------------------------------------------------------------------
+    // Albums — the grid and the detail header (MAE-119)
+    // -----------------------------------------------------------------------
+
+    queryAlbums({ query, window }: QueryAlbumsRequest): AlbumWindowResult {
+        const where = this.albumConditions(query)
+        const { offset } = normalizeWindow(window)
+
+        const total =
+            this.database.db.select({ value: count() }).from(albumsTable).where(where).get()?.value ?? 0
+
+        if (offset >= total) return { rows: [], offset, total }
+
+        const rows = this.albumWindowQuery({ query, window }).all()
+        const albumIds = rows.map(row => row.id)
+        const artistsByAlbum = this.albumArtists(albumIds)
+        const songCountByAlbum = this.albumSongCounts(albumIds)
+
+        return {
+            rows: rows.map(row => ({
+                id: row.id,
+                title: row.title,
+                coverPath: row.coverPath,
+                albumArtistText: row.artistText,
+                albumArtists: artistsByAlbum.get(row.id) ?? [],
+                year: row.year,
+                recordLabelId: row.recordLabelId,
+                recordLabelText: row.recordLabelText,
+                songCount: songCountByAlbum.get(row.id) ?? 0,
+            })),
+            offset,
+            total,
+        }
+    }
+
+    /** The album window's SQL, for the scale check's `EXPLAIN QUERY PLAN`. See {@link songWindowSql}. */
+    albumWindowSql(request: QueryAlbumsRequest): { sql: string; params: unknown[] } {
+        return this.albumWindowQuery(request).toSQL()
+    }
+
+    /**
+     * One window of the grid. No join at all: every attribute this orders or filters by
+     * lives on `albums`, including the two the write side denormalizes there so the
+     * ordering can be index-backed rather than an aggregate over the whole table.
+     */
+    private albumWindowQuery({ query, window }: QueryAlbumsRequest) {
+        const { offset, limit } = normalizeWindow(window)
+
+        return this.database.db
+            .select({
+                id: albumsTable.id,
+                title: albumsTable.title,
+                coverPath: albumsTable.coverPath,
+                artistText: albumsTable.artistText,
+                year: albumsTable.year,
+                recordLabelId: albumsTable.recordLabelId,
+                recordLabelText: albumsTable.recordLabelText,
+            })
+            .from(albumsTable)
+            .where(this.albumConditions(query))
+            .orderBy(...albumOrdering(query.sort))
+            .limit(limit)
+            .offset(offset)
+    }
+
+    /**
+     * How many songs each album in the window has, missing ones included.
+     *
+     * A live `COUNT`, and affordable precisely because it runs *after* the window —
+     * one grouped seek per tile on screen over `songs_album_id_idx`, not one per album
+     * in the library. That is the whole difference between this and the
+     * `ORDER BY (SELECT COUNT(*) …)` ADR 0005 rejected: an ordering has to evaluate the
+     * aggregate for every candidate row before it knows which ones the window holds.
+     *
+     * An album with no songs is absent from the result rather than present as zero;
+     * the caller defaults it.
+     */
+    private albumSongCounts(albumIds: string[]): Map<string, number> {
+        if (albumIds.length == 0) return new Map()
+
+        return new Map(
+            this.database.db
+                .select({ albumId: songsTable.albumId, value: count() })
+                .from(songsTable)
+                .where(inArray(songsTable.albumId, albumIds))
+                .groupBy(songsTable.albumId)
+                .all()
+                .flatMap(row => (row.albumId == null ? [] : [[row.albumId, row.value] as const])),
+        )
+    }
+
+    /**
+     * Filter + search as one `WHERE`, on the same `EXISTS`-not-`JOIN` rule as
+     * {@link songConditions}: an album credited to two of the selected artists must
+     * still count once, and a join would duplicate its row and corrupt the total.
+     */
+    private albumConditions(query: AlbumQuery): SQL | undefined {
+        const conditions: (SQL | undefined)[] = [albumSearchCondition(query.search)]
+
+        const albumArtistIds = nonEmpty(query.filter.albumArtistIds)
+        if (albumArtistIds) {
+            conditions.push(
+                exists(
+                    this.database.db
+                        .select({ value: albumArtistsTable.albumId })
+                        .from(albumArtistsTable)
+                        .where(
+                            and(
+                                eq(albumArtistsTable.albumId, albumsTable.id),
+                                inArray(albumArtistsTable.artistId, albumArtistIds),
+                            ),
+                        ),
+                ),
+            )
+        }
+
+        // An album reaches a genre only through its songs — genre is tagged per file,
+        // and a compilation legitimately spans several.
+        const genreIds = nonEmpty(query.filter.genreIds)
+        if (genreIds) {
+            conditions.push(
+                exists(
+                    this.database.db
+                        .select({ value: songsTable.id })
+                        .from(songsTable)
+                        .innerJoin(songGenresTable, eq(songGenresTable.songId, songsTable.id))
+                        .where(
+                            and(
+                                eq(songsTable.albumId, albumsTable.id),
+                                inArray(songGenresTable.genreId, genreIds),
+                            ),
+                        ),
+                ),
+            )
+        }
+
+        const recordLabelIds = nonEmpty(query.filter.recordLabelIds)
+        if (recordLabelIds) conditions.push(inArray(albumsTable.recordLabelId, recordLabelIds))
+
+        return and(...conditions.filter((condition): condition is SQL => condition != null))
+    }
+
+    describeAlbumFilter(filter: AlbumFilter): AlbumFilterDescription {
+        return {
+            albumArtists: this.entityNames(artistsTable, artistsTable.name, filter.albumArtistIds),
+            recordLabels: this.entityNames(recordLabelsTable, recordLabelsTable.name, filter.recordLabelIds),
+            genres: this.entityNames(genresTable, genresTable.name, filter.genreIds),
+        }
+    }
+
+    /**
+     * One album's own attributes for the detail header.
+     *
+     * Its tracks are **not** here: they are an ordinary windowed `SongQuery` filtered
+     * to this album, so a 200-track compilation costs the same as any other list.
+     *
+     * `null` for an id that resolves to nothing, which a stale link or a rescan that
+     * re-keyed the album both produce. The page renders that as not-found rather than
+     * as a failure — the request worked, the album is gone.
+     */
+    getAlbumDetail(albumId: string): AlbumDetailResult {
+        const album = this.database.db
+            .select({
+                id: albumsTable.id,
+                title: albumsTable.title,
+                coverPath: albumsTable.coverPath,
+                artistText: albumsTable.artistText,
+                year: albumsTable.year,
+                date: albumsTable.date,
+                catalogNumber: albumsTable.catalogNumber,
+                recordLabelId: albumsTable.recordLabelId,
+                recordLabelText: albumsTable.recordLabelText,
+            })
+            .from(albumsTable)
+            .where(eq(albumsTable.id, albumId))
+            .get()
+
+        if (!album) return null
+
+        // One pass over this album's songs for both figures — the count is a live
+        // aggregate now, and it was already going to walk `songs_album_id_idx` for the
+        // duration.
+        const totals = this.database.db
+            .select({ songCount: count(), totalDuration: sum(songsTable.duration) })
+            .from(songsTable)
+            .where(eq(songsTable.albumId, albumId))
+            .get()
+
+        const genres = this.database.db
+            .selectDistinct({ id: genresTable.id, name: genresTable.name })
+            .from(songsTable)
+            .innerJoin(songGenresTable, eq(songGenresTable.songId, songsTable.id))
+            .innerJoin(genresTable, eq(songGenresTable.genreId, genresTable.id))
+            .where(eq(songsTable.albumId, albumId))
+            .orderBy(asc(genresTable.name))
+            .all()
+
+        return {
+            id: album.id,
+            title: album.title,
+            coverPath: album.coverPath,
+            albumArtistText: album.artistText,
+            albumArtists: this.albumArtists([albumId]).get(albumId) ?? [],
+            year: album.year,
+            date: album.date,
+            catalogNumber: album.catalogNumber,
+            recordLabelId: album.recordLabelId,
+            recordLabelText: album.recordLabelText,
+            songCount: totals?.songCount ?? 0,
+            // `sum` returns a string from SQLite's numeric affinity, and null when no
+            // song on the album carries a duration at all.
+            totalDuration: totals?.totalDuration == null ? null : Number(totals.totalDuration),
+            genres,
+        }
+    }
+
+    /**
+     * The album artists for each album, in credited order.
+     *
+     * A plain list rather than {@link ArtistCreditSegment}s: an album artist is one tag
+     * shared by a group of files, not a credit line the UI has to reproduce verbatim.
+     * So there is no `joinPhrase` to fabricate here, and none of the caveat that hangs
+     * over {@link artistCredits}.
+     */
+    private albumArtists(albumIds: string[]): Map<string, CatalogEntityRef[]> {
+        const byAlbum = new Map<string, CatalogEntityRef[]>()
+        if (albumIds.length == 0) return byAlbum
+
+        const rows = this.database.db
+            .select({ albumId: albumArtistsTable.albumId, id: artistsTable.id, name: artistsTable.name })
+            .from(albumArtistsTable)
+            .innerJoin(artistsTable, eq(albumArtistsTable.artistId, artistsTable.id))
+            .where(inArray(albumArtistsTable.albumId, albumIds))
+            .orderBy(asc(albumArtistsTable.albumId), asc(albumArtistsTable.position))
+            .all()
+
+        for (const row of rows) {
+            const existing = byAlbum.get(row.albumId)
+            if (existing) existing.push({ id: row.id, name: row.name })
+            else byAlbum.set(row.albumId, [{ id: row.id, name: row.name }])
+        }
+
+        return byAlbum
+    }
+
     private entityNames<TTable extends CatalogEntityTable>(
         table: TTable,
         nameColumn: TTable['id'] | AnySQLiteColumn,
@@ -381,6 +636,21 @@ const sortColumns: Record<SongSortField, AnySQLiteColumn> = {
     [SongSortField.year]: songsTable.year,
     [SongSortField.recordLabel]: songsTable.recordLabelText,
     [SongSortField.dateAdded]: songsTable.createdAt,
+    [SongSortField.trackNumber]: songsTable.trackNumber,
+}
+
+/** The albums grid's ordering, id tiebreaker included. Exported for the scale check. */
+export const albumOrdering = (sort: AlbumQuery['sort']): SQL[] => {
+    const direction = sort.direction == 'desc' ? desc : asc
+    return [direction(albumSortColumns[sort.field]), direction(albumsTable.id)]
+}
+
+const albumSortColumns: Record<AlbumSortField, AnySQLiteColumn> = {
+    [AlbumSortField.title]: albumsTable.title,
+    [AlbumSortField.albumArtist]: albumsTable.artistText,
+    [AlbumSortField.year]: albumsTable.year,
+    [AlbumSortField.recordLabel]: albumsTable.recordLabelText,
+    [AlbumSortField.dateAdded]: albumsTable.dateAdded,
 }
 
 /** Treat an omitted and an empty id list identically, so filters compare by value. */

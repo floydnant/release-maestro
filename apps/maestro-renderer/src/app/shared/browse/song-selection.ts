@@ -7,6 +7,7 @@ import {
     type SelectionAnchor,
     type SelectionGesture,
 } from './browse-selection'
+import { sameIds } from './query-params.utils'
 
 /**
  * Songs bound to the generic browse selection mechanics in `browse-selection.ts`.
@@ -63,12 +64,6 @@ export const sameFilter = (left: SongFilter, right: SongFilter): boolean =>
     sameIds(left.genreIds, right.genreIds) &&
     sameIds(left.recordLabelIds, right.recordLabelIds) &&
     sameIds(left.albumIds, right.albumIds)
-
-const sameIds = (left: string[] | undefined, right: string[] | undefined): boolean => {
-    const leftIds = left ?? []
-    const rightIds = right ?? []
-    return leftIds.length == rightIds.length && leftIds.every((id, index) => id == rightIds[index])
-}
 
 /** Drop the renderer-only indices; this is what crosses IPC and what actions resolve. */
 export const toSongSelection = (state: SongSelectionState): SongSelection => toWireSelection(state)

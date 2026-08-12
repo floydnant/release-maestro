@@ -1,13 +1,16 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
+import { RouterLink } from '@angular/router'
 import type { ArtistCreditSegment, SongRow } from '@release-maestro/core'
 import { isSelectionModifierHeld } from '../../browse/song-selection'
 import { fileUrl } from '../../utils/file-url.util'
 import { formatBpm, formatDateShort, formatDuration } from '../../utils/formatting.utils'
 import { IconComponent } from '../icon/icon.component'
 import {
+    DEFAULT_SONG_TABLE_COLUMNS,
     SONG_TABLE_COLUMN_WIDTHS,
     type EntityFilterKind,
     type EntityFilterRequest,
+    type SongTableColumn,
 } from './song-table.component'
 
 /**
@@ -32,16 +35,20 @@ import {
     selector: 'app-song-table-row',
     templateUrl: './song-table-row.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent],
+    imports: [IconComponent, RouterLink],
     host: { class: 'contents' },
 })
 export class SongTableRowComponent {
     row = input.required<SongRow>()
     /** Only the empty-cover placeholder needs it — the row's own styling is the parent's. */
     selected = input.required<boolean>()
+    /** Passed straight down from the table, so a column keeps its heading and its cells in step. */
+    columns = input<readonly SongTableColumn[]>(DEFAULT_SONG_TABLE_COLUMNS)
 
     /** Shared with the header, so a column has one width — see the constant. */
-    protected readonly columns = SONG_TABLE_COLUMN_WIDTHS
+    protected readonly widths = SONG_TABLE_COLUMN_WIDTHS
+
+    protected shown = computed(() => new Set(this.columns()))
 
     entityFilter = output<EntityFilterRequest>()
     filterMissing = output<void>()
@@ -59,6 +66,17 @@ export class SongTableRowComponent {
         event.stopPropagation()
         if (isSelectionModifierHeld(event)) return
         this.entityFilter.emit({ kind, id, name })
+    }
+
+    /**
+     * The album cell is a real link to the album's page, so this only has to keep it out
+     * of the row's way — and stop it navigating when the click was building a selection.
+     * Cmd-clicking rows is how you pick several, and having one of them jump to another
+     * page instead would be the last thing the user meant.
+     */
+    protected onAlbumLink(event: MouseEvent): void {
+        event.stopPropagation()
+        if (isSelectionModifierHeld(event)) event.preventDefault()
     }
 
     protected onMissingBadge(event: MouseEvent): void {

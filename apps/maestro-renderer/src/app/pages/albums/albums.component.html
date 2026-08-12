@@ -1,0 +1,23 @@
+<app-browse-shell
+    [state]="shellState()"
+    [filters]="filterState()"
+    (searchChange)="onSearch($event)"
+    (chipRemove)="onChipRemove($event)"
+    (clearFilters)="onClearFilters()"
+    (retry)="onRetry()"
+>
+    <!-- Inside the projected content rather than in the shell's bar, so it goes away
+         with the grid: there is nothing to sort in an empty result set, and the empty
+         state's own "Clear filters" is the way back out of one. -->
+    <app-album-sort-bar
+        [sort]="query().sort"
+        (sortField)="onSortField($event)"
+        (directionToggle)="onDirectionToggle()"
+    ></app-album-sort-bar>
+
+    <app-album-grid
+        [result]="result()"
+        [query]="query()"
+        (viewportChange)="onViewportChange($event)"
+    ></app-album-grid>
+</app-browse-shell>

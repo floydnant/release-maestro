@@ -1,0 +1,82 @@
+<!-- Not the browse shell. Its chrome is a title, a count, a search box and filter chips
+     over one result set — an album has none of those: the "filter" is the route, and
+     searching within one record is not a thing anyone does. The states it would have
+     framed are here instead, because this page has one the shell knows nothing about:
+     an album that no longer exists. -->
+@switch (status()) {
+    @case ('loading') {
+        <div class="flex flex-1 items-center justify-center p-8" role="status">
+            <p class="type-body-sm text-content-secondary">Loading album…</p>
+        </div>
+    }
+
+    @case ('missing') {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+            <app-icon name="octUnlink" size="28" color="content.muted"></app-icon>
+            <p class="type-body-md text-content-primary">This album is no longer in your library</p>
+            <p class="type-body-sm max-w-md text-content-secondary">
+                A rescan can re-key an album when its tags change, which leaves a link like this one pointing
+                at nothing.
+            </p>
+            <a class="btn-primary" routerLink="/albums">Back to albums</a>
+        </div>
+    }
+
+    @case ('error') {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+            <app-icon name="octXCircleFill" size="28" color="content.danger"></app-icon>
+            <p class="type-body-md text-content-primary">Could not load this album</p>
+            <p class="type-body-sm max-w-md text-content-secondary">The library did not answer.</p>
+            <a class="btn-neutral" routerLink="/albums">Back to albums</a>
+        </div>
+    }
+
+    @default {
+        @if (album(); as loadedAlbum) {
+            <app-album-detail-header
+                [album]="loadedAlbum"
+                [songCount]="headerSongCount()"
+                [songCountLabel]="songCountLabel()"
+            ></app-album-detail-header>
+
+            <!-- The table's own error branch. The shell used to own this, and an album's
+                 tracks failing while its header loaded fine is a state the header cannot
+                 speak for. -->
+            @if (result().status === 'error' && (!result().loaded || !songWindowMatchesAlbum())) {
+                <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+                    <app-icon name="octXCircleFill" size="28" color="content.danger"></app-icon>
+                    <p class="type-body-md text-content-primary">Could not load this album’s tracks</p>
+                    <p class="type-body-sm max-w-md text-content-secondary">
+                        {{ result().error || 'The library did not answer.' }}
+                    </p>
+                    <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
+                </div>
+            } @else if (!songWindowMatchesAlbum()) {
+                <div class="flex flex-1 items-center justify-center p-8" role="status">
+                    <p class="type-body-sm text-content-secondary">Loading tracks…</p>
+                </div>
+            } @else if (result().loaded && result().total === 0) {
+                <!-- Reachable when ingest re-keys every song to another album but the
+                     old album row remains. Missing songs still belong to their album. -->
+                <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+                    <p class="type-body-md text-content-primary">No tracks linked to this album</p>
+                    <p class="type-body-sm max-w-md text-content-secondary">
+                        Their tags changed, so the library moved them to another album during a later scan.
+                    </p>
+                </div>
+            } @else {
+                <app-song-table
+                    [result]="result()"
+                    [query]="query()"
+                    [selection]="selection()"
+                    [columns]="columns"
+                    (sortChange)="onSort($event)"
+                    (selectionChange)="onSelectionChange($event)"
+                    (viewportChange)="onViewportChange($event)"
+                    (entityFilter)="onEntityFilter($event)"
+                    (filterMissing)="onFilterMissing()"
+                ></app-song-table>
+            }
+        }
+    }
+}

@@ -7,6 +7,7 @@ import {
     type SongQuery,
     type SortDirection,
 } from '@release-maestro/core'
+import { firstValue, idList, idParam, type ReadonlyParams } from './query-params.utils'
 
 /**
  * A {@link SongQuery} as URL query params, and back.
@@ -39,15 +40,33 @@ export const SongQueryParam = {
 /** The params this module owns, so a caller can clear them without clearing others. */
 export type SongQueryParams = Partial<Record<(typeof SongQueryParam)[keyof typeof SongQueryParam], string>>
 
-/** What the router hands back: values may be absent, a string, or (rarely) repeated. */
-export type ReadonlyParams = Record<string, string | string[] | undefined | null>
+export type { ReadonlyParams } from './query-params.utils'
 
 const SORT_FIELDS = new Set<string>(Object.values(SongSortField))
 const PRESENCES = new Set<string>(Object.values(SongPresence))
 
-export const songQueryFromParams = (params: ReadonlyParams): SongQuery => {
-    const sortField = firstValue(params[SongQueryParam.sort])
+/**
+ * The sort the params ask for, falling back to `fallback` for anything they do not say.
+ *
+ * The fallback is a parameter because "no sort in the URL" does not mean the same thing
+ * on every surface: the track list reads it as date added, and an album's track list
+ * reads it as track number. Both still accept any field the other can write, so a URL
+ * stays meaningful when it moves between them.
+ */
+export const songSortFromParams = (
+    params: ReadonlyParams,
+    fallback: SongQuery['sort'] = DEFAULT_SONG_SORT,
+): SongQuery['sort'] => {
+    const field = firstValue(params[SongQueryParam.sort])
     const direction = firstValue(params[SongQueryParam.direction])
+
+    return {
+        field: field != null && SORT_FIELDS.has(field) ? (field as SongSortField) : fallback.field,
+        direction: direction == 'asc' || direction == 'desc' ? direction : fallback.direction,
+    }
+}
+
+export const songQueryFromParams = (params: ReadonlyParams): SongQuery => {
     const presence = firstValue(params[SongQueryParam.presence])
 
     const filter: SongFilter = {
@@ -61,13 +80,7 @@ export const songQueryFromParams = (params: ReadonlyParams): SongQuery => {
     return {
         ...emptySongQuery(),
         search: firstValue(params[SongQueryParam.search]) ?? '',
-        sort: {
-            field:
-                sortField != null && SORT_FIELDS.has(sortField)
-                    ? (sortField as SongSortField)
-                    : DEFAULT_SONG_SORT.field,
-            direction: direction == 'asc' || direction == 'desc' ? direction : DEFAULT_SONG_SORT.direction,
-        },
+        sort: songSortFromParams(params),
         filter: stripEmpty(filter),
     }
 }
@@ -104,27 +117,6 @@ const directionParam = (query: SongQuery): string | null => {
     if (query.sort.field != DEFAULT_SONG_SORT.field) return query.sort.direction
     return query.sort.direction == DEFAULT_SONG_SORT.direction ? null : query.sort.direction
 }
-
-const firstValue = (value: string | string[] | undefined | null): string | undefined => {
-    if (value == null) return undefined
-    return Array.isArray(value) ? value[0] : value
-}
-
-const idList = (value: string | string[] | undefined | null): string[] | undefined => {
-    const raw = firstValue(value)
-    if (!raw) return undefined
-    const ids = [
-        ...new Set(
-            raw
-                .split(',')
-                .map(id => id.trim())
-                .filter(Boolean),
-        ),
-    ]
-    return ids.length > 0 ? ids : undefined
-}
-
-const idParam = (ids: string[] | undefined): string | null => (ids?.length ? ids.join(',') : null)
 
 /** Drop empty id lists so two equivalent filters compare equal by value. */
 const stripEmpty = (filter: SongFilter): SongFilter => {

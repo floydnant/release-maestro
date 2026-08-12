@@ -18,97 +18,132 @@
         role="row"
         aria-rowindex="1"
     >
-        <span
-            class="shrink-0 border-b border-border-subtle"
-            role="columnheader"
-            [style.width.px]="columns.cover"
-        >
-            <span class="sr-only">Cover art</span>
-        </span>
+        @if (shown().has('trackNumber')) {
+            <!-- `sortLabel` because `#` is a symbol, and "Sort by #" is not a sentence. -->
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.trackNumber"
+                field="trackNumber"
+                label="#"
+                sortLabel="track number"
+                [numeric]="true"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('cover')) {
+            <span
+                class="shrink-0 border-b border-border-subtle"
+                role="columnheader"
+                [style.width.px]="widths.cover"
+            >
+                <span class="sr-only">Cover art</span>
+            </span>
+        }
 
-        <app-song-table-heading
-            class="shrink-0 grow"
-            [style.width.px]="columns.title"
-            field="title"
-            label="Title"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.artist"
-            field="artist"
-            label="Artist"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.album"
-            field="album"
-            label="Album"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.genre"
-            field="genre"
-            label="Genre"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.bpm"
-            field="bpm"
-            label="BPM"
-            [numeric]="true"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.musicalKey"
-            field="musicalKey"
-            label="Key"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.duration"
-            field="duration"
-            label="Time"
-            [numeric]="true"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.year"
-            field="year"
-            label="Year"
-            [numeric]="true"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.recordLabel"
-            field="recordLabel"
-            label="Record label"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
-        <app-song-table-heading
-            class="shrink-0"
-            [style.width.px]="columns.dateAdded"
-            field="dateAdded"
-            label="Added"
-            [sort]="sort()"
-            (sortChange)="sortChange.emit($event)"
-        ></app-song-table-heading>
+        @if (shown().has('title')) {
+            <app-song-table-heading
+                class="shrink-0 grow"
+                [style.width.px]="widths.title"
+                field="title"
+                label="Title"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('artist')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.artist"
+                field="artist"
+                label="Artist"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('album')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.album"
+                field="album"
+                label="Album"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('genre')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.genre"
+                field="genre"
+                label="Genre"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('bpm')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.bpm"
+                field="bpm"
+                label="BPM"
+                [numeric]="true"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('musicalKey')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.musicalKey"
+                field="musicalKey"
+                label="Key"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('duration')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.duration"
+                field="duration"
+                label="Time"
+                [numeric]="true"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('year')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.year"
+                field="year"
+                label="Year"
+                [numeric]="true"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('recordLabel')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.recordLabel"
+                field="recordLabel"
+                label="Record label"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
+        @if (shown().has('dateAdded')) {
+            <app-song-table-heading
+                class="shrink-0"
+                [style.width.px]="widths.dateAdded"
+                field="dateAdded"
+                label="Added"
+                [sort]="sort()"
+                (sortChange)="sortChange.emit($event)"
+            ></app-song-table-heading>
+        }
     </div>
 
     <!-- A spacer as tall as the whole result set gives the scrollbar its range; only
@@ -156,6 +191,7 @@
                     <app-song-table-row
                         [row]="row"
                         [selected]="selected"
+                        [columns]="columns()"
                         (entityFilter)="entityFilter.emit($event)"
                         (filterMissing)="filterMissing.emit()"
                     ></app-song-table-row>

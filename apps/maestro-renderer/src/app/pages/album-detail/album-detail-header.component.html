@@ -1,0 +1,86 @@
+@if (album().coverPath) {
+    <img
+        class="album-detail__cover | size-64 shrink-0 rounded-md object-cover"
+        alt=""
+        [src]="fileUrl(album().coverPath!)"
+    />
+} @else {
+    <span
+        class="album-detail__cover | grid size-64 shrink-0 place-items-center rounded-md bg-background-elevated"
+    >
+        <app-icon name="musicNote" size="40" color="content.muted"></app-icon>
+    </span>
+}
+
+<div class="flex min-w-0 flex-col justify-end gap-1 pb-1">
+    <h1 class="album-title | type-hero-title truncate" [title]="album().title">{{ album().title }}</h1>
+
+    <p class="album-artist | type-section-title min-w-0 truncate text-content-secondary">
+        @if (album().albumArtists.length) {
+            @for (artist of album().albumArtists; track artist.id; let last = $last) {
+                <a
+                    class="text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                    [routerLink]="['/tracks']"
+                    [queryParams]="{ artist: artist.id }"
+                >
+                    {{ artist.name }}
+                </a>
+                @if (!last) {
+                    <span>, </span>
+                }
+            }
+        } @else {
+            <span class="text-content-muted">{{ album().albumArtistText || '—' }}</span>
+        }
+    </p>
+
+    <!-- One line of facts, separated rather than laid out as a table: they are short,
+         several are usually absent, and a label column of five rows for three values
+         reads as a form rather than as a record sleeve. -->
+    <p class="type-body-sm flex min-w-0 flex-wrap items-center gap-x-2 text-content-muted">
+        <span class="tabular-nums">{{ songCount() }} {{ songCountLabel() }}</span>
+
+        @if (duration()) {
+            <span aria-hidden="true">•</span>
+            <span class="tabular-nums">{{ duration() }}</span>
+        }
+
+        @if (albumDate()) {
+            <span aria-hidden="true">•</span>
+            <span class="tabular-nums">{{ albumDate() }}</span>
+        }
+
+        @if (album().recordLabelId && album().recordLabelText) {
+            <span aria-hidden="true">•</span>
+            <a
+                class="rounded-sm underline-offset-2 hover:text-content-action hover:underline"
+                [routerLink]="['/tracks']"
+                [queryParams]="{ recordLabel: album().recordLabelId }"
+            >
+                {{ album().recordLabelText }}
+            </a>
+        } @else if (album().recordLabelText) {
+            <span aria-hidden="true">•</span>
+            <span>{{ album().recordLabelText }}</span>
+        }
+
+        @if (album().catalogNumber) {
+            <span aria-hidden="true">•</span>
+            <span>{{ album().catalogNumber }}</span>
+        }
+    </p>
+
+    @if (album().genres.length) {
+        <p class="album-detail__genres | flex min-w-0 flex-wrap items-center gap-1.5 pt-1">
+            @for (genre of album().genres; track genre.id) {
+                <a
+                    class="badge !no-underline transition-colors hover:border-border-default hover:bg-background-elevated"
+                    [routerLink]="['/tracks']"
+                    [queryParams]="{ genre: genre.id }"
+                >
+                    {{ genre.name }}
+                </a>
+            }
+        </p>
+    }
+</div>

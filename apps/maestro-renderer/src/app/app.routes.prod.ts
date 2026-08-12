@@ -19,6 +19,15 @@ export const appRoutes: Route[] = [
         component: FeedComponent,
     },
     {
+        path: 'albums',
+        loadComponent: () => import('./pages/albums/albums.component').then(m => m.AlbumsComponent),
+    },
+    {
+        path: 'albums/:albumId',
+        loadComponent: () =>
+            import('./pages/album-detail/album-detail.component').then(m => m.AlbumDetailComponent),
+    },
+    {
         path: 'settings',
         component: SettingsComponent,
         children: [

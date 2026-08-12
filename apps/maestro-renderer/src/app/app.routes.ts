@@ -40,6 +40,17 @@ export const appRoutes: Route[] = [
         canActivate: [libraryOnboardingGuard],
     },
     {
+        path: 'albums',
+        loadComponent: () => import('./pages/albums/albums.component').then(m => m.AlbumsComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
+        path: 'albums/:albumId',
+        loadComponent: () =>
+            import('./pages/album-detail/album-detail.component').then(m => m.AlbumDetailComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
         path: 'import',
         loadComponent: () =>
             import('./pages/library-import/library-import.component').then(m => m.LibraryImportComponent),
