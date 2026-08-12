@@ -348,9 +348,9 @@ const checkRawColorUsage = () => {
     visit(sourceRoot)
     if (violations.length) throw new Error(`Raw foundation color utilities found:\n${violations.join('\n')}`)
 
-    const productionRoutes = fs.readFileSync(path.join(projectRoot, 'src/app/app.routes.prod.ts'), 'utf8')
-    if (productionRoutes.includes('design-system')) {
-        throw new Error('The design-system specimen must not be imported by production routes')
+    const appRoutes = fs.readFileSync(path.join(projectRoot, 'src/app/app.routes.ts'), 'utf8')
+    if (appRoutes.includes('design-system') && !/webEnv\.production\s*\?\s*\[\]/.test(appRoutes)) {
+        throw new Error('The design-system specimen must be excluded when webEnv.production is true')
     }
 }
 

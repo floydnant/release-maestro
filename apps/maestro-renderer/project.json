@@ -37,10 +37,6 @@
                         {
                             "replace": "apps/maestro-renderer/src/environments/environment.ts",
                             "with": "apps/maestro-renderer/src/environments/environment.prod.ts"
-                        },
-                        {
-                            "replace": "apps/maestro-renderer/src/app/app.routes.ts",
-                            "with": "apps/maestro-renderer/src/app/app.routes.prod.ts"
                         }
                     ],
                     "budgets": [
