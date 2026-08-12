@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 
-type ShowableWindow = Pick<BrowserWindow, 'show' | 'showInactive' | 'blur' | 'hide'>
+type ShowableWindow = Pick<BrowserWindow, 'show' | 'showInactive' | 'blur'>
 
 /** Show E2E windows without activating them, while preserving normal application startup. */
 export const showMainWindow = (
@@ -9,6 +9,6 @@ export const showMainWindow = (
 ): void => {
     if (background) {
         mainWindow.showInactive()
-        mainWindow.hide()
+        mainWindow.blur()
     } else mainWindow.show()
 }
