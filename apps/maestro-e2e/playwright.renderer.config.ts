@@ -28,7 +28,7 @@ export default defineConfig({
         ['html', { open: 'never', outputFolder: `${workspaceRoot}/playwright-report/renderer` }],
         ['list'],
     ],
-    workers: 3,
+    workers: process.env.CI ? 1 : 3,
     webServer: process.env['BASE_URL']
         ? undefined
         : {

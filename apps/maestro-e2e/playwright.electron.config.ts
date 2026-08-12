@@ -10,7 +10,7 @@ export default defineConfig({
         ['list'],
     ],
     retries: process.env.CI ? 1 : 0,
-    workers: 3,
+    workers: process.env.CI ? 1 : 3,
     timeout: 120_000,
     expect: {
         timeout: 20_000,
