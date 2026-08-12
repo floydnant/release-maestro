@@ -15,7 +15,7 @@ export default defineConfig({
         trace: 'retain-on-failure-and-retries',
     },
     webServer: {
-        command: 'make serve-renderer',
+        command: 'npx nx serve maestro-renderer --port 4200',
         url: 'http://localhost:4200',
         reuseExistingServer: !process.env.CI,
         cwd: workspaceRoot,

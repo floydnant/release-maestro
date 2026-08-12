@@ -8,36 +8,22 @@
     "targets": {
         "e2e": {
             "dependsOn": ["typecheck", "maestro-electron:build"],
-            "command": "playwright test -c apps/maestro-e2e/playwright.electron.config.ts",
-            "configurations": {
-                "ui": {
-                    "command": "playwright test -c apps/maestro-e2e/playwright.electron.config.ts --ui"
-                }
-            }
+            "command": "playwright test -c apps/maestro-e2e/playwright.electron.config.ts"
         },
         "e2e-production": {
             "dependsOn": ["typecheck", "maestro-electron:package"],
-            "command": "playwright test -c apps/maestro-e2e/playwright.electron.production.config.ts",
-            "configurations": {
-                "ui": {
-                    "command": "playwright test -c apps/maestro-e2e/playwright.electron.production.config.ts --ui"
-                }
-            }
+            "command": "playwright test -c apps/maestro-e2e/playwright.electron.production.config.ts"
         },
         "e2e-renderer": {
             "dependsOn": ["typecheck"],
-            "command": "playwright test -c apps/maestro-e2e/playwright.renderer.config.ts",
-            "configurations": {
-                "ui": {
-                    "command": "playwright test -c apps/maestro-e2e/playwright.renderer.config.ts --ui"
-                }
-            }
+            "command": "playwright test -c apps/maestro-e2e/playwright.renderer.config.ts"
         },
         "lint": {
             "executor": "@nx/eslint:lint"
         },
         "typecheck": {
             "cache": true,
+            "inputs": ["default", "^default"],
             "command": "tsc --noEmit -p apps/maestro-e2e/tsconfig.json"
         }
     }
