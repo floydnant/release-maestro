@@ -139,3 +139,8 @@ Library scan E2E generates distinctly tagged media from the small committed fixt
 committing many near-identical binaries. Prefer extending
 `apps/maestro-e2e/src/fixtures/tagged-library.fixture.ts` over adding binary fixtures; its local
 comments and dependent assertions document the load-bearing dataset shape and cover-art dedup setup.
+
+Renderer playback E2E also uses the committed MP3, served through Playwright by
+`apps/maestro-e2e/src/fixtures/audio.fixture.ts`. Do not point scenario data at a remote media URL:
+the playback regression deliberately puts Chromium offline so the renderer suite remains runnable
+without internet access.
