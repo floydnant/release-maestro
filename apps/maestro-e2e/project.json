@@ -23,7 +23,6 @@
         },
         "typecheck": {
             "cache": true,
-            "inputs": ["default", "^default"],
             "command": "tsc --noEmit -p apps/maestro-e2e/tsconfig.json"
         }
     }
