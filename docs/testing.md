@@ -82,6 +82,10 @@ is cached, so unchanged inputs reuse the existing app bundle. The launcher resol
 unpacked application layout for macOS, Windows, or Linux; CI runs this suite on all three operating
 systems.
 
+Electron E2E windows are visible but use `showInactive()` by default so repeated app launches do not
+steal focus. Set `RELEASE_MAESTRO_E2E_BACKGROUND=0` when a debugging session should activate each
+window normally.
+
 One project at a time, straight to nx:
 
 ```bash

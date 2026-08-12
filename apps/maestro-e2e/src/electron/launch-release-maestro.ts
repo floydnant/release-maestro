@@ -70,6 +70,7 @@ export const launchReleaseMaestro = async (appDataDir: string): Promise<Electron
             ...cleanEnv(),
             ...(packaged ? {} : { ELECTRON_IS_DEV: '1' }),
             RELEASE_MAESTRO_APP_DATA_DIR: appDataDir,
+            RELEASE_MAESTRO_E2E_BACKGROUND: process.env['RELEASE_MAESTRO_E2E_BACKGROUND'] ?? '1',
         },
     })
 }
