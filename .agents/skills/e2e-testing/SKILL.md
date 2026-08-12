@@ -25,5 +25,5 @@ description: Playwright E2E readiness and test authoring guidance.
   use the target-specific commands in `docs/testing.md#fast-iteration`
 - all suites type-check before they run (`maestro-e2e:e2e`, `:e2e-production`, and `:e2e-renderer`
   depend on `maestro-e2e:typecheck`), because Playwright transpiles without semantic checking
-- to point the renderer suite at an already-running dev server, set `BASE_URL`; it defaults to
-  `http://localhost:4200`
+- to point the renderer suite at an already-running server, set `BASE_URL`; otherwise it owns
+  `http://localhost:4201`. Development Electron E2E owns port 4200 so both targets can run concurrently

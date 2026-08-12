@@ -4,7 +4,11 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
     ...nxE2EPreset(__filename, { testDir: './src/electron' }),
-    reporter: [['html', { open: 'never' }], ['list']],
+    outputDir: `${workspaceRoot}/dist/.playwright/maestro-e2e-electron/test-output`,
+    reporter: [
+        ['html', { open: 'never', outputFolder: `${workspaceRoot}/playwright-report/electron` }],
+        ['list'],
+    ],
     retries: process.env.CI ? 1 : 0,
     workers: 1,
     timeout: 120_000,

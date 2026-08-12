@@ -3,6 +3,7 @@
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
 SKIP_NX_CACHE := false
+E2E_REPORT := electron
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
@@ -81,8 +82,8 @@ e2e-production: package-dir ## Package and run Electron end-to-end tests for the
 	npx nx run maestro-e2e:e2e-production
 e2e-renderer: ## Run renderer only end-to-end tests
 	npx nx run maestro-e2e:e2e-renderer
-e2e-show-report: ## Show the latest e2e test report
-	npx playwright show-report
+e2e-show-report: ## Show an e2e report (E2E_REPORT=electron, renderer, or production)
+	npx playwright show-report playwright-report/$(E2E_REPORT)
 
 # Code Quality
 typecheck-e2e: ## Type-check the end-to-end test suite (also runs automatically before e2e)
