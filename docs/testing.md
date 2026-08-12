@@ -62,27 +62,24 @@ npx nx run maestro-e2e:e2e-production -- \
   --grep "library routes are available"
 ```
 
-Arguments after `--` are forwarded to Playwright. Add `--list` to confirm the selected tests without
-running them. Using the Nx target preserves its build, package, and typecheck dependencies.
-
 ## Widen before handoff
 
 Run the narrowest relevant check first, then widen according to the changed boundary:
 
 ```bash
-npx nx test maestro-renderer # one project's unit suite
+npx nx test maestro-renderer  # one project's unit suite
 npx nx build maestro-electron # build/type gate for one project
 make e2e-renderer             # renderer scenario suite
 make e2e                      # full development Electron suite
 make e2e-production           # cached package + production Electron suite
 make format-check             # non-mutating repo formatting check
 make affected                 # affected build/lint/unit/development-Electron/renderer checks
-make sure                     # formats, then lint/build/unit/renderer E2E
+make sure                     # formats, then lint/build/unit/development Electron/renderer E2E
 ```
 
-`make sure` mutates formatting. Full Electron E2E is intentionally separate because it repeatedly
-opens the desktop app. `make e2e-production` excludes the development-only debug-console spec and is
-the check for file-URL routing, lazy chunks, packaging, and cross-platform behavior.
+`make sure` mutates formatting. `make e2e-production` remains separate because it packages the app,
+excludes the development-only debug-console spec, and checks file-URL routing, lazy chunks, and
+cross-platform packaging behavior.
 
 Production packaging is cached. The launcher resolves electron-builder's unpacked layout on macOS,
 Windows, and Linux, and CI runs the production suite on all three. E2E windows remain visible but use

@@ -41,7 +41,7 @@ This starts the Angular dev server and the Electron main process with hot reload
 `make` is the repo-wide interface — run `make help` for the full list. It is what CI runs.
 
 ```bash
-make sure          # format, lint, build, unit test, renderer E2E
+make sure          # format, lint, build, unit test, development Electron/renderer E2E
 make affected      # build, lint, unit/E2E tests for affected projects; no formatting
 make format-check  # non-mutating formatting check
 make e2e           # full Electron E2E against the development build
@@ -49,8 +49,7 @@ make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
 ```
 
-`make sure` mutates formatting. Electron E2E remains opt-in because it repeatedly opens the app;
-those windows are visible but do not take focus by default.
+`make sure` mutates formatting.
 
 For focused work, use Nx; see the [fast-iteration examples](docs/testing.md#fast-iteration) for file
 and test-name filters.

@@ -26,14 +26,14 @@ description: Verification loop using repository make targets.
 
 ## Commands
 
-- `make sure` — format, then lint, build, unit-test, and run renderer E2E across the repo.
-  **Mutates formatting.**
+- `make sure` — format, then lint, build, unit-test, and run development Electron and renderer E2E
+  across the repo. **Mutates formatting.**
 - `make format-check` — non-mutating formatting check, for review and CI-style verification.
 - `make affected` — build, lint, unit tests, development Electron E2E, and renderer E2E, scoped to
   what git says changed; does not check or mutate formatting.
 - `make e2e-renderer` — renderer-only E2E and part of `make sure`.
-- `make e2e` — full Electron E2E. Run intentionally when the changed journey needs it.
-  The E2E targets type-check themselves first.
+- `make e2e` — development Electron E2E and part of `make sure`. The E2E targets type-check
+  themselves first.
 - `make e2e-production` — package the app for the host OS and run the production-compatible Electron
   suite. Use it for file-URL routing, lazy chunks, packaging-only, and cross-platform behavior.
 - `make build-prod` — catches production-only build issues.

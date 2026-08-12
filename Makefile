@@ -97,8 +97,8 @@ f: format
 format-check: ## Check formatting
 	npx prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md"
 
-sure: format ## Format, lint, build, unit test, and renderer E2E; build is the app type gate
-	npx nx run-many -t build,lint,test,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
+sure: format ## Format, lint, build, unit test, and development E2E; build is the app type gate
+	npx nx run-many -t build,lint,test,e2e,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
 affected: ## Run checks only on affected projects based on git changes
 	npx nx affected -t build,lint,test,e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
 
