@@ -45,13 +45,28 @@ test('cancelling an import mid-scan self-heals via the startup rescan', async ({
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await expect(page.getByRole('heading', { name: 'Importing your library' })).toBeVisible()
-    await expect(page.getByText(/Reading tracks…/)).toBeVisible({ timeout: 30_000 })
 
-    // Cancel as soon as the deep-read phase is observable. Waiting on diagnostic work here lets a
-    // fast scan replace the button between an isVisible() check and click(), especially on Windows.
-    const cancelButton = page.getByRole('button', { name: 'Cancel import' })
-    await expect(cancelButton).toBeVisible()
-    await cancelButton.click()
+    // Click in the same browser tick that observes the deep-read state. Playwright's normal click
+    // waits for actionability and scrolls first; a fast scan can finish and detach this transient
+    // button during that delay. The DOM click still exercises the real Angular handler and IPC.
+    await page.waitForFunction(
+        () => {
+            const reading = [...document.querySelectorAll('*')].some(element =>
+                element.textContent?.trim().startsWith('Reading tracks…'),
+            )
+            if (!reading) return false
+
+            const cancelButton = [...document.querySelectorAll('button')].find(
+                button => button.textContent?.trim() === 'Cancel import',
+            )
+            if (!(cancelButton instanceof HTMLButtonElement)) return false
+
+            cancelButton.click()
+            return true
+        },
+        undefined,
+        { timeout: 30_000 },
+    )
     await expect(page.getByText(/Import cancelled/).first()).toBeVisible({ timeout: 20_000 })
     await expect(page.getByRole('button', { name: 'Retry import' })).toBeVisible()
 
