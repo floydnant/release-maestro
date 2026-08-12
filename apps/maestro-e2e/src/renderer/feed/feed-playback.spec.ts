@@ -1,10 +1,12 @@
 // Covers preview playback and seeking behavior for feed item tracks.
 import { expect, type Page, test } from '@playwright/test'
+import { installAudioFixtureRoute } from '../../fixtures/audio.fixture'
 import { createHydratedRelease, createRendererScenario, scenarioBuilder } from '../scenario-harness'
 
 const createFeedWithPlayableTrack = async (page: Page) => {
     const release = createHydratedRelease()
 
+    await installAudioFixtureRoute(page)
     await createRendererScenario(page, scenarioBuilder().feed([release]).build())
 
     return release
@@ -19,6 +21,7 @@ const startKarasuPlayback = async (page: Page) => {
 test.describe('release feed playback scenarios', () => {
     test('plays and seeks a real preview stream', async ({ page }) => {
         await createFeedWithPlayableTrack(page)
+        await page.context().setOffline(true)
 
         await page.getByRole('button', { name: 'Play Karasu' }).click()
         await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()

@@ -15,6 +15,15 @@
                 }
             }
         },
+        "e2e-production": {
+            "dependsOn": ["typecheck", "maestro-electron:package"],
+            "command": "playwright test -c apps/maestro-e2e/playwright.electron.production.config.ts",
+            "configurations": {
+                "ui": {
+                    "command": "playwright test -c apps/maestro-e2e/playwright.electron.production.config.ts --ui"
+                }
+            }
+        },
         "e2e-renderer": {
             "dependsOn": ["typecheck"],
             "command": "playwright test -c apps/maestro-e2e/playwright.renderer.config.ts",

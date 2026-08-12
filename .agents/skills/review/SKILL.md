@@ -66,9 +66,9 @@ Repo-wide gates go through `make`; single-project gates go direct to `nx`.
 | a user journey (scan/import, feed, playback)        | `make e2e` or `make e2e-renderer`                 |
 | build config, packaging, or deps                    | `make build-prod`                                 |
 
-`make affected` includes full Electron E2E, which repeatedly opens and closes the desktop app. Do
-not use it merely as a convenient multi-project unit-test command; select the affected Nx project
-targets directly unless full-app coverage is intentional.
+`make affected` includes both development E2E layers. Do not use it merely as a convenient
+multi-project unit-test command; select the affected Nx project targets directly unless full-app
+coverage is intentional.
 
 There is no repo-wide typecheck target. Type errors in renderer, electron, and core surface through
 `build` — run `npx nx build <project>` (or `make build`) when the diff changes types or contracts.

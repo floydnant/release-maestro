@@ -39,12 +39,14 @@ intentional convenience summaries.
 - **`make` for repo-wide checks** — `make sure`, `make affected`, `make test`, `make lint`,
   `make format-check`, `make build-prod`, `db-*`, packaging.
 - **`nx` for single-project checks** — `npx nx test maestro-renderer`, `npx nx build maestro-core`.
-  Prefer it over a make wrapper for focused work.
-- `make sure` formats, lints, builds, unit-tests, and runs renderer E2E. It mutates formatting.
-  Full Electron E2E is intentionally separate (`make e2e`) because it repeatedly opens the app;
-  run it when the changed user journey warrants the disruption.
-- `make affected` runs build, lint, unit tests, and both E2E targets for affected projects. It does
-  not check or mutate formatting.
+  Prefer it over a make wrapper for focused work; file/name-filtered examples are in
+  [docs/testing.md](docs/testing.md#fast-iteration).
+- `make sure` formats, lints, builds, unit-tests, and runs development Electron and renderer E2E. It
+  mutates formatting. Use `make e2e` or `make e2e-renderer` when only one E2E layer is relevant.
+- `make e2e-production` packages the app for the host OS and runs the production-compatible Electron
+  suite. Use it for file-URL, lazy-loading, packaging, and cross-platform behavior.
+- `make affected` runs build, lint, unit tests, development Electron E2E, and renderer E2E for
+  affected projects. It does not check or mutate formatting.
 - Never use `npm run` scripts.
 
 Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verification-loop/SKILL.md).

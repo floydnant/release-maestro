@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
-import { _electron as electron, ElectronApplication, Page } from 'playwright'
+import { ElectronApplication, Page } from 'playwright'
 import { buildTaggedLibrary, type TaggedTrackSpec } from '../fixtures/tagged-library.fixture'
+import { launchReleaseMaestro } from './launch-release-maestro'
 
 /**
  * The albums grid and the album detail page over a real scan.
@@ -18,28 +18,6 @@ import { buildTaggedLibrary, type TaggedTrackSpec } from '../fixtures/tagged-lib
  * that can catch the write side failing to keep them true: a repository unit test seeds
  * them, and a scale check only explains the plan.
  */
-
-const workspaceRoot = join(__dirname, '../../../..')
-const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
-
-const cleanEnv = (): Record<string, string> => {
-    const env = Object.fromEntries(
-        Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] == 'string'),
-    )
-    delete env.ELECTRON_RUN_AS_NODE
-    return env
-}
-
-const launchReleaseMaestro = async (appDataDir: string): Promise<ElectronApplication> =>
-    electron.launch({
-        args: [electronMainPath],
-        cwd: workspaceRoot,
-        env: {
-            ...cleanEnv(),
-            ELECTRON_IS_DEV: '1',
-            RELEASE_MAESTRO_APP_DATA_DIR: appDataDir,
-        },
-    })
 
 const stubFolderPicker = (app: ElectronApplication, directory: string): Promise<void> =>
     app.evaluate(({ dialog }, dir) => {

@@ -2,6 +2,7 @@ import { BrowserWindow, screen, session, shell } from 'electron'
 import { join } from 'path'
 import { format } from 'url'
 import { environment } from '../environments/environment'
+import { showMainWindow } from './app-window'
 import { rendererAppName, rendererAppPort } from './constants'
 import { nativeWindowBackgroundColor } from './design-tokens.generated'
 import { configurePermissionPolicy } from './permissions'
@@ -129,7 +130,9 @@ export default class App {
 
         // if main window is ready to show, close the splash window and show the main window
         App.mainWindow.once('ready-to-show', () => {
-            App.mainWindow?.show()
+            if (App.mainWindow) {
+                showMainWindow(App.mainWindow)
+            }
         })
 
         // handle all external redirects in a new browser window

@@ -16,6 +16,7 @@
                 "assets": ["apps/maestro-electron/src/assets"]
             },
             "configurations": {
+                "development": {},
                 "production": {
                     "optimization": true,
                     "extractLicenses": true,
@@ -27,7 +28,8 @@
                         }
                     ]
                 }
-            }
+            },
+            "defaultConfiguration": "production"
         },
         "serve-internal": {
             "executor": "nx-electron:execute",
@@ -42,6 +44,8 @@
         "package": {
             "dependsOn": ["maestro-renderer:build", "prepare-icons", "build"],
             "executor": "nx-electron:package",
+            "cache": true,
+            "outputs": ["{workspaceRoot}/dist/packages"],
             "options": {
                 "name": "maestro-electron",
                 "sourcePath": "dist/apps",
@@ -59,6 +63,8 @@
         "make": {
             "dependsOn": ["maestro-renderer:build", "prepare-icons", "build"],
             "executor": "nx-electron:make",
+            "cache": true,
+            "outputs": ["{workspaceRoot}/dist/executables"],
             "options": {
                 "name": "maestro-electron",
                 "sourcePath": "dist/apps",

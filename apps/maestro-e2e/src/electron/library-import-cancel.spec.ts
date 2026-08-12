@@ -1,27 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { _electron as electron, ElectronApplication, Page } from 'playwright'
+import { Page } from 'playwright'
 import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
 import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
 import type { TaggedTrackSpec } from '../fixtures/tagged-library.fixture'
-
-const workspaceRoot = join(__dirname, '../../../..')
-const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
-
-const cleanEnv = (): Record<string, string> => {
-    const env = Object.fromEntries(
-        Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] == 'string'),
-    )
-    delete env.ELECTRON_RUN_AS_NODE
-    return env
-}
-
-const launch = async (appDataDir: string): Promise<ElectronApplication> =>
-    electron.launch({
-        args: [electronMainPath],
-        cwd: workspaceRoot,
-        env: { ...cleanEnv(), ELECTRON_IS_DEV: '1', RELEASE_MAESTRO_APP_DATA_DIR: appDataDir },
-    })
+import { launchReleaseMaestro as launch } from './launch-release-maestro'
 
 const colors = ['red', 'green', 'blue', 'gold'] as const
 

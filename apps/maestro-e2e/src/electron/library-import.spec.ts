@@ -1,30 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { _electron as electron, ElectronApplication, Page } from 'playwright'
+import { ElectronApplication, Page } from 'playwright'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
-
-const workspaceRoot = join(__dirname, '../../../..')
-const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
-
-const cleanEnv = (): Record<string, string> => {
-    const env = Object.fromEntries(
-        Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] == 'string'),
-    )
-    delete env.ELECTRON_RUN_AS_NODE
-    return env
-}
-
-const launchReleaseMaestro = async (appDataDir: string): Promise<ElectronApplication> =>
-    electron.launch({
-        args: [electronMainPath],
-        cwd: workspaceRoot,
-        env: {
-            ...cleanEnv(),
-            ELECTRON_IS_DEV: '1',
-            RELEASE_MAESTRO_APP_DATA_DIR: appDataDir,
-        },
-    })
+import { launchReleaseMaestro } from './launch-release-maestro'
 
 /** Replace the native folder picker with a stub returning the given directory. */
 const stubFolderPicker = (app: ElectronApplication, directory: string): Promise<void> =>
@@ -150,4 +129,26 @@ test('onboarding can be skipped and keeps nudging via the sidebar CTA', async ({
     page = await electronApp.firstWindow()
     await expect(page).toHaveURL(/\/home$/)
     await expect(page.getByText("Your music library isn't set up yet.")).toBeVisible()
+})
+
+test('library routes are available after onboarding is skipped', async ({}, testInfo) => {
+    const appDataDir = testInfo.outputPath('app-data')
+    await mkdir(appDataDir, { recursive: true })
+
+    electronApp = await launchReleaseMaestro(appDataDir)
+    page = await electronApp.firstWindow()
+
+    await page.getByRole('button', { name: 'Skip for now' }).click()
+
+    await page.getByRole('link', { name: 'Tracks' }).click()
+    await expect(page).toHaveURL(/\/tracks$/)
+    await expect(page.getByRole('heading', { name: 'Tracks' })).toBeVisible()
+
+    await page.getByRole('link', { name: 'Library settings' }).click()
+    await expect(page).toHaveURL(/\/settings\/library$/)
+    await expect(page.getByRole('heading', { name: 'Library folders' })).toBeVisible()
+
+    await page.getByRole('link', { name: 'Set up library' }).click()
+    await expect(page).toHaveURL(/\/import$/)
+    await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
 })

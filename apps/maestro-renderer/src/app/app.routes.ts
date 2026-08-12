@@ -18,6 +18,16 @@ const developmentRoutes: Route[] = webEnv.production
           },
       ]
 
+const developmentSettingsRoutes: Route[] = webEnv.production
+    ? []
+    : [
+          {
+              path: 'debug',
+              loadComponent: () =>
+                  import('./pages/settings/debug/debug.component').then(m => m.DebugComponent),
+          },
+      ]
+
 export const appRoutes: Route[] = [
     {
         path: '',
@@ -66,11 +76,7 @@ export const appRoutes: Route[] = [
                         m => m.LibrarySettingsComponent,
                     ),
             },
-            {
-                path: 'debug',
-                loadComponent: () =>
-                    import('./pages/settings/debug/debug.component').then(m => m.DebugComponent),
-            },
+            ...developmentSettingsRoutes,
             {
                 path: 'apple-mail',
                 loadComponent: () =>

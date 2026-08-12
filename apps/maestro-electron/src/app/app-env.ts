@@ -7,22 +7,26 @@ import { join, resolve } from 'path'
 export type AppPaths = Paths & { resources: string }
 
 const localDevPath = '.app-data.dev'
-const localDevRoot = process.env.RELEASE_MAESTRO_APP_DATA_DIR
+const appDataOverride = process.env.RELEASE_MAESTRO_APP_DATA_DIR
     ? resolve(process.env.RELEASE_MAESTRO_APP_DATA_DIR)
-    : join(process.cwd(), localDevPath)
-export const appPaths: AppPaths = app.isPackaged
-    ? {
-          ...envPaths('release-maestro', { suffix: '' }),
-          resources: join(process.resourcesPath, '..'),
-      }
-    : {
-          cache: join(localDevRoot, 'cache'),
-          log: join(localDevRoot, 'log'),
-          temp: join(localDevRoot, 'temp'),
-          data: join(localDevRoot, 'data'),
-          config: join(localDevRoot, 'config'),
-          resources: process.cwd(),
-      }
+    : undefined
+const localDevRoot = appDataOverride ?? join(process.cwd(), localDevPath)
+const resources = app.isPackaged ? join(process.resourcesPath, '..') : process.cwd()
+
+export const appPaths: AppPaths =
+    appDataOverride || !app.isPackaged
+        ? {
+              cache: join(localDevRoot, 'cache'),
+              log: join(localDevRoot, 'log'),
+              temp: join(localDevRoot, 'temp'),
+              data: join(localDevRoot, 'data'),
+              config: join(localDevRoot, 'config'),
+              resources,
+          }
+        : {
+              ...envPaths('release-maestro', { suffix: '' }),
+              resources,
+          }
 
 const metadataEngineBinaryName = process.platform == 'win32' ? 'metadata-engine.exe' : 'metadata-engine'
 

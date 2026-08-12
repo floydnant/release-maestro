@@ -18,7 +18,9 @@ description: Playwright E2E readiness and test authoring guidance.
 - keep specs focused on critical user journeys and route-level navigation
 - use soft assertions only for known prototype gaps that should not block signal
 - keep traces/screenshots on failure and use trace viewer for CI/local debugging
-- both suites type-check before they run (`maestro-e2e:e2e` and `:e2e-renderer` depend on
-  `maestro-e2e:typecheck`), because Playwright transpiles without semantic checking
+- iterate on one spec or test title when useful, then widen to the relevant suite before handoff;
+  use the target-specific commands in `docs/testing.md#fast-iteration`
+- all suites type-check before they run (`maestro-e2e:e2e`, `:e2e-production`, and `:e2e-renderer`
+  depend on `maestro-e2e:typecheck`), because Playwright transpiles without semantic checking
 - to point the renderer suite at an already-running dev server, set `BASE_URL`; it defaults to
   `http://localhost:4200`

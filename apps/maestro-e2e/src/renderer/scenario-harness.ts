@@ -15,6 +15,7 @@ import {
     SongRow,
     SongWindowResult,
 } from '@release-maestro/core'
+import { audioFixtureUrl } from '../fixtures/audio.fixture'
 
 type MainIpcChannel = keyof MainIpcContract & string
 type RendererIpcChannel = keyof RendererIpcContract & string
@@ -375,8 +376,7 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
                 duration: 184,
                 titleLink: null,
                 albumPreorder: false,
-                streamUrl:
-                    'https://github.com/floydnant/release-maestro/raw/db7766d68cbb1d8053c1ca471195e6f10c3c2d32/fixtures/06-karasu-ktmp3.mp3',
+                streamUrl: audioFixtureUrl,
             },
         ],
     },
