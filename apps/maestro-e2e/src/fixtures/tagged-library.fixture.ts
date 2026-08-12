@@ -4,7 +4,7 @@
  * import-flow tests exercise album grouping and the cover mosaic without
  * committing more binary fixtures.
  */
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -270,7 +270,7 @@ export const buildTaggedLibrary = async (
     specs: TaggedTrackSpec[] = DEFAULT_LIBRARY,
     audioBytes?: number,
 ): Promise<string> => {
-    const libraryDir = await mkdtemp(join(tmpdir(), 'release-maestro-e2e-library-'))
+    const libraryDir = await realpath(await mkdtemp(join(tmpdir(), 'release-maestro-e2e-library-')))
     const libraryDirs = libraryDirsByTest.get(testInfo) ?? []
     libraryDirs.push(libraryDir)
     libraryDirsByTest.set(testInfo, libraryDirs)
