@@ -44,17 +44,16 @@ This starts the Angular dev server and the Electron main process with hot reload
 make sure          # format, lint, build, unit test, renderer E2E
 make affected      # build, lint, unit/E2E tests for affected projects; no formatting
 make format-check  # non-mutating formatting check
-make e2e           # opt-in full Electron E2E; repeatedly opens the desktop app
+make e2e           # full Electron E2E against the development build
 make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
 ```
 
-`make sure` mutates formatting. Full Electron E2E is deliberately not part of it because repeatedly
-opening and closing Electron interrupts the developer's desktop session; run `make e2e`
-intentionally when a changed user journey needs full-app coverage.
+`make sure` mutates formatting. Electron E2E remains opt-in because it repeatedly opens the app;
+those windows are visible but do not take focus by default.
 
-For focused work on a single project, go straight to nx rather than through make — it schedules and
-caches per project better:
+For focused work, use Nx; see the [fast-iteration examples](docs/testing.md#fast-iteration) for file
+and test-name filters.
 
 ```bash
 npx nx test maestro-renderer
@@ -81,7 +80,7 @@ Five Nx projects, whose names are not self-explanatory:
 - **`maestro-core`** — shared Zod schemas and types. The contract for everything crossing the
   main/renderer and metadata-engine boundaries.
 - **`metadata-engine`** — Rust sidecar that reads and writes audio file tags.
-- **`maestro-e2e`** — both E2E suites, renderer-only and full Electron.
+- **`maestro-e2e`** — renderer and full-Electron E2E, including packaged-app coverage.
 
 `apple-scripts/` holds the AppleScript that exports mail out of Apple Mail; `drizzle/` holds
 migrations. A project's `project.json` declares its explicit configuration, but Nx can infer
