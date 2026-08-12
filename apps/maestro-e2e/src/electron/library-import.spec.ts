@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { ElectronApplication, Page } from 'playwright'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
+import { buildTaggedLibrary, cleanupTaggedLibraries } from '../fixtures/tagged-library.fixture'
 import { launchReleaseMaestro } from './launch-release-maestro'
 
 /** Replace the native folder picker with a stub returning the given directory. */
@@ -18,9 +18,13 @@ const stubFolderPicker = (app: ElectronApplication, directory: string): Promise<
 let electronApp: ElectronApplication | undefined
 let page: Page
 
-test.afterEach(async () => {
-    await electronApp?.close()
-    electronApp = undefined
+test.afterEach(async ({}, testInfo) => {
+    try {
+        await electronApp?.close()
+    } finally {
+        electronApp = undefined
+        await cleanupTaggedLibraries(testInfo)
+    }
 })
 
 test('first run gates into onboarding, imports a library, and shows the cover mosaic', async ({}, testInfo) => {

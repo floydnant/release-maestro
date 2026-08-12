@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { ElectronApplication, Page } from 'playwright'
 import { mkdir } from 'node:fs/promises'
-import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
+import { buildTaggedLibrary, cleanupTaggedLibraries } from '../fixtures/tagged-library.fixture'
 import type { TaggedTrackSpec } from '../fixtures/tagged-library.fixture'
 import { launchReleaseMaestro as launch } from './launch-release-maestro'
 
@@ -19,9 +19,13 @@ const bigLibrary = (count: number): TaggedTrackSpec[] =>
 
 let app: ElectronApplication | undefined
 
-test.afterEach(async () => {
-    await app?.close()
-    app = undefined
+test.afterEach(async ({}, testInfo) => {
+    try {
+        await app?.close()
+    } finally {
+        app = undefined
+        await cleanupTaggedLibraries(testInfo)
+    }
 })
 
 test('cancelling an import mid-scan self-heals via the startup rescan', async ({}, testInfo) => {

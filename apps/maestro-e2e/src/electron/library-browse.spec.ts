@@ -2,7 +2,7 @@ import { expect, test, type TestInfo } from '@playwright/test'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ElectronApplication, Page } from 'playwright'
-import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
+import { buildTaggedLibrary, cleanupTaggedLibraries } from '../fixtures/tagged-library.fixture'
 import { launchReleaseMaestro } from './launch-release-maestro'
 
 /**
@@ -26,9 +26,13 @@ const stubFolderPicker = (app: ElectronApplication, directory: string): Promise<
 let electronApp: ElectronApplication | undefined
 let page: Page
 
-test.afterEach(async () => {
-    await electronApp?.close()
-    electronApp = undefined
+test.afterEach(async ({}, testInfo) => {
+    try {
+        await electronApp?.close()
+    } finally {
+        electronApp = undefined
+        await cleanupTaggedLibraries(testInfo)
+    }
 })
 
 /** Onboard through a real scan of the tagged fixture and land on `/tracks`. */

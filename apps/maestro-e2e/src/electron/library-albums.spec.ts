@@ -1,7 +1,11 @@
 import { expect, test, type TestInfo } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { ElectronApplication, Page } from 'playwright'
-import { buildTaggedLibrary, type TaggedTrackSpec } from '../fixtures/tagged-library.fixture'
+import {
+    buildTaggedLibrary,
+    cleanupTaggedLibraries,
+    type TaggedTrackSpec,
+} from '../fixtures/tagged-library.fixture'
 import { launchReleaseMaestro } from './launch-release-maestro'
 
 /**
@@ -31,9 +35,13 @@ const stubFolderPicker = (app: ElectronApplication, directory: string): Promise<
 let electronApp: ElectronApplication | undefined
 let page: Page
 
-test.afterEach(async () => {
-    await electronApp?.close()
-    electronApp = undefined
+test.afterEach(async ({}, testInfo) => {
+    try {
+        await electronApp?.close()
+    } finally {
+        electronApp = undefined
+        await cleanupTaggedLibraries(testInfo)
+    }
 })
 
 /** Onboard through a real scan of a library folder and land in the app. */
