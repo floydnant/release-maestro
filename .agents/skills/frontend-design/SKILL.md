@@ -62,6 +62,25 @@ Layer discipline is unchecked too: product code consumes **semantic** tokens
 (`bg-background-surface`, `text-content-muted`). Foundation tokens belong to token infrastructure,
 to shared primitives where there is a stated reason, and to the design-system specimen.
 
+## When the class list is built at runtime
+
+Every styling class has to resolve to CSS, so a class list assembled at runtime is reported as
+`dynamicClassList` rather than quietly accepted. Three ways out, in order of preference:
+
+1. **Put the branches in the template**, where they are validated like any other list:
+   `[ngClass]="{ 'border-status-danger-border': failed() }"`, or a conditional over whole literals.
+2. **Return whole class lists from a component member** — a method, a getter, a `computed`, a
+   constant property — where every branch is a string literal. The rule resolves those against the
+   component that owns the template and validates each literal, so a closed vocabulary is allowed to
+   live in TypeScript. It has to be _this_ component's member, read the way it is declared, with no
+   chain hanging off it; a value imported from another module cannot be followed.
+3. **Suppress with a reason** when neither fits — a class name crossing a module boundary, a
+   vocabulary that is genuinely open. Name what the vocabulary is and why the rule cannot see it, the
+   way `design-system.component.html` does. A suppression without a reason is not the convention.
+
+Concatenating onto a runtime value (`'type-' + variant()`) is reported separately as `partialClass`,
+because the class name itself is only half-written and no authority can check half a name.
+
 ## Build accessibility in
 
 Accessibility is part of the implementation contract, not a later audit. Every UI change must:

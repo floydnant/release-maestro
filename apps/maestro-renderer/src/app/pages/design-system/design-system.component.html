@@ -74,8 +74,9 @@
                             eslint-disable-next-line design-system/valid-template-classnames --
                             `token` comes from the generated `typographyVariantIdentifiers`, so every
                             `type-*` class this can produce is a generated design-system class. The
-                            typed-API check reads the *root* identifier of the expression, which here
-                            is a loop variable rather than the generated export itself.
+                            rule resolves a closed vocabulary only as far as the component's own
+                            members; `token` is a loop variable over a value imported from another
+                            module, which needs a type checker to follow (MAE-111).
                         -->
                         <p class="mt-2" [ngClass]="'type-' + token">Music discovery for working collectors</p>
                     </div>

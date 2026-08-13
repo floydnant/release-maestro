@@ -178,6 +178,20 @@ templateTester.run('valid-template-classnames', templateRule, {
         template('reporting stays configurable', '<div [class]="workerHealthClass()"></div>', {
             options: quiet,
         }),
+
+        // --- A9: a closed vocabulary the owning component declares ---
+        template('A9 a method whose every branch is a literal', '<div [class]="statusClass(s)"></div>'),
+        template('A9 a computed', '<div [class]="badgeClass()"></div>'),
+        template('A9 a computed with a concise ternary body', '<div [class]="toneClass()"></div>'),
+        template('A9 a constant property, read without a call', '<div [class]="listClass"></div>'),
+        template('A9 a getter', '<div [class]="panelClass"></div>'),
+        template('A9 among the other surfaces', '<div [ngClass]="badgeClass()"></div>'),
+        template(
+            // The literal ends in whitespace, so nothing is glued and both parts are whole lists.
+            'A9 concatenated onto a literal prefix',
+            '<div [class]="\'badge \' + statusClass(s)"></div>',
+        ),
+        template('A9 inside a conditional', '<div [class]="cond ? badgeClass() : listClass"></div>'),
     ],
 
     invalid: [
@@ -283,6 +297,56 @@ templateTester.run('valid-template-classnames', templateRule, {
             '<div [ngClass]="typographyVariantIdentifiers[index]"></div>',
             { errors: [{ messageId: 'dynamicClassList' }] },
         ),
+
+        // --- A9's other half: resolving a member is not accepting it ---
+        template(
+            // The whole reason the answer is the literals rather than the member: a closed
+            // vocabulary is only as good as the classes in it.
+            'A9 a resolved member carrying an unknown class',
+            '<div [class]="plantedClass()"></div>',
+            { errors: [didYouMean('fleex', 'flex')] },
+        ),
+        template('A9 a member with a branch that is not a literal', '<div [class]="mixedClass(x)"></div>', {
+            errors: [{ messageId: 'dynamicClassList' }],
+        }),
+        template(
+            // Writable, so the initial value is not what the template renders.
+            'A9 a signal is not a closed vocabulary',
+            '<div [class]="mutableClass()"></div>',
+            { errors: [{ messageId: 'dynamicClassList' }] },
+        ),
+        template(
+            // Declaration kind and call shape have to agree, or the expression is not describing
+            // this member.
+            'A9 a method read without calling it',
+            '<div [class]="statusClass"></div>',
+            { errors: [{ messageId: 'dynamicClassList' }] },
+        ),
+        template('A9 a constant property called like a method', '<div [class]="listClass()"></div>', {
+            errors: [{ messageId: 'dynamicClassList' }],
+        }),
+        template(
+            // Nothing can be said about what the rest of the chain does to the resolved value.
+            'A9 a chain hanging off a resolved member',
+            '<div [class]="badgeClass().length"></div>',
+            { errors: [{ messageId: 'dynamicClassList' }] },
+        ),
+        template(
+            // Angular binds `listClass` to the loop item, not to the component's member. The
+            // expression AST cannot tell the two apart, so the template's own bindings win.
+            'A9 a member shadowed by a name the template binds',
+            '@for (listClass of rows; track listClass) { <div [class]="listClass"></div> }',
+            { errors: [{ messageId: 'dynamicClassList' }] },
+        ),
+        {
+            // The removed check trusted a root identifier for its spelling. This is that exact
+            // shape: a local `computed` that is not Angular's, wrapping a valid class name.
+            name: 'A9 a look-alike factory from outside @angular/core',
+            filename: path.join(FIXTURES, 'local-computed.component.html'),
+            options: settings,
+            code: '<div [class]="wrapperClass()"></div>',
+            errors: [{ messageId: 'dynamicClassList' }],
+        },
 
         // --- D1: the descriptor reading, offered only where a descriptor could have gone ---
         template(

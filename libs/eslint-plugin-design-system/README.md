@@ -9,9 +9,9 @@ convention it enforces is documented for humans and agents in
 work and where they stop.
 
 The library knows nothing about Release Maestro's design system, or any other. Every authority — the
-Tailwind config, the global stylesheets, the generated token module — arrives as a rule option, which
-is what makes it a library rather than a folder of scripts, and what would make publishing it a
-packaging question rather than a rewrite.
+Tailwind config and the global stylesheets — arrives as a rule option, which is what makes it a
+library rather than a folder of scripts, and what would make publishing it a packaging question
+rather than a rewrite.
 
 ## The two rules
 
@@ -99,7 +99,7 @@ Every message names its own failure and stops. The two findings with nothing to 
 list itself are the exception, and say what to do instead:
 
 ```
-Runtime-built class list — use a generated token API, or suppress with a reason.
+Runtime-built class list — enumerate the classes, or suppress with a reason.
 `type-` is glued to a runtime value — suppress with a reason if the vocabulary is closed.
 ```
 
@@ -113,13 +113,42 @@ Statically enumerable bindings are validated like any other class list: `[class.
 object keys, `[class]` conditionals and concatenations. What cannot be enumerated is reported as
 `dynamicClassList` rather than quietly accepted — moving a class into a binding is not a bypass.
 
-**There is no exemption for typed or generated APIs.** An earlier version accepted any expression
-whose root identifier matched an export of a configured generated module. That was not a type-based
-check: it read export _names_ out of a file, never resolved the template's member to that export,
-and never established that the call returns class names — so a same-named component helper, or any
-chain hanging off an accepted root, sailed through. It also had no real consumer, since the
-generated token module exports values (`semanticColor` returns a `var(...)` string) rather than
-class names. A check that cannot fail is worse than no check, so it is gone.
+### A closed vocabulary in the component
+
+One shape resolves rather than reports: the expression names a member of the component that owns the
+template, and that member returns nothing but string literals. `[class]="'badge ' + statusClass(s)"`
+is checked against every branch `statusClass` can return.
+
+The resolution is in [`src/lib/member-classes.cjs`](src/lib/member-classes.cjs), and two properties
+are what make it an acceptance path rather than a bypass:
+
+- **Resolved by declaration site, not by spelling.** The member is looked up on the component the
+  template already maps to. A same-named helper somewhere else in the app is not a match, and a name
+  the template itself binds — a `@for` item, `@let`, an `as` alias, a `#ref` — never resolves against
+  the component at all.
+- **The answer is the literal strings**, which go through the same three authorities as any
+  hand-written class list. A resolved member carrying `fleex` is reported exactly like a template
+  carrying `fleex`. Nothing is trusted for where it came from.
+
+It gives up — and reports `dynamicClassList` as before — on anything it cannot enumerate from one
+file: a branch that is not a literal, `signal()` (writable, so its initial value is not what renders),
+a `computed` that is not Angular's, a call chain past the resolved member, a member whose call shape
+disagrees with its declaration, a name declared by two components in the same file.
+
+**There is still no exemption for typed or generated APIs**, and the difference is the point. An
+earlier version accepted any expression whose root identifier matched an export of a configured
+generated module. That was not a type-based check: it read export _names_ out of a file, never
+resolved the template's member to that export, and never established that the call returns class
+names — so a same-named component helper, or any chain hanging off an accepted root, sailed through.
+It also had no real consumer, since the generated token module exports values (`semanticColor`
+returns a `var(...)` string) rather than class names. A check that cannot fail is worse than no
+check, so it is gone.
+
+Crossing a module boundary — a class name imported from elsewhere, or a loop over a generated
+identifier list — needs a TypeScript `TypeChecker`, which needs a program. Measured at roughly +30%
+on the renderer's lint, and deferred in
+[MAE-111](https://linear.app/floyd-haremsa/issue/MAE-111) until narrow suppressions are frequent
+enough to be worth it.
 
 The supported answer for a genuinely closed vocabulary the rule cannot see is a narrow
 `eslint-disable-next-line` with a reason. Three sites in the renderer have one — `'type-' + token`

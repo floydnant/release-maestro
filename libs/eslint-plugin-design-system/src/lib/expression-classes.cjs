@@ -18,10 +18,19 @@ function isStringLiteral(node) {
  */
 
 /**
+ * @callback ResolveExpression
+ * @param {AngularExpression} node
+ * @returns {string[]|null} every class list the expression can produce, or null when that is not
+ *   knowable. See `member-classes.cjs` — the strings come back to be validated like any other, so
+ *   resolving one is not the same as accepting it.
+ */
+
+/**
  * @param {AngularExpression} root
+ * @param {ResolveExpression} [resolve]
  * @returns {{ strings: ClassString[], dynamic: boolean }}
  */
-function collectClassStrings(root) {
+function collectClassStrings(root, resolve) {
     /** @type {ClassString[]} */
     const strings = []
     let dynamic = false
@@ -86,8 +95,21 @@ function collectClassStrings(root) {
                 node.expressions?.forEach(expression => visit(expression, truncatedStart, truncatedEnd))
                 return
 
-            default:
-                dynamic = true
+            default: {
+                // A resolved member behaves exactly like a string literal with several possible
+                // values — same truncation flags, same validation. It carries no span of its own,
+                // because the literals live in the component file, so the diagnostic falls back to
+                // the whole binding.
+                const resolved = resolve?.(node)
+                if (!resolved) {
+                    dynamic = true
+                    return
+                }
+
+                for (const value of resolved) {
+                    strings.push({ value, offset: null, truncatedStart, truncatedEnd })
+                }
+            }
         }
     }
 

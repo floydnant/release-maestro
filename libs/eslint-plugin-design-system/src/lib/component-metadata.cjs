@@ -17,6 +17,81 @@ const DECORATORS = new Set(['Component', 'Directive'])
 /** @type {Map<string, { mtimeMs: number, metadata: ComponentMetadata }>} */
 const metadataCache = new Map()
 
+/** @type {Map<string, { mtimeMs: number, source: ts.SourceFile }>} */
+const sourceCache = new Map()
+
+/**
+ * The parsed component file, shared by everything here that needs its AST. One `createSourceFile`
+ * per component per lint run: the decorator read and the member resolution in `member-classes.cjs`
+ * both want the same tree, and parsing the renderer's largest component twice costs ~17ms for
+ * nothing.
+ *
+ * @param {string} tsPath
+ * @returns {ts.SourceFile|null} null when the file cannot be read at all
+ */
+function componentSourceFile(tsPath) {
+    let stat
+    try {
+        stat = fs.statSync(tsPath)
+    } catch {
+        return null
+    }
+
+    const cached = sourceCache.get(tsPath)
+    if (cached && cached.mtimeMs === stat.mtimeMs) return cached.source
+
+    const source = ts.createSourceFile(
+        tsPath,
+        fs.readFileSync(tsPath, 'utf8'),
+        ts.ScriptTarget.Latest,
+        true,
+    )
+    sourceCache.set(tsPath, { mtimeMs: stat.mtimeMs, source })
+    return source
+}
+
+/**
+ * The classes in a file that carry `@Component` or `@Directive`. A template resolves against these
+ * and nothing else — a plain exported class in the same file is not what the template sees.
+ *
+ * @param {ts.SourceFile} source
+ * @returns {ts.ClassDeclaration[]}
+ */
+function decoratedClasses(source) {
+    /** @type {ts.ClassDeclaration[]} */
+    const classes = []
+
+    /** @param {ts.Node} node */
+    const visit = node => {
+        if (ts.isClassDeclaration(node) && componentDecorators(node).length > 0) classes.push(node)
+        ts.forEachChild(node, visit)
+    }
+
+    visit(source)
+    return classes
+}
+
+/**
+ * @param {ts.ClassDeclaration} node
+ * @returns {ts.ObjectLiteralExpression[]} the metadata object of every `@Component`/`@Directive` on
+ *   the class
+ */
+function componentDecorators(node) {
+    /** @type {ts.ObjectLiteralExpression[]} */
+    const metadata = []
+
+    for (const decorator of ts.getDecorators(node) ?? []) {
+        const call = decorator.expression
+        if (!ts.isCallExpression(call)) continue
+        if (!ts.isIdentifier(call.expression) || !DECORATORS.has(call.expression.text)) continue
+
+        const argument = call.arguments[0]
+        if (argument && ts.isObjectLiteralExpression(argument)) metadata.push(argument)
+    }
+
+    return metadata
+}
+
 /**
  * @param {ts.Node | undefined} node
  * @returns {string|null}
@@ -76,42 +151,24 @@ function readComponentMetadata(tsPath) {
     const cached = metadataCache.get(tsPath)
     if (cached && cached.mtimeMs === stat.mtimeMs) return cached.metadata
 
-    const source = ts.createSourceFile(
-        tsPath,
-        fs.readFileSync(tsPath, 'utf8'),
-        ts.ScriptTarget.Latest,
-        true,
-    )
+    const source = componentSourceFile(tsPath)
 
     /** @type {ComponentMetadata} */
     const metadata = { styleUrls: [], inlineStyles: [], templateUrls: [] }
 
-    /** @param {ts.Node} node */
-    const visit = node => {
-        if (ts.isClassDeclaration(node)) {
-            for (const decorator of ts.getDecorators(node) ?? []) {
-                const call = decorator.expression
-                if (!ts.isCallExpression(call)) continue
-                if (!ts.isIdentifier(call.expression) || !DECORATORS.has(call.expression.text)) continue
-
-                const argument = call.arguments[0]
-                if (!argument || !ts.isObjectLiteralExpression(argument)) continue
-
-                metadata.styleUrls.push(
-                    ...stringLiteralValues(propertyValue(argument, 'styleUrl')),
-                    ...stringLiteralValues(propertyValue(argument, 'styleUrls')),
-                )
-                metadata.inlineStyles.push(...stringLiteralValues(propertyValue(argument, 'styles')))
-                metadata.templateUrls.push(...stringLiteralValues(propertyValue(argument, 'templateUrl')))
-            }
+    for (const declaration of source ? decoratedClasses(source) : []) {
+        for (const argument of componentDecorators(declaration)) {
+            metadata.styleUrls.push(
+                ...stringLiteralValues(propertyValue(argument, 'styleUrl')),
+                ...stringLiteralValues(propertyValue(argument, 'styleUrls')),
+            )
+            metadata.inlineStyles.push(...stringLiteralValues(propertyValue(argument, 'styles')))
+            metadata.templateUrls.push(...stringLiteralValues(propertyValue(argument, 'templateUrl')))
         }
-        ts.forEachChild(node, visit)
     }
-
-    visit(source)
 
     metadataCache.set(tsPath, { mtimeMs: stat.mtimeMs, metadata })
     return metadata
 }
 
-module.exports = { readComponentMetadata }
+module.exports = { componentSourceFile, decoratedClasses, readComponentMetadata }

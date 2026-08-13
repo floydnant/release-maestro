@@ -7,13 +7,59 @@
 const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
 const { CLASS_MESSAGES, describeUnknownClass, TEMPLATE_MESSAGES } = require('../lib/diagnostics.cjs')
 const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
+const { componentFileFor } = require('../lib/css-classes.cjs')
 const { collectClassStrings } = require('../lib/expression-classes.cjs')
+const { createMemberResolver } = require('../lib/member-classes.cjs')
 
 /** `BindingType.Class`, i.e. `[class.foo]`. */
 const CLASS_BINDING = 2
 /** Names classes to apply on a route match — a list of styling, never a place to name an element. */
 const ROUTER_LINK_ACTIVE = 'routerLinkActive'
 const CLASS_ATTRIBUTES = new Set(['class', 'ngClass', ROUTER_LINK_ACTIVE])
+
+/**
+ * The template AST fields that bind a name for the markup below them: `@for` items and their
+ * context variables, `<ng-template let-…>`, `#refs`, and the `as` alias on `@if`. `@let` carries
+ * its name on the node itself and is handled beside these.
+ */
+const VARIABLE_FIELDS = ['item', 'contextVariables', 'variables', 'references', 'expressionAlias']
+
+/**
+ * Every name the template itself binds. Angular resolves these ahead of the component's members and
+ * the expression AST does not mark which is which, so a name bound anywhere in the file is off
+ * limits for member resolution — over-broad by design, and the cost of being wrong is only that an
+ * expression stays unresolved.
+ *
+ * @param {object} ast the parsed template
+ * @returns {Set<string>}
+ */
+function boundNames(ast) {
+    /** @type {Set<string>} */
+    const names = new Set()
+
+    /** @param {unknown} node */
+    const visit = node => {
+        if (!node || typeof node !== 'object') return
+        if (Array.isArray(node)) return node.forEach(visit)
+
+        const record = /** @type {Record<string, any>} */ (node)
+        if (record.type === 'LetDeclaration' && typeof record.name === 'string') names.add(record.name)
+
+        for (const field of VARIABLE_FIELDS) {
+            for (const variable of [record[field]].flat()) {
+                if (variable && typeof variable.name === 'string') names.add(variable.name)
+            }
+        }
+
+        for (const [key, value] of Object.entries(record)) {
+            if (key === 'parent' || key.endsWith('Span')) continue
+            visit(value)
+        }
+    }
+
+    visit(ast)
+    return names
+}
 
 const malformedMessageIds = {
     emptyDescriptor: 'emptyDescriptor',
@@ -40,6 +86,10 @@ module.exports = {
             cwd: context.cwd,
             filePath: context.filename,
         })
+        const resolveMember = createMemberResolver(
+            componentFileFor(context.filename),
+            boundNames(sourceCode.ast),
+        )
 
         /**
          * An index the parser reported but the source map cannot place is not a reason to lose the
@@ -139,7 +189,7 @@ module.exports = {
         const checkExpression = node => {
             const fallbackLoc = locFor(node.sourceSpan.start.offset, node.sourceSpan.end.offset)
 
-            const { strings, dynamic } = collectClassStrings(node.value)
+            const { strings, dynamic } = collectClassStrings(node.value, resolveMember)
 
             for (const literal of strings) {
                 checkClassList(literal.value, {
