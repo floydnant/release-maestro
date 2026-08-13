@@ -18,6 +18,7 @@
         },
         "typecheck": {
             "executor": "nx:run-commands",
+            "cache": true,
             "options": {
                 "command": "npx tsc --noEmit -p libs/eslint-plugin-design-system/tsconfig.lib.json"
             }

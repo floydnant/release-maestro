@@ -45,7 +45,7 @@ test.beforeEach(async ({}, testInfo) => {
     const appDataDir = testInfo.outputPath('app-data')
     await mkdir(appDataDir, { recursive: true })
 
-    electronApp = await launchReleaseMaestro(appDataDir)
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
     await openDebugConsole(page)
 })

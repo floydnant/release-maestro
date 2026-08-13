@@ -4,13 +4,15 @@
  * import-flow tests exercise album grouping and the cover mosaic without
  * committing more binary fixtures.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { TestInfo } from '@playwright/test'
 
 const workspaceRoot = join(__dirname, '../../../..')
 const sourceFixturePath = join(workspaceRoot, 'fixtures/06-karasu-ktmp3.mp3')
+const libraryDirsByTest = new WeakMap<TestInfo, string[]>()
 
 /** 24×24 solid-color PNGs (base64) used as embedded cover art. */
 const coverPngs = {
@@ -255,7 +257,9 @@ const stripId3 = (data: Buffer): Buffer => {
 const CREATION_SPACING_MS = 5
 
 /**
- * Writes the tagged library into the test's output dir and returns its path.
+ * Writes the tagged library outside Playwright's managed output directory and
+ * returns its path. A concurrent Playwright invocation may clean that output
+ * directory while this test is still scanning, so live inputs cannot reside there.
  * `audioBytes` optionally truncates the audio stream to keep large generated
  * libraries small and fast (readers tolerate a cut-off final frame).
  *
@@ -266,8 +270,10 @@ export const buildTaggedLibrary = async (
     specs: TaggedTrackSpec[] = DEFAULT_LIBRARY,
     audioBytes?: number,
 ): Promise<string> => {
-    const libraryDir = testInfo.outputPath('library')
-    await mkdir(libraryDir, { recursive: true })
+    const libraryDir = await realpath(await mkdtemp(join(tmpdir(), 'release-maestro-e2e-library-')))
+    const libraryDirs = libraryDirsByTest.get(testInfo) ?? []
+    libraryDirs.push(libraryDir)
+    libraryDirsByTest.set(testInfo, libraryDirs)
     let audio = stripId3(await readFile(sourceFixturePath))
     if (audioBytes) audio = audio.subarray(0, audioBytes)
     for (const [index, spec] of specs.entries()) {
@@ -275,4 +281,11 @@ export const buildTaggedLibrary = async (
         await writeFile(join(libraryDir, spec.fileName), Buffer.concat([buildId3Tag(spec), audio]))
     }
     return libraryDir
+}
+
+/** Removes every tagged library built for a test, after Electron releases its files. */
+export const cleanupTaggedLibraries = async (testInfo: TestInfo): Promise<void> => {
+    const libraryDirs = libraryDirsByTest.get(testInfo) ?? []
+    libraryDirsByTest.delete(testInfo)
+    await Promise.all(libraryDirs.map(libraryDir => rm(libraryDir, { recursive: true, force: true })))
 }

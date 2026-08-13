@@ -2,8 +2,8 @@ import { workspaceRoot } from '@nx/devkit'
 import { nxE2EPreset } from '@nx/playwright/preset'
 import { defineConfig, devices } from '@playwright/test'
 
-// For CI, you may want to set BASE_URL to the deployed application.
-const baseURL = process.env['BASE_URL'] || 'http://localhost:4200'
+const rendererE2EPort = 4201
+const baseURL = process.env['BASE_URL'] || `http://localhost:${rendererE2EPort}`
 
 /**
  * Read environment variables from file.
@@ -16,6 +16,7 @@ const baseURL = process.env['BASE_URL'] || 'http://localhost:4200'
  */
 export default defineConfig({
     ...nxE2EPreset(__filename, { testDir: './src/renderer' }),
+    outputDir: `${workspaceRoot}/dist/.playwright/maestro-e2e-renderer/test-output`,
     testIgnore: 'electron/**',
     /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
     use: {
@@ -23,13 +24,19 @@ export default defineConfig({
         /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'retain-on-failure-and-retries',
     },
-    reporter: [['html', { open: 'never' }], ['list']],
-    webServer: {
-        command: 'make serve-renderer',
-        url: 'http://localhost:4200',
-        reuseExistingServer: !process.env.CI,
-        cwd: workspaceRoot,
-    },
+    reporter: [
+        ['html', { open: 'never', outputFolder: `${workspaceRoot}/playwright-report/renderer` }],
+        ['list'],
+    ],
+    workers: process.env.CI ? 1 : 3,
+    webServer: process.env['BASE_URL']
+        ? undefined
+        : {
+              command: 'npx nx serve maestro-renderer -c e2e',
+              url: baseURL,
+              reuseExistingServer: !process.env.CI,
+              cwd: workspaceRoot,
+          },
     projects: [
         {
             name: 'chromium',

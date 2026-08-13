@@ -70,6 +70,10 @@
                 },
                 "development": {
                     "buildTarget": "maestro-renderer:build:development"
+                },
+                "e2e": {
+                    "buildTarget": "maestro-renderer:build:development",
+                    "port": 4201
                 }
             },
             "defaultConfiguration": "development",

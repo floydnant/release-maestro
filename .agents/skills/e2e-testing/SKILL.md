@@ -17,10 +17,13 @@ description: Playwright E2E readiness and test authoring guidance.
 - use web-first assertions (`await expect(locator).toBeVisible()`), avoid manual `isVisible()` checks
 - keep specs focused on critical user journeys and route-level navigation
 - use soft assertions only for known prototype gaps that should not block signal
-- keep traces/screenshots on failure and use trace viewer for CI/local debugging
+- use trace viewer for CI/local debugging. Electron contexts are traced explicitly by
+  `launch-release-maestro.ts`. The visible, unfocused window also remains available for ad hoc
+  screenshots when the user wants an on-demand visual; keep those one-off captures out of committed
+  behavioral specs
 - iterate on one spec or test title when useful, then widen to the relevant suite before handoff;
   use the target-specific commands in `docs/testing.md#fast-iteration`
 - all suites type-check before they run (`maestro-e2e:e2e`, `:e2e-production`, and `:e2e-renderer`
   depend on `maestro-e2e:typecheck`), because Playwright transpiles without semantic checking
-- to point the renderer suite at an already-running dev server, set `BASE_URL`; it defaults to
-  `http://localhost:4200`
+- to point the renderer suite at an already-running server, set `BASE_URL`; otherwise it owns
+  `http://localhost:4201`. Development Electron E2E owns port 4200 so both targets can run concurrently

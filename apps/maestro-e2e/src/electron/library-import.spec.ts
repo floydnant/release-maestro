@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { ElectronApplication, Page } from 'playwright'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
+import { buildTaggedLibrary, cleanupTaggedLibraries } from '../fixtures/tagged-library.fixture'
 import { launchReleaseMaestro } from './launch-release-maestro'
 
 /** Replace the native folder picker with a stub returning the given directory. */
@@ -18,9 +18,13 @@ const stubFolderPicker = (app: ElectronApplication, directory: string): Promise<
 let electronApp: ElectronApplication | undefined
 let page: Page
 
-test.afterEach(async () => {
-    await electronApp?.close()
-    electronApp = undefined
+test.afterEach(async ({}, testInfo) => {
+    try {
+        await electronApp?.close()
+    } finally {
+        electronApp = undefined
+        await cleanupTaggedLibraries(testInfo)
+    }
 })
 
 test('first run gates into onboarding, imports a library, and shows the cover mosaic', async ({}, testInfo) => {
@@ -28,7 +32,7 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
 
-    electronApp = await launchReleaseMaestro(appDataDir)
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
 
     // With no configured folders, the guard routes straight into onboarding.
@@ -39,7 +43,6 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     await stubFolderPicker(electronApp, libraryDir)
     await page.getByRole('button', { name: 'Add folders' }).click()
     await expect(page.getByText(libraryDir)).toBeVisible()
-    await page.screenshot({ path: testInfo.outputPath('import-pick.png') })
     await page.getByRole('button', { name: 'Continue' }).click()
 
     // Scan finishes into the done step: the live stat tiles settle at their final
@@ -51,8 +54,6 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     await expect
         .poll(async () => page.getByTestId('import-mosaic').locator('img').count(), { timeout: 10_000 })
         .toBe(3)
-    await page.screenshot({ path: testInfo.outputPath('import-done.png') })
-
     await page.getByRole('button', { name: 'Take me to my library' }).click()
     await expect(page).toHaveURL(/\/home$/)
 
@@ -66,7 +67,7 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
 
     // Relaunch: guard passes, startup rescan self-heals (all unchanged).
     await electronApp.close()
-    electronApp = await launchReleaseMaestro(appDataDir)
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
     await expect(page).toHaveURL(/\/home$/)
     await page.getByRole('link', { name: 'Settings' }).click()
@@ -84,7 +85,7 @@ test('failed files surface in Library Settings, linked from onboarding', async (
     // A garbage "audio" file: discovered by extension, fails the metadata read.
     await writeFile(join(libraryDir, 'zz-broken.mp3'), 'this is not audio')
 
-    electronApp = await launchReleaseMaestro(appDataDir)
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
 
     await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
@@ -110,7 +111,7 @@ test('onboarding can be skipped and keeps nudging via the sidebar CTA', async ({
     const appDataDir = testInfo.outputPath('app-data')
     await mkdir(appDataDir, { recursive: true })
 
-    electronApp = await launchReleaseMaestro(appDataDir)
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
 
     await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
@@ -125,7 +126,7 @@ test('onboarding can be skipped and keeps nudging via the sidebar CTA', async ({
 
     // Skip persists across relaunches: no gate, CTA still nudges.
     await electronApp.close()
-    electronApp = await launchReleaseMaestro(appDataDir)
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
     await expect(page).toHaveURL(/\/home$/)
     await expect(page.getByText("Your music library isn't set up yet.")).toBeVisible()
@@ -135,7 +136,7 @@ test('library routes are available after onboarding is skipped', async ({}, test
     const appDataDir = testInfo.outputPath('app-data')
     await mkdir(appDataDir, { recursive: true })
 
-    electronApp = await launchReleaseMaestro(appDataDir)
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
     page = await electronApp.firstWindow()
 
     await page.getByRole('button', { name: 'Skip for now' }).click()

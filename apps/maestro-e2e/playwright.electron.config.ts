@@ -4,18 +4,19 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
     ...nxE2EPreset(__filename, { testDir: './src/electron' }),
-    reporter: [['html', { open: 'never' }], ['list']],
+    outputDir: `${workspaceRoot}/dist/.playwright/maestro-e2e-electron/test-output`,
+    reporter: [
+        ['html', { open: 'never', outputFolder: `${workspaceRoot}/playwright-report/electron` }],
+        ['list'],
+    ],
     retries: process.env.CI ? 1 : 0,
-    workers: 1,
+    workers: process.env.CI ? 1 : 3,
     timeout: 120_000,
     expect: {
         timeout: 20_000,
     },
-    use: {
-        trace: 'retain-on-failure-and-retries',
-    },
     webServer: {
-        command: 'make serve-renderer',
+        command: 'npx nx serve maestro-renderer --port 4200',
         url: 'http://localhost:4200',
         reuseExistingServer: !process.env.CI,
         cwd: workspaceRoot,

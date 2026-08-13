@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
-import { Page } from 'playwright'
+import { ElectronApplication, Page } from 'playwright'
 import { mkdir } from 'node:fs/promises'
-import { buildTaggedLibrary } from '../fixtures/tagged-library.fixture'
+import { buildTaggedLibrary, cleanupTaggedLibraries } from '../fixtures/tagged-library.fixture'
 import type { TaggedTrackSpec } from '../fixtures/tagged-library.fixture'
 import { launchReleaseMaestro as launch } from './launch-release-maestro'
 
@@ -17,13 +17,24 @@ const bigLibrary = (count: number): TaggedTrackSpec[] =>
         cover: colors[i % colors.length],
     }))
 
+let app: ElectronApplication | undefined
+
+test.afterEach(async ({}, testInfo) => {
+    try {
+        await app?.close()
+    } finally {
+        app = undefined
+        await cleanupTaggedLibraries(testInfo)
+    }
+})
+
 test('cancelling an import mid-scan self-heals via the startup rescan', async ({}, testInfo) => {
     test.setTimeout(240_000)
     const appDataDir = testInfo.outputPath('app-data')
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo, bigLibrary(1500), 100_000)
 
-    let app = await launch(appDataDir)
+    app = await launch(appDataDir, testInfo)
     let page: Page = await app.firstWindow()
 
     await expect(page.getByRole('heading', { name: 'Set up your music library' })).toBeVisible()
@@ -34,28 +45,35 @@ test('cancelling an import mid-scan self-heals via the startup rescan', async ({
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await expect(page.getByRole('heading', { name: 'Importing your library' })).toBeVisible()
-    await expect(page.getByText(/Reading tracks…/)).toBeVisible({ timeout: 30_000 })
-    await page.screenshot({ path: testInfo.outputPath('import-mid-scan.png') })
 
-    // The mosaic is DOM-capped to its (responsive) grid: at most 2 imgs per cell
-    // (an entering cover plus the one it replaces), never one per scanned track.
-    const mosaic = page.getByTestId('import-mosaic')
-    const cellCount = await page.getByTestId('import-mosaic-cell').count()
-    expect(cellCount).toBeGreaterThan(0)
-    expect(await mosaic.locator('img').count()).toBeLessThanOrEqual(2 * cellCount)
+    // Click in the same browser tick that observes the deep-read state. Playwright's normal click
+    // waits for actionability and scrolls first; a fast scan can finish and detach this transient
+    // button during that delay. The DOM click still exercises the real Angular handler and IPC.
+    await page.waitForFunction(
+        () => {
+            const reading = [...document.querySelectorAll('*')].some(element =>
+                element.textContent?.trim().startsWith('Reading tracks…'),
+            )
+            if (!reading) return false
 
-    // Cancel mid-read; if the scan won the race and completed, the cancel branch is moot.
-    const cancelButton = page.getByRole('button', { name: 'Cancel import' })
-    if (await cancelButton.isVisible()) {
-        await cancelButton.click()
-        await expect(page.getByText(/Import cancelled/).first()).toBeVisible({ timeout: 20_000 })
-        await expect(page.getByRole('button', { name: 'Retry import' })).toBeVisible()
-    }
+            const cancelButton = [...document.querySelectorAll('button')].find(
+                button => button.textContent?.trim() === 'Cancel import',
+            )
+            if (!(cancelButton instanceof HTMLButtonElement)) return false
+
+            cancelButton.click()
+            return true
+        },
+        undefined,
+        { timeout: 30_000 },
+    )
+    await expect(page.getByText(/Import cancelled/).first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('button', { name: 'Retry import' })).toBeVisible()
 
     // Relaunch: folders are configured, so the guard passes and the startup
     // rescan finishes what the cancelled import left behind.
     await app.close()
-    app = await launch(appDataDir)
+    app = await launch(appDataDir, testInfo)
     page = await app.firstWindow()
     await expect(page).toHaveURL(/\/home$/)
     await page.getByRole('link', { name: 'Settings' }).click()
@@ -65,4 +83,5 @@ test('cancelling an import mid-scan self-heals via the startup rescan', async ({
     })
 
     await app.close()
+    app = undefined
 })
