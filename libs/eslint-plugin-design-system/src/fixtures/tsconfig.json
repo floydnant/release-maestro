@@ -1,0 +1,22 @@
+{
+    // The fixtures are excluded from `tsconfig.lib.json` — they are deliberately imperfect code, and
+    // `nx typecheck` must not grade them. This config exists for the *other* consumer of a tsconfig:
+    // `type-program.cjs` discovers it by walking up from a fixture component, which is how the
+    // corpus exercises the typed tier of member resolution over real files on disk.
+    //
+    // No diagnostics are ever requested from the program built here, so this only has to be close
+    // enough for the checker to type the fixture components' members.
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "es2022",
+        "moduleResolution": "bundler",
+        "lib": ["es2022", "dom"],
+        "strict": true,
+        "experimentalDecorators": true,
+        "useDefineForClassFields": false,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "types": []
+    },
+    "include": ["*.ts"]
+}

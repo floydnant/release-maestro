@@ -1,5 +1,13 @@
 /* Fixture for the class-validation rules: not part of the application. */
 import { Component, computed, signal } from '@angular/core'
+import {
+    anyClass,
+    Density,
+    pickDensity,
+    pickPlantedDensity,
+    PlantedDensity,
+    SpecimenBase,
+} from './class-vocabulary'
 
 @Component({
     selector: 'app-specimen',
@@ -14,7 +22,7 @@ import { Component, computed, signal } from '@angular/core'
         class: 'inline-flex scoped-only',
     },
 })
-export class SpecimenComponent {
+export class SpecimenComponent extends SpecimenBase {
     /**
      * The members below are the corpus for member resolution. Names the template tests expect to
      * stay unresolvable — `workerHealthClass`, `classMap`, `typographyClass` — are deliberately not
@@ -62,4 +70,26 @@ export class SpecimenComponent {
 
     /** Writable, so its initial value says nothing about what the template renders. */
     readonly mutableClass = signal('flex')
+
+    // --- the typed tier: closed sets no single-file parse can see ---------------------------------
+
+    /** `as const` is the same string at runtime, so the syntactic tier sees through it too. */
+    readonly assertedClass = 'flex items-center' as const
+
+    /** The vocabulary is a type alias in another module; the initializer is a call. */
+    readonly densityClass: Density = pickDensity()
+
+    /** Writable — but the type parameter constrains every `set`, so the type *is* the closed set. */
+    readonly modeClass = signal<'flex' | 'hidden'>('flex')
+
+    /** An annotated union return over a body that enumerates nothing. */
+    variantClass(index: number): 'type-body-sm' | 'type-code-sm' {
+        return index % 2 === 0 ? this.toneClass() : 'type-body-sm'
+    }
+
+    /** Resolvable through the checker and wrong: the literals are still validated. */
+    readonly plantedDensity: PlantedDensity = pickPlantedDensity()
+
+    /** Typed as `string`, which is what the diagnostic has to be able to say. */
+    readonly widenedClass: string = anyClass()
 }

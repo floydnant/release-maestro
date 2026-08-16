@@ -18,21 +18,30 @@ function isStringLiteral(node) {
  */
 
 /**
+ * @typedef {{ reason: string, data?: Record<string, string> }} UnresolvedReason
+ */
+
+/**
  * @callback ResolveExpression
  * @param {AngularExpression} node
- * @returns {string[]|null} every class list the expression can produce, or null when that is not
- *   knowable. See `member-classes.cjs` — the strings come back to be validated like any other, so
- *   resolving one is not the same as accepting it.
+ * @returns {{ literals: string[] } | UnresolvedReason | null} every class list the expression can
+ *   produce; a reason it could not be enumerated; or null when the expression is not addressing a
+ *   component member at all. See `member-classes.cjs` — the strings come back to be validated like
+ *   any other, so resolving one is not the same as accepting it.
  */
 
 /**
  * @param {AngularExpression} root
  * @param {ResolveExpression} [resolve]
- * @returns {{ strings: ClassString[], dynamic: boolean }}
+ * @returns {{ strings: ClassString[], dynamic: boolean, reasons: UnresolvedReason[] }}
+ *   `dynamic` covers the parts nothing more specific can be said about; `reasons` carries the parts
+ *   that can be explained, and the caller reports both.
  */
 function collectClassStrings(root, resolve) {
     /** @type {ClassString[]} */
     const strings = []
+    /** @type {Map<string, UnresolvedReason>} */
+    const reasons = new Map()
     let dynamic = false
 
     /**
@@ -73,6 +82,45 @@ function collectClassStrings(root, resolve) {
                 visit(node.falseExp, truncatedStart, truncatedEnd)
                 return
 
+            case 'Interpolation': {
+                // Angular represents `class="{{ member }}"` as an Interpolation rather than as the
+                // member expression itself. Walk the alternating static/expression parts so member
+                // resolution and ordinary class validation apply here exactly as they do to a
+                // property binding. A static part is marked truncated only when an expression
+                // touches its edge; whitespace means the neighbouring value starts a new token.
+                const segments = node.strings ?? []
+                const expressions = node.expressions ?? []
+
+                for (let index = 0; index < segments.length; index += 1) {
+                    const segment = segments[index]
+                    if (segment) {
+                        strings.push({
+                            value: segment,
+                            offset: null,
+                            truncatedStart:
+                                (index === 0 && truncatedStart) ||
+                                (index > 0 && !/^\s/.test(segment)),
+                            truncatedEnd:
+                                (index === segments.length - 1 && truncatedEnd) ||
+                                (index < expressions.length && !/\s$/.test(segment)),
+                        })
+                    }
+
+                    const expression = expressions[index]
+                    if (!expression) continue
+
+                    const before = segments[index] ?? ''
+                    const after = segments[index + 1] ?? ''
+                    visit(
+                        expression,
+                        /\S$/.test(before) || (before === '' && index === 0 && truncatedStart),
+                        /^\S/.test(after) ||
+                            (after === '' && index === expressions.length - 1 && truncatedEnd),
+                    )
+                }
+                return
+            }
+
             case 'LiteralMap':
                 node.keys?.forEach(key => {
                     // `{ ...base, 'flex': cond }` — a spread contributes keys that only exist at
@@ -106,7 +154,13 @@ function collectClassStrings(root, resolve) {
                     return
                 }
 
-                for (const value of resolved) {
+                if ('reason' in resolved) {
+                    // Keyed so a binding naming the same member twice is explained once.
+                    reasons.set(resolved.reason + '\0' + JSON.stringify(resolved.data ?? {}), resolved)
+                    return
+                }
+
+                for (const value of resolved.literals) {
                     strings.push({ value, offset: null, truncatedStart, truncatedEnd })
                 }
             }
@@ -114,7 +168,7 @@ function collectClassStrings(root, resolve) {
     }
 
     visit(root, false, false)
-    return { strings, dynamic }
+    return { strings, dynamic, reasons: [...reasons.values()] }
 }
 
 module.exports = { collectClassStrings }

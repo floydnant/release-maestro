@@ -86,6 +86,8 @@ interface AngularExpression {
     /** `Conditional` */
     trueExp?: AngularExpression
     falseExp?: AngularExpression
+    /** `Interpolation` */
+    strings?: InstanceType<NgCompiler['Interpolation']>['strings']
     /** `LiteralMap` — the entries are a union; only the `property` kind carries a `key`. */
     keys?: InstanceType<NgCompiler['LiteralMap']>['keys']
     /** `LiteralArray` */

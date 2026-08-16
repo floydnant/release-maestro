@@ -42,6 +42,12 @@ const authorities = {
 const settings = [authorities]
 /** The unsupported cases are noisy by default; silencing them isolates the case under test. */
 const quiet = [{ ...authorities, reportDynamic: false }]
+/**
+ * The typed tier of member resolution. Kept to the cases that need it so the rest of the corpus
+ * keeps proving the syntactic tier answers on its own — and so one `ts.Program` is built for this
+ * file rather than one per case.
+ */
+const typed = [{ ...authorities, resolveTypes: true }]
 
 /** @param {string} className */
 const unknown = className => ({ messageId: 'unknownClass', data: { className } })
@@ -95,6 +101,36 @@ const bareUtility = (className, suggestion) => ({
     messageId: 'bareUtility',
     data: { className, suggestion },
 })
+
+/**
+ * A class list naming a component member the rule could not enumerate. Each of these replaces the
+ * bare `dynamicClassList` for a case where the rule knows which edit would fix it — see
+ * `diagnostics.cjs` for why that distinction is the point rather than a nicety.
+ */
+const unresolved = {
+    /** @param {string} name */
+    unknownMember: name => ({ messageId: 'unknownMember', data: { name, component: 'SpecimenComponent' } }),
+    /** @param {string} name */
+    shadowed: name => ({ messageId: 'shadowedMember', data: { name, component: 'SpecimenComponent' } }),
+    chained: () => ({ messageId: 'chainedMember' }),
+    /** @param {string} name @param {boolean} declaredInvoked */
+    callShape: (name, declaredInvoked) => ({
+        messageId: 'memberCallShape',
+        data: {
+            name,
+            declared: declaredInvoked ? 'a method or a signal' : 'a plain value',
+            read: declaredInvoked ? 'a property' : 'a call',
+            fix: declaredInvoked ? `${name}()` : name,
+        },
+    }),
+    /** @param {string} name @param {string} type */
+    wider: (name, type) => ({ messageId: 'widerMember', data: { name, type } }),
+    /** @param {string} name */
+    unenumerable: name => ({
+        messageId: 'unenumerableMember',
+        data: { name, component: 'SpecimenComponent' },
+    }),
+}
 
 /**
  * A named case against the template fixture. `extra` is intersected into the result rather than
@@ -192,6 +228,25 @@ templateTester.run('valid-template-classnames', templateRule, {
             '<div [class]="\'badge \' + statusClass(s)"></div>',
         ),
         template('A9 inside a conditional', '<div [class]="cond ? badgeClass() : listClass"></div>'),
+        template('A9 a value asserted with `as const`', '<div [class]="assertedClass"></div>'),
+        template(
+            'A9 a constant property inside attribute interpolation',
+            '<div class="{{ assertedClass }}"></div>',
+        ),
+
+        // --- A9 through the checker: closed sets no single-file parse can see ---
+        template('A11 a union type alias from another module', '<div [class]="densityClass"></div>', {
+            options: typed,
+        }),
+        template('A11 a signal whose type parameter is the vocabulary', '<div [class]="modeClass()"></div>', {
+            options: typed,
+        }),
+        template('A11 an annotated union return', '<div [class]="variantClass(1)"></div>', {
+            options: typed,
+        }),
+        template('A11 a member inherited from a base class', '<div [class]="inheritedClass"></div>', {
+            options: typed,
+        }),
     ],
 
     invalid: [
@@ -256,11 +311,14 @@ templateTester.run('valid-template-classnames', templateRule, {
                 ],
             },
         ),
+        // Each of these used to be one undifferentiated `dynamicClassList`. The verdict now names
+        // the reason, because "runtime-built class list" leaves a reader nowhere to go but
+        // `eslint-disable` — see `diagnostics.cjs`.
         template('R5 unresolvable call', '<div [class]="workerHealthClass()"></div>', {
-            errors: [{ messageId: 'dynamicClassList' }],
+            errors: [unresolved.unknownMember('workerHealthClass')],
         }),
         template('R5 unresolvable map reference', '<div [ngClass]="classMap"></div>', {
-            errors: [{ messageId: 'dynamicClassList' }],
+            errors: [unresolved.unknownMember('classMap')],
         }),
         template(
             // A spread contributes keys that exist only at runtime. The written-out keys beside it
@@ -271,7 +329,7 @@ templateTester.run('valid-template-classnames', templateRule, {
         ),
         template('R5 runtime-built prefix', '<div [ngClass]="\'type-\' + token"></div>', {
             errors: [
-                { messageId: 'dynamicClassList' },
+                unresolved.unknownMember('token'),
                 { messageId: 'partialClass', data: { className: 'type-' } },
             ],
         }),
@@ -279,10 +337,10 @@ templateTester.run('valid-template-classnames', templateRule, {
             // The known fragment is still validated; only the fragment touching the runtime value is not.
             'R5 known fragment beside a runtime one',
             '<div [class]="\'badge borderx \' + workerHealthClass()"></div>',
-            { errors: [{ messageId: 'dynamicClassList' }, unknown('borderx')] },
+            { errors: [unresolved.unknownMember('workerHealthClass'), unknown('borderx')] },
         ),
         template('R5 interpolated class list', '<div class="{{ dynamicClass }}"></div>', {
-            errors: [{ messageId: 'dynamicClassList' }],
+            errors: [unresolved.unknownMember('dynamicClass')],
         }),
         template(
             // No expression is trusted for its shape. A call that looks like a generated token API
@@ -290,12 +348,12 @@ templateTester.run('valid-template-classnames', templateRule, {
             // an exemption keyed on the *name* of the thing being called proves nothing at all.
             'R5 a call that looks like a generated token API',
             '<div [class]="typographyClass(variant())"></div>',
-            { errors: [{ messageId: 'dynamicClassList' }] },
+            { errors: [unresolved.unknownMember('typographyClass')] },
         ),
         template(
             'R5 a property chain rooted in a generated module',
             '<div [ngClass]="typographyVariantIdentifiers[index]"></div>',
-            { errors: [{ messageId: 'dynamicClassList' }] },
+            { errors: [unresolved.chained()] },
         ),
 
         // --- A9's other half: resolving a member is not accepting it ---
@@ -306,37 +364,43 @@ templateTester.run('valid-template-classnames', templateRule, {
             '<div [class]="plantedClass()"></div>',
             { errors: [didYouMean('fleex', 'flex')] },
         ),
+        template(
+            'A9 an interpolated member carrying an unknown class',
+            '<div class="{{ plantedClass() }}"></div>',
+            { errors: [didYouMean('fleex', 'flex')] },
+        ),
         template('A9 a member with a branch that is not a literal', '<div [class]="mixedClass(x)"></div>', {
-            errors: [{ messageId: 'dynamicClassList' }],
+            errors: [unresolved.unenumerable('mixedClass')],
         }),
         template(
-            // Writable, so the initial value is not what the template renders.
+            // Writable, so the initial value is not what the template renders — and its type
+            // parameter was inferred as `string`, so the checker does not rescue it either.
             'A9 a signal is not a closed vocabulary',
             '<div [class]="mutableClass()"></div>',
-            { errors: [{ messageId: 'dynamicClassList' }] },
+            { errors: [unresolved.unenumerable('mutableClass')] },
         ),
         template(
             // Declaration kind and call shape have to agree, or the expression is not describing
             // this member.
             'A9 a method read without calling it',
             '<div [class]="statusClass"></div>',
-            { errors: [{ messageId: 'dynamicClassList' }] },
+            { errors: [unresolved.callShape('statusClass', true)] },
         ),
         template('A9 a constant property called like a method', '<div [class]="listClass()"></div>', {
-            errors: [{ messageId: 'dynamicClassList' }],
+            errors: [unresolved.callShape('listClass', false)],
         }),
         template(
             // Nothing can be said about what the rest of the chain does to the resolved value.
             'A9 a chain hanging off a resolved member',
             '<div [class]="badgeClass().length"></div>',
-            { errors: [{ messageId: 'dynamicClassList' }] },
+            { errors: [unresolved.chained()] },
         ),
         template(
             // Angular binds `listClass` to the loop item, not to the component's member. The
             // expression AST cannot tell the two apart, so the template's own bindings win.
             'A9 a member shadowed by a name the template binds',
             '@for (listClass of rows; track listClass) { <div [class]="listClass"></div> }',
-            { errors: [{ messageId: 'dynamicClassList' }] },
+            { errors: [unresolved.shadowed('listClass')] },
         ),
         {
             // The removed check trusted a root identifier for its spelling. This is that exact
@@ -345,8 +409,50 @@ templateTester.run('valid-template-classnames', templateRule, {
             filename: path.join(FIXTURES, 'local-computed.component.html'),
             options: settings,
             code: '<div [class]="wrapperClass()"></div>',
-            errors: [{ messageId: 'dynamicClassList' }],
+            errors: [
+                {
+                    messageId: 'unenumerableMember',
+                    data: { name: 'wrapperClass', component: 'LocalComputedComponent' },
+                },
+            ],
         },
+
+        // --- A11's other half: the checker resolves more, and accepts no more ---
+        template(
+            // The whole point of returning literals rather than a verdict, restated for the tier
+            // that crosses a module boundary to find them.
+            'A11 a union from another module carrying an unknown class',
+            '<div [class]="plantedDensity"></div>',
+            // First in a pipe-less list, so it lands in descriptor position like any other — a
+            // resolved member's literals are validated exactly as if they had been typed inline.
+            { options: typed, errors: [orDescriptor('gapp-3', 'gap-3')] },
+        ),
+        template(
+            // The message that has to name the type, because "narrow it" is not an instruction
+            // without one.
+            'A11 a member typed `string`',
+            '<div [class]="widenedClass"></div>',
+            { options: typed, errors: [unresolved.wider('widenedClass', 'string')] },
+        ),
+        template(
+            // `signal('flex')` infers `WritableSignal<string>`; the checker reports the widening
+            // rather than papering over it.
+            'A11 a signal whose type parameter was inferred as string',
+            '<div [class]="mutableClass()"></div>',
+            { options: typed, errors: [unresolved.wider('mutableClass', 'string')] },
+        ),
+        template(
+            // Resolving through the checker does not loosen the call-shape rule.
+            'A11 a typed member read with the wrong call shape',
+            '<div [class]="modeClass"></div>',
+            { options: typed, errors: [unresolved.callShape('modeClass', true)] },
+        ),
+        template(
+            // Nothing on the component and nothing on its base class.
+            'A11 a name no ancestor declares',
+            '<div [class]="workerHealthClass()"></div>',
+            { options: typed, errors: [unresolved.unknownMember('workerHealthClass')] },
+        ),
 
         // --- D1: the descriptor reading, offered only where a descriptor could have gone ---
         template(
@@ -595,5 +701,84 @@ describe('the committed specimen fixture', () => {
         const [first] = result.messages
 
         expect((first.endColumn ?? 0) - first.column).toBe('type-code-sl'.length)
+    })
+})
+
+// --- what an unresolvable class list actually tells the reader ------------------------------------
+
+describe('the member diagnostics, as rendered', () => {
+    /**
+     * Asserted as text rather than by message id, for the same reason the specimen fixture is: these
+     * messages exist to be *acted on*. A reader — or an agent — who is told "runtime-built class
+     * list" has one move available, and it is `eslint-disable`. Every message below names the edit
+     * that would resolve the member instead, and that property is what these cases protect.
+     */
+    const lint = (/** @type {string} */ code) =>
+        new ESLint({
+            cwd: __dirname,
+            overrideConfigFile: true,
+            overrideConfig: [
+                {
+                    files: ['**/*.html'],
+                    languageOptions: { parser: templateParser },
+                    plugins: { 'design-system': plugin },
+                    rules: {
+                        'design-system/valid-template-classnames': [
+                            'error',
+                            { ...authorities, resolveTypes: true },
+                        ],
+                    },
+                },
+            ],
+        })
+            .lintText(code, { filePath: FIXTURE_TEMPLATE })
+            .then(([result]) => result.messages.map(message => message.message))
+
+    it.each([
+        [
+            'a name the component does not have',
+            '<div [class]="workerHealthClass()"></div>',
+            '`workerHealthClass` is not a member of `SpecimenComponent` — a class list has to come ' +
+                'from the component this template belongs to.',
+        ],
+        [
+            'a member typed too widely to enumerate',
+            '<div [class]="widenedClass"></div>',
+            '`widenedClass` is typed `string`, which is not a closed set of class names — narrow it ' +
+                "to a string-literal union (`'flex' | 'hidden'`), or suppress with a reason.",
+        ],
+        [
+            'a member read with the wrong call shape',
+            '<div [class]="statusClass"></div>',
+            '`statusClass` is a method or a signal, but the template reads it as a property — write ' +
+                '`statusClass()`.',
+        ],
+        [
+            'a value called as though it were a method',
+            '<div [class]="listClass()"></div>',
+            '`listClass` is a plain value, but the template reads it as a call — write `listClass`.',
+        ],
+        [
+            'a class list reached through a chain',
+            '<div [class]="badgeClass().length"></div>',
+            'A class list reached through a property chain or an index is not resolvable — only ' +
+                '`member` and `member()` resolve against the component. Give the whole class list ' +
+                'its own member, or suppress with a reason.',
+        ],
+        [
+            'a name the template binds itself',
+            '@for (listClass of rows; track listClass) { <div [class]="listClass"></div> }',
+            '`listClass` is bound by the template, not by `SpecimenComponent` — Angular resolves ' +
+                'template variables ahead of members, so nothing about its value is knowable here. ' +
+                'Move the class list onto the component, or suppress with a reason.',
+        ],
+    ])('says what to do about %s', async (_name, code, expected) => {
+        expect(await lint(code)).toEqual([expected])
+    })
+
+    it('still reports the classes inside a member it did resolve', async () => {
+        expect(await lint('<div [class]="plantedClass()"></div>')).toEqual([
+            'Unknown class `fleex` — did you mean `flex`?',
+        ])
     })
 })

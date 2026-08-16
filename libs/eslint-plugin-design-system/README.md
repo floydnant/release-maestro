@@ -31,8 +31,19 @@ const classValidationOptions = {
 }
 ```
 
-`tailwindConfig` is required, `globalStylesheets` optional. The relative path is because the
-workspace does not use npm workspaces — a published consumer would write the package name.
+The relative path is because the workspace does not use npm workspaces — a published consumer would
+write the package name.
+
+| Option              | Default | Meaning                                                                                          |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `tailwindConfig`    | —       | Required. The config whose utilities and theme paths are the authority.                          |
+| `globalStylesheets` | `[]`    | Stylesheets whose authored classes count as known everywhere.                                    |
+| `reportDynamic`     | `true`  | Report class lists that cannot be enumerated. Off silences the whole category.                   |
+| `resolveTypes`      | `false` | Resolve a component member through a `TypeChecker` when its syntax is not enumerable. See below. |
+| `tsconfig`          | —       | The project `resolveTypes` builds from. Discovered from the component file when unset.           |
+
+`resolveTypes` and `tsconfig` are read by `valid-template-classnames` only; the host rule has no
+template member to resolve.
 
 Registration is per-project on purpose: the renderer's authorities are the renderer's, so putting
 this at the workspace root would lint `maestro-electron` against a design system it does not use.
@@ -95,13 +106,28 @@ calling those "unknown" sends the reader to the Tailwind docs to discover that t
 | `py-14`       | `` `py-14` is off the `py` scale — did you mean `py-12`? `` (a tie goes to the smaller value) |
 | `rounded`     | ``Bare `rounded` emits no CSS — did you mean `rounded-sm`?``                                  |
 
-Every message names its own failure and stops. The two findings with nothing to fix in the class
-list itself are the exception, and say what to do instead:
+Every message names its own failure and stops. The findings with nothing to fix in the class list
+itself are the exception, and say what to do instead:
 
 ```
 Runtime-built class list — enumerate the classes, or suppress with a reason.
 `type-` is glued to a runtime value — suppress with a reason if the vocabulary is closed.
 ```
+
+That first one is the fallback, and it is a **dead end for the reader**: it names no expression, no
+member, and no edit, so the only move it suggests is `eslint-disable`. Wherever the rule knows more
+than "runtime-built", it says so instead — which is what keeps a suppression from being the path of
+least resistance for a human or an agent.
+
+| The binding                      | What it is told                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `[class]="workerHealthClass()"`  | `` `workerHealthClass` is not a member of `AppComponent` — … ``                                               |
+| `[class]="libraryScanPercent()"` | `` `libraryScanPercent` is typed `number`, which is not a closed set of class names — narrow it … ``          |
+| `[class]="statusClass"`          | `` `statusClass` is a method or a signal, but the template reads it as a property — write `statusClass()`. `` |
+| `[class]="listClass()"`          | `` `listClass` is a plain value, but the template reads it as a call — write `listClass`. ``                  |
+| `[class]="badgeClass().length"`  | `A class list reached through a property chain or an index is not resolvable — …`                             |
+| `@for (c of rows) [class]="c"`   | `` `c` is bound by the template, not by `AppComponent` — … ``                                                 |
+| a member no tier could enumerate | `` `x` is a member of `C` but its class list is not enumerable from that file — … ``                          |
 
 All wording lives in [`src/lib/diagnostics.cjs`](src/lib/diagnostics.cjs), shared by both rules —
 two rules reporting the same mistake in drifting words is worse than no wording at all. The rendered
@@ -110,14 +136,19 @@ text is asserted verbatim in the corpus, not just the message ids.
 ## Dynamic class lists
 
 Statically enumerable bindings are validated like any other class list: `[class.foo]`, `[ngClass]`
-object keys, `[class]` conditionals and concatenations. What cannot be enumerated is reported as
-`dynamicClassList` rather than quietly accepted — moving a class into a binding is not a bypass.
+object keys, `[class]` conditionals and concatenations. What cannot be enumerated is reported rather
+than quietly accepted — moving a class into a binding is not a bypass.
+
+Real applications need some dynamism, though, and a rule whose only answer to it is "suppress this"
+trains everyone to suppress. So the interesting question is not whether a binding is dynamic but
+whether the set of classes it can produce is **closed**. Two tiers try to answer that, in cost order,
+and whichever fails says why.
 
 ### A closed vocabulary in the component
 
-One shape resolves rather than reports: the expression names a member of the component that owns the
-template, and that member returns nothing but string literals. `[class]="'badge ' + statusClass(s)"`
-is checked against every branch `statusClass` can return.
+The first tier costs nothing: the expression names a member of the component that owns the template,
+and that member returns nothing but string literals. `[class]="'badge ' + statusClass(s)"` is checked
+against every branch `statusClass` can return.
 
 The resolution is in [`src/lib/member-classes.cjs`](src/lib/member-classes.cjs), and two properties
 are what make it an acceptance path rather than a bypass:
@@ -130,10 +161,47 @@ are what make it an acceptance path rather than a bypass:
   hand-written class list. A resolved member carrying `fleex` is reported exactly like a template
   carrying `fleex`. Nothing is trusted for where it came from.
 
-It gives up — and reports `dynamicClassList` as before — on anything it cannot enumerate from one
-file: a branch that is not a literal, `signal()` (writable, so its initial value is not what renders),
-a `computed` that is not Angular's, a call chain past the resolved member, a member whose call shape
-disagrees with its declaration, a name declared by two components in the same file.
+This tier reads one file's syntax and nothing else, so it gives up on a branch that is not a literal,
+`signal()` (writable, so its initial value is not what renders), a `computed` that is not Angular's,
+a call chain past the resolved member, a member whose call shape disagrees with its declaration, and
+a name declared by two components in the same file. It gives up **with a reason** — see the message
+table above — and the tier below picks up several of those cases.
+
+### The same vocabulary, through the type checker
+
+`resolveTypes: true` adds a second tier: when a member the component genuinely declares is not
+enumerable from its syntax, the member's **type** is asked instead. A union of string literals is a
+closed vocabulary however it was written, so this resolves what a parse cannot see —
+
+```ts
+readonly densityClass: Density = pickDensity()      // union alias from another module
+readonly modeClass = signal<'flex' | 'hidden'>('flex')  // writable, but the type constrains every set
+variantClass(i: number): 'type-body-sm' | 'type-code-sm'  // annotated return, unenumerable body
+readonly inheritedClass: 'panel' | 'badge'          // declared on a base class
+```
+
+— and reports the type standing in the way when it is not closed: `` `x` is typed `string`, which is
+not a closed set of class names ``. Nothing else loosens. The literals are still validated against
+the same three authorities, the call shape still has to agree, a template-bound name still never
+resolves, and a chain still resolves nothing.
+
+It is off by default because it builds a TypeScript program, which the plugin should not impose on a
+consumer that has not asked for one. Two things keep it affordable, both measured on the renderer's
+61-root program (540 files) and implemented in
+[`src/lib/type-program.cjs`](src/lib/type-program.cjs):
+
+- **Lazy.** Nothing is built until a class binding names a member the syntactic tier could not
+  enumerate. A template with no dynamic class list never constructs a program. In practice the
+  renderer's own lint does not build one at all — its single unresolvable binding is a template-bound
+  name, which is decided before the tier is reached.
+- **Reused.** ~1.1s for the first build, ~80ms per rebuild after an edit, because the compiler host
+  caches source files by mtime and each rebuild is handed the previous program. In an editor, where
+  ESLint is a long-lived server, that first second is paid once per session. (Deliberately not
+  `ts.createWatchProgram`: same incremental cost, but it installs file watchers and ESLint gives a
+  rule no teardown hook to close them with.)
+
+`tsconfig` names the project to build from; without it the nearest tsconfig that actually lists the
+component file is discovered by walking up from it.
 
 **There is still no exemption for typed or generated APIs**, and the difference is the point. An
 earlier version accepted any expression whose root identifier matched an export of a configured
@@ -144,18 +212,25 @@ It also had no real consumer, since the generated token module exports values (`
 returns a `var(...)` string) rather than class names. A check that cannot fail is worse than no
 check, so it is gone.
 
-Crossing a module boundary — a class name imported from elsewhere, or a loop over a generated
-identifier list — needs a TypeScript `TypeChecker`, which needs a program. Measured at roughly +30%
-on the renderer's lint, and deferred in
-[MAE-111](https://linear.app/floyd-haremsa/issue/MAE-111) until narrow suppressions are frequent
-enough to be worth it.
+### What neither tier reaches
 
-The supported answer for a genuinely closed vocabulary the rule cannot see is a narrow
-`eslint-disable-next-line` with a reason. Three sites in the renderer have one — `'type-' + token`
-in the design-system specimen and two closed-vocabulary helpers in `debug.component.html`. Note
-that `eslint-disable-next-line` is line-based and Prettier's attribute wrapping can move the
-reported line away from the comment; a multi-line binding needs a `eslint-disable` /
-`eslint-enable` pair around the element instead.
+**Concatenation.** `'type-' + token` is `string` however `token` is typed — `+` and template
+literals both widen — so no amount of type information resolves a prefix glued to a runtime value.
+A member returning whole class names does.
+
+**A name the template binds.** `@for` items, `@let`, `as` aliases and `#ref`s are resolved by Angular
+ahead of the component's members, and the expression AST does not mark which is which. A name the
+template binds anywhere is never resolved against the component — over-broad on purpose, and the
+cost of being wrong is only that an expression stays unresolved.
+
+**Anything reached through a chain or an index.** `obj.member()`, `member().foo`, `list[i]`: the rule
+cannot see what the rest of the chain does to the value, so the root resolving proves nothing.
+
+The supported answer for a genuinely closed vocabulary that lands in one of those is a narrow
+`eslint-disable-next-line` with a reason. One site in the renderer has one — `'type-' + token` in the
+design-system specimen, which is both of the first two at once. Note that `eslint-disable-next-line`
+is line-based and Prettier's attribute wrapping can move the reported line away from the comment; a
+multi-line binding needs an `eslint-disable` / `eslint-enable` pair around the element instead.
 
 ## Tests
 
@@ -216,7 +291,8 @@ had quietly papered over.
 | Case                                                            | Status                                                                                                                      |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Bare design tokens in `.css` files                              | **out of scope** — ESLint has no CSS language wired here; this is [MAE-109](https://linear.app/floyd-haremsa/issue/MAE-109) |
-| Class vocabularies defined as string literals in component TS   | **unsupported** — closed but invisible to both rules; needs a suppression                                                   |
+| Class vocabularies defined as string literals in component TS   | **supported** — resolved from the component's syntax, or from its types under `resolveTypes`                                |
+| A prefix concatenated onto a runtime value (`'type-' + token`)  | **unsupported** — `+` widens to `string` whatever the operand is typed as; needs a member returning whole class names       |
 | Class applied by a parent component's stylesheet or `::ng-deep` | **would be a false positive** — none exist in the renderer today                                                            |
 | Classes applied imperatively (`classList.add`)                  | **out of scope** — banned rather than validated, see [MAE-108](https://linear.app/floyd-haremsa/issue/MAE-108)              |
 
@@ -225,6 +301,12 @@ and stylesheets are cached by mtime, but ESLint's own per-file cache is keyed on
 came from, not on the authorities. Editing `tailwind.config.js` or a global stylesheet does not
 invalidate it, so a long-lived editor server can hold a stale verdict until the template itself
 changes. A full `nx lint` run is unaffected because nx re-runs the process.
+
+`resolveTypes` has a narrower version of the same hazard. Its program rebuilds when any project file
+it already holds changes on disk, but a file _added_ since the tsconfig was parsed is not in it — the
+parse is cached by the tsconfig's own mtime. A brand-new component therefore resolves to nothing
+rather than to something wrong, which degrades to the pre-`resolveTypes` verdict until the process
+restarts.
 
 Cost over the whole renderer is roughly 0.15 s of a ~3.7 s lint — inside run-to-run noise. ESLint's
 file cache works normally, so a warm re-lint is ~1 s for the project and effectively instant for a

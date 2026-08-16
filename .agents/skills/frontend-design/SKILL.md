@@ -64,22 +64,42 @@ to shared primitives where there is a stated reason, and to the design-system sp
 
 ## When the class list is built at runtime
 
-Every styling class has to resolve to CSS, so a class list assembled at runtime is reported as
-`dynamicClassList` rather than quietly accepted. Three ways out, in order of preference:
+Every styling class has to resolve to CSS, so a class list assembled at runtime is reported rather
+than quietly accepted. What the rule is actually asking is not "is this dynamic" but "is the set of
+classes it can produce **closed**" — dynamic and closed is fine. Three ways out, in order of
+preference:
 
 1. **Put the branches in the template**, where they are validated like any other list:
    `[ngClass]="{ 'border-status-danger-border': failed() }"`, or a conditional over whole literals.
 2. **Return whole class lists from a component member** — a method, a getter, a `computed`, a
-   constant property — where every branch is a string literal. The rule resolves those against the
-   component that owns the template and validates each literal, so a closed vocabulary is allowed to
-   live in TypeScript. It has to be _this_ component's member, read the way it is declared, with no
-   chain hanging off it; a value imported from another module cannot be followed.
-3. **Suppress with a reason** when neither fits — a class name crossing a module boundary, a
-   vocabulary that is genuinely open. Name what the vocabulary is and why the rule cannot see it, the
-   way `design-system.component.html` does. A suppression without a reason is not the convention.
+   constant property. Either every branch is a string literal, or the member carries a string-literal
+   union type, which is what lets the vocabulary live in another module:
 
-Concatenating onto a runtime value (`'type-' + variant()`) is reported separately as `partialClass`,
-because the class name itself is only half-written and no authority can check half a name.
+    ```ts
+    type Density = 'gap-1' | 'gap-3' // in a shared module
+    readonly densityClass: Density = pickDensity() //  resolves through the type
+    readonly modeClass = signal<'flex' | 'hidden'>('flex') //  the type constrains every set
+    variantClass(i: number): 'type-body-sm' | 'type-code-sm' //  annotated return
+    readonly widened: string = pick() //  `string` is not a closed set
+    ```
+
+    It has to be _this_ component's member (or an ancestor's), read the way it is declared, with no
+    chain hanging off it.
+
+3. **Suppress with a reason** when neither fits. Name what the vocabulary is and why the rule cannot
+   see it, the way `design-system.component.html` does. A suppression without a reason is not the
+   convention.
+
+**Read the message before reaching for step 3.** It names the reason and usually the edit —
+`` `x` is typed `string`, narrow it to a string-literal union ``, `` write `x()` ``, `` `x` is bound
+by the template ``. Only the bare `Runtime-built class list` means the rule genuinely had nothing
+more to say.
+
+Two shapes no amount of typing rescues, so do not try: **concatenating onto a runtime value**
+(`'type-' + variant()`, reported separately as `partialClass`) — `+` widens to `string` whatever the
+operand is typed as — and **a name the template itself binds**, a `@for` item or `@let` or an `as`
+alias, which Angular resolves ahead of any component member. Both want a member returning whole class
+names instead.
 
 ## Build accessibility in
 

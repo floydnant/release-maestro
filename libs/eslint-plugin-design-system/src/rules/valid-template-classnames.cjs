@@ -89,6 +89,7 @@ module.exports = {
         const resolveMember = createMemberResolver(
             componentFileFor(context.filename),
             boundNames(sourceCode.ast),
+            { resolveTypes: options.resolveTypes, tsconfig: options.tsconfig },
         )
 
         /**
@@ -189,7 +190,7 @@ module.exports = {
         const checkExpression = node => {
             const fallbackLoc = locFor(node.sourceSpan.start.offset, node.sourceSpan.end.offset)
 
-            const { strings, dynamic } = collectClassStrings(node.value, resolveMember)
+            const { strings, dynamic, reasons } = collectClassStrings(node.value, resolveMember)
 
             for (const literal of strings) {
                 checkClassList(literal.value, {
@@ -201,9 +202,14 @@ module.exports = {
                 })
             }
 
-            if (dynamic && reportDynamic) {
-                context.report({ messageId: 'dynamicClassList', loc: fallbackLoc })
+            if (!reportDynamic) return
+
+            // A binding can fail in more than one way at once — a spread beside an unresolvable
+            // member — and each half is reported, because fixing one does not reveal the other.
+            for (const { reason, data } of reasons) {
+                context.report({ messageId: reason, data, loc: fallbackLoc })
             }
+            if (dynamic) context.report({ messageId: 'dynamicClassList', loc: fallbackLoc })
         }
 
         return {
