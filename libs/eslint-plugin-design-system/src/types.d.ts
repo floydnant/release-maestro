@@ -1,3 +1,5 @@
+type ClassCheckerOptions = import('./lib/class-checker.cjs').ClassCheckerOptions
+
 /**
  * Types for the two surfaces that cannot simply be imported.
  *

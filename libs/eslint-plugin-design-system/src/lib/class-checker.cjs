@@ -57,11 +57,7 @@ function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
      * @returns {import('./suggest.cjs').Suggestion|null}
      */
     const suggest = className =>
-        suggestClassName(className, [
-            ...localClasses,
-            ...globalClasses,
-            ...tailwindClassList(tailwindConfig),
-        ])
+        suggestClassName(className, [...localClasses, ...globalClasses, ...tailwindClassList(tailwindConfig)])
 
     /** @param {string} themePath */
     const isThemePath = themePath => themePathExists(tailwindConfig, themePath)

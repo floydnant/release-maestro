@@ -1,3 +1,5 @@
+/// <reference types="../../libs/eslint-plugin-design-system/src/types" />
+
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,10 +16,9 @@ const projectRoot = dirname(fileURLToPath(import.meta.url))
  * system — the options below are what teach it this one — so registering it at the workspace root
  * would lint `maestro-electron` against a design system it does not use.
  */
-const designSystem = createRequire(import.meta.url)(
-    '../../libs/eslint-plugin-design-system/src/index.cjs',
-)
+const designSystem = createRequire(import.meta.url)('../../libs/eslint-plugin-design-system/src/index.cjs')
 
+/** @type {ClassCheckerOptions} */
 const classValidationOptions = {
     tailwindConfig: join(projectRoot, 'tailwind.config.js'),
     globalStylesheets: [join(projectRoot, 'src/styles.css')],
