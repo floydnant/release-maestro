@@ -369,7 +369,13 @@ export class SongTableComponent {
         const element = this.scroller()?.nativeElement
         if (!element) return
 
-        const firstVisible = Math.floor(element.scrollTop / ROW_HEIGHT)
+        // A pending restore is where the table is *about* to be. Until it is applied the
+        // element is still at the top, and the `ResizeObserver` that fires the moment the
+        // table attaches would otherwise ask for the top of the list — the throwaway
+        // round trip seeding the page's window exists to avoid.
+        const scrollTop = this.restoreScrollTop() ?? element.scrollTop
+
+        const firstVisible = Math.floor(scrollTop / ROW_HEIGHT)
         const visibleCount = Math.ceil(element.clientHeight / ROW_HEIGHT)
         const offset = Math.max(0, firstVisible - OVERSCAN_ROWS)
         const limit = visibleCount + OVERSCAN_ROWS * 2

@@ -536,7 +536,12 @@ export class AlbumGridComponent {
 
         const { columns, rowHeight } = this.layout()
 
-        const firstVisibleRow = Math.floor(element.scrollTop / rowHeight)
+        // A pending restore is where the grid is *about* to be — see the same line in
+        // `SongTableComponent.onScroll` for why measuring the element instead asks for
+        // the top of the list.
+        const scrollTop = this.restoreScrollTop() ?? element.scrollTop
+
+        const firstVisibleRow = Math.floor(scrollTop / rowHeight)
         const visibleRows = Math.ceil(element.clientHeight / rowHeight)
         const startRow = Math.max(0, firstVisibleRow - OVERSCAN_ROWS)
 
