@@ -309,7 +309,10 @@ export class AlbumDetailComponent {
      *
      * Returning to `trackNumber` is a plain navigation to the route without the params,
      * which `nextSort` reaches by cycling the column — nothing extra is needed to get
-     * back to album order beyond clicking the default column, or going back.
+     * back to album order beyond clicking the default column.
+     *
+     * It replaces the history entry rather than pushing one: a sort is not a page, and
+     * Back from here belongs to whatever brought the user to this album. See ADR 0006.
      */
     protected onSort(field: SongSortField): void {
         const next = nextSort(this.sort(), field)
@@ -323,6 +326,7 @@ export class AlbumDetailComponent {
                         : next.direction,
             },
             queryParamsHandling: 'merge',
+            replaceUrl: true,
         })
     }
 

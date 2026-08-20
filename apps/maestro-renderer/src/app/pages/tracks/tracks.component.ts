@@ -196,7 +196,7 @@ export class TracksComponent {
                 filter(search => search != this.query().search),
                 takeUntilDestroyed(),
             )
-            .subscribe(search => this.patchQuery({ ...this.query(), search }, { replaceUrl: true }))
+            .subscribe(search => this.patchQuery({ ...this.query(), search }))
     }
 
     /**
@@ -270,8 +270,8 @@ export class TracksComponent {
 
     /**
      * Typing is debounced before it reaches the URL, so a search costs one query
-     * rather than one per keystroke. The navigation replaces rather than pushes:
-     * back should leave the search, not walk back through every letter of it.
+     * rather than one per keystroke — the debounce is about IPC, not about history;
+     * every query change replaces. See {@link patchQuery}.
      */
     protected onSearch(search: string): void {
         this.searchInput$.next(search)
@@ -343,12 +343,19 @@ export class TracksComponent {
         this.browse.retry()
     }
 
-    private patchQuery(query: SongQuery, { replaceUrl = false }: { replaceUrl?: boolean } = {}): void {
+    /**
+     * Write a query to the URL, **replacing** the history entry rather than pushing one.
+     *
+     * Filter, sort and search are not history steps — see ADR 0006. Back means "the
+     * previous page", and the page you return to carries whatever query was last in
+     * force on it.
+     */
+    private patchQuery(query: SongQuery): void {
         this.router.navigate([], {
             relativeTo: this.route,
             queryParams: songQueryToParams(query),
             queryParamsHandling: 'merge',
-            replaceUrl,
+            replaceUrl: true,
         })
     }
 }
