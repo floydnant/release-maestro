@@ -57,11 +57,7 @@ function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
      * @returns {import('./suggest.cjs').Suggestion|null}
      */
     const suggest = className =>
-        suggestClassName(className, [
-            ...localClasses,
-            ...globalClasses,
-            ...tailwindClassList(tailwindConfig),
-        ])
+        suggestClassName(className, [...localClasses, ...globalClasses, ...tailwindClassList(tailwindConfig)])
 
     /** @param {string} themePath */
     const isThemePath = themePath => themePathExists(tailwindConfig, themePath)
@@ -77,6 +73,16 @@ const sharedSchema = {
         tailwindConfig: { type: 'string' },
         globalStylesheets: { type: 'array', items: { type: 'string' } },
         reportDynamic: { type: 'boolean' },
+
+        /**
+         * Resolve a component member through a `TypeChecker` when its class list is not enumerable
+         * from the component file's syntax alone. Off by default: it builds a TypeScript program,
+         * which the plugin should not impose on a consumer that has not asked for it. See
+         * `type-program.cjs` for what it costs and when it is paid.
+         */
+        resolveTypes: { type: 'boolean' },
+        /** The tsconfig to build that program from. Discovered from the component file when unset. */
+        tsconfig: { type: 'string' },
     },
 }
 

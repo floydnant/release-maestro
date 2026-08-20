@@ -62,6 +62,22 @@ Layer discipline is unchecked too: product code consumes **semantic** tokens
 (`bg-background-surface`, `text-content-muted`). Foundation tokens belong to token infrastructure,
 to shared primitives where there is a stated reason, and to the design-system specimen.
 
+## Keep runtime class vocabularies closed
+
+A runtime class vocabulary must be **closed**: every whole class list the binding can produce is
+enumerable. Prefer literal branches in the template; otherwise use a component member with literal
+branches or a string-literal union. Return whole class names — gluing a runtime fragment into one is
+not resolvable.
+
+Follow the diagnostic's named edit before suppressing. Suppress only for the bare
+`Runtime-built class list`, or to defer a named edit against a tracked issue. State the closed
+vocabulary, unresolved shape, and reason for deferral; the
+[`design-system` specimen](../../../apps/maestro-renderer/src/app/pages/design-system/design-system.component.html)
+is the worked example.
+
+When the required rewrite is unclear, read
+[`Dynamic class lists`](../../../libs/eslint-plugin-design-system/README.md#dynamic-class-lists).
+
 ## Build accessibility in
 
 Accessibility is part of the implementation contract, not a later audit. Every UI change must:

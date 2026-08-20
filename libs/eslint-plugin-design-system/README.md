@@ -8,10 +8,10 @@ convention it enforces is documented for humans and agents in
 [`frontend-design`](../../.agents/skills/frontend-design/SKILL.md); this file is about how the rules
 work and where they stop.
 
-The library knows nothing about Release Maestro's design system, or any other. Every authority — the
-Tailwind config, the global stylesheets, the generated token module — arrives as a rule option, which
-is what makes it a library rather than a folder of scripts, and what would make publishing it a
-packaging question rather than a rewrite.
+The library knows nothing about Release Maestro's design system, or any other. Its configured
+authorities — the Tailwind config and the global stylesheets — arrive as rule options, which is what
+makes it a library rather than a folder of scripts, and what would make publishing it a packaging
+question rather than a rewrite.
 
 ## The two rules
 
@@ -20,22 +20,20 @@ packaging question rather than a rewrite.
 | `design-system/valid-template-classnames` | `class`, `ngClass`, `routerLinkActive`, `[class]`, `[ngClass]`, `[class.foo]`, in `.html` files and in inline templates (via the Angular inline-template processor) |
 | `design-system/valid-host-classnames`     | `@Component`/`@Directive` `host: { class: '…' }` and `host: { '[class.foo]': … }`                                                                                   |
 
-Both are registered at `error` in `apps/maestro-renderer/eslint.config.mjs`:
+Both are registered at `error` in the renderer's
+[`eslint.config.mjs`](../../apps/maestro-renderer/eslint.config.mjs), which turns on typed member
+resolution and explains why registration is per-project.
 
-```js
-const designSystem = createRequire(import.meta.url)('../../libs/eslint-plugin-design-system/src/index.cjs')
+| Option              | Default    | Meaning                                                                                                                      |
+| ------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `tailwindConfig`    | required   | The config whose utilities and theme paths are the authority.                                                                |
+| `globalStylesheets` | `[]`       | Stylesheets whose authored classes count as known everywhere.                                                                |
+| `reportDynamic`     | `true`     | Report class lists that cannot be enumerated. Off silences the whole category.                                               |
+| `resolveTypes`      | `false`    | Resolve an otherwise unenumerable component member through a `TypeChecker`. See [Dynamic class lists](#dynamic-class-lists). |
+| `tsconfig`          | discovered | The project `resolveTypes` builds from.                                                                                      |
 
-const classValidationOptions = {
-    tailwindConfig: join(projectRoot, 'tailwind.config.js'),
-    globalStylesheets: [join(projectRoot, 'src/styles.css')],
-}
-```
-
-`tailwindConfig` is required, `globalStylesheets` optional. The relative path is because the
-workspace does not use npm workspaces — a published consumer would write the package name.
-
-Registration is per-project on purpose: the renderer's authorities are the renderer's, so putting
-this at the workspace root would lint `maestro-electron` against a design system it does not use.
+`resolveTypes` and `tsconfig` affect `valid-template-classnames` only; the host rule has no template
+member to resolve.
 
 ## What makes a class known
 
@@ -95,42 +93,72 @@ calling those "unknown" sends the reader to the Tailwind docs to discover that t
 | `py-14`       | `` `py-14` is off the `py` scale — did you mean `py-12`? `` (a tie goes to the smaller value) |
 | `rounded`     | ``Bare `rounded` emits no CSS — did you mean `rounded-sm`?``                                  |
 
-Every message names its own failure and stops. The two findings with nothing to fix in the class
-list itself are the exception, and say what to do instead:
-
-```
-Runtime-built class list — use a generated token API, or suppress with a reason.
-`type-` is glued to a runtime value — suppress with a reason if the vocabulary is closed.
-```
+Every message names the failure. Member-specific runtime messages also name the next edit; the bare
+`Runtime-built class list` is the fallback when the expression does not address a resolvable member.
 
 All wording lives in [`src/lib/diagnostics.cjs`](src/lib/diagnostics.cjs), shared by both rules —
 two rules reporting the same mistake in drifting words is worse than no wording at all. The rendered
-text is asserted verbatim in the corpus, not just the message ids.
+member messages are asserted verbatim in the corpus; other findings are checked by message id and
+data.
 
 ## Dynamic class lists
 
-Statically enumerable bindings are validated like any other class list: `[class.foo]`, `[ngClass]`
-object keys, `[class]` conditionals and concatenations. What cannot be enumerated is reported as
-`dynamicClassList` rather than quietly accepted — moving a class into a binding is not a bypass.
+`[class.foo]` bindings, object literals, conditionals, arrays, and supported concatenations are
+enumerated from the Angular expression tree whenever every branch is a literal. When an expression
+remains dynamic, the useful distinction is whether its possible **whole class lists** form a closed
+set. Two member-resolution tiers answer that question:
 
-**There is no exemption for typed or generated APIs.** An earlier version accepted any expression
-whose root identifier matched an export of a configured generated module. That was not a type-based
-check: it read export _names_ out of a file, never resolved the template's member to that export,
-and never established that the call returns class names — so a same-named component helper, or any
-chain hanging off an accepted root, sailed through. It also had no real consumer, since the
-generated token module exports values (`semanticColor` returns a `var(...)` string) rather than
-class names. A check that cannot fail is worse than no check, so it is gone.
+1. **Component syntax.** Resolve a direct `member` or `member()` against the component that owns the
+   template. Constant properties, methods, getters, function properties, and Angular `computed`
+   values resolve when every possible result is a string literal.
+2. **Component types.** With `resolveTypes: true`, ask the `TypeChecker` for a member the component
+   declares — or might inherit — but whose syntax was not enumerable. String-literal unions expose
+   vocabularies from another module, carried by a signal, returned from an unenumerable method body,
+   or inherited from a base class:
 
-The supported answer for a genuinely closed vocabulary the rule cannot see is a narrow
-`eslint-disable-next-line` with a reason. Three sites in the renderer have one — `'type-' + token`
-in the design-system specimen and two closed-vocabulary helpers in `debug.component.html`. Note
-that `eslint-disable-next-line` is line-based and Prettier's attribute wrapping can move the
-reported line away from the comment; a multi-line binding needs a `eslint-disable` /
-`eslint-enable` pair around the element instead.
+    ```ts
+    readonly densityClass: Density = pickDensity() // union alias from another module
+    readonly modeClass = signal<'flex' | 'hidden'>('flex') // constrained writable signal
+    variantClass(i: number): 'type-body-sm' | 'type-code-sm' // annotated return
+    readonly inheritedClass: 'panel' | 'badge' // declared on a base class
+    ```
+
+Both tiers preserve the same invariants: the template uses the member's actual call shape, resolution
+is by declaration site rather than spelling, and every resulting literal is checked against
+Tailwind, global styles, and component styles. Typed resolution is opt-in because it builds a
+TypeScript program; the build is lazy, cached per tsconfig, and reused incrementally. The mechanics
+live in [`member-classes.cjs`](src/lib/member-classes.cjs) and
+[`type-program.cjs`](src/lib/type-program.cjs).
+
+There is no export-name or generated-API exemption. An earlier version trusted the name of an export
+without proving that the template addressed it or that it returned classes; the generated token API
+returns CSS values such as `var(...)`, not class names.
+
+### Shapes no tier resolves
+
+| Shape                                                              | Resolvable shape                                                                  |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| A runtime value glued to a prefix or suffix: `'type-' + variant()` | A component member maps the input to whole class names.                           |
+| A `@for`, `@let`, `as`, template-variable, or reference binding    | A component member accepts the value and returns every possible whole class list. |
+| A property chain or index such as `obj.member()` or `list[i]`      | A direct component `member` or `member()` returns the whole class list.           |
+
+Typing a glued runtime fragment cannot rescue it: `+` and TypeScript template literals widen the
+result to `string`. Template-bound names are left unresolved because Angular resolves them ahead of
+component members and the expression AST does not preserve that distinction. Chains and indexes
+also remain unresolved because resolving only their root proves nothing about the final value.
+
+Other member diagnostics identify an edit that makes the shape resolvable: narrow an effective
+`string` to a string-literal union, return literals from every branch, or match the declaration's
+call shape (`member` versus `member()`).
+
+When a closed vocabulary genuinely cannot take a resolvable shape, follow the suppression convention
+in [`frontend-design`](../../.agents/skills/frontend-design/SKILL.md#keep-runtime-class-vocabularies-closed).
+`eslint-disable-next-line` is line-based, and Prettier can move the reported binding away from the
+comment; bracket a multi-line element with `eslint-disable` and `eslint-enable` instead.
 
 ## Tests
 
-The acceptance corpus is [`plugin.spec.cjs`](plugin.spec.cjs), one file tracking MAE-100's shared
+The acceptance corpus is [`plugin.spec.cjs`](src/plugin.spec.cjs), one file tracking MAE-100's shared
 corpus case by case (`R*` = reject, `A*` = accept, plus `R7`/`S1` from the comparison). It runs
 under Jest in the Node environment:
 
@@ -187,7 +215,6 @@ had quietly papered over.
 | Case                                                            | Status                                                                                                                      |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Bare design tokens in `.css` files                              | **out of scope** — ESLint has no CSS language wired here; this is [MAE-109](https://linear.app/floyd-haremsa/issue/MAE-109) |
-| Class vocabularies defined as string literals in component TS   | **unsupported** — closed but invisible to both rules; needs a suppression                                                   |
 | Class applied by a parent component's stylesheet or `::ng-deep` | **would be a false positive** — none exist in the renderer today                                                            |
 | Classes applied imperatively (`classList.add`)                  | **out of scope** — banned rather than validated, see [MAE-108](https://linear.app/floyd-haremsa/issue/MAE-108)              |
 
@@ -197,6 +224,7 @@ came from, not on the authorities. Editing `tailwind.config.js` or a global styl
 invalidate it, so a long-lived editor server can hold a stale verdict until the template itself
 changes. A full `nx lint` run is unaffected because nx re-runs the process.
 
-Cost over the whole renderer is roughly 0.15 s of a ~3.7 s lint — inside run-to-run noise. ESLint's
-file cache works normally, so a warm re-lint is ~1 s for the project and effectively instant for a
-single open file.
+Typed resolution has a narrower version of the same hazard. It checks mtimes only for files already
+in its program, while the tsconfig parse and root list are cached. A class list in a newly added file
+therefore gets the untyped verdict until the ESLint process restarts — reported, never accepted
+unchecked.

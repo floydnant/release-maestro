@@ -19,3 +19,8 @@
 <div class="specimen-root | flex items-center gap-3">
     <span class="scoped-only nested-scoped inline-scoped"></span>
 </div>
+
+<!-- Accepted through the component: a closed vocabulary that lives in TypeScript. Both branches of
+     `badgeClass` are validated here, which is what makes this an acceptance rather than a bypass. -->
+<div [class]="badgeClass()"></div>
+<div [class]="'badge ' + statusClass('ok')"></div>

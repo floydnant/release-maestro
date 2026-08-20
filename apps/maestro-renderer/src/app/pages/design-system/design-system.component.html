@@ -73,9 +73,14 @@
                         <!--
                             eslint-disable-next-line design-system/valid-template-classnames --
                             `token` comes from the generated `typographyVariantIdentifiers`, so every
-                            `type-*` class this can produce is a generated design-system class. The
-                            typed-API check reads the *root* identifier of the expression, which here
-                            is a loop variable rather than the generated export itself.
+                            `type-*` class this can produce is a generated design-system class.
+                            Neither tier of member resolution reaches it, and turning on the type
+                            checker did not change that: `token` is a name the template itself binds,
+                            which Angular resolves ahead of any member, and `'type-' + token` widens
+                            to `string` through the `+` regardless of what `token` is typed as. The
+                            way out is a member returning whole class names rather than a prefix
+                            glued to a runtime value — deferred with MAE-111, which this one site
+                            does not justify on its own.
                         -->
                         <p class="mt-2" [ngClass]="'type-' + token">Music discovery for working collectors</p>
                     </div>

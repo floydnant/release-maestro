@@ -1,3 +1,5 @@
+type ClassCheckerOptions = import('./lib/class-checker.cjs').ClassCheckerOptions
+
 /**
  * Types for the two surfaces that cannot simply be imported.
  *
@@ -86,6 +88,8 @@ interface AngularExpression {
     /** `Conditional` */
     trueExp?: AngularExpression
     falseExp?: AngularExpression
+    /** `Interpolation` */
+    strings?: InstanceType<NgCompiler['Interpolation']>['strings']
     /** `LiteralMap` — the entries are a union; only the `property` kind carries a `key`. */
     keys?: InstanceType<NgCompiler['LiteralMap']>['keys']
     /** `LiteralArray` */

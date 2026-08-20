@@ -44,8 +44,52 @@ const DYNAMIC_MESSAGE = {
 /** `host: { class: someExpression }` is the decorator's version of `[class]`. */
 const HOST_MESSAGES = { ...DYNAMIC_MESSAGE }
 
+/**
+ * The verdicts for a class list that names a component member the rule could not enumerate.
+ *
+ * `dynamicClassList` above is the honest answer when the expression is not addressing a member at
+ * all, and it is a dead end for the reader: the only action it suggests is a suppression, which is
+ * how suppressions accumulate. Each message here replaces it for a case where the rule knows more
+ * than "runtime-built", and every one of them names the edit that would resolve the member — so an
+ * agent reading the diagnostic has somewhere to go that is not `eslint-disable`.
+ */
+const MEMBER_MESSAGES = {
+    unknownMember:
+        '`{{name}}` is not a member of `{{component}}` — a class list has to come from the component ' +
+        'this template belongs to.',
+
+    shadowedMember:
+        '`{{name}}` is bound by the template, not by `{{component}}` — Angular resolves template ' +
+        'variables ahead of members, so nothing about its value is knowable here. Move the class ' +
+        'list onto the component, or suppress with a reason.',
+
+    chainedMember:
+        'A class list reached through a property chain or an index is not resolvable — only ' +
+        '`member` and `member()` resolve against the component. Give the whole class list its own ' +
+        'member, or suppress with a reason.',
+
+    memberCallShape:
+        '`{{name}}` is {{declared}}, but the template reads it as {{read}} — write `{{fix}}`.',
+
+    ambiguousMember:
+        '`{{name}}` is declared by more than one component in this file — the template maps to the ' +
+        'file, so there is no saying which. Give them distinct names.',
+
+    // Two ways to fail to enumerate, and the difference matters to whoever has to fix it: the typed
+    // tier can name the type standing in the way, the syntactic one can only say it looked.
+    widerMember:
+        '`{{name}}` is typed `{{type}}`, which is not a closed set of class names — narrow it to a ' +
+        "string-literal union (`'flex' | 'hidden'`), or suppress with a reason.",
+
+    unenumerableMember:
+        '`{{name}}` is a member of `{{component}}` but its class list is not enumerable from that ' +
+        'file — return string literals from every branch, or turn on `resolveTypes` and give it a ' +
+        'string-literal union type, or suppress with a reason.',
+}
+
 const TEMPLATE_MESSAGES = {
     ...DYNAMIC_MESSAGE,
+    ...MEMBER_MESSAGES,
     partialClass:
         '`{{className}}` is glued to a runtime value — suppress with a reason if the vocabulary is closed.',
 }
