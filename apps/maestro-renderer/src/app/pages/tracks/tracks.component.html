@@ -10,10 +10,12 @@
         [result]="result()"
         [query]="query()"
         [selection]="selection()"
+        [restoreScrollTop]="history.scrollRestore()"
         (sortChange)="onSort($event)"
         (selectionChange)="onSelectionChange($event)"
         (viewportChange)="onViewportChange($event)"
         (entityFilter)="onEntityFilter($event)"
         (filterMissing)="onFilterMissing()"
+        (scrollRestored)="history.consumeScrollRestore()"
     ></app-song-table>
 </app-browse-shell>

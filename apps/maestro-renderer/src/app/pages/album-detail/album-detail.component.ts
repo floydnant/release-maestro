@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal } from '@angular/core'
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    DestroyRef,
+    inject,
+    linkedSignal,
+    untracked,
+    viewChild,
+} from '@angular/core'
 import { toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router, RouterLink } from '@angular/router'
 import {
@@ -21,6 +30,7 @@ import {
     startWith,
     switchMap,
 } from 'rxjs'
+import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
@@ -33,6 +43,7 @@ import {
 } from '../../shared/browse/song-selection'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import {
+    songWindowOffsetAt,
     SongTableComponent,
     type EntityFilterRequest,
     type SongTableColumn,
@@ -97,6 +108,9 @@ export class AlbumDetailComponent {
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
     private libraryService = inject(LibraryService)
+    protected history = inject(HistoryService)
+
+    private table = viewChild(SongTableComponent)
 
     private albumId = toSignal(this.route.paramMap.pipe(map(params => params.get(ALBUM_ID_PARAM) ?? '')), {
         initialValue: '',
@@ -188,13 +202,25 @@ export class AlbumDetailComponent {
         { equal: sameQuery },
     )
 
+    /**
+     * The slice the table wants, seeded from a remembered scroll position when the
+     * navigation that brought us here is a restore — see `TracksComponent.viewport`,
+     * which carries the reasoning for both.
+     */
     protected viewport = linkedSignal<SongQuery, BrowseWindow>({
         source: () => this.query(),
         computation: (_query, previous) => ({
-            offset: 0,
+            offset: untracked(() => offsetForRestore(this.history.scrollRestore())),
             limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
         }),
     })
+
+    constructor() {
+        // Where the table is scrolled to, so that leaving this album records it against
+        // the history entry being left.
+        const unregister = this.history.registerScrollProvider(() => this.table()?.scrollTop() ?? null)
+        inject(DestroyRef).onDestroy(unregister)
+    }
 
     private browse = createBrowseQuery({
         query: this.query,
@@ -342,6 +368,10 @@ export class AlbumDetailComponent {
         this.browse.retry()
     }
 }
+
+/** Where a window has to start for a remembered scroll position to be inside it. */
+const offsetForRestore = (scrollTop: number | null): number =>
+    scrollTop == null ? 0 : songWindowOffsetAt(scrollTop)
 
 /**
  * Which track-list query param addresses each entity kind. `album` is absent on purpose

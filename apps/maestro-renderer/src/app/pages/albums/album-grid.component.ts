@@ -82,6 +82,27 @@ export const initialWindowLimit = (width: number, height: number): number => {
 }
 
 /**
+ * The window a surface should open with to land at a remembered scroll position — the
+ * grid's counterpart to the track table's `songWindowOffsetAt`, and the *page's* to ask
+ * for, because the grid is created after the first window has been requested.
+ *
+ * **An estimate, and the one part of scroll restoration that cannot be exact.** A tile's
+ * height follows the column width, which follows a container that does not exist yet, so
+ * this assumes the same square tile at the same minimum width that {@link
+ * initialWindowLimit} does. It can be a row or two out until the real measurement lands,
+ * at which point the grid re-requests against its own geometry and the scroll position
+ * it puts back is exact regardless — this only decides which window is fetched first.
+ *
+ * Overscan is subtracted rather than added, which also cushions the estimate: the widest
+ * tile it can assume is the narrowest one allowed, so it over-counts columns.
+ */
+export const estimatedAlbumWindowOffsetAt = (scrollTop: number, width: number): number => {
+    const columns = Math.max(1, Math.floor((width + TILE_GAP) / (MIN_TILE_WIDTH + TILE_GAP)))
+    const row = Math.floor(scrollTop / (MIN_TILE_WIDTH + TILE_GAP))
+    return Math.max(0, row - OVERSCAN_ROWS) * columns
+}
+
+/**
  * Tile *rows* fetched beyond the viewport on each side.
  *
  * Far smaller than the track table's twenty, and not because a grid scrolls
@@ -176,8 +197,15 @@ export class AlbumGridComponent {
      * position measured against the old one is meaningless against it.
      */
     query = input.required<AlbumQuery>()
+    /**
+     * A scroll position to put back, in pixels, when this window is the one the user
+     * left behind — see `HistoryService`. Null on an ordinary navigation.
+     */
+    restoreScrollTop = input<number | null>(null)
 
     viewportChange = output<BrowseWindow>()
+    /** {@link restoreScrollTop} has been applied, so nothing should offer it again. */
+    scrollRestored = output<void>()
 
     protected readonly fileUrl = fileUrl
     protected readonly gap = TILE_GAP
@@ -373,9 +401,42 @@ export class AlbumGridComponent {
                 this.lastWindow = null
                 this.focusedIndex.set(NO_FOCUS)
                 this.pendingFocusIndex = NO_FOCUS
+
+                // A restore belongs to the query it arrived with, and this effect runs
+                // on that query — going to the top here would undo it before it was
+                // ever applied.
+                if (this.restoreScrollTop() != null) return
                 this.scroller()?.nativeElement?.scrollTo({ top: 0 })
             })
         })
+
+        // Put a remembered scroll position back, once there is a canvas tall enough to
+        // hold it. Two things have to have happened first, and both are asynchronous:
+        // the total that sizes the spacer has to have arrived over IPC, and the grid has
+        // to have measured its own row height — a canvas computed against
+        // `PLACEHOLDER_MEASUREMENT` is one column tall and would clamp the position to a
+        // fraction of where it belongs.
+        afterRenderEffect(() => {
+            const target = this.restoreScrollTop()
+            const ready = this.result().loaded && this.measured()
+            untracked(() => {
+                if (target == null || !ready) return
+
+                const element = this.scroller()?.nativeElement
+                if (!element) return
+
+                element.scrollTop = target
+                // The page seeded the window from the same position, so this usually
+                // asks for what it already has — `sync` compares before emitting.
+                this.onScroll()
+                this.scrollRestored.emit()
+            })
+        })
+    }
+
+    /** Where this grid is scrolled to, for the history entry that is being left. */
+    scrollTop(): number | null {
+        return this.scroller()?.nativeElement.scrollTop ?? null
     }
 
     /**

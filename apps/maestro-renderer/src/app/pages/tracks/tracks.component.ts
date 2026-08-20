@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal } from '@angular/core'
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    DestroyRef,
+    inject,
+    linkedSignal,
+    untracked,
+    viewChild,
+} from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
 import {
@@ -22,6 +31,7 @@ import {
     Subject,
     switchMap,
 } from 'rxjs'
+import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
@@ -40,6 +50,7 @@ import {
     type BrowseShellState,
 } from '../../shared/components/browse-shell/browse-shell.component'
 import {
+    songWindowOffsetAt,
     SongTableComponent,
     type EntityFilterKind,
     type EntityFilterRequest,
@@ -93,6 +104,7 @@ export class TracksComponent {
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
     private libraryService = inject(LibraryService)
+    protected history = inject(HistoryService)
 
     private queryParams = toSignal(this.route.queryParams, { initialValue: {} })
     /**
@@ -104,14 +116,25 @@ export class TracksComponent {
     })
 
     /**
-     * The slice the table wants. It goes back to the top whenever the query changes:
-     * offset 5,000 means nothing in a result set the user has just filtered down, and
-     * fetching it would only waste a round trip on rows nobody can see.
+     * The slice the table wants.
+     *
+     * It goes back to the top whenever the query changes: offset 5,000 means nothing in a
+     * result set the user has just filtered down, and fetching it would only waste a round
+     * trip on rows nobody can see.
+     *
+     * **Unless the query arrived with a scroll position**, which is what going back to
+     * this page is. Seeding the offset here rather than letting the table correct it
+     * afterwards is what makes the *first* window the right one — the table is created
+     * after this window has been asked for, so a correction it made would be a correction
+     * to a round trip that had already happened, and a visible flash of the top of the
+     * list.
      */
     protected viewport = linkedSignal<SongQuery, BrowseWindow>({
         source: () => this.query(),
         computation: (_query, previous) => ({
-            offset: 0,
+            // Untracked: this is a seed for a new query, not a dependency. Tracking it
+            // would rebuild the window again the moment the table consumed it.
+            offset: untracked(() => offsetForRestore(this.history.scrollRestore())),
             // Keep whatever the table measured; only the offset is stale.
             limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
         }),
@@ -185,7 +208,15 @@ export class TracksComponent {
 
     private searchInput$ = new Subject<string>()
 
+    private table = viewChild(SongTableComponent)
+
     constructor() {
+        // Where the table is scrolled to, so that leaving this page records it against
+        // the history entry being left. The service asks at `NavigationStart`, which is
+        // the last moment the table is both alive and still scrolled.
+        const unregister = this.history.registerScrollProvider(() => this.table()?.scrollTop() ?? null)
+        inject(DestroyRef).onDestroy(unregister)
+
         // A manual subscribe, because the result of this stream is a navigation rather
         // than state — there is no signal for it to land in. `takeUntilDestroyed` ends it.
         this.searchInput$
@@ -359,6 +390,10 @@ export class TracksComponent {
         })
     }
 }
+
+/** Where a window has to start for a remembered scroll position to be inside it. */
+const offsetForRestore = (scrollTop: number | null): number =>
+    scrollTop == null ? 0 : songWindowOffsetAt(scrollTop)
 
 const EMPTY_DESCRIPTION: SongFilterDescription = {
     artists: [],
