@@ -33,9 +33,15 @@
     background: transparent;
 }
 
+/* The drag region swallows clicks: anything interactive inside it has to opt out, or
+   it is a dead zone that never receives one. Not expressible in Tailwind. */
+.title-bar__nav,
+.title-bar__controls {
+    -webkit-app-region: no-drag;
+}
+
 .title-bar__controls {
     display: flex;
-    -webkit-app-region: no-drag;
 }
 
 .title-bar__button {

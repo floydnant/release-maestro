@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core'
 import { NgIcon, provideIcons } from '@ng-icons/core'
 import {
     octCheckCircleFill,
+    octChevronLeft,
+    octChevronRight,
     octDash,
     octFileDirectory,
     octFileDirectoryFill,
@@ -27,6 +29,8 @@ import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.gene
 
 const icons = {
     octCheckCircleFill,
+    octChevronLeft,
+    octChevronRight,
     octDash,
     octFileDirectory,
     octFileDirectoryFill,

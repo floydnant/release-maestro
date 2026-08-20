@@ -18,6 +18,7 @@ import { webEnv } from '../environments/environment'
 import { ElectronService } from './core/services'
 import { WebAudioPlayer } from './core/services/audio-player.service'
 import { FeedService } from './core/services/feed.service'
+import { HistoryService } from './core/services/history.service'
 import { LibraryService } from './core/services/library.service'
 import { SettingsService } from './core/settings/settings.service'
 import { IconComponent } from './shared/components/icon/icon.component'
@@ -45,11 +46,15 @@ interface ScanIndicatorView {
  */
 const STARTUP_PHASE_MIN_DWELL_MS = 1000
 
+/** Where a keystroke means "move the caret", not "move through history". */
+const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contenteditable="false"])'
+
 @Component({
     selector: 'app-root',
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.css'],
     standalone: true,
+    host: { '(document:keydown)': 'onDocumentKeydown($event)' },
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         RouterModule,
@@ -66,12 +71,50 @@ export class AppComponent {
     feedService = inject(FeedService)
     audioPlayer = inject(WebAudioPlayer)
     libraryService = inject(LibraryService)
+    history = inject(HistoryService)
     private settingsService = inject(SettingsService)
     private router = inject(Router)
 
     readonly showDesignSystem = !webEnv.production
     readonly isElectron = this.electronService.isElectron
     readonly isMacos = this.isElectron && this.electronService.platform === 'darwin'
+
+    /**
+     * Back and forward from the keyboard, on the bindings the host platform uses:
+     * Cmd+[ / Cmd+] and Cmd+← / Cmd+→ on macOS, Alt+← / Alt+→ elsewhere.
+     *
+     * On `document` rather than on the buttons, because the point is to work from
+     * wherever you are — the same reasoning, and the same shape, as the Cmd+F binding in
+     * `BrowseShellComponent`.
+     *
+     * **Text entry is left alone.** Cmd+← in a text field means "jump to the start of
+     * the line", and taking that over would break the search box for anyone who uses it.
+     */
+    protected onDocumentKeydown(event: KeyboardEvent): void {
+        const direction = this.historyDirection(event)
+        if (!direction) return
+        if (event.target instanceof Element && event.target.closest(TEXT_ENTRY_SELECTOR)) return
+
+        event.preventDefault()
+        if (direction == 'back') this.history.back()
+        else this.history.forward()
+    }
+
+    private historyDirection(event: KeyboardEvent): 'back' | 'forward' | null {
+        if (event.shiftKey || event.repeat) return null
+
+        if (this.isMacos) {
+            if (!event.metaKey || event.ctrlKey || event.altKey) return null
+            if (event.key == '[' || event.key == 'ArrowLeft') return 'back'
+            if (event.key == ']' || event.key == 'ArrowRight') return 'forward'
+            return null
+        }
+
+        if (!event.altKey || event.metaKey || event.ctrlKey) return null
+        if (event.key == 'ArrowLeft') return 'back'
+        if (event.key == 'ArrowRight') return 'forward'
+        return null
+    }
 
     triggerEmailImport() {
         this.feedService.triggerEmailImport().catch(err => {
