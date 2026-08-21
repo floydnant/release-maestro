@@ -27,4 +27,15 @@ describe(AppComponent.name, () => {
 
         expect(fixture.nativeElement.querySelector('.title-bar__controls')).toBeNull()
     })
+
+    it('places history navigation in the full-height sidebar chrome', () => {
+        const fixture = TestBed.createComponent(AppComponent)
+
+        fixture.detectChanges()
+
+        const sidebar = fixture.nativeElement.querySelector('aside.sidebar') as HTMLElement
+        const history = sidebar.querySelector('nav[aria-label="History"]')
+        expect(history).not.toBeNull()
+        expect(fixture.nativeElement.querySelector('header.title-bar nav[aria-label="History"]')).toBeNull()
+    })
 })

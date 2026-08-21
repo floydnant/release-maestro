@@ -1,4 +1,3 @@
-import { NgClass } from '@angular/common'
 import {
     ChangeDetectionStrategy,
     Component,
@@ -56,14 +55,7 @@ const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contentedit
     standalone: true,
     host: { '(document:keydown)': 'onDocumentKeydown($event)' },
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
-        RouterModule,
-        TranslateModule,
-        ProgressBarComponent,
-        ProgressRingComponent,
-        IconComponent,
-        NgClass,
-    ],
+    imports: [RouterModule, TranslateModule, ProgressBarComponent, ProgressRingComponent, IconComponent],
 })
 export class AppComponent {
     translate = inject(TranslateService)

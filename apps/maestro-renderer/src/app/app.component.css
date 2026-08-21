@@ -33,8 +33,14 @@
     background: transparent;
 }
 
-/* The drag region swallows clicks: anything interactive inside it has to opt out, or
-   it is a dead zone that never receives one. Not expressible in Tailwind. */
+/* The sidebar owns the left part of the window chrome, including the native macOS
+   controls. This is the draggable space between those controls and History. */
+.sidebar__title-bar {
+    -webkit-app-region: drag;
+}
+
+/* Window drag regions swallow clicks: anything interactive inside one has to opt out,
+   or it is a dead zone that never receives them. Not expressible in Tailwind. */
 .title-bar__nav,
 .title-bar__controls {
     -webkit-app-region: no-drag;

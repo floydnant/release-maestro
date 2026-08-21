@@ -1,6 +1,6 @@
 # Only route changes are history steps; filter, sort and search replace the entry
 
-The title bar has Back and Forward buttons (MAE-139), and every browse surface declares the URL as
+The sidebar chrome has Back and Forward buttons (MAE-139), and every browse surface declares the URL as
 the single source of truth for filter, sort and search — so every sort click, chip removal and
 settled search term was a history entry, and getting back to the album you came from took eleven
 presses. So `patchQuery` on both browse pages, and the sort on the album detail page, navigate with

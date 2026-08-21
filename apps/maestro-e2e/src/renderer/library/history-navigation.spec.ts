@@ -9,7 +9,7 @@ import {
 } from '../scenario-harness'
 
 /**
- * The title bar's Back and Forward, against mocked IPC.
+ * The sidebar chrome's Back and Forward, against mocked IPC.
  *
  * Three separate contracts, and they fail in different ways:
  *
