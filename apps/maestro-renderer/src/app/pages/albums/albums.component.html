@@ -18,8 +18,8 @@
     <app-album-grid
         [result]="result()"
         [query]="query()"
-        [restoreScrollTop]="history.scrollRestore()"
+        [restoreScrollTop]="restoreScrollTop()"
         (viewportChange)="onViewportChange($event)"
-        (scrollRestored)="history.consumeScrollRestore()"
+        (scrollRestored)="onScrollRestored()"
     ></app-album-grid>
 </app-browse-shell>

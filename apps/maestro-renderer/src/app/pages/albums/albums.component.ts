@@ -111,12 +111,29 @@ export class AlbumsComponent {
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
     private libraryService = inject(LibraryService)
-    protected history = inject(HistoryService)
+    private history = inject(HistoryService)
 
     private queryParams = toSignal(this.route.queryParams, { initialValue: {} })
     /** Compared by value, so a navigation that rebuilds an identical query is not a change. */
     protected query = computed<AlbumQuery>(() => albumQueryFromParams(this.queryParams()), {
         equal: sameAlbumQuery,
+    })
+
+    /**
+     * The scroll position **this arrival** is meant to land at, latched per query.
+     *
+     * Latched rather than read live, because the surface being left is still alive and
+     * still rendering while the incoming route's guards run. Following the service's
+     * signal would let this page apply — and consume — a position that belongs to the
+     * page replacing it, and the incoming one would then open at the top of the list.
+     *
+     * Keyed on the query rather than on construction so that a same-component
+     * navigation picks it up too: a detail route reuses its component, and the
+     * viewport below is re-seeded on exactly the same source.
+     */
+    protected restoreScrollTop = linkedSignal<AlbumQuery, number | null>({
+        source: () => this.query(),
+        computation: () => untracked(() => this.history.scrollRestore()),
     })
 
     /**
@@ -132,7 +149,7 @@ export class AlbumsComponent {
         source: () => this.query(),
         computation: (_query, previous) => ({
             // Untracked: a seed for a new query, not a dependency.
-            offset: untracked(() => offsetForRestore(this.history.scrollRestore())),
+            offset: untracked(() => offsetForRestore(this.restoreScrollTop())),
             // Keep whatever the grid measured; only the offset is stale.
             limit: previous?.value.limit ?? initialLimit(),
         }),
@@ -289,6 +306,12 @@ export class AlbumsComponent {
 
     protected onRetry(): void {
         this.browse.retry()
+    }
+
+    /** The grid has put the position back; nothing should offer it again. */
+    protected onScrollRestored(): void {
+        this.restoreScrollTop.set(null)
+        this.history.consumeScrollRestore()
     }
 
     /**

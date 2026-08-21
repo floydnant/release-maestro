@@ -108,7 +108,7 @@ export class AlbumDetailComponent {
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
     private libraryService = inject(LibraryService)
-    protected history = inject(HistoryService)
+    private history = inject(HistoryService)
 
     private table = viewChild(SongTableComponent)
 
@@ -203,14 +203,24 @@ export class AlbumDetailComponent {
     )
 
     /**
-     * The slice the table wants, seeded from a remembered scroll position when the
-     * navigation that brought us here is a restore — see `TracksComponent.viewport`,
-     * which carries the reasoning for both.
+     * The scroll position this arrival is meant to land at, latched per query — see
+     * `TracksComponent.restoreScrollTop`, which carries the reasoning. It matters most
+     * here: moving between two albums reuses this component, so construction is not the
+     * event a latch can key on.
+     */
+    protected restoreScrollTop = linkedSignal<SongQuery, number | null>({
+        source: () => this.query(),
+        computation: () => untracked(() => this.history.scrollRestore()),
+    })
+
+    /**
+     * The slice the table wants, seeded from that position so the first window fetched
+     * is the right one — see `TracksComponent.viewport`.
      */
     protected viewport = linkedSignal<SongQuery, BrowseWindow>({
         source: () => this.query(),
         computation: (_query, previous) => ({
-            offset: untracked(() => offsetForRestore(this.history.scrollRestore())),
+            offset: untracked(() => offsetForRestore(this.restoreScrollTop())),
             limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
         }),
     })
@@ -366,6 +376,12 @@ export class AlbumDetailComponent {
 
     protected onRetry(): void {
         this.browse.retry()
+    }
+
+    /** The table has put the position back; nothing should offer it again. */
+    protected onScrollRestored(): void {
+        this.restoreScrollTop.set(null)
+        this.history.consumeScrollRestore()
     }
 }
 

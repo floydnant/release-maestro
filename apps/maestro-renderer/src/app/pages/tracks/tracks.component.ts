@@ -104,7 +104,7 @@ export class TracksComponent {
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
     private libraryService = inject(LibraryService)
-    protected history = inject(HistoryService)
+    private history = inject(HistoryService)
 
     private queryParams = toSignal(this.route.queryParams, { initialValue: {} })
     /**
@@ -113,6 +113,28 @@ export class TracksComponent {
      */
     protected query = computed<SongQuery>(() => songQueryFromParams(this.queryParams()), {
         equal: sameQuery,
+    })
+
+    /**
+     * The scroll position **this arrival** is meant to land at, latched per query.
+     *
+     * Latched rather than read live, because the surface being left is still alive and
+     * still rendering while the incoming route's guards run. Following the service's
+     * signal would let this page apply — and consume — a position that belongs to the
+     * page replacing it, and the incoming one would then open at the top of the list.
+     *
+     * **Nothing in the renderer E2E suite proves this**, and it is not for want of
+     * trying: provoking it needs a guard slow enough for a render to land inside it, and
+     * the scenario harness requires `get-settings` to resolve synchronously. The latch is
+     * a structural guard rather than a tested one.
+     *
+     * Keyed on the query rather than on construction so that a same-component navigation
+     * picks it up too — `/albums/:albumId` reuses its component — and so that the
+     * viewport below is re-seeded from exactly the same source.
+     */
+    protected restoreScrollTop = linkedSignal<SongQuery, number | null>({
+        source: () => this.query(),
+        computation: () => untracked(() => this.history.scrollRestore()),
     })
 
     /**
@@ -134,7 +156,7 @@ export class TracksComponent {
         computation: (_query, previous) => ({
             // Untracked: this is a seed for a new query, not a dependency. Tracking it
             // would rebuild the window again the moment the table consumed it.
-            offset: untracked(() => offsetForRestore(this.history.scrollRestore())),
+            offset: untracked(() => offsetForRestore(this.restoreScrollTop())),
             // Keep whatever the table measured; only the offset is stale.
             limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
         }),
@@ -372,6 +394,12 @@ export class TracksComponent {
 
     protected onRetry(): void {
         this.browse.retry()
+    }
+
+    /** The table has put the position back; nothing should offer it again. */
+    protected onScrollRestored(): void {
+        this.restoreScrollTop.set(null)
+        this.history.consumeScrollRestore()
     }
 
     /**

@@ -1,8 +1,15 @@
 import { Location } from '@angular/common'
 import { TestBed } from '@angular/core/testing'
-import { NavigationCancel, NavigationEnd, NavigationStart, Router } from '@angular/router'
+import {
+    NavigationCancel,
+    NavigationCancellationCode,
+    NavigationEnd,
+    NavigationSkipped,
+    NavigationStart,
+    Router,
+} from '@angular/router'
 import { Subject } from 'rxjs'
-import { HistoryService } from './history.service'
+import { advance, emptyStack, HistoryService } from './history.service'
 
 /**
  * The cursor model, driven by a fake `Router` event stream.
@@ -25,7 +32,7 @@ interface NavigationOptions {
 }
 
 describe('HistoryService', () => {
-    let events: Subject<NavigationStart | NavigationEnd | NavigationCancel>
+    let events: Subject<NavigationStart | NavigationEnd | NavigationCancel | NavigationSkipped>
     let service: HistoryService
     let location: { back: jest.Mock; forward: jest.Mock }
     let nextId: number
@@ -48,7 +55,16 @@ describe('HistoryService', () => {
         return id
     }
 
-    const cancel = (id: number, url: string) => events.next(new NavigationCancel(id, url, ''))
+    /** A guard answering with a `UrlTree`: the redirect that follows is its own navigation. */
+    const redirect = (id: number, url: string) =>
+        events.next(new NavigationCancel(id, url, '', NavigationCancellationCode.Redirect))
+
+    /** A guard answering `false`: the router puts the previous URL back where it is. */
+    const reject = (id: number, url: string) =>
+        events.next(new NavigationCancel(id, url, '', NavigationCancellationCode.GuardRejected))
+
+    /** An identical-URL navigation the router declines to run at all. */
+    const skip = (id: number, url: string) => events.next(new NavigationSkipped(id, url))
 
     beforeEach(() => {
         events = new Subject()
@@ -146,8 +162,8 @@ describe('HistoryService', () => {
     it('does not advance the cursor for a navigation that changes no URL', () => {
         const home = navigate('/home')
         navigate('/albums')
-        navigate('/albums', { skipLocationChange: true })
-        // The router replaces rather than pushes when the URL already matches.
+        // The router replaces rather than pushes when the URL already matches, whatever
+        // the caller asked for.
         navigate('/albums')
 
         navigate('/home', { restoredFrom: home })
@@ -159,7 +175,7 @@ describe('HistoryService', () => {
         const home = navigate('/home')
 
         const bounced = start('/tracks')
-        cancel(bounced, '/tracks')
+        redirect(bounced, '/tracks')
         navigate('/import')
 
         expect(service.canGoBack()).toBe(true)
@@ -176,10 +192,59 @@ describe('HistoryService', () => {
         // The browser has already moved by the time the guard cancels, so the cursor has
         // to move with it; the redirect that follows replaces the entry it landed on.
         const bounced = start('/home', { restoredFrom: home })
-        cancel(bounced, '/home')
+        redirect(bounced, '/home')
         expect(service.canGoBack()).toBe(false)
 
         navigate('/import', { replaceUrl: true })
+        expect(service.canGoBack()).toBe(false)
+        expect(service.canGoForward()).toBe(true)
+    })
+
+    it('follows the router when a guard rejects a Back outright', () => {
+        const home = navigate('/home')
+        const albums = navigate('/albums')
+        navigate('/tracks')
+
+        // The browser moved to the albums entry, then the router wrote the tracks URL
+        // and id into it — `resetUrlToCurrentUrlTree`. The model has to agree, or the
+        // next popstate is classified against an entry the browser no longer holds.
+        const rejected = start('/albums', { restoredFrom: albums })
+        reject(rejected, '/albums')
+        expect(service.canGoBack()).toBe(true)
+        expect(service.canGoForward()).toBe(true)
+
+        navigate('/home', { restoredFrom: home })
+        expect(service.canGoBack()).toBe(false)
+        expect(service.canGoForward()).toBe(true)
+    })
+
+    it('changes nothing for a navigation the router declined to run', () => {
+        const home = navigate('/home')
+        navigate('/albums')
+
+        const skipped = start('/albums')
+        skip(skipped, '/albums')
+
+        // The skipped navigation must not leave its classification behind for the next
+        // one to be judged by.
+        navigate('/tracks')
+        expect(service.canGoBack()).toBe(true)
+
+        navigate('/home', { restoredFrom: home })
+        expect(service.canGoBack()).toBe(false)
+        expect(service.canGoForward()).toBe(true)
+    })
+
+    it('leaves the address bar alone for a skipLocationChange navigation', () => {
+        const home = navigate('/home')
+        navigate('/albums')
+        navigate('/hidden', { skipLocationChange: true })
+
+        // The browser entry still holds /albums, so navigating there is a replace and
+        // not a push — which is only true if the entry was never rewritten.
+        navigate('/albums')
+        navigate('/home', { restoredFrom: home })
+
         expect(service.canGoBack()).toBe(false)
         expect(service.canGoForward()).toBe(true)
     })
@@ -275,5 +340,39 @@ describe('HistoryService', () => {
             navigate('/home', { restoredFrom: home })
             expect(service.scrollRestore()).toBeNull()
         })
+    })
+})
+
+/**
+ * The fold itself, where the stack's own bookkeeping is observable.
+ *
+ * Everything above goes through the service, because that is how the app uses it. This
+ * one property cannot: what it asserts is that the id table does not grow, and the id
+ * table is deliberately not reachable from outside.
+ */
+describe('the history fold', () => {
+    const step = (
+        event: NavigationStart | NavigationEnd,
+        extras: { replaceUrl?: boolean } | null = null,
+    ) => ({ event, extras, scrollTop: null })
+
+    it('retires the navigation ids of an entry it rewrites', () => {
+        let stack = emptyStack()
+        let id = 1
+        const run = (url: string, extras: { replaceUrl?: boolean } | null = null) => {
+            stack = advance(stack, step(new NavigationStart(id, url), extras))
+            stack = advance(stack, step(new NavigationEnd(id, url, url), extras))
+            id++
+        }
+
+        run('/home')
+        run('/albums')
+        for (let edit = 0; edit < 50; edit++) run(`/albums?sort=${edit}`, { replaceUrl: true })
+
+        // The router overwrote the entry's state on each replace, so none of the retired
+        // ids can be named by a popstate again — and one id per query edit would live
+        // for as long as the window does.
+        expect(stack.index.size).toBe(stack.urls.length)
+        expect(stack.urls).toEqual(['/home', '/albums?sort=49'])
     })
 })
