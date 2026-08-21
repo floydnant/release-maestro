@@ -171,6 +171,72 @@ test.describe('where Back lands', () => {
         for (const request of windowsAfterBack) expect(request.window.offset).toBeGreaterThan(900)
     })
 
+    test('brings the albums grid back from an album, with its filter, sort and place', async ({ page }) => {
+        // The journey the feature exists for: browse, open a record, come back to the
+        // grid you were reading rather than to the top of an unsorted one.
+        const controller = await createRendererScenario(
+            page,
+            browsableLibrary(page),
+            '/albums?sort=year&dir=desc&q=album%201',
+        )
+        const grid = albumGrid(page)
+        await expect(grid).toBeVisible()
+
+        await grid.evaluate(element => element.scrollTo({ top: 2_400 }))
+        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(2_400)
+        await expect.poll(async () => (await controller.lastCall('library:query-albums')) != null).toBe(true)
+
+        // A tile that is wholly on screen, so that clicking it does not scroll the grid
+        // and quietly change the position under test. Which album that is depends on the
+        // measured geometry, so it is read off the DOM rather than named.
+        const tileHref = await grid.evaluate(element => {
+            const viewport = element.getBoundingClientRect()
+            const tiles = [...element.querySelectorAll<HTMLAnchorElement>('a[href^="/albums/"]')]
+            const onScreen = tiles.find(anchor => {
+                const box = anchor.getBoundingClientRect()
+                return box.top >= viewport.top && box.bottom <= viewport.bottom
+            })
+            return onScreen?.getAttribute('href') ?? null
+        })
+        expect(tileHref).not.toBeNull()
+
+        await page.locator(`a[href="${tileHref}"]`).click()
+        await expect(page).toHaveURL(new RegExp(`${tileHref}$`))
+        await expect(trackGrid(page)).toBeVisible()
+
+        await backButton(page).click()
+
+        await expect(page).toHaveURL(/sort=year/)
+        await expect(page).toHaveURL(/dir=desc/)
+        await expect(page.getByRole('searchbox', { name: 'Search albums' })).toHaveValue('album 1')
+        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(2_400)
+        await expect(forwardButton(page)).toBeEnabled()
+    })
+
+    test('brings the album track table back to where it was', async ({ page }) => {
+        const controller = await createRendererScenario(page, browsableLibrary(page), '/albums/album-4')
+        const grid = trackGrid(page)
+        await expect(grid).toBeVisible()
+
+        await grid.evaluate(element => element.scrollTo({ top: 40 * 600 }))
+        await expect
+            .poll(async () => (await songWindows(controller)).at(-1)?.window.offset)
+            .toBeGreaterThan(500)
+
+        await sidebarLink(page, 'Tracks').click()
+        await expect(page).toHaveURL(/\/tracks/)
+        const windowsBeforeBack = (await songWindows(controller)).length
+
+        await backButton(page).click()
+
+        await expect(page).toHaveURL(/\/albums\/album-4/)
+        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(40 * 600)
+
+        const windowsAfterBack = (await songWindows(controller)).slice(windowsBeforeBack)
+        expect(windowsAfterBack.length).toBeGreaterThan(0)
+        for (const request of windowsAfterBack) expect(request.window.offset).toBeGreaterThan(500)
+    })
+
     test('brings the grid back to roughly where it was', async ({ page }) => {
         const controller = await createRendererScenario(page, browsableLibrary(page), '/albums')
         const grid = albumGrid(page)

@@ -186,11 +186,11 @@ slides, and there is no page number for anything to be on.
 **History entry**:
 One step of Back and Forward — a _route_, and whatever filter, sort and search were last
 in force on it. Filter, sort and search changes rewrite the entry rather than adding one
-([ADR 0006](../../adr/0006-only-route-changes-are-history-steps.md)), so the number of
-entries between two records is the number of pages the user opened, not the number of
-adjustments they made along the way.
-_Avoid_: **page** here too, in its browser-history sense — a page in this app is a route,
-and an entry carries more than one.
+([ADR 0006](../../adr/0006-only-route-changes-are-history-steps.md)), so the entries
+between two records count the routes the user opened, not the adjustments they made along
+the way.
+_Avoid_: **page**, in its browser-history sense. A route is what an entry addresses, and
+one route serves any number of entries as its query changes.
 
 **Restore**:
 Arriving at a history entry by going back or forward, as opposed to opening it. The
