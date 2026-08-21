@@ -50,6 +50,8 @@ const icons = {
     snooze: solarAlarmSleep,
     snoozeFilled: solarAlarmSleepBold,
     musicNote: solarMusicNoteBold,
+    navigationBack: octChevronLeft,
+    navigationForward: octChevronRight,
 } satisfies Record<string, string>
 export type IconIdentitfier = keyof typeof icons
 
