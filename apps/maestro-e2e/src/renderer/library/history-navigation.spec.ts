@@ -213,6 +213,42 @@ test.describe('where Back lands', () => {
         await expect(forwardButton(page)).toBeEnabled()
     })
 
+    test('brings the albums grid back after jumping near the end with the scrollbar', async ({ page }) => {
+        const controller = await createRendererScenario(page, browsableLibrary(page), '/albums')
+        const grid = albumGrid(page)
+        await expect(grid).toBeVisible()
+
+        const target = await grid.evaluate(element => element.scrollHeight - element.clientHeight - 100)
+        await grid.evaluate((element, top) => element.scrollTo({ top }), target)
+        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(target)
+
+        await expect
+            .poll(async () => {
+                const request = await controller.lastCall('library:query-albums')
+                return (request?.payload as { window?: { offset?: number } } | undefined)?.window?.offset
+            })
+            .toBeGreaterThan(1_500)
+
+        const tileHref = await grid.evaluate(element => {
+            const viewport = element.getBoundingClientRect()
+            const tiles = [...element.querySelectorAll<HTMLAnchorElement>('a[href^="/albums/"]')]
+            const onScreen = tiles.find(anchor => {
+                const box = anchor.getBoundingClientRect()
+                return box.top >= viewport.top && box.bottom <= viewport.bottom
+            })
+            return onScreen?.getAttribute('href') ?? null
+        })
+        expect(tileHref).not.toBeNull()
+        await page.locator(`a[href="${tileHref}"]`).click()
+        await expect(trackGrid(page)).toBeVisible()
+
+        await backButton(page).click()
+
+        await expect(grid).toBeVisible()
+        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(target)
+        await expect(page.locator('a[href^="/albums/"]').first()).toBeVisible()
+    })
+
     test('brings the album track table back to where it was', async ({ page }) => {
         const controller = await createRendererScenario(page, browsableLibrary(page), '/albums/album-4')
         const grid = trackGrid(page)

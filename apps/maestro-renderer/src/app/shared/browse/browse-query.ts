@@ -116,7 +116,7 @@ export const createBrowseQuery = <TQuery, TRow>(
             merge(options.refresh ?? EMPTY, retry$).pipe(startWith(null)),
         ]).pipe(
             switchMap(([query, window]) =>
-                defer(() => options.fetchWindow(query, window)).pipe(
+                defer(() => fetchWindowWithinResult(options, query, window)).pipe(
                     map((response): BrowseReducer<TRow> => () => ({
                         status: 'ready',
                         offset: response.offset,
@@ -172,6 +172,40 @@ const clampWindow = (window: BrowseWindow): BrowseWindow => ({
     offset: Math.max(0, Math.trunc(window.offset)),
     limit: Math.min(BROWSE_WINDOW_MAX_LIMIT, Math.max(0, Math.trunc(window.limit))),
 })
+
+/**
+ * Recover when a viewport derived from stale or estimated geometry starts past the end
+ * of a nonempty result set.
+ *
+ * Album scroll restoration has to estimate its first window before the grid exists to
+ * measure itself. The estimate is deliberately approximate, and sufficiently deep in a
+ * catalog it can overshoot the total. Accepting that empty window would leave the grid
+ * with no tile to measure, so it could never build the canvas that lets it correct the
+ * estimate. The last full window breaks that cycle; once rendered, the virtualizer's
+ * measured geometry asks for the exact window in the normal way.
+ *
+ * This is also the safe answer when a result set shrinks underneath any browse surface.
+ * It retries at most once, and only when the response proves both that the set is not
+ * empty and that the requested offset is outside it.
+ */
+const fetchWindowWithinResult = async <TQuery, TRow>(
+    options: BrowseQueryOptions<TQuery, TRow>,
+    query: TQuery,
+    window: BrowseWindow,
+): Promise<BrowseWindowResult<TRow>> => {
+    const response = await options.fetchWindow(query, window)
+    const isPastNonemptyResult =
+        window.limit > 0 &&
+        response.total > 0 &&
+        response.rows.length == 0 &&
+        response.offset >= response.total
+    if (!isPastNonemptyResult) return response
+
+    return options.fetchWindow(query, {
+        offset: Math.max(0, response.total - window.limit),
+        limit: window.limit,
+    })
+}
 
 const browseErrorMessage = (error: unknown, entityLabel: string): string => {
     if (typeof error == 'string') return error
