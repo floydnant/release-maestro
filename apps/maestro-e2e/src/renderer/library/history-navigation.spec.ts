@@ -46,6 +46,14 @@ test.describe('what the buttons offer', () => {
         await createRendererScenario(page, rendererScenarios.albums.withAlbums(), '/albums')
         await expect(albumGrid(page)).toBeVisible()
 
+        const sidebarChromeHeight = await page
+            .getByRole('navigation', { name: 'History' })
+            .evaluate(element => element.parentElement?.getBoundingClientRect().height)
+        const contentChromeHeight = await page
+            .getByRole('banner')
+            .evaluate(element => element.getBoundingClientRect().height)
+        expect(sidebarChromeHeight).toBe(contentChromeHeight)
+
         await expect(backButton(page)).toBeDisabled()
         await expect(forwardButton(page)).toBeDisabled()
     })
