@@ -1,6 +1,7 @@
 import { NgClass } from '@angular/common'
 import {
     afterNextRender,
+    afterRenderEffect,
     ChangeDetectionStrategy,
     Component,
     computed,
@@ -125,6 +126,19 @@ export const DEFAULT_SONG_TABLE_COLUMNS: readonly SongTableColumn[] = [
 const OVERSCAN_ROWS = 20
 
 /**
+ * The window a surface should open with to land at a remembered scroll position.
+ *
+ * Exported because the *page* has to ask for it, not the table: the table is created
+ * after the first window has been requested, so a table that corrected the offset itself
+ * would be correcting a round trip that had already happened — one throwaway query at
+ * offset 0, and a visible flash of the top of the list before the real window arrives.
+ *
+ * Exact here, unlike the grid's estimate, because {@link ROW_HEIGHT} is a constant.
+ */
+export const songWindowOffsetAt = (scrollTop: number): number =>
+    Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS)
+
+/**
  * Rows kept visible past the cursor when the keyboard moves it. Distinct from
  * {@link OVERSCAN_ROWS}, which is about what is *fetched*; this is about what the user
  * can see ahead of where they are.
@@ -173,6 +187,11 @@ export class SongTableComponent {
      * between them without relearning the table.
      */
     columns = input<readonly SongTableColumn[]>(DEFAULT_SONG_TABLE_COLUMNS)
+    /**
+     * A scroll position to put back, in pixels, when this window is the one the user
+     * left behind — see `HistoryService`. Null on an ordinary navigation.
+     */
+    restoreScrollTop = input<number | null>(null)
 
     sortChange = output<SongSortField>()
     viewportChange = output<BrowseWindow>()
@@ -185,6 +204,8 @@ export class SongTableComponent {
      * filter for, and costs nothing when there is not.
      */
     filterMissing = output<void>()
+    /** {@link restoreScrollTop} has been applied, so nothing should offer it again. */
+    scrollRestored = output<void>()
 
     protected readonly rowHeight = ROW_HEIGHT
     protected readonly widths = SONG_TABLE_COLUMN_WIDTHS
@@ -283,9 +304,44 @@ export class SongTableComponent {
                 // this emitted is no longer what it holds — keeping it would let the
                 // comparison in `onScroll` swallow the measurement that re-syncs them.
                 this.lastWindow = null
+
+                // A restore belongs to the query it arrived with, and this effect runs
+                // on that query — going to the top here would undo the restore before
+                // it was ever applied.
+                if (this.restoreScrollTop() != null) return
                 this.scroller()?.nativeElement?.scrollTo({ top: 0 })
             })
         })
+
+        // Put a remembered scroll position back, once there is a canvas tall enough to
+        // hold it. The spacer is sized from `result.total`, which arrives over IPC, so
+        // a `scrollTop` written before the first window lands is silently clamped to the
+        // height of an empty list — which is zero.
+        //
+        // `afterRenderEffect` rather than `effect`, because the height in question is
+        // the DOM's, not the signal's: the spacer has to have been laid out at the new
+        // total before the scroller can be moved down it.
+        afterRenderEffect(() => {
+            const target = this.restoreScrollTop()
+            const loaded = this.result().loaded
+            untracked(() => {
+                if (target == null || !loaded) return
+
+                const element = this.scroller()?.nativeElement
+                if (!element) return
+
+                element.scrollTop = target
+                // The page seeded the window from the same position, so this usually
+                // asks for what it already has — `onScroll` compares before emitting.
+                this.onScroll()
+                this.scrollRestored.emit()
+            })
+        })
+    }
+
+    /** Where this table is scrolled to, for the history entry that is being left. */
+    scrollTop(): number | null {
+        return this.scroller()?.nativeElement.scrollTop ?? null
     }
 
     protected isRowSelected(row: SongRow, index: number): boolean {
@@ -313,7 +369,13 @@ export class SongTableComponent {
         const element = this.scroller()?.nativeElement
         if (!element) return
 
-        const firstVisible = Math.floor(element.scrollTop / ROW_HEIGHT)
+        // A pending restore is where the table is *about* to be. Until it is applied the
+        // element is still at the top, and the `ResizeObserver` that fires the moment the
+        // table attaches would otherwise ask for the top of the list — the throwaway
+        // round trip seeding the page's window exists to avoid.
+        const scrollTop = this.restoreScrollTop() ?? element.scrollTop
+
+        const firstVisible = Math.floor(scrollTop / ROW_HEIGHT)
         const visibleCount = Math.ceil(element.clientHeight / ROW_HEIGHT)
         const offset = Math.max(0, firstVisible - OVERSCAN_ROWS)
         const limit = visibleCount + OVERSCAN_ROWS * 2

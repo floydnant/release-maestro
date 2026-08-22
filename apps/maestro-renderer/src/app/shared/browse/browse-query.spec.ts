@@ -215,4 +215,20 @@ describe('createBrowseQuery', () => {
         expect(result).toMatchObject({ status: 'ready', total: 0, loaded: true })
         expect(result.rows).toEqual([])
     })
+
+    it('recovers an out-of-range window against a nonempty result set', async () => {
+        const browse = create()
+        viewport.set({ offset: 2_000, limit: 20 })
+        await settle()
+
+        latest().resolve({ rows: [], offset: 2_000, total: 1_204 })
+        await settle()
+
+        expect(latest().window).toEqual({ offset: 1_184, limit: 20 })
+        latest().resolve(windowOf(1_184, 1_204, 20))
+        await settle()
+
+        expect(browse.result()).toMatchObject({ status: 'ready', offset: 1_184, total: 1_204 })
+        expect(browse.result().rows).toHaveLength(20)
+    })
 })

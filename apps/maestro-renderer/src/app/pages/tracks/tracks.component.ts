@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal } from '@angular/core'
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    DestroyRef,
+    inject,
+    linkedSignal,
+    untracked,
+    viewChild,
+} from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
 import {
@@ -22,6 +31,7 @@ import {
     Subject,
     switchMap,
 } from 'rxjs'
+import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
@@ -40,6 +50,7 @@ import {
     type BrowseShellState,
 } from '../../shared/components/browse-shell/browse-shell.component'
 import {
+    songWindowOffsetAt,
     SongTableComponent,
     type EntityFilterKind,
     type EntityFilterRequest,
@@ -93,6 +104,7 @@ export class TracksComponent {
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
     private libraryService = inject(LibraryService)
+    private history = inject(HistoryService)
 
     private queryParams = toSignal(this.route.queryParams, { initialValue: {} })
     /**
@@ -104,14 +116,47 @@ export class TracksComponent {
     })
 
     /**
-     * The slice the table wants. It goes back to the top whenever the query changes:
-     * offset 5,000 means nothing in a result set the user has just filtered down, and
-     * fetching it would only waste a round trip on rows nobody can see.
+     * The scroll position **this arrival** is meant to land at, latched per query.
+     *
+     * Latched rather than read live, because the surface being left is still alive and
+     * still rendering while the incoming route's guards run. Following the service's
+     * signal would let this page apply — and consume — a position that belongs to the
+     * page replacing it, and the incoming one would then open at the top of the list.
+     *
+     * **Nothing in the renderer E2E suite proves this**, and it is not for want of
+     * trying: provoking it needs a guard slow enough for a render to land inside it, and
+     * the scenario harness requires `get-settings` to resolve synchronously. The latch is
+     * a structural guard rather than a tested one.
+     *
+     * Keyed on the query rather than on construction so that a same-component navigation
+     * picks it up too — `/albums/:albumId` reuses its component — and so that the
+     * viewport below is re-seeded from exactly the same source.
+     */
+    protected restoreScrollTop = linkedSignal<SongQuery, number | null>({
+        source: () => this.query(),
+        computation: () => untracked(() => this.history.scrollRestore()),
+    })
+
+    /**
+     * The slice the table wants.
+     *
+     * It goes back to the top whenever the query changes: offset 5,000 means nothing in a
+     * result set the user has just filtered down, and fetching it would only waste a round
+     * trip on rows nobody can see.
+     *
+     * **Unless the query arrived with a scroll position**, which is what going back to
+     * this page is. Seeding the offset here rather than letting the table correct it
+     * afterwards is what makes the *first* window the right one — the table is created
+     * after this window has been asked for, so a correction it made would be a correction
+     * to a round trip that had already happened, and a visible flash of the top of the
+     * list.
      */
     protected viewport = linkedSignal<SongQuery, BrowseWindow>({
         source: () => this.query(),
         computation: (_query, previous) => ({
-            offset: 0,
+            // Untracked: this is a seed for a new query, not a dependency. Tracking it
+            // would rebuild the window again the moment the table consumed it.
+            offset: untracked(() => offsetForRestore(this.restoreScrollTop())),
             // Keep whatever the table measured; only the offset is stale.
             limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
         }),
@@ -185,7 +230,15 @@ export class TracksComponent {
 
     private searchInput$ = new Subject<string>()
 
+    private table = viewChild(SongTableComponent)
+
     constructor() {
+        // Where the table is scrolled to, so that leaving this page records it against
+        // the history entry being left. The service asks at `NavigationStart`, which is
+        // the last moment the table is both alive and still scrolled.
+        const unregister = this.history.registerScrollProvider(() => this.table()?.scrollTop() ?? null)
+        inject(DestroyRef).onDestroy(unregister)
+
         // A manual subscribe, because the result of this stream is a navigation rather
         // than state — there is no signal for it to land in. `takeUntilDestroyed` ends it.
         this.searchInput$
@@ -196,7 +249,7 @@ export class TracksComponent {
                 filter(search => search != this.query().search),
                 takeUntilDestroyed(),
             )
-            .subscribe(search => this.patchQuery({ ...this.query(), search }, { replaceUrl: true }))
+            .subscribe(search => this.patchQuery({ ...this.query(), search }))
     }
 
     /**
@@ -270,8 +323,8 @@ export class TracksComponent {
 
     /**
      * Typing is debounced before it reaches the URL, so a search costs one query
-     * rather than one per keystroke. The navigation replaces rather than pushes:
-     * back should leave the search, not walk back through every letter of it.
+     * rather than one per keystroke — the debounce is about IPC, not about history;
+     * every query change replaces. See {@link patchQuery}.
      */
     protected onSearch(search: string): void {
         this.searchInput$.next(search)
@@ -343,15 +396,32 @@ export class TracksComponent {
         this.browse.retry()
     }
 
-    private patchQuery(query: SongQuery, { replaceUrl = false }: { replaceUrl?: boolean } = {}): void {
+    /** The table has put the position back; nothing should offer it again. */
+    protected onScrollRestored(): void {
+        this.restoreScrollTop.set(null)
+        this.history.consumeScrollRestore()
+    }
+
+    /**
+     * Write a query to the URL, **replacing** the history entry rather than pushing one.
+     *
+     * Filter, sort and search are not history steps — see ADR 0006. Back means "the
+     * previous page", and the page you return to carries whatever query was last in
+     * force on it.
+     */
+    private patchQuery(query: SongQuery): void {
         this.router.navigate([], {
             relativeTo: this.route,
             queryParams: songQueryToParams(query),
             queryParamsHandling: 'merge',
-            replaceUrl,
+            replaceUrl: true,
         })
     }
 }
+
+/** Where a window has to start for a remembered scroll position to be inside it. */
+const offsetForRestore = (scrollTop: number | null): number =>
+    scrollTop == null ? 0 : songWindowOffsetAt(scrollTop)
 
 const EMPTY_DESCRIPTION: SongFilterDescription = {
     artists: [],

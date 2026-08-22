@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal } from '@angular/core'
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    DestroyRef,
+    inject,
+    linkedSignal,
+    untracked,
+    viewChild,
+} from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
 import type {
@@ -21,6 +30,7 @@ import {
     Subject,
     switchMap,
 } from 'rxjs'
+import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import {
@@ -37,7 +47,7 @@ import {
     type BrowseFilterState,
     type BrowseShellState,
 } from '../../shared/components/browse-shell/browse-shell.component'
-import { AlbumGridComponent, initialWindowLimit } from './album-grid.component'
+import { AlbumGridComponent, estimatedAlbumWindowOffsetAt, initialWindowLimit } from './album-grid.component'
 import { AlbumSortBarComponent } from './album-sort-bar.component'
 
 /**
@@ -68,6 +78,15 @@ const SEARCH_DEBOUNCE_MS = 200
  */
 const initialLimit = (): number => initialWindowLimit(window.innerWidth, window.innerHeight)
 
+/**
+ * Where a window has to start for a remembered scroll position to be inside it.
+ *
+ * Estimated against the browser window, which is wider than the grid — see
+ * {@link estimatedAlbumWindowOffsetAt} for what that costs and why it is bounded.
+ */
+const offsetForRestore = (scrollTop: number | null): number =>
+    scrollTop == null ? 0 : estimatedAlbumWindowOffsetAt(scrollTop, window.innerWidth)
+
 /** Album is one word in code and in copy alike — see the glossary. */
 const ALBUMS_LABEL = 'albums'
 const ALBUM_LABEL = 'album'
@@ -92,6 +111,7 @@ export class AlbumsComponent {
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
     private libraryService = inject(LibraryService)
+    private history = inject(HistoryService)
 
     private queryParams = toSignal(this.route.queryParams, { initialValue: {} })
     /** Compared by value, so a navigation that rebuilds an identical query is not a change. */
@@ -100,13 +120,36 @@ export class AlbumsComponent {
     })
 
     /**
-     * The slice the grid wants. It goes back to the top whenever the query changes:
-     * offset 5,000 means nothing in a result set the user has just filtered down.
+     * The scroll position **this arrival** is meant to land at, latched per query.
+     *
+     * Latched rather than read live, because the surface being left is still alive and
+     * still rendering while the incoming route's guards run. Following the service's
+     * signal would let this page apply — and consume — a position that belongs to the
+     * page replacing it, and the incoming one would then open at the top of the list.
+     *
+     * Keyed on the query rather than on construction so that a same-component
+     * navigation picks it up too: a detail route reuses its component, and the
+     * viewport below is re-seeded on exactly the same source.
+     */
+    protected restoreScrollTop = linkedSignal<AlbumQuery, number | null>({
+        source: () => this.query(),
+        computation: () => untracked(() => this.history.scrollRestore()),
+    })
+
+    /**
+     * The slice the grid wants.
+     *
+     * It goes back to the top whenever the query changes: offset 5,000 means nothing in a
+     * result set the user has just filtered down. **Unless the query arrived with a
+     * scroll position**, which is what going back to this page is — seeding the offset
+     * here is what makes the first window fetched the right one, rather than a throwaway
+     * query at the top of the list. Same shape, and same reasoning, as `TracksComponent`.
      */
     protected viewport = linkedSignal<AlbumQuery, BrowseWindow>({
         source: () => this.query(),
         computation: (_query, previous) => ({
-            offset: 0,
+            // Untracked: a seed for a new query, not a dependency.
+            offset: untracked(() => offsetForRestore(this.restoreScrollTop())),
             // Keep whatever the grid measured; only the offset is stale.
             limit: previous?.value.limit ?? initialLimit(),
         }),
@@ -167,7 +210,14 @@ export class AlbumsComponent {
 
     private searchInput$ = new Subject<string>()
 
+    private grid = viewChild(AlbumGridComponent)
+
     constructor() {
+        // Where the grid is scrolled to, so that leaving this page records it against the
+        // history entry being left — see `TracksComponent`, which does the same.
+        const unregister = this.history.registerScrollProvider(() => this.grid()?.scrollTop() ?? null)
+        inject(DestroyRef).onDestroy(unregister)
+
         // A manual subscribe, because the result of this stream is a navigation rather
         // than state — there is no signal for it to land in. `takeUntilDestroyed` ends it.
         this.searchInput$
@@ -178,7 +228,7 @@ export class AlbumsComponent {
                 filter(search => search != this.query().search),
                 takeUntilDestroyed(),
             )
-            .subscribe(search => this.patchQuery({ ...this.query(), search }, { replaceUrl: true }))
+            .subscribe(search => this.patchQuery({ ...this.query(), search }))
     }
 
     protected shellState = computed<BrowseShellState>(() => {
@@ -228,8 +278,8 @@ export class AlbumsComponent {
 
     /**
      * Typing is debounced before it reaches the URL, so a search costs one query rather
-     * than one per keystroke. The navigation replaces rather than pushes: back should
-     * leave the search, not walk back through every letter of it.
+     * than one per keystroke — the debounce is about IPC, not about history; every query
+     * change replaces. See {@link patchQuery}.
      */
     protected onSearch(search: string): void {
         this.searchInput$.next(search)
@@ -258,12 +308,24 @@ export class AlbumsComponent {
         this.browse.retry()
     }
 
-    private patchQuery(query: AlbumQuery, { replaceUrl = false }: { replaceUrl?: boolean } = {}): void {
+    /** The grid has put the position back; nothing should offer it again. */
+    protected onScrollRestored(): void {
+        this.restoreScrollTop.set(null)
+        this.history.consumeScrollRestore()
+    }
+
+    /**
+     * Write a query to the URL, **replacing** the history entry rather than pushing one.
+     *
+     * Filter, sort and search are not history steps — see ADR 0006, and
+     * `TracksComponent.patchQuery`, which is the same rule on the same reasoning.
+     */
+    private patchQuery(query: AlbumQuery): void {
         this.router.navigate([], {
             relativeTo: this.route,
             queryParams: albumQueryToParams(query),
             queryParamsHandling: 'merge',
-            replaceUrl,
+            replaceUrl: true,
         })
     }
 }

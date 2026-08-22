@@ -70,11 +70,13 @@
                     [query]="query()"
                     [selection]="selection()"
                     [columns]="columns"
+                    [restoreScrollTop]="restoreScrollTop()"
                     (sortChange)="onSort($event)"
                     (selectionChange)="onSelectionChange($event)"
                     (viewportChange)="onViewportChange($event)"
                     (entityFilter)="onEntityFilter($event)"
                     (filterMissing)="onFilterMissing()"
+                    (scrollRestored)="onScrollRestored()"
                 ></app-song-table>
             }
         }

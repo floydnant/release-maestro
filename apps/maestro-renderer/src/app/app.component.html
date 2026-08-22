@@ -1,75 +1,34 @@
-<div class="app-shell | flex h-screen flex-col overflow-hidden bg-background-canvas">
-    <header class="title-bar" [class.title-bar--overlay]="isImportRoute()">
-        <div
-            class="title-bar__drag-region | flex min-w-0 flex-1 items-center justify-start"
-            [ngClass]="{ 'ml-52': isMacos }"
+<div class="app-shell | flex h-screen overflow-hidden bg-background-canvas">
+    @if (!isImportRoute()) {
+        <aside
+            class="sidebar | flex w-52 shrink-0 flex-col border-r border-border-subtle bg-background-surface shadow-lg"
         >
-            @if (scanIndicator(); as scan) {
-                <p class="type-body-sm flex items-center gap-1 px-2 text-content-secondary">
-                    @if (scan.phase === 'reading') {
-                        <app-progress-ring
-                            mode="progress"
-                            [diameter]="25"
-                            [strokeWidth]="2.5"
-                            color="content.success"
-                            bgColor="background.surface"
-                            [progress]="libraryScanPercent()"
-                        ></app-progress-ring>
-                    } @else {
-                        <app-progress-ring
-                            mode="spinning"
-                            [diameter]="25"
-                            [strokeWidth]="2.5"
-                            color="content.secondary"
-                            bgColor="background.surface"
-                        ></app-progress-ring>
-                    }
-
-                    @if (scan.phase === 'discovering') {
-                        Scanning library…
-                    } @else {
-                        Reading
-                        <span class="font-mono">{{ scan.readDone }}/{{ scan.readTotal }}</span> tracks
-                        @if (scan.failedFiles > 0) {
-                            <span class="text-content-danger"
-                                >· <span class="font-mono">{{ scan.failedFiles }}</span> Failed</span
-                            >
-                        }
-                    }
-                </p>
-            }
-        </div>
-
-        @if (isElectron && !isMacos) {
-            <div class="title-bar__controls">
-                <button class="title-bar__button" type="button" title="Minimize" (click)="minimizeWindow()">
-                    <app-icon name="octDash" size="14"></app-icon>
-                </button>
-                <button
-                    class="title-bar__button"
-                    type="button"
-                    title="Maximize"
-                    (click)="toggleMaximizeWindow()"
-                >
-                    <app-icon name="octScreenFull" size="14"></app-icon>
-                </button>
-                <button
-                    class="title-bar__button title-bar__button--close"
-                    type="button"
-                    title="Close"
-                    (click)="closeWindow()"
-                >
-                    <app-icon name="octX" size="14"></app-icon>
-                </button>
+            <div class="sidebar__title-bar | flex h-[2.25rem] shrink-0 items-center justify-end px-2">
+                <nav class="title-bar__nav | flex items-center gap-1" aria-label="History">
+                    <button
+                        class="history-back-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard disabled:cursor-default disabled:text-content-muted hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed"
+                        type="button"
+                        title="Back"
+                        aria-label="Back"
+                        [disabled]="!history.canGoBack()"
+                        (click)="history.back()"
+                    >
+                        <app-icon name="navigationBack" size="18"></app-icon>
+                    </button>
+                    <button
+                        class="history-forward-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard disabled:cursor-default disabled:text-content-muted hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed"
+                        type="button"
+                        title="Forward"
+                        aria-label="Forward"
+                        [disabled]="!history.canGoForward()"
+                        (click)="history.forward()"
+                    >
+                        <app-icon name="navigationForward" size="18"></app-icon>
+                    </button>
+                </nav>
             </div>
-        }
-    </header>
 
-    <div class="flex min-h-0 grow overflow-hidden">
-        @if (!isImportRoute()) {
-            <aside
-                class="sidebar | flex w-52 shrink-0 flex-col border-r border-border-subtle bg-background-surface p-4 shadow-lg"
-            >
+            <div class="sidebar__content | flex min-h-0 flex-1 flex-col p-4">
                 <nav>
                     <ul class="flex flex-col gap-1">
                         <li>
@@ -180,8 +139,78 @@
                         </button>
                     </div>
                 </div>
-            </aside>
-        }
+            </div>
+        </aside>
+    }
+
+    <div class="app-shell__content | flex min-w-0 flex-1 flex-col">
+        <header class="title-bar" [class.title-bar--overlay]="isImportRoute()">
+            <div class="title-bar__drag-region | flex min-w-0 flex-1 items-center justify-start">
+                @if (scanIndicator(); as scan) {
+                    <p class="type-body-sm flex items-center gap-1 px-2 text-content-secondary">
+                        @if (scan.phase === 'reading') {
+                            <app-progress-ring
+                                mode="progress"
+                                [diameter]="25"
+                                [strokeWidth]="2.5"
+                                color="content.success"
+                                bgColor="background.surface"
+                                [progress]="libraryScanPercent()"
+                            ></app-progress-ring>
+                        } @else {
+                            <app-progress-ring
+                                mode="spinning"
+                                [diameter]="25"
+                                [strokeWidth]="2.5"
+                                color="content.secondary"
+                                bgColor="background.surface"
+                            ></app-progress-ring>
+                        }
+
+                        @if (scan.phase === 'discovering') {
+                            Scanning library…
+                        } @else {
+                            Reading
+                            <span class="font-mono">{{ scan.readDone }}/{{ scan.readTotal }}</span> tracks
+                            @if (scan.failedFiles > 0) {
+                                <span class="text-content-danger"
+                                    >· <span class="font-mono">{{ scan.failedFiles }}</span> Failed</span
+                                >
+                            }
+                        }
+                    </p>
+                }
+            </div>
+
+            @if (isElectron && !isMacos) {
+                <div class="title-bar__controls">
+                    <button
+                        class="title-bar__button"
+                        type="button"
+                        title="Minimize"
+                        (click)="minimizeWindow()"
+                    >
+                        <app-icon name="octDash" size="14"></app-icon>
+                    </button>
+                    <button
+                        class="title-bar__button"
+                        type="button"
+                        title="Maximize"
+                        (click)="toggleMaximizeWindow()"
+                    >
+                        <app-icon name="octScreenFull" size="14"></app-icon>
+                    </button>
+                    <button
+                        class="title-bar__button title-bar__button--close"
+                        type="button"
+                        title="Close"
+                        (click)="closeWindow()"
+                    >
+                        <app-icon name="octX" size="14"></app-icon>
+                    </button>
+                </div>
+            }
+        </header>
 
         <main class="flex min-h-0 min-w-0 grow overflow-hidden bg-background-canvas">
             <router-outlet></router-outlet>

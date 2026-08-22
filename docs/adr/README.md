@@ -14,3 +14,4 @@ ADRs live here at the root rather than per project, because contexts cross proje
 | 0003 | [An unreachable library folder makes its tracks missing, it does not fail the scan](./0003-unreachable-folders-make-their-tracks-missing.md)                     | Music library |
 | 0004 | [Browse queries are windowed, and a selection carries a query rather than a list of ids](./0004-browse-queries-are-windowed-and-selections-carry-a-query.md)     | Music library |
 | 0005 | [Album attributes the grid sorts by are denormalized columns, maintained by the write side](./0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md) | Music library |
+| 0006 | [Only route changes are history steps; filter, sort and search replace the entry](./0006-only-route-changes-are-history-steps.md)                                | Music library |
