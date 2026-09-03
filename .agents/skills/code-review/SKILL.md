@@ -1,9 +1,9 @@
 ---
-name: review
+name: code-review
 description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along three axes — Regression (does existing behavior still work, and is the new logic correct?), Standards (does the code follow this repo's documented standards?), and Spec (does the code match what the originating issue/PRD asked for?). Runs the verification gates, then the three reviews in parallel sub-agents, and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
 ---
 
-# Review
+# Code Review
 
 Three-axis review of the diff between the working tree and a fixed point:
 
