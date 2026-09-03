@@ -86,8 +86,12 @@ cross-platform packaging behavior.
 
 Production packaging is cached. The launcher resolves electron-builder's unpacked layout on macOS,
 Windows, and Linux, and CI runs the production suite on all three. E2E windows remain visible but
-unfocused by default so an agent can capture the running app on demand without stealing focus; set
+unfocused by default, so a screenshot of a test run never steals focus; set
 `RELEASE_MAESTRO_E2E_BACKGROUND=0` to activate the window while debugging.
+
+To inspect the development app rather than a test run, attach to the debug ports `make dev` opens.
+The [`inspect-running-app`](../.agents/skills/inspect-running-app/SKILL.md) skill owns that
+workflow. Reach for it before you write a throwaway spec to look at something.
 
 Electron creates its browser context outside Playwright Test's managed browser fixtures, so
 `launch-release-maestro.ts` starts context tracing explicitly and attaches the archive when the app

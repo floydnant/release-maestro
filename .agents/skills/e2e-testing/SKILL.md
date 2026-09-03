@@ -17,8 +17,10 @@ description: Playwright E2E readiness and test authoring guidance.
 - use web-first assertions (`await expect(locator).toBeVisible()`), avoid manual `isVisible()` checks
 - keep specs focused on critical user journeys and route-level navigation
 - use soft assertions only for known prototype gaps that should not block signal
+- this skill covers committed specs. To inspect the running `make dev` app by hand, for its DOM,
+  console, network, performance traces, or main-process profiles, use `inspect-running-app`
 - use trace viewer for CI/local debugging. Electron contexts are traced explicitly by
-  `launch-release-maestro.ts`. The visible, unfocused window also remains available for ad hoc
+  `launch-release-maestro.ts`. The visible, unfocused window stays available for ad hoc
   screenshots when the user wants an on-demand visual; keep those one-off captures out of committed
   behavioral specs
 - iterate on one spec or test title when useful, then widen to the relevant suite before handoff;

@@ -34,7 +34,9 @@
         "serve-internal": {
             "executor": "nx-electron:execute",
             "options": {
-                "buildTarget": "maestro-electron:build"
+                "buildTarget": "maestro-electron:build",
+                "remoteDebuggingPort": 9222,
+                "port": 5858
             }
         },
         "serve": {
