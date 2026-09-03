@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Inspect Running App'
+    short_description: 'Chrome DevTools against the running dev app'
+policy:
+    allow_implicit_invocation: true

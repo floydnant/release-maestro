@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Profiling'
+    short_description: 'CPU, trace, and heap profiling of the running app'
+policy:
+    allow_implicit_invocation: true
