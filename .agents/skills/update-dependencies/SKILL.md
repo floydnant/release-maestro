@@ -1,6 +1,7 @@
 ---
 name: update-dependencies
-description: Update Release Maestro dependencies, repair update-related incompatibilities and regressions, and open a PR. Use for dependency refreshes or Dependabot-style maintenance with automatic fixes.
+description: Update Release Maestro dependencies, repair update-related incompatibilities and regressions, and open a PR.
+disable-model-invocation: true
 ---
 
 # Update dependencies
