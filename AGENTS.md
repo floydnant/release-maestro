@@ -89,13 +89,3 @@ the change that invalidates them, not afterwards.
   `verification-loop` restate it. Grep for the old command name and fix every copy.
 - **A new or moved code path cited by a skill** — skills name concrete files as worked examples. If
   you move or delete one, update the skill that points at it.
-
-## Skills
-
-`.agents/skills/` holds vendored skills tracked in `skills-lock.json` plus repo-owned ones that are
-not in the lock and must survive a re-sync.
-
-Vendored skills are generic. Apply this repository's rules when they mention a different task runner,
-context layout, or tool name. In particular, prototype commands go through Make/Nx rather than a new
-`package.json` script, and references to an “Agent tool” mean the available parallel delegation
-capability; if none exists, do the work locally.

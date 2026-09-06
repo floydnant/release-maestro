@@ -32,6 +32,17 @@ jobs:
             - name: Check lint
               run: make lint
 
+    agents:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: ./.github/actions/setup-node
+
+            # Structural only, so it runs on every pull request rather than a path-selected lane:
+            # a skill rename must not slip through a docs-only change.
+            - name: Check agent harness
+              run: make agents-check
+
     test:
         runs-on: ubuntu-latest
         steps:
