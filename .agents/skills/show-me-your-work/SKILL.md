@@ -55,12 +55,12 @@ Commit it only when the work is ambitious enough that a reviewer needs the trail
 
 At the end of the run, before handing back, check the log told the truth. Read this run's transcript wherever the harness records sessions — the system prompt or environment usually names the directory for the active workspace. Stay inside that workspace's directory: a harness keeps every project's transcripts under one root, so a wider glob reads private conversations from unrelated projects. If no transcript is reachable, audit against your own working notes and say in the reply that the transcript wasn't available. Walk the log against what actually happened:
 
-- Every row maps to a real action. Cut invented or aspirational entries.
+- Every row maps to a real action. Append a correction identifying any invented or aspirational entry and retracting its claim.
 - Each row's evidence resolves and shows what the row claims.
 - A fork, pivot, or abandoned approach that shaped the work but isn't logged is a gap. Add it.
-- Drop padding. If nobody would audit a row, it doesn't earn its place.
+- Keep new rows relevant to decisions and checkpoints a reviewer would audit. Preserve existing rows, including padding.
 
-Fix the log, not the story. If the work diverged from what a row claims, the row is wrong.
+If the work diverged from what a row claims, append a correction that identifies the original row and records what actually happened, with supporting evidence. Leave the original row intact.
 
 ## Cross-model review of the trail
 
