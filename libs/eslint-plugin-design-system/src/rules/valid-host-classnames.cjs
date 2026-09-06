@@ -72,6 +72,7 @@ module.exports = {
         })
 
         return {
+            /** @param {import('estree').CallExpression} node */
             'Decorator > CallExpression'(node) {
                 if (node.callee.type !== 'Identifier' || !HOST_DECORATORS.has(node.callee.name)) return
 

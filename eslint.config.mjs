@@ -1,6 +1,7 @@
 import nx from '@nx/eslint-plugin'
 import tailwind from 'eslint-plugin-tailwindcss'
 import { defineConfig } from 'eslint/config'
+import * as jsonParser from 'jsonc-eslint-parser'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -27,7 +28,7 @@ export default defineConfig([
             ],
         },
         languageOptions: {
-            parser: (await import('jsonc-eslint-parser')).default,
+            parser: jsonParser,
         },
     },
     {

@@ -123,8 +123,13 @@ db-truncate-library: ## Truncate library tables (keeps migrations + feed tables)
 clean: ## Clean build outputs and caches
 	rm -rf dist/ release/ .angular/cache/
 	npx nx reset
-install: ## Install dependencies
-	npm install
+.PHONY: i
+install: ## Install npm packages, Rust crates, and Playwright Chromium dependencies
+	npm ci
+	npm ci --prefix tools
+	cargo fetch --locked --manifest-path apps/metadata-engine/Cargo.toml
+	npx playwright install --with-deps chromium
+i: install ## Alias for install
 rebuild-electron: ## Rebuild native dependencies (e.g. after Electron version change)
 	electron-rebuild -f -w better-sqlite3
 rebuild-node: ## Rebuild native dependencies for Node.js (e.g. after Node version change)

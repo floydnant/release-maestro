@@ -328,6 +328,8 @@ test.describe('the keyboard', () => {
 
         await page.keyboard.press('Meta+ArrowLeft')
         await expect(page).toHaveURL(/\/albums/)
+        // Popstate changes the URL before Angular finishes restoring the history entry.
+        await expect(forwardButton(page)).toBeEnabled()
 
         await page.keyboard.press('Meta+ArrowRight')
         await expect(page).toHaveURL(/\/tracks/)

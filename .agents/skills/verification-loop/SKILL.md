@@ -26,6 +26,9 @@ description: Verification loop using repository make targets.
 
 ## Commands
 
+- `make install` or `make i` — install root and tools npm packages from lockfiles, fetch locked Rust
+  crates, and install Playwright Chromium with its system dependencies. Requires Node/npm and Rust.
+
 - `make sure` — format, then lint, build, unit-test, and run development Electron and renderer E2E
   across the repo. **Mutates formatting.**
 - `make format-check` — non-mutating formatting check, for review and CI-style verification.

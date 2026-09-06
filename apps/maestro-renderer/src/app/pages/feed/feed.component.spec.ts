@@ -1,7 +1,7 @@
 import { WritableSignal } from '@angular/core'
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing'
 import { provideRouter } from '@angular/router'
-import { TranslateModule } from '@ngx-translate/core'
+import { provideTranslateService } from '@ngx-translate/core'
 import { EMPTY } from 'rxjs'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { FeedService } from '../../core/services/feed.service'
@@ -23,8 +23,9 @@ describe(FeedComponent.name, () => {
     beforeEach(waitForAsync(() => {
         void TestBed.configureTestingModule({
             declarations: [],
-            imports: [FeedComponent, TranslateModule.forRoot()],
+            imports: [FeedComponent],
             providers: [
+                provideTranslateService(),
                 provideRouter([]),
                 provideWebAudioPlayerMock(),
                 {

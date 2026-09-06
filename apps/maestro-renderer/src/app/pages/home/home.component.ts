@@ -1,5 +1,5 @@
 import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core'
-import { TranslateModule } from '@ngx-translate/core'
+import { TranslatePipe } from '@ngx-translate/core'
 
 @Component({
     selector: 'app-home',
@@ -7,7 +7,7 @@ import { TranslateModule } from '@ngx-translate/core'
     styleUrls: ['./home.component.css'],
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [TranslateModule],
+    imports: [TranslatePipe],
 })
 export class HomeComponent implements OnInit {
     ngOnInit(): void {
