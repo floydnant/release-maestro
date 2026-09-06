@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Swarm'
+    short_description: 'Fan out N parallel workers'
+policy:
+    allow_implicit_invocation: false

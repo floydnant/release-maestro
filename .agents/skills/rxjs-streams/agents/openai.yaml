@@ -1,0 +1,5 @@
+interface:
+    display_name: 'RxJS Streams'
+    short_description: 'Asynchronous pipelines in both processes'
+policy:
+    allow_implicit_invocation: true

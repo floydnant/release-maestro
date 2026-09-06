@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Regression'
+    short_description: 'Behavioral regression and correctness review of a diff'
+policy:
+    allow_implicit_invocation: true

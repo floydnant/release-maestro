@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Angular Patterns'
+    short_description: 'How renderer code is structured'
+policy:
+    allow_implicit_invocation: true

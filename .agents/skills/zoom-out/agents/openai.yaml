@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Zoom Out'
+    short_description: 'Give broader context on a section of code'
+policy:
+    allow_implicit_invocation: false

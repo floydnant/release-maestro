@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Principle: Redesign From First Principles'
+    short_description: 'Integrate a requirement as if it were there on day one'
+policy:
+    allow_implicit_invocation: true

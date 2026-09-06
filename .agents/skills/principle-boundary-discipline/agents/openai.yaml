@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Principle: Boundary Discipline'
+    short_description: 'Concentrate guards at system boundaries'
+policy:
+    allow_implicit_invocation: true

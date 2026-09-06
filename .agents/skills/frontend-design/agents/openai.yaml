@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Frontend Design'
+    short_description: 'Build and refine renderer UI'
+policy:
+    allow_implicit_invocation: true
