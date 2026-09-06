@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Second Opinion'
+    short_description: "Ask another vendor's agent for a blind-spot check"
+policy:
+    allow_implicit_invocation: true

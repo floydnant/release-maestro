@@ -3,7 +3,7 @@
     "harnesses": {
         "claude": {
             "skillsDir": ".claude/skills",
-            "diverge": []
+            "diverge": ["second-opinion"]
         }
     }
 }
