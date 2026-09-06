@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Update Dependencies'
+    short_description: 'Update dependencies, fix regressions, and open a PR'
+policy:
+    allow_implicit_invocation: true
