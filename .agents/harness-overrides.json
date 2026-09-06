@@ -1,0 +1,9 @@
+{
+    "$schema-note": "Skills listed under a harness diverge from the canonical .agents/skills copy and are real directories in that harness's skills directory. Every skill not listed here must be a symlink to its canonical source. Adding a name here is the only way to opt out of the 1:1 link.",
+    "harnesses": {
+        "claude": {
+            "skillsDir": ".claude/skills",
+            "diverge": ["second-opinion"]
+        }
+    }
+}

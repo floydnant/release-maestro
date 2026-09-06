@@ -71,6 +71,10 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
 - Commit messages use Conventional Commits with a mandatory `type:` prefix on the subject line
 - Tests: prefer shared fixture files for reusable fixtures; keep fixtures inline only when clearly
   one-off to that spec
+- Pull requests follow [.github/pull_request_template.md](.github/pull_request_template.md).
+  `gh pr create --body` skips the template, so read it and match it by hand
+- Draft pull requests are only for work that is knowingly not mergeable. When the task is ready to
+  hand to a reviewer, open the pull request as ready for review
 
 ## Keeping the docs true
 
@@ -89,13 +93,3 @@ the change that invalidates them, not afterwards.
   `verification-loop` restate it. Grep for the old command name and fix every copy.
 - **A new or moved code path cited by a skill** — skills name concrete files as worked examples. If
   you move or delete one, update the skill that points at it.
-
-## Skills
-
-`.agents/skills/` holds vendored skills tracked in `skills-lock.json` plus repo-owned ones that are
-not in the lock and must survive a re-sync.
-
-Vendored skills are generic. Apply this repository's rules when they mention a different task runner,
-context layout, or tool name. In particular, prototype commands go through Make/Nx rather than a new
-`package.json` script, and references to an “Agent tool” mean the available parallel delegation
-capability; if none exists, do the work locally.

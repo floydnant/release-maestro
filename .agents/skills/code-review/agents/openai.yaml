@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Code Review'
+    short_description: 'Three-axis review of a diff'
+policy:
+    allow_implicit_invocation: true

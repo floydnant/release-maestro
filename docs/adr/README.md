@@ -5,7 +5,7 @@ contradicts one, say so explicitly rather than quietly overriding it.
 
 ADRs live here at the root rather than per project, because contexts cross project boundaries — see
 [CONTEXT-MAP.md](../../CONTEXT-MAP.md). Format and when to write one:
-[`.agents/skills/grill-with-docs/ADR-FORMAT.md`](../../.agents/skills/grill-with-docs/ADR-FORMAT.md).
+[`.agents/skills/domain-modeling/ADR-FORMAT.md`](../../.agents/skills/domain-modeling/ADR-FORMAT.md).
 
 | #    | Decision                                                                                                                                                         | Context       |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |

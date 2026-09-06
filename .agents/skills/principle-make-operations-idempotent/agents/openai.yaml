@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Principle: Make Operations Idempotent'
+    short_description: 'Converge to the same end state on every run'
+policy:
+    allow_implicit_invocation: true

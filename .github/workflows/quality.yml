@@ -32,6 +32,21 @@ jobs:
             - name: Check lint
               run: make lint
 
+    agents:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: '22'
+            - name: Install agent-check dependencies
+              run: npm ci --prefix tools --ignore-scripts --no-audit --no-fund
+
+            # Structural only, so it runs on every pull request rather than a path-selected lane:
+            # a skill rename must not slip through a docs-only change.
+            - name: Check agent harness
+              run: make agents-check
+
     test:
         runs-on: ubuntu-latest
         steps:

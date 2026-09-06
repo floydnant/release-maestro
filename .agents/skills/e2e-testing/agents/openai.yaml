@@ -1,0 +1,5 @@
+interface:
+    display_name: 'E2E Testing'
+    short_description: 'Playwright readiness and test authoring'
+policy:
+    allow_implicit_invocation: true

@@ -35,8 +35,8 @@ silently overriding it.
 
 ## Naming, for skills that expect other conventions
 
-- The root glossary index is **`CONTEXT-MAP.md`**, not `CONTEXT.md`. A skill that tells you to create
-  a root `CONTEXT.md` when none exists (`/grill-with-docs`, `/improve-codebase-architecture`) should
+- The root glossary index is **`CONTEXT-MAP.md`**, not `CONTEXT.md`. A generic skill that tells you to create
+  a root `CONTEXT.md` when none exists should
   extend `CONTEXT-MAP.md` and the per-context files instead. Do not create a second root glossary.
 - Contexts are product boundaries, not Nx projects — each spans several projects. Do not look for a
   per-project `CONTEXT.md` or a per-project `docs/adr/`. See `CONTEXT-MAP.md` for why.
@@ -49,8 +49,7 @@ silently overriding it.
   copy and `song` in code. The identifier names a view, not a domain concept; the register split
   applies to the domain, which is why `SongTableComponent` sits one folder away carrying `Song` rows.
   Without this, every page in the library disagrees with its own URL.
-- `ADR-FORMAT.md` (bundled with `/grill-with-docs`, also cited by
-  `/improve-codebase-architecture`) owns the ADR format and the test for when one is warranted.
+- `ADR-FORMAT.md` (bundled with `/domain-modeling`) owns the ADR format and the test for when one is warranted.
   Two things it does not know about this repo: `docs/adr/` already exists, so ignore its instruction
   to create the directory lazily; and a new ADR also needs a row in the index table in
   [`docs/adr/README.md`](../adr/README.md), including its context.

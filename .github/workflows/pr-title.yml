@@ -1,0 +1,29 @@
+name: 'PR title'
+
+# Squash merges take the pull-request title as the commit subject, so the title has to satisfy the
+# same Conventional Commits rule as a commit message. Separate from Quality because it needs the
+# `edited` event: retitling a pull request must re-run this check, and must not re-run the suite.
+
+on:
+    pull_request:
+        branches:
+            - main
+        types: [opened, edited, reopened, synchronize]
+
+permissions:
+    contents: read
+
+jobs:
+    conventional-commit:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: '22'
+            - name: Check the title is a Conventional Commit
+              # The title is untrusted input. It goes through the environment, never through `${{ }}`
+              # interpolation into the script, which would let a crafted title run commands here.
+              env:
+                  TITLE: ${{ github.event.pull_request.title }}
+              run: node tools/verify-pr-title.mjs
