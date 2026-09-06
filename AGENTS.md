@@ -71,6 +71,10 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
 - Commit messages use Conventional Commits with a mandatory `type:` prefix on the subject line
 - Tests: prefer shared fixture files for reusable fixtures; keep fixtures inline only when clearly
   one-off to that spec
+- Pull requests follow [.github/pull_request_template.md](.github/pull_request_template.md).
+  `gh pr create --body` skips the template, so read it and match it by hand
+- Draft pull requests are only for work that is knowingly not mergeable. When the task is ready to
+  hand to a reviewer, open the pull request as ready for review
 
 ## Keeping the docs true
 
