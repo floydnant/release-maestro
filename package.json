@@ -90,7 +90,7 @@
         "jest-preset-angular": "17.0.0",
         "jest-util": "30.4.1",
         "jsonc-eslint-parser": "2.4.0",
-        "nx": "22.7.5",
+        "nx": "22.7.7",
         "nx-electron": "22.0.0",
         "playwright": "1.62.0",
         "postcss": "8.5.25",
