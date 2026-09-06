@@ -46,7 +46,7 @@
     },
     "mac": {
         "icon": "dist/assets/icons/favicon.icns",
-        "x64ArchFiles": "**/metadata-engine",
+        "x64ArchFiles": "**/{metadata-engine,better-sqlite3/prebuilds/darwin-{arm64,x64}.node}",
         "target": [
             {
                 "target": "default",
