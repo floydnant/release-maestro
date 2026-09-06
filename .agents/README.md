@@ -12,8 +12,13 @@ capability; if none exists, do the work locally.
 `.claude/skills/<name>` is a relative symlink to `../../.agents/skills/<name>`, and Codex reads the
 canonical tree through each skill's `agents/openai.yaml` sidecar, whose `allow_implicit_invocation`
 must agree with the SKILL.md `disable-model-invocation` flag. A skill that genuinely needs to differ
-per harness is declared in [.agents/harness-overrides.json](.agents/harness-overrides.json) and only
+per harness is declared in [.agents/harness-overrides.json](harness-overrides.json) and only
 then may be a real directory instead of a link — anything else divergent is a mistake.
 
-`make agents-check` verifies all of that offline, plus frontmatter and cross-skill links. Run it
-after adding, renaming, or removing a skill; CI runs it on every pull request.
+Install the check's isolated YAML parser with `npm ci --prefix tools`. Then `make agents-check`
+runs offline and validates the manifest, canonical and divergent frontmatter, invocation policies,
+and cross-skill links. It also runs fixture tests for malformed inputs. Run it after adding,
+renaming, or removing a skill; CI installs only the tools package for this check.
+
+Policy fields use YAML booleans, such as `true`, `True`, or `TRUE`. Strings such as `yes` and
+quoted `"true"` are rejected to avoid differences between YAML versions.

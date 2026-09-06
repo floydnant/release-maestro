@@ -4,13 +4,15 @@
 //
 // Source of truth is .agents/skills/<name>/SKILL.md. Harness directories hold adapters only:
 // a relative symlink per skill, unless the skill is declared divergent in
-// .agents/harness-overrides.json. Runs on Node with no dependencies so it works before install.
+// .agents/harness-overrides.json. Install the isolated tools dependencies with npm ci --prefix tools.
 
 import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+import { parseDocument } from 'yaml'
+
+const repoRoot = resolve(process.argv[2] ?? resolve(dirname(fileURLToPath(import.meta.url)), '..'))
 const canonicalDir = join(repoRoot, '.agents', 'skills')
 const manifestPath = join(repoRoot, '.agents', 'harness-overrides.json')
 
@@ -36,66 +38,64 @@ function assert(condition, okMessage, failMessage) {
     return condition
 }
 
-// --- Minimal frontmatter reader -------------------------------------------------------------
-// Handles `key: scalar`, quoted scalars, and folded/literal blocks (`>`, `>-`, `|`, `|-`).
-// That is the whole vocabulary the skill frontmatter and the openai.yaml sidecars use.
+// YAML 1.2 treats yes/no as strings. Reject them for boolean policy fields.
+const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 
-function unquote(value) {
-    const trimmed = value.trim()
-    if (trimmed.length >= 2 && (trimmed.startsWith("'") || trimmed.startsWith('"'))) {
-        const quote = trimmed[0]
-        if (trimmed.endsWith(quote)) return trimmed.slice(1, -1).replaceAll(quote + quote, quote)
+function readYaml(text, file) {
+    try {
+        const document = parseDocument(text)
+        const problems = [...document.errors, ...document.warnings]
+        if (problems.length) throw new Error(problems.map(problem => problem.message).join('; '))
+        const data = document.toJS()
+        if (!isRecord(data)) throw new Error('expected a YAML mapping')
+        return data
+    } catch (error) {
+        fail(`${rel(file)} has invalid YAML: ${error.message}`)
+        return null
     }
-    return trimmed
 }
 
-function parseBlock(lines, indent = 0) {
-    const result = {}
-    for (let i = 0; i < lines.length; i += 1) {
-        const line = lines[i]
-        if (!line.trim() || line.trimStart().startsWith('#')) continue
-        const leading = line.length - line.trimStart().length
-        if (leading !== indent) continue
-
-        const match = /^([A-Za-z$][\w$-]*):[ \t]*(.*)$/.exec(line.trim())
-        if (!match) continue
-        const [, key, rawValue] = match
-
-        if (rawValue === '' || /^[|>][-+]?$/.test(rawValue)) {
-            const body = []
-            let j = i + 1
-            for (; j < lines.length; j += 1) {
-                const next = lines[j]
-                if (next.trim() && next.length - next.trimStart().length <= indent) break
-                body.push(next)
-            }
-            result[key] =
-                rawValue === ''
-                    ? parseBlock(
-                          body,
-                          body.find(l => l.trim())
-                              ? body.find(l => l.trim()).length - body.find(l => l.trim()).trimStart().length
-                              : indent + 4,
-                      )
-                    : body
-                          .map(l => l.trim())
-                          .filter(Boolean)
-                          .join(rawValue.startsWith('|') ? '\n' : ' ')
-            i = j - 1
-            continue
-        }
-        result[key] = unquote(rawValue)
-    }
-    return result
-}
-
-function readFrontmatter(file) {
-    const text = readFileSync(file, 'utf8')
-    const lines = text.split('\n')
-    if (lines[0] !== '---') return null
+function validateSkill(skillFile, name) {
+    const label = rel(skillFile)
+    if (
+        !assert(
+            existsSync(skillFile) && statSync(skillFile).isFile(),
+            `${label} exists`,
+            `${label} must be a file`,
+        )
+    )
+        return null
+    const lines = readFileSync(skillFile, 'utf8').split(/\r?\n/)
     const end = lines.indexOf('---', 1)
-    if (end === -1) return null
-    return parseBlock(lines.slice(1, end))
+    if (
+        !assert(
+            lines[0] === '---' && end > 0,
+            `${label} has complete YAML frontmatter`,
+            `${label} must open and close its frontmatter with ---`,
+        )
+    )
+        return null
+    const data = readYaml(lines.slice(1, end).join('\n'), skillFile)
+    if (!data) return null
+    assert(
+        data.name === name,
+        `${label} name matches its directory`,
+        `${label} declares name '${data.name ?? ''}' but sits in '${name}'`,
+    )
+    assert(
+        typeof data.description === 'string' &&
+            data.description.trim().length > 0 &&
+            data.description.length <= 1024,
+        `${label} has a description`,
+        `${label} needs a description of 1 to 1024 characters`,
+    )
+    assert(
+        data['disable-model-invocation'] === undefined ||
+            typeof data['disable-model-invocation'] === 'boolean',
+        `${label} has a boolean invocation flag`,
+        `${label} disable-model-invocation must be a YAML boolean, true or false`,
+    )
+    return data
 }
 
 // --- Manifest --------------------------------------------------------------------------------
@@ -110,11 +110,34 @@ if (assert(existsSync(manifestPath), `${rel(manifestPath)} exists`, `${rel(manif
     }
 }
 
-const harnesses = Object.entries(manifest.harnesses ?? {}).map(([id, config]) => ({
-    id,
-    skillsDir: config.skillsDir,
-    diverge: new Set(config.diverge ?? []),
-}))
+const harnesses = []
+if (
+    assert(
+        isRecord(manifest) && isRecord(manifest.harnesses) && Object.keys(manifest.harnesses).length > 0,
+        'manifest declares harnesses',
+        `${rel(manifestPath)} needs a non-empty harnesses object`,
+    )
+) {
+    for (const [id, config] of Object.entries(manifest.harnesses)) {
+        const valid =
+            isRecord(config) &&
+            typeof config.skillsDir === 'string' &&
+            config.skillsDir.trim().length > 0 &&
+            !isAbsolute(config.skillsDir) &&
+            !relative(repoRoot, resolve(repoRoot, config.skillsDir)).startsWith('..') &&
+            (config.diverge === undefined ||
+                (Array.isArray(config.diverge) && config.diverge.every(name => typeof name === 'string')))
+        if (
+            assert(
+                valid,
+                `${id} has valid configuration`,
+                `${rel(manifestPath)} harness '${id}' needs a repository-relative skillsDir and an optional array of divergence names`,
+            )
+        ) {
+            harnesses.push({ id, skillsDir: config.skillsDir, diverge: new Set(config.diverge ?? []) })
+        }
+    }
+}
 
 // --- Canonical skills ------------------------------------------------------------------------
 
@@ -140,36 +163,23 @@ for (const name of skillNames) {
         `${rel(skillDir)} must be lowercase kebab-case`,
     )
 
-    const frontmatter = readFrontmatter(skillFile)
-    if (
-        !assert(
-            frontmatter !== null,
-            `${label} has complete YAML frontmatter`,
-            `${label} must open and close its frontmatter with ---`,
-        )
-    )
-        continue
-
-    assert(
-        frontmatter.name === name,
-        `${label} name matches its directory`,
-        `${label} declares name '${frontmatter.name ?? ''}' but sits in '${name}'`,
-    )
-
-    const description = frontmatter.description ?? ''
-    assert(
-        description.length > 0 && description.length <= 1024,
-        `${label} has a description`,
-        `${label} needs a description of 1 to 1024 characters (has ${description.length})`,
-    )
+    const frontmatter = validateSkill(skillFile, name)
+    if (!frontmatter) continue
 
     // --- openai.yaml sidecar ---
     const sidecar = join(skillDir, 'agents', 'openai.yaml')
     const sidecarLabel = rel(sidecar)
-    if (!assert(existsSync(sidecar), `${sidecarLabel} exists`, `${rel(skillDir)} needs agents/openai.yaml`))
+    if (
+        !assert(
+            existsSync(sidecar) && statSync(sidecar).isFile(),
+            `${sidecarLabel} exists`,
+            `${rel(skillDir)} needs agents/openai.yaml as a file`,
+        )
+    )
         continue
 
-    const sidecarData = parseBlock(readFileSync(sidecar, 'utf8').split('\n'))
+    const sidecarData = readYaml(readFileSync(sidecar, 'utf8'), sidecar)
+    if (!sidecarData) continue
     const iface = sidecarData.interface ?? {}
     assert(
         typeof iface.display_name === 'string' && iface.display_name.length > 0,
@@ -185,14 +195,14 @@ for (const name of skillNames) {
     const declared = (sidecarData.policy ?? {}).allow_implicit_invocation
     if (
         assert(
-            declared === 'true' || declared === 'false',
+            typeof declared === 'boolean',
             `${sidecarLabel} declares allow_implicit_invocation`,
             `${sidecarLabel} needs policy.allow_implicit_invocation set to true or false`,
         )
     ) {
-        const modelInvocable = frontmatter['disable-model-invocation'] !== 'true'
+        const modelInvocable = frontmatter['disable-model-invocation'] !== true
         assert(
-            (declared === 'true') === modelInvocable,
+            declared === modelInvocable,
             `${sidecarLabel} invocation policy matches SKILL.md`,
             `${sidecarLabel} says allow_implicit_invocation: ${declared} but ${label} says disable-model-invocation: ${frontmatter['disable-model-invocation'] ?? 'false'}`,
         )
@@ -202,6 +212,7 @@ for (const name of skillNames) {
 // --- Harness adapters, both directions --------------------------------------------------------
 
 const canonicalNames = new Set(skillNames)
+const divergentDirs = []
 
 for (const harness of harnesses) {
     const adapterRoot = join(repoRoot, harness.skillsDir)
@@ -233,7 +244,7 @@ for (const harness of harnesses) {
     for (const name of skillNames) {
         const adapter = join(adapterRoot, name)
         const adapterLabel = `${harness.skillsDir}/${name}`
-        const expected = join('../..', '.agents', 'skills', name)
+        const expected = relative(adapterRoot, join(canonicalDir, name))
 
         if (harness.diverge.has(name)) {
             const isRealDir =
@@ -243,6 +254,10 @@ for (const harness of harnesses) {
                 `${adapterLabel} is a declared divergence with its own SKILL.md`,
                 `${adapterLabel} is declared divergent, so it must be a real directory containing SKILL.md`,
             )
+            if (isRealDir) {
+                validateSkill(join(adapter, 'SKILL.md'), name)
+                divergentDirs.push(adapter)
+            }
             continue
         }
 
@@ -257,7 +272,7 @@ for (const harness of harnesses) {
     }
 
     // Adapter -> canonical
-    for (const entry of readdirSync(adapterRoot)) {
+    for (const entry of readdirSync(adapterRoot).filter(name => !['.DS_Store', 'Thumbs.db'].includes(name))) {
         assert(
             canonicalNames.has(entry),
             `${harness.skillsDir}/${entry} has a canonical source`,
@@ -266,7 +281,7 @@ for (const harness of harnesses) {
     }
 
     // No copied skill content
-    for (const entry of readdirSync(adapterRoot)) {
+    for (const entry of readdirSync(adapterRoot).filter(name => !['.DS_Store', 'Thumbs.db'].includes(name))) {
         if (harness.diverge.has(entry)) continue
         const adapter = join(adapterRoot, entry)
         const link = lstatSync(adapter, { throwIfNoEntry: false })
@@ -298,7 +313,11 @@ const referencePattern = /\]\(([^)\s]+)\)|`([^`\s]+\.(?:md|sh|tsv|ts|json|yaml))
 let brokenReferences = 0
 let checkedReferences = 0
 
-for (const file of skillNames.length ? markdownFiles(canonicalDir) : []) {
+const referenceFiles = [
+    ...(skillNames.length ? markdownFiles(canonicalDir) : []),
+    ...divergentDirs.flatMap(markdownFiles),
+]
+for (const file of referenceFiles) {
     const text = readFileSync(file, 'utf8')
     for (const match of text.matchAll(referencePattern)) {
         const isMarkdownLink = match[1] !== undefined
@@ -326,8 +345,8 @@ for (const file of skillNames.length ? markdownFiles(canonicalDir) : []) {
 
 assert(
     brokenReferences === 0,
-    `all ${checkedReferences} cross-references in .agents/skills resolve`,
-    `${brokenReferences} of ${checkedReferences} cross-references in .agents/skills do not resolve`,
+    `all ${checkedReferences} cross-references in canonical and divergent skills resolve`,
+    `${brokenReferences} of ${checkedReferences} cross-references in canonical and divergent skills do not resolve`,
 )
 
 // --- Summary -------------------------------------------------------------------------------------

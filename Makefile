@@ -91,14 +91,15 @@ typecheck-e2e: ## Type-check the end-to-end test suite (also runs automatically 
 lint: ## Lint all projects
 	npx nx run-many -t lint --output-style=stream --skipNxCache=$(SKIP_NX_CACHE)
 format: ## Format all files
-	npx prettier --write "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md" "./**/*.yaml" "./**/*.mjs"
+	npx prettier --write "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md" "./**/*.yaml" "./**/*.yml" "./**/*.mjs"
 	@echo ""
 	@git status --short
 f: format
 format-check: ## Check formatting
-	npx prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md" "./**/*.yaml" "./**/*.mjs"
+	npx prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md" "./**/*.yaml" "./**/*.yml" "./**/*.mjs"
 
 agents-check: ## Verify the canonical agent skills and their harness adapters
+	node --test tools/*.test.mjs
 	node tools/verify-agent-harness.mjs
 
 sure: format ## Format, lint, build, unit test, and development E2E; build is the app type gate

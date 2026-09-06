@@ -60,6 +60,22 @@ updates:
                   - 'minor'
                   - 'patch'
 
+    - package-ecosystem: 'npm'
+      directory: '/tools'
+      schedule:
+          interval: 'weekly'
+      groups:
+          tools:
+              applies-to: version-updates
+              update-types:
+                  - 'minor'
+                  - 'patch'
+          tools-security:
+              applies-to: security-updates
+              update-types:
+                  - 'minor'
+                  - 'patch'
+
     - package-ecosystem: 'cargo'
       directory: '/apps/metadata-engine'
       schedule:

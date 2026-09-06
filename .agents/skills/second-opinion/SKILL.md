@@ -10,6 +10,11 @@ question to a different vendor's CLI and reports what comes back.
 
 ## Invoke
 
+Include this instruction in every brief sent to the reviewing agent:
+
+> Perform this review yourself and return your findings directly. Do not invoke the second-opinion
+> skill or request another second opinion. This call is the final review level.
+
 ```sh
 claude -p --model claude-opus-5 --effort medium --permission-mode plan "<brief>"
 ```

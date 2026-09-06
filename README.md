@@ -51,6 +51,9 @@ make e2e-renderer  # renderer-only E2E (type-checks itself first)
 
 `make sure` mutates formatting.
 
+For agent skills and harness adapters, install the isolated YAML parser with `npm ci --prefix tools`,
+then run `make agents-check` to validate the tree and run its fixture tests.
+
 For focused work, use Nx; see the [fast-iteration examples](docs/testing.md#fast-iteration) for file
 and test-name filters.
 

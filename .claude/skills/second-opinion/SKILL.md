@@ -14,6 +14,11 @@ This is the Claude copy, which calls Codex. It diverges from the canonical
 
 ## Invoke
 
+Include this instruction in every brief sent to the reviewing agent:
+
+> Perform this review yourself and return your findings directly. Do not invoke the second-opinion
+> skill or request another second opinion. This call is the final review level.
+
 ```sh
 codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only "<brief>"
 ```
