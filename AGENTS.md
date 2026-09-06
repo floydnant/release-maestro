@@ -38,6 +38,8 @@ intentional convenience summaries.
 
 - **`make` for repo-wide checks** — `make sure`, `make affected`, `make test`, `make lint`,
   `make format-check`, `make build-prod`, `db-*`, packaging.
+- **`make install` or `make i` for dependencies** — root and tools npm packages, locked Rust crates,
+  and Playwright Chromium with its system dependencies. Node/npm and Rust must already be installed.
 - **`nx` for single-project checks** — `npx nx test maestro-renderer`, `npx nx build maestro-core`.
   Prefer it over a make wrapper for focused work; file/name-filtered examples are in
   [docs/testing.md](docs/testing.md#fast-iteration).

@@ -30,11 +30,15 @@ A desktop app for your music. Scan your local collection into a searchable libra
 ## Getting Started
 
 ```bash
-npm i
+make install # or make i
 make dev
 ```
 
-This starts the Angular dev server and the Electron main process with hot reload.
+`make install` installs the root and tools npm packages from their lockfiles, fetches the locked Rust
+crates, and installs Playwright Chromium with its system dependencies. Linux system dependencies may
+require sudo. Chromium requires an OS supported by the installed Playwright version.
+
+`make dev` starts the Angular dev server and the Electron main process with hot reload.
 
 ## Commands
 
@@ -51,8 +55,8 @@ make e2e-renderer  # renderer-only E2E (type-checks itself first)
 
 `make sure` mutates formatting.
 
-For agent skills and harness adapters, install the isolated YAML parser with `npm ci --prefix tools`,
-then run `make agents-check` to validate the tree and run its fixture tests.
+After installation, run `make agents-check` to validate the agent skills and harness adapters and run
+their fixture tests.
 
 For focused work, use Nx; see the [fast-iteration examples](docs/testing.md#fast-iteration) for file
 and test-name filters.

@@ -6,6 +6,9 @@ The [`e2e-testing`](../.agents/skills/e2e-testing/SKILL.md) skill adds Playwrigh
 
 ## Choose the layer
 
+Run `make install` or `make i` to install the npm packages, fetch Rust crates, and install Playwright
+Chromium with its system dependencies before running the checks below.
+
 - Unit tests cover renderer components, Electron services, core schemas, and metadata-engine behavior
   close to the code under test.
 - Renderer E2E uses a browser with mocked Electron IPC. Use it for UI state matrices—loading, empty,
