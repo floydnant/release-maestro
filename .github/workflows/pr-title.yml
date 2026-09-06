@@ -1,0 +1,50 @@
+name: 'PR title'
+
+# Squash merges take the pull-request title as the commit subject, so the title has to satisfy the
+# same Conventional Commits rule as a commit message. Separate from Quality because it needs the
+# `edited` event: retitling a pull request must re-run this check, and must not re-run the suite.
+
+on:
+    pull_request:
+        branches:
+            - main
+        types: [opened, edited, reopened, synchronize]
+
+permissions:
+    contents: read
+
+jobs:
+    conventional-commit:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check the title is a Conventional Commit
+              # The title is untrusted input. It goes through the environment, never through `${{ }}`
+              # interpolation into the script, which would let a crafted title run commands here.
+              env:
+                  TITLE: ${{ github.event.pull_request.title }}
+              run: |
+                  types='build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test'
+                  pattern="^($types)(\([a-z0-9._/-]+\))?!?: .+"
+
+                  if [[ $TITLE =~ $pattern ]]; then
+                    echo "ok - '$TITLE'"
+                    exit 0
+                  fi
+
+                  echo "::error title=Pull request title is not a Conventional Commit::${TITLE}"
+                  {
+                    echo '## Pull request title is not a Conventional Commit'
+                    echo
+                    echo "Got: \`${TITLE}\`"
+                    echo
+                    echo 'Expected `type(optional-scope)!: description`, for example:'
+                    echo
+                    echo '- `feat(renderer): add history navigation controls`'
+                    echo '- `fix: keep the scan cursor after a restart`'
+                    echo '- `refactor(skills)!: rename the review skill`'
+                    echo
+                    echo "Types: \`${types//|/\`, \`}\`."
+                    echo
+                    echo 'Scope is optional and free-form. `!` marks a breaking change.'
+                  } >>"$GITHUB_STEP_SUMMARY"
+                  exit 1
