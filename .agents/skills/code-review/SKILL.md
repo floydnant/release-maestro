@@ -94,23 +94,43 @@ subjects are pull requests; Linear issues are `MAE-123`. Look for the originatin
 
 Pass the sub-agent the files that actually exist here:
 
-- `AGENTS.md` — rules, validation loop, issue tracker.
-- `docs/agents/domain.md` — repository-specific context layout, vocabulary, and naming overrides.
-- `CONTEXT-MAP.md` and the relevant `docs/contexts/*/CONTEXT.md` — vocabulary and boundaries.
-- `docs/adr/` — architectural decisions are standards.
-- `docs/testing.md` — test-layer split, E2E conventions, fixture isolation.
-- `.agents/skills/frontend-design/SKILL.md` — required for any diff touching
+- `AGENTS.md`: rules, validation loop, issue tracker.
+- `docs/agents/domain.md`: repository-specific context layout, vocabulary, and naming overrides.
+- `CONTEXT-MAP.md` and the relevant `docs/contexts/*/CONTEXT.md`: vocabulary and boundaries.
+- `docs/adr/`: architectural decisions are standards.
+- `docs/testing.md`: test-layer split, E2E conventions, fixture isolation.
+- `.agents/skills/frontend-design/SKILL.md`: required for any diff touching
   `apps/maestro-renderer` UI.
-- `.agents/skills/angular-patterns/SKILL.md` — signals as the state model, the signal/observable
+- `.agents/skills/angular-patterns/SKILL.md`: signals as the state model, the signal/observable
   bridge, componentization; required for any renderer TypeScript or template diff.
-- `.agents/skills/rxjs-streams/SKILL.md` — required for any diff touching an observable in **either**
+- `.agents/skills/rxjs-streams/SKILL.md`: required for any diff touching an observable in **either**
   process: operator choice, cancellation, subscription lifetime.
-- `.agents/skills/verification-loop/SKILL.md` — how changes are meant to be verified.
-- `eslint.config.*`, `tsconfig*.json`, `.prettierrc*` — machine-enforced; note them but don't
+- `.agents/skills/verification-loop/SKILL.md`: how changes are meant to be verified.
+- `eslint.config.*`, `tsconfig*.json`, `.prettierrc*`: machine-enforced; note them but don't
   re-check what step 3 already ran.
 
+**Engineering principles.** The `principle-*` skills are standards too. Each names a property the
+code should have, so pass the ones the diff actually reaches rather than all seven:
+
+Principles: Include when the diff...
+
+- `.agents/skills/principle-type-system-discipline/SKILL.md`: adds or changes a type, a signature, a cast, or a parse of external data
+- `.agents/skills/principle-boundary-discipline/SKILL.md`: adds validation, error handling, or a framework adapter
+- `.agents/skills/principle-laziness-protocol/SKILL.md`: adds abstraction, layering, or signal threading — or is simply large
+- `.agents/skills/principle-foundational-thinking/SKILL.md`: changes a core data structure, or shares state between actors
+- `.agents/skills/principle-make-operations-idempotent/SKILL.md`: touches a command, a lifecycle step, or a processing loop
+- `.agents/skills/principle-redesign-from-first-principles/SKILL.md`: bolts a new requirement onto an existing design
+- `.agents/skills/principle-exhaust-the-design-space/SKILL.md`: introduces a novel interaction or architecture with no precedent here
+
+A principle finding is usually a judgement call rather than a hard violation, so say which it is.
+`exhaust-the-design-space` is the weakest of the seven to review against: it describes work done
+before the diff existed, so the reviewer can ask whether alternatives were weighed but can never read
+the answer off the diff.
+
 When the diff touches documentation, Standards must also check that those docs stay true to the code
-and workflows, per `AGENTS.md` ("Keeping the docs true").
+and workflows, per `AGENTS.md` ("Keeping the docs true"). If code changes warrant a doc update but the
+diff doesn't include it, report that as a Standards finding too, for example if a new concept is
+introduced in the code but not documented.
 
 ### 6. Spawn the three sub-agents in parallel
 
@@ -143,9 +163,9 @@ Run the step 3 gates while the sub-agents work.
 
 ### 7. Aggregate
 
-Present the results under `## Gates`, `## Regression`, `## Standards`, and `## Spec`. Keep the three
-sub-agent reports verbatim or lightly cleaned. Do **not** merge or rerank findings across axes — the
-separation is the point.
+Present the results under `## Regression`, `## Standards`, and `## Spec`. If the gates failed, include
+`## Gates` as well, otherwise leave it out. Keep the three sub-agent reports verbatim or lightly cleaned.
+Do **not** merge or rerank findings across axes — the separation is the point.
 
 End with a one-line summary: gate status, total findings per axis, and the worst single issue.
 
