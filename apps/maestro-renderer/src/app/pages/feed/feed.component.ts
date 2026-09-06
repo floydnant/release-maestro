@@ -10,7 +10,6 @@ import {
 } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
-import { TranslateModule } from '@ngx-translate/core'
 import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
 import { combineLatestWith, fromEvent, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
 import { ElectronService } from '../../core/services'
@@ -47,7 +46,6 @@ type FeedState =
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         CommonModule,
-        TranslateModule,
         SafePipe,
         IntersectionDirective,
         ProgressRingComponent,

@@ -10,7 +10,7 @@ import {
 } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
-import { TranslateModule, TranslateService } from '@ngx-translate/core'
+import { TranslateService } from '@ngx-translate/core'
 import { EmailImportProgressUpdate } from '@release-maestro/core'
 import { filter, map, Observable } from 'rxjs'
 import { webEnv } from '../environments/environment'
@@ -55,7 +55,7 @@ const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contentedit
     standalone: true,
     host: { '(document:keydown)': 'onDocumentKeydown($event)' },
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterModule, TranslateModule, ProgressBarComponent, ProgressRingComponent, IconComponent],
+    imports: [RouterModule, ProgressBarComponent, ProgressRingComponent, IconComponent],
 })
 export class AppComponent {
     translate = inject(TranslateService)
@@ -200,7 +200,7 @@ export class AppComponent {
     })
 
     constructor() {
-        this.translate.setDefaultLang('en')
+        this.translate.setFallbackLang('en')
         console.log('webEnv', webEnv)
 
         if (this.electronService.isElectron) {

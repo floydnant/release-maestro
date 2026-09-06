@@ -1,6 +1,6 @@
 import { TestBed, waitForAsync } from '@angular/core/testing'
 import { provideRouter } from '@angular/router'
-import { TranslateModule } from '@ngx-translate/core'
+import { provideTranslateService } from '@ngx-translate/core'
 import { provideWebAudioPlayerMock } from '../test/mocks'
 import { AppComponent } from './app.component'
 import { ElectronService } from './core/services'
@@ -9,8 +9,13 @@ describe(AppComponent.name, () => {
     beforeEach(waitForAsync(() => {
         void TestBed.configureTestingModule({
             declarations: [],
-            imports: [AppComponent, TranslateModule.forRoot()],
-            providers: [provideRouter([]), ElectronService, provideWebAudioPlayerMock()],
+            imports: [AppComponent],
+            providers: [
+                provideTranslateService(),
+                provideRouter([]),
+                ElectronService,
+                provideWebAudioPlayerMock(),
+            ],
         }).compileComponents()
     }))
 
