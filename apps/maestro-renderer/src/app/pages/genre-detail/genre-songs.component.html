@@ -1,0 +1,24 @@
+@if (result().status === 'error') {
+    <div class="flex items-center justify-center gap-3 p-4" role="alert">
+        <p class="type-body-sm text-content-secondary">Could not load this genre's tracks</p>
+        <button type="button" class="btn-neutral" (click)="onRetry()">Try again</button>
+    </div>
+}
+@if (!result().loaded && result().status === 'loading') {
+    <p class="type-body-sm p-8 text-content-secondary" role="status">Loading tracks…</p>
+} @else if (result().loaded && result().total === 0) {
+    <p class="type-body-sm p-8 text-content-secondary">No tracks linked to this genre</p>
+} @else if (result().loaded) {
+    <app-song-table
+        [result]="result()"
+        [query]="query()"
+        [selection]="selection()"
+        [restoreScrollTop]="restoreScrollTop()"
+        (sortChange)="onSort($event)"
+        (selectionChange)="selection.set($event)"
+        (viewportChange)="viewport.set($event)"
+        (entityFilter)="onEntity($event)"
+        (filterMissing)="onMissing()"
+        (scrollRestored)="onScrollRestored()"
+    ></app-song-table>
+}

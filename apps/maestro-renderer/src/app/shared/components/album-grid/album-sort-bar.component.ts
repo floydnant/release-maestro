@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { AlbumSortField, type AlbumSort } from '@release-maestro/core'
-import { IconComponent } from '../../shared/components/icon/icon.component'
+import { IconComponent } from '../icon/icon.component'
 
 /**
  * The albums grid's sort control.

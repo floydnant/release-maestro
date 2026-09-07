@@ -1,0 +1,27 @@
+<app-browse-shell
+    [state]="shellState()"
+    [filters]="filters()"
+    (searchChange)="onSearch($event)"
+    (clearFilters)="onClear()"
+    (retry)="onRetry()"
+>
+    <div class="genre-sort | flex items-center border-b border-border-subtle px-6 py-2">
+        <button
+            type="button"
+            class="btn-nkd-neutral"
+            (click)="onSort()"
+            [attr.aria-label]="query().sort.direction === 'asc' ? 'Sort genres Z to A' : 'Sort genres A to Z'"
+        >
+            Name {{ query().sort.direction === 'asc' ? '↑' : '↓' }}
+        </button>
+    </div>
+    <app-catalog-list
+        label="Genres"
+        [result]="result()"
+        [query]="query()"
+        [showCounts]="true"
+        [restoreScrollTop]="restoreScrollTop()"
+        (viewportChange)="viewport.set($event)"
+        (scrollRestored)="onScrollRestored()"
+    ></app-catalog-list>
+</app-browse-shell>

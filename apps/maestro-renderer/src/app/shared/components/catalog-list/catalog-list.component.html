@@ -1,0 +1,49 @@
+<div
+    #viewport
+    class="catalog-list | min-h-0 flex-1 overflow-auto"
+    role="region"
+    [attr.aria-label]="label()"
+    tabindex="0"
+    (scroll)="onScroll()"
+    (keydown)="onKeydown($event)"
+    [attr.aria-busy]="result().status === 'loading'"
+>
+    <div class="relative min-w-max" [style.height.px]="height()">
+        <ul
+            class="absolute inset-x-0 top-0 m-0 list-none p-0"
+            [style.transform]="'translateY(' + offset() + 'px)'"
+        >
+            @for (row of result().rows; track row.id; let index = $index) {
+                <li
+                    [style.height.px]="rowHeight"
+                    [attr.aria-setsize]="result().total"
+                    [attr.aria-posinset]="result().offset + index + 1"
+                >
+                    <a
+                        class="catalog-list__link | flex h-full items-center gap-6 border-b border-border-subtle px-6 text-content-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-border-focus hover:bg-background-surface"
+                        [routerLink]="row.link"
+                        [queryParams]="row.queryParams"
+                        [attr.data-index]="result().offset + index"
+                        (focus)="activeIndex.set(result().offset + index)"
+                    >
+                        <span class="min-w-32 flex-1 truncate" [title]="row.name">{{ row.name }}</span>
+                        @if (showCounts() && row.counts; as counts) {
+                            <span class="type-body-sm w-24 text-right text-content-secondary"
+                                >{{ counts.songCount | number }}
+                                {{ counts.songCount === 1 ? 'track' : 'tracks' }}</span
+                            >
+                            <span class="type-body-sm w-24 text-right text-content-secondary"
+                                >{{ counts.artistCount | number }}
+                                {{ counts.artistCount === 1 ? 'artist' : 'artists' }}</span
+                            >
+                            <span class="type-body-sm w-24 text-right text-content-secondary"
+                                >{{ counts.albumCount | number }}
+                                {{ counts.albumCount === 1 ? 'album' : 'albums' }}</span
+                            >
+                        }
+                    </a>
+                </li>
+            }
+        </ul>
+    </div>
+</div>

@@ -134,22 +134,34 @@
         [style.width.px]="widths.genre"
         [title]="row().genreText || ''"
     >
-        @if (row().genres.length) {
-            @for (genre of row().genres; track genre.id; let last = $last) {
+        @if (row().genres.length === 1) {
+            @for (genre of row().genres; track genre.id) {
                 <button
                     type="button"
                     tabindex="-1"
                     class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                     (click)="onEntity($event, 'genre', genre.id, genre.name)"
                 >
-                    {{ genre.name }}
+                    {{ row().genreText || genre.name }}
                 </button>
-                @if (!last) {
-                    <span>, </span>
-                }
             }
         } @else {
-            <span class="text-content-muted">—</span>
+            <span class="block truncate text-content-secondary">{{ row().genreText || '—' }}</span>
+            @if (row().genres.length > 1) {
+                <span class="genre-entities | flex gap-1">
+                    @for (genre of row().genres; track genre.id) {
+                        <button
+                            type="button"
+                            tabindex="-1"
+                            class="type-label-sm max-w-full truncate rounded-sm text-content-action hover:underline"
+                            [attr.aria-label]="'Filter by genre ' + genre.name"
+                            (click)="onEntity($event, 'genre', genre.id, genre.name)"
+                        >
+                            {{ genre.name }}
+                        </button>
+                    }
+                </span>
+            }
         }
     </span>
 }

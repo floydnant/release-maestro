@@ -1,3 +1,11 @@
+import type {
+    QueryGenresRequest,
+    GenreWindowResult,
+    GetGenreDetailRequest,
+    GenreDetailResult,
+    QueryGenreRelatedRequest,
+    GenreRelatedWindowResult,
+} from '../schemas/library-browse.schema'
 /**
  * The concrete IPC contracts for this application — the single source of truth
  * both the Electron main process and the Angular renderer import.
@@ -100,6 +108,12 @@ export const MainIpcContract = defineIpcContract({
     [LibraryIpcChannel.getScanStatus]: defineIpcRequest<void, LibraryScanSnapshot>(),
 
     // library browsing (windowed read side, see ADR 0004)
+    [LibraryBrowseIpcChannel.queryGenres]: defineIpcRequest<QueryGenresRequest, GenreWindowResult>(),
+    [LibraryBrowseIpcChannel.getGenreDetail]: defineIpcRequest<GetGenreDetailRequest, GenreDetailResult>(),
+    [LibraryBrowseIpcChannel.queryGenreRelated]: defineIpcRequest<
+        QueryGenreRelatedRequest,
+        GenreRelatedWindowResult
+    >(),
     [LibraryBrowseIpcChannel.querySongs]: defineIpcRequest<QuerySongsRequest, SongWindowResult>(),
     [LibraryBrowseIpcChannel.describeSongFilter]: defineIpcRequest<
         DescribeSongFilterRequest,

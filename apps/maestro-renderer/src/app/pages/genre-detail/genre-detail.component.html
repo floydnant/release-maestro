@@ -1,0 +1,68 @@
+@switch (detail().status) {
+    @case ('loading') {
+        <p class="type-body-sm p-8 text-content-secondary" role="status">Loading genre…</p>
+    }
+    @case ('missing') {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+            <p class="type-body-md text-content-primary">This genre is no longer in your library</p>
+            <a class="btn-primary" routerLink="/genres">Back to genres</a>
+        </div>
+    }
+    @case ('error') {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center" role="alert">
+            <p class="type-body-md text-content-primary">Could not load this genre</p>
+            <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
+            <a class="btn-neutral" routerLink="/genres">Back to genres</a>
+        </div>
+    }
+}
+@for (entry of content(); track entry.key) {
+    <header class="genre-detail__header | flex flex-col gap-3 border-b border-border-subtle p-6">
+        <a class="type-body-sm w-fit text-content-action hover:underline" routerLink="/genres">All genres</a>
+        <h1 class="type-hero-title break-words text-content-primary">{{ entry.genre.name }}</h1>
+        <p class="type-body-sm text-content-secondary">
+            {{ entry.genre.songCount | number }} {{ entry.genre.songCount === 1 ? 'track' : 'tracks' }}
+        </p>
+        <nav class="genre-detail__sections | flex flex-wrap gap-2" aria-label="Genre sections">
+            <a
+                class="btn-nkd-neutral"
+                routerLink="."
+                [replaceUrl]="true"
+                [queryParams]="{}"
+                [attr.aria-current]="section() === 'songs' ? 'page' : null"
+                >Tracks</a
+            >
+            <a
+                class="btn-nkd-neutral"
+                routerLink="."
+                [replaceUrl]="true"
+                [queryParams]="{ section: 'artists' }"
+                [attr.aria-current]="section() === 'artists' ? 'page' : null"
+                >Artists ({{ entry.genre.artistCount | number }})</a
+            >
+            <a
+                class="btn-nkd-neutral"
+                routerLink="."
+                [replaceUrl]="true"
+                [queryParams]="{ section: 'albums' }"
+                [attr.aria-current]="section() === 'albums' ? 'page' : null"
+                >Albums ({{ entry.genre.albumCount | number }})</a
+            >
+            <a
+                class="btn-nkd-neutral"
+                routerLink="."
+                [replaceUrl]="true"
+                [queryParams]="{ section: 'recordLabels' }"
+                [attr.aria-current]="section() === 'recordLabels' ? 'page' : null"
+                >Record labels ({{ entry.genre.recordLabelCount | number }})</a
+            >
+        </nav>
+    </header>
+    @if (section() === 'albums') {
+        <app-genre-albums [genreId]="entry.genre.id"></app-genre-albums>
+    } @else if (relatedQuery(); as query) {
+        <app-genre-related [query]="query" [label]="relatedLabel()"></app-genre-related>
+    } @else {
+        <app-genre-songs [genreId]="entry.genre.id"></app-genre-songs>
+    }
+}

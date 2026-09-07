@@ -110,6 +110,7 @@ test.describe('rendering a window', () => {
         const longGenre = createSongRow({
             id: 'song-long',
             title: 'Sprawling',
+            genreText: 'Deep Progressive Melodic Organic House',
             genres: [{ id: 'g1', name: 'Deep Progressive Melodic Organic House' }],
         })
         await openTracks(page, scenarioBuilder().songs([longGenre]).build())
