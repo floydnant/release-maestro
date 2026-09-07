@@ -27,7 +27,7 @@
         <nav class="genre-detail__sections | flex flex-wrap items-center gap-1" aria-label="Genre sections">
             @for (tab of sections(); track tab.key) {
                 <a
-                    class="genre-detail__tab | type-label-md relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-content-secondary transition-colors duration-fast ease-standard after:absolute after:inset-x-3 after:-bottom-1 after:h-1 after:rounded-full aria-[current=page]:text-content-primary aria-[current=page]:after:bg-content-action hover:bg-action-quiet-hover hover:text-content-primary hover:no-underline"
+                    class="genre-detail__tab | btn type-label-md relative flex items-center gap-1.5 text-content-secondary transition-colors duration-fast ease-standard after:absolute after:inset-x-3 after:-bottom-1 after:h-1 after:rounded-full aria-[current=page]:text-content-primary aria-[current=page]:after:bg-action-primary hover:bg-action-quiet-hover hover:text-content-primary hover:no-underline"
                     routerLink="."
                     [replaceUrl]="true"
                     [queryParams]="tab.params"
