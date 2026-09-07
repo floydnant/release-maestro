@@ -9,7 +9,6 @@ import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh
 import { GenreSongsComponent } from './genre-songs.component'
 import { GenreAlbumsComponent } from './genre-albums.component'
 import { GenreRelatedComponent } from './genre-related.component'
-import { IconComponent } from '../../shared/components/icon/icon.component'
 
 type DetailState = { status: 'ready'; genre: GenreDetail } | { status: 'loading' | 'missing' | 'error' }
 const LOADING: DetailState = { status: 'loading' }
@@ -18,14 +17,7 @@ const LOADING: DetailState = { status: 'loading' }
     selector: 'app-genre-detail',
     templateUrl: './genre-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
-        DecimalPipe,
-        RouterLink,
-        IconComponent,
-        GenreSongsComponent,
-        GenreRelatedComponent,
-        GenreAlbumsComponent,
-    ],
+    imports: [DecimalPipe, RouterLink, GenreSongsComponent, GenreRelatedComponent, GenreAlbumsComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class GenreDetailComponent {

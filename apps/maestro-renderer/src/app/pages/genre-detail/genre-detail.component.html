@@ -17,27 +17,17 @@
     }
 }
 @for (entry of content(); track entry.key) {
-    <header class="genre-detail__header | flex flex-col gap-4 border-b border-border-subtle px-6 pt-5">
-        <a
-            class="genre-detail__back | type-body-sm flex w-fit items-center gap-1 text-content-secondary hover:text-content-action"
-            routerLink="/genres"
-        >
-            <app-icon name="navigationBack" size="14"></app-icon>
-            All genres
-        </a>
-
+    <header class="genre-detail__header | flex flex-col gap-4 px-6 pb-4 pt-5">
         <h1 class="type-hero-title break-words text-content-primary">{{ entry.genre.name }}</h1>
 
-        <!-- Underline tabs, pulled onto the header's own bottom border so the active one
-             joins the section it opens. Each carries its count, so the header does not
-             repeat one of them as a subtitle. -->
-        <nav
-            class="genre-detail__sections | -mb-px flex flex-wrap items-center gap-1"
-            aria-label="Genre sections"
-        >
+        <!-- Underline tabs. The bar is a pseudo-element under the label rather than a
+             border on the box, so the hover background stays an ordinary rounded pill
+             and the indicator is not bent by its corners. Each tab carries its count, so
+             the header does not repeat one of them as a subtitle. -->
+        <nav class="genre-detail__sections | flex flex-wrap items-center gap-1" aria-label="Genre sections">
             @for (tab of sections(); track tab.key) {
                 <a
-                    class="genre-detail__tab | type-label-md flex items-center gap-1.5 rounded-t-md border-b-2 border-transparent px-3 py-2 text-content-secondary transition-colors duration-fast ease-standard aria-[current=page]:border-action-primary aria-[current=page]:text-content-primary hover:bg-action-quiet-hover hover:text-content-primary hover:no-underline"
+                    class="genre-detail__tab | type-label-md relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-content-secondary transition-colors duration-fast ease-standard after:absolute after:inset-x-3 after:-bottom-1 after:h-1 after:rounded-full aria-[current=page]:text-content-primary aria-[current=page]:after:bg-content-action hover:bg-action-quiet-hover hover:text-content-primary hover:no-underline"
                     routerLink="."
                     [replaceUrl]="true"
                     [queryParams]="tab.params"
