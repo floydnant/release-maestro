@@ -100,12 +100,12 @@ test('genre detail sorts tracks and recovers a failed related list', async ({ pa
     await expect
         .poll(async () => (await controller.lastCall('library:query-songs'))?.payload)
         .toMatchObject({ query: { sort: { field: 'title' }, filter: { genreIds: ['ambient'] } } })
-    await page.getByRole('link', { name: /^Artists \(/ }).click()
+    await page.getByRole('link', { name: /^Artists / }).click()
     await expect(page.getByText('Loading artists…')).toBeVisible()
     await controller.resolveAllPending('library:query-genre-related', { rows: [], total: 0, offset: 0 })
     await expect(page.getByText('No artists linked to this genre')).toBeVisible()
     await controller.setHandler('library:query-genre-related', { kind: 'reject', message: 'Unavailable' })
-    await page.getByRole('link', { name: /^Record labels \(/ }).click()
+    await page.getByRole('link', { name: /^Record labels / }).click()
     await expect(page.getByText('Could not load record labels for this genre')).toBeVisible()
     await controller.setHandler('library:query-genre-related', {
         kind: 'resolve',
@@ -248,9 +248,9 @@ test('genre albums use the shared grid and recover after a failed load', async (
     await controller.setHandler('library:query-albums', { kind: 'reject', message: 'Unavailable' })
     await page
         .getByRole('navigation', { name: 'Genre sections' })
-        .getByRole('link', { name: 'Tracks', exact: true })
+        .getByRole('link', { name: /^Tracks / })
         .click()
-    await page.getByRole('link', { name: /^Albums \(/ }).click()
+    await page.getByRole('link', { name: /^Albums / }).click()
     await expect(page.getByText('Could not load albums for this genre')).toBeVisible()
     await controller.setHandler('library:query-albums', {
         kind: 'resolve',

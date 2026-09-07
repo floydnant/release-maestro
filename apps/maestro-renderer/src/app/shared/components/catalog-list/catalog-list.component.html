@@ -26,22 +26,28 @@
                         [attr.data-index]="result().offset + index"
                         (focus)="activeIndex.set(result().offset + index)"
                     >
-                        <span class="min-w-32 flex-1 truncate" [title]="row.name">{{ row.name }}</span>
+                        <span class="min-w-0 flex-1 truncate" [title]="row.name">{{ row.name }}</span>
                         @if (showCounts() && row.counts; as counts) {
-                            <span
-                                class="type-body-sm w-24 shrink-0 text-right tabular-nums text-content-secondary"
-                                >{{ counts.songCount | number }}
-                                {{ counts.songCount === 1 ? 'track' : 'tracks' }}</span
+                            <!-- The unit is spoken but not drawn: the header row above
+                                 labels the columns, and repeating "tracks" on every row
+                                 buries the numbers it belongs to. -->
+                            <span class="w-24 shrink-0 text-right tabular-nums text-content-secondary"
+                                >{{ counts.songCount | number
+                                }}<span class="sr-only">
+                                    {{ counts.songCount === 1 ? 'track' : 'tracks' }}</span
+                                ></span
                             >
-                            <span
-                                class="type-body-sm w-24 shrink-0 text-right tabular-nums text-content-secondary"
-                                >{{ counts.artistCount | number }}
-                                {{ counts.artistCount === 1 ? 'artist' : 'artists' }}</span
+                            <span class="w-24 shrink-0 text-right tabular-nums text-content-secondary"
+                                >{{ counts.artistCount | number
+                                }}<span class="sr-only">
+                                    {{ counts.artistCount === 1 ? 'artist' : 'artists' }}</span
+                                ></span
                             >
-                            <span
-                                class="type-body-sm w-24 shrink-0 text-right tabular-nums text-content-secondary"
-                                >{{ counts.albumCount | number }}
-                                {{ counts.albumCount === 1 ? 'album' : 'albums' }}</span
+                            <span class="w-24 shrink-0 text-right tabular-nums text-content-secondary"
+                                >{{ counts.albumCount | number
+                                }}<span class="sr-only">
+                                    {{ counts.albumCount === 1 ? 'album' : 'albums' }}</span
+                                ></span
                             >
                         }
                     </a>

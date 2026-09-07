@@ -68,7 +68,7 @@ test('scanned genres expose counts, tracks and related entities without splittin
     await expect(page.getByRole('row').filter({ has: page.getByRole('gridcell') })).toHaveCount(2)
     await expect(page.getByRole('row', { name: /Dawn by/ })).toBeVisible()
     await expect(page.getByRole('row', { name: /Compound by/ })).toBeHidden()
-    await page.getByRole('link', { name: 'Artists (1)', exact: true }).click()
+    await page.getByRole('link', { name: 'Artists 1', exact: true }).click()
     await expect(
         page.getByRole('region', { name: 'Artists' }).getByRole('link', { name: 'Aurora Fields' }),
     ).toBeVisible()
@@ -76,11 +76,11 @@ test('scanned genres expose counts, tracks and related entities without splittin
     await expect(page).toHaveURL(/tracks.*genre=.*artist=/)
     await expect(page.getByRole('row').filter({ has: page.getByRole('gridcell') })).toHaveCount(2)
     await page.getByRole('button', { name: 'Back', exact: true }).click()
-    await page.getByRole('link', { name: 'Albums (1)', exact: true }).click()
+    await page.getByRole('link', { name: 'Albums 1', exact: true }).click()
     await expect(
         page.getByRole('grid', { name: 'Albums' }).getByRole('link', { name: /^Daybreak/ }),
     ).toBeVisible()
-    await page.getByRole('link', { name: 'Record labels (1)', exact: true }).click()
+    await page.getByRole('link', { name: 'Record labels 1', exact: true }).click()
     await page.getByRole('region', { name: 'Record labels' }).getByRole('link', { name: 'Kosmische' }).click()
     await expect(page).toHaveURL(/tracks.*genre=.*recordLabel=/)
     await expect(page.getByRole('row').filter({ has: page.getByRole('gridcell') })).toHaveCount(2)

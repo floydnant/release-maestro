@@ -17,45 +17,36 @@
     }
 }
 @for (entry of content(); track entry.key) {
-    <header class="genre-detail__header | flex flex-col gap-3 border-b border-border-subtle p-6">
-        <a class="type-body-sm w-fit text-content-action hover:underline" routerLink="/genres">All genres</a>
+    <header class="genre-detail__header | flex flex-col gap-4 border-b border-border-subtle px-6 pt-5">
+        <a
+            class="genre-detail__back | type-body-sm flex w-fit items-center gap-1 text-content-secondary hover:text-content-action"
+            routerLink="/genres"
+        >
+            <app-icon name="navigationBack" size="14"></app-icon>
+            All genres
+        </a>
+
         <h1 class="type-hero-title break-words text-content-primary">{{ entry.genre.name }}</h1>
-        <p class="type-body-sm text-content-secondary">
-            {{ entry.genre.songCount | number }} {{ entry.genre.songCount === 1 ? 'track' : 'tracks' }}
-        </p>
-        <nav class="genre-detail__sections | flex flex-wrap gap-2" aria-label="Genre sections">
-            <a
-                class="btn-nkd-neutral aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content"
-                routerLink="."
-                [replaceUrl]="true"
-                [queryParams]="{}"
-                [attr.aria-current]="section() === 'songs' ? 'page' : null"
-                >Tracks</a
-            >
-            <a
-                class="btn-nkd-neutral aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content"
-                routerLink="."
-                [replaceUrl]="true"
-                [queryParams]="{ section: 'artists' }"
-                [attr.aria-current]="section() === 'artists' ? 'page' : null"
-                >Artists ({{ entry.genre.artistCount | number }})</a
-            >
-            <a
-                class="btn-nkd-neutral aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content"
-                routerLink="."
-                [replaceUrl]="true"
-                [queryParams]="{ section: 'albums' }"
-                [attr.aria-current]="section() === 'albums' ? 'page' : null"
-                >Albums ({{ entry.genre.albumCount | number }})</a
-            >
-            <a
-                class="btn-nkd-neutral aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content"
-                routerLink="."
-                [replaceUrl]="true"
-                [queryParams]="{ section: 'recordLabels' }"
-                [attr.aria-current]="section() === 'recordLabels' ? 'page' : null"
-                >Record labels ({{ entry.genre.recordLabelCount | number }})</a
-            >
+
+        <!-- Underline tabs, pulled onto the header's own bottom border so the active one
+             joins the section it opens. Each carries its count, so the header does not
+             repeat one of them as a subtitle. -->
+        <nav
+            class="genre-detail__sections | -mb-px flex flex-wrap items-center gap-1"
+            aria-label="Genre sections"
+        >
+            @for (tab of sections(); track tab.key) {
+                <a
+                    class="genre-detail__tab | type-label-md flex items-center gap-1.5 rounded-t-md border-b-2 border-transparent px-3 py-2 text-content-secondary transition-colors duration-fast ease-standard aria-[current=page]:border-action-primary aria-[current=page]:text-content-primary hover:bg-action-quiet-hover hover:text-content-primary hover:no-underline"
+                    routerLink="."
+                    [replaceUrl]="true"
+                    [queryParams]="tab.params"
+                    [attr.aria-current]="tab.current ? 'page' : null"
+                >
+                    {{ tab.label }}
+                    <span class="type-body-sm tabular-nums text-content-muted">{{ tab.count | number }}</span>
+                </a>
+            }
         </nav>
     </header>
     @if (section() === 'albums') {
