@@ -25,7 +25,7 @@
         </p>
         <nav class="genre-detail__sections | flex flex-wrap gap-2" aria-label="Genre sections">
             <a
-                class="btn-nkd-neutral"
+                class="btn-nkd-neutral aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content"
                 routerLink="."
                 [replaceUrl]="true"
                 [queryParams]="{}"
@@ -33,7 +33,7 @@
                 >Tracks</a
             >
             <a
-                class="btn-nkd-neutral"
+                class="btn-nkd-neutral aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content"
                 routerLink="."
                 [replaceUrl]="true"
                 [queryParams]="{ section: 'artists' }"
@@ -41,7 +41,7 @@
                 >Artists ({{ entry.genre.artistCount | number }})</a
             >
             <a
-                class="btn-nkd-neutral"
+                class="btn-nkd-neutral aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content"
                 routerLink="."
                 [replaceUrl]="true"
                 [queryParams]="{ section: 'albums' }"
@@ -49,7 +49,7 @@
                 >Albums ({{ entry.genre.albumCount | number }})</a
             >
             <a
-                class="btn-nkd-neutral"
+                class="btn-nkd-neutral aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content"
                 routerLink="."
                 [replaceUrl]="true"
                 [queryParams]="{ section: 'recordLabels' }"

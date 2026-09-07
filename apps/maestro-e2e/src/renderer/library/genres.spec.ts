@@ -117,7 +117,7 @@ test('genre detail sorts tracks and recovers a failed related list', async ({ pa
     ).toBeVisible()
 })
 
-test('shows genreText verbatim but filters each resolved genre by id', async ({ page }) => {
+test('shows genreText verbatim with a detail link for each resolved genre', async ({ page }) => {
     const controller = await createRendererScenario(
         page,
         scenarioBuilder()
@@ -134,10 +134,17 @@ test('shows genreText verbatim but filters each resolved genre by id', async ({ 
         '/tracks',
     )
     await expect(page.getByText('Techno; Ambient', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Filter by genre Ambient' }).click()
-    await expect
-        .poll(async () => (await controller.lastCall('library:query-songs'))?.payload)
-        .toMatchObject({ query: { filter: { genreIds: ['ambient'] } } })
+    const ambient = page.getByRole('link', { name: 'View genre Ambient' })
+    await expect(ambient).toHaveAttribute('href', '/genres/ambient')
+    await expect(page.getByRole('link', { name: 'View genre Techno' })).toHaveAttribute(
+        'href',
+        '/genres/techno',
+    )
+    const previousQuery = (await controller.lastCall('library:query-songs'))?.payload
+    await ambient.click({ modifiers: ['Shift'] })
+    await expect(page).toHaveURL(/\/tracks$/)
+    await expect(page.getByRole('row').filter({ has: ambient })).toHaveAttribute('aria-selected', 'true')
+    expect((await controller.lastCall('library:query-songs'))?.payload).toEqual(previousQuery)
 })
 
 test('list loading, failures and retries have distinct states', async ({ page }) => {
@@ -210,7 +217,7 @@ test('Back restores a deep genre window after a delayed response', async ({ page
     )
     const list = page.getByRole('region', { name: 'Genres', exact: true })
     await expect(list.getByRole('link', { name: /^Genre 0 / })).toBeVisible()
-    await list.evaluate(element => element.scrollTo({ top: 240_000 }))
+    await list.evaluate(element => element.scrollTo({ top: 200_000 }))
     await expect(list.getByRole('link', { name: /^Genre 5000 / })).toBeVisible()
     const scrollTop = await list.evaluate(element => element.scrollTop)
     await list.getByRole('link', { name: /^Genre 5000 / }).click()
@@ -219,10 +226,10 @@ test('Back restores a deep genre window after a delayed response', async ({ page
     await page.getByRole('button', { name: 'Back', exact: true }).click()
     await expect(page.getByText('Loading genres…')).toBeVisible()
     await controller.resolveAllPending('library:query-genres', {
-        offset: 4990,
+        offset: 4980,
         total: 10_000,
         rows: Array.from({ length: 70 }, (_, i) =>
-            createGenre({ id: `genre-${4990 + i}`, name: `Genre ${4990 + i}` }),
+            createGenre({ id: `genre-${4980 + i}`, name: `Genre ${4980 + i}` }),
         ),
     })
     await expect.poll(() => list.evaluate(element => element.scrollTop)).toBe(scrollTop)

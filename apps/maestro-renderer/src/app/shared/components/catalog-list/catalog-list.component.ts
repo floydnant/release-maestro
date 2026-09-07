@@ -17,17 +17,15 @@ import { DecimalPipe } from '@angular/common'
 import { RouterLink, type Params } from '@angular/router'
 import type { BrowseWindow, CatalogEntityRef, GenreRow } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
+import { LIST_ROW_HEIGHT as ROW_HEIGHT, listWindowAt } from '../../browse/list-window'
+
+export { listWindowOffsetAt as catalogWindowOffsetAt } from '../../browse/list-window'
 
 export interface CatalogListRow extends CatalogEntityRef {
     link: string[]
     queryParams?: Params
     counts?: Pick<GenreRow, 'songCount' | 'artistCount' | 'albumCount'>
 }
-
-const ROW_HEIGHT = 48
-const OVERSCAN = 10
-export const catalogWindowOffsetAt = (scrollTop: number): number =>
-    Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
 
 /** A bounded list of entity links. The scroll container stays keyboard reachable at every window. */
 @Component({
@@ -100,10 +98,9 @@ export class CatalogListComponent {
 
     protected onScroll(): void {
         const element = this.viewport().nativeElement
-        this.viewportChange.emit({
-            offset: catalogWindowOffsetAt(this.restoreScrollTop() ?? element.scrollTop),
-            limit: Math.ceil(element.clientHeight / ROW_HEIGHT) + OVERSCAN * 2,
-        })
+        this.viewportChange.emit(
+            listWindowAt(this.restoreScrollTop() ?? element.scrollTop, element.clientHeight),
+        )
     }
 
     protected onKeydown(event: KeyboardEvent): void {

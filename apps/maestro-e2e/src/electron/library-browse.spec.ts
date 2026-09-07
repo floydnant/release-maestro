@@ -135,14 +135,15 @@ test('search and entity filters narrow a real library', async ({}, testInfo) => 
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '6 tracks' }),
     ).toBeVisible()
 
-    // Clicking a genre cell filters by the genre *entity*, and the chip names it.
-    await page.getByRole('button', { name: 'Techno', exact: true }).first().click()
-    await expect(
-        page.getByRole('status', { name: 'Result count' }).filter({ hasText: '2 tracks' }),
-    ).toBeVisible()
-    await expect(page.getByRole('button', { name: /Remove Genre filter Techno/ })).toBeVisible()
+    // Genre cells open the detail page; Back restores the track list.
+    await page.getByRole('link', { name: 'Techno', exact: true }).first().click()
+    await expect(page).toHaveURL(/\/genres\/[^/?]+$/)
+    await expect(page.getByRole('heading', { name: 'Techno', exact: true })).toBeVisible()
+    await expect.poll(rowTitles).toEqual(expect.arrayContaining(['Dusk', 'Void']))
+    await expect(page.getByRole('row').filter({ has: page.getByRole('gridcell') })).toHaveCount(2)
 
-    await page.getByRole('button', { name: /Remove Genre filter Techno/ }).click()
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await expect(page).toHaveURL(/\/tracks$/)
     await expect(
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '6 tracks' }),
     ).toBeVisible()

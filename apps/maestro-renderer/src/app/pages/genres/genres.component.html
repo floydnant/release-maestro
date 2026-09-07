@@ -5,14 +5,19 @@
     (clearFilters)="onClear()"
     (retry)="onRetry()"
 >
-    <div class="genre-sort | flex items-center border-b border-border-subtle px-6 py-2">
+    <div class="genre-sort | flex items-center border-b border-border-subtle px-6">
         <button
             type="button"
-            class="btn-nkd-neutral"
+            class="type-label-sm flex items-center gap-1 py-2 text-content-primary"
             (click)="onSort()"
             [attr.aria-label]="query().sort.direction === 'asc' ? 'Sort genres Z to A' : 'Sort genres A to Z'"
         >
-            Name {{ query().sort.direction === 'asc' ? '↑' : '↓' }}
+            Name
+            <app-icon
+                [name]="query().sort.direction === 'asc' ? 'octTriangleUp' : 'octTriangleDown'"
+                size="12"
+                color="content.action"
+            ></app-icon>
         </button>
     </div>
     <app-catalog-list

@@ -21,6 +21,7 @@ import {
     sameGenreQuery,
 } from '../../shared/browse/genre-query-params'
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
+import { IconComponent } from '../../shared/components/icon/icon.component'
 import { BrowseShellComponent } from '../../shared/components/browse-shell/browse-shell.component'
 import {
     CatalogListComponent,
@@ -31,7 +32,7 @@ import {
     selector: 'app-genres',
     templateUrl: './genres.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [BrowseShellComponent, CatalogListComponent],
+    imports: [BrowseShellComponent, CatalogListComponent, IconComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class GenresComponent {
