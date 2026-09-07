@@ -77,6 +77,10 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
   `gh pr create --body` skips the template, so read it and match it by hand
 - Draft pull requests are only for work that is knowingly not mergeable. When the task is ready to
   hand to a reviewer, open the pull request as ready for review
+- Open anything you post to GitHub or Linear with your model and harness on its own first line,
+  such as `Claude Opus 5 via Claude Code`. This covers comments, issue descriptions, and pull
+  request descriptions. The text carries the account owner's name, so a reader has to learn at the
+  top that a machine wrote it. In a pull request the line goes above the template's `Closes` line
 
 ## Keeping the docs true
 

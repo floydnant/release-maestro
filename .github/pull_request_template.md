@@ -2,6 +2,8 @@ Closes [MAE-000](https://linear.app/floyd-haremsa/issue/MAE-000)
 
 <!--
 The Closes line above and the "What changed" section below are the two required parts.
+
+An agent writing this puts its model and harness on the first line, above Closes. See AGENTS.md.
 Everything else is your call: add, rename, or drop sections to fit the change.
 
 Replace MAE-000 and the URL with the Linear issue this pull request closes. The team key
