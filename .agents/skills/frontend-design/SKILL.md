@@ -99,6 +99,23 @@ Accessibility is part of the implementation contract, not a later audit. Every U
 Verify relevant behavior with user-visible roles, accessible names, labels, keyboard interactions,
 visible focus, and responsive states. Follow `docs/testing.md` for test conventions.
 
+To audit a screen in the running app, attach with [`inspect-running-app`](../inspect-running-app/SKILL.md)
+and work from the accessibility tree, which is what assistive technology reads:
+
+- `take_snapshot` returns that tree. An icon-only button with an empty name, a skipped heading
+  level, or a reading order that disagrees with the screenshot all show up here.
+- `list_console_messages` with `types: ["issue"]` reports Chrome's own audits, including missing
+  labels, invalid ARIA, and low contrast. Set `includePreservedMessages: true` to catch issues
+  raised during load.
+- `lighthouse_audit` with `mode: "navigation"` gives a scored baseline. Write the report to
+  `outputDirPath` and filter it for failures rather than reading it whole, because the JSON is
+  large:
+    ```bash
+    node -e "const r=require('./report.json'); Object.values(r.audits).filter(a=>a.score!==null&&a.score<1).forEach(a=>console.log(JSON.stringify({id:a.id,title:a.title,items:a.details?.items})))"
+    ```
+- `press_key` with `Tab`, then a fresh snapshot, shows where focus actually moved. A dialog must
+  trap focus until it closes.
+
 ## Before coding
 
 Understand the context before opening an editor:
