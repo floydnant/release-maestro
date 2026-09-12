@@ -18,6 +18,10 @@ Preserve existing product behavior.
 3. Check registries and official migration guides for versions, peer dependencies, and runtime
    requirements. Update coupled packages together, especially Angular/Nx/TypeScript, the test toolchain,
    and Electron/native modules. Use supported migration tools and regenerate the owning lockfiles.
+   For a long-running migration, or a breaking major that requires source-code changes, use
+   [show-me-your-work](../show-me-your-work/SKILL.md) for the rest of the run. Start its decision log
+   before the first migration change and carry it through PR publication. Routine updates and majors
+   resolved by manifest and lockfile changes alone do not need a log.
 4. Run focused checks after each group and repair update-related failures in code, configuration,
    tooling, and tests. For difficult failures, use [diagnosing-bugs](../diagnosing-bugs/SKILL.md).
    Confirm suspected pre-existing failures against the base with its original locks.

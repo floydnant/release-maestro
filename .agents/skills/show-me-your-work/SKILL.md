@@ -1,6 +1,6 @@
 ---
 name: show-me-your-work
-description: 'Keep a reviewable decision trail for long-running or unattended work: a TSV log with one row per decision (what, why, evidence, result). Local by default; commit it when a reviewer needs the trail to trust the result. Use for /show-me-your-work, autonomous or multi-phase runs, or work a human reviews after stepping away.'
+description: 'Keep a reviewable decision trail for long-running or unattended work: a local TSV log with one row per decision (what, why, evidence, result), published as a Markdown table in the PR. Use for /show-me-your-work, autonomous or multi-phase runs, or work a human reviews after stepping away.'
 disable-model-invocation: true
 ---
 
@@ -10,7 +10,7 @@ For work a human reviews after the fact, a decision trail lets them reconstruct 
 
 ## The format
 
-A single TSV file, one row per decision. TSV because GitHub renders it as a sortable table, `column -s$'\t' -t` and spreadsheets read it, and a row appends with one command. Cells stay single-line. Evidence is a pointer, not prose.
+A single TSV file, one row per decision. TSV because `column -s$'\t' -t` and spreadsheets read it, a row appends with one command, and it converts deterministically to a Markdown table for review. Cells stay single-line. Evidence is a pointer, not prose.
 
 Copy `references/decision-log-template.tsv` (the header row) to start a clean log. Columns:
 
@@ -39,11 +39,11 @@ Use the helper so rows stay well-formed: `scripts/log.sh <logfile> <phase> <deci
 
 Log decision points and checkpoints, not every action: a fork chosen, a unit completed with its verification result, a pivot or revert with its trigger, a blocker surfaced, a gate fixed. For loop runs, one row per iteration. Skip the trivial and self-evident.
 
-## Where it lives
+## Publish the trail
 
-By default the log is a working artifact, not committed. Keep it at `decisions.tsv` in the work dir, or `.audit/<task-slug>.tsv` when several efforts run at once, and leave it out of git. Most work doesn't need a committed trail; the local log still keeps the run honest and can be discarded after.
+The TSV is a local working artifact. Keep it at `decisions.tsv` in the work dir, or `.audit/<task-slug>.tsv` when several efforts run at once. Leave it out of git.
 
-Commit it only when the work is ambitious enough that a reviewer needs the trail to trust the result: a large cross-language port, a multi-week migration, anything where confidence has to be shown rather than assumed. A committed log renders as a table in the PR.
+After the final audit, run `scripts/to-markdown.sh <logfile.tsv> <output.md>`. Paste the generated table into the pull-request description when opening the PR, or post it in a PR comment if the description already exists. Keep both files out of git and delete them when they are no longer needed locally.
 
 ## Rules
 
@@ -77,7 +77,7 @@ Every reply for a run that produced a trail ends with an "Attention" section. Le
 
 ## Reviewing the trail
 
-Read top to bottom, follow the evidence pointers, spot-check. GitHub renders a committed TSV as a table; `column -s$'\t' -t decisions.tsv` renders it in a terminal. A row whose evidence doesn't resolve, or whose result is unverified, is the audit catching a gap.
+Read top to bottom, follow the evidence pointers, spot-check. The pull-request description or comment renders the converted Markdown as a table; `column -s$'\t' -t decisions.tsv` renders the local source in a terminal. A row whose evidence doesn't resolve, or whose result is unverified, is the audit catching a gap.
 
 ## Composing this skill
 
