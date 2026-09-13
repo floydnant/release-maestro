@@ -13,11 +13,15 @@ Preserve existing product behavior.
 
 1. Honor the requested scope. By default, update all tracked npm and Cargo packages to compatible
    stable releases, including majors. Keep prereleases opt-in and existing pinning conventions.
-2. Use a dedicated branch or worktree, record the base commit, and establish a verification baseline.
-   Reuse a matching branch and PR when resuming. Keep unrelated changes out.
+2. Start a dedicated branch or worktree from `origin/main`, record the base commit, and establish a
+   verification baseline. Reuse a matching branch and PR when resuming. Keep unrelated changes out.
 3. Check registries and official migration guides for versions, peer dependencies, and runtime
    requirements. Update coupled packages together, especially Angular/Nx/TypeScript, the test toolchain,
    and Electron/native modules. Use supported migration tools and regenerate the owning lockfiles.
+   For a long-running migration, or a breaking major that requires source-code changes, use
+   [show-me-your-work](../show-me-your-work/SKILL.md) for the rest of the run. Start its decision log
+   before the first migration change and carry it through PR publication. Routine updates and majors
+   resolved by manifest and lockfile changes alone do not need a log.
 4. Run focused checks after each group and repair update-related failures in code, configuration,
    tooling, and tests. For difficult failures, use [diagnosing-bugs](../diagnosing-bugs/SKILL.md).
    Confirm suspected pre-existing failures against the base with its original locks.
@@ -37,6 +41,10 @@ Verify installs from the final lockfiles and inspect generated changes for unrel
 - `make build-prod` for compiler, bundler, or build-tool updates.
 - `make e2e-production` for Electron, native modules, sidecar packaging, or packaged loading changes.
   Use CI for other platforms.
+
+If the final diff changes source code, configuration, tooling, or tests, run
+[code-review](../code-review/SKILL.md) against the recorded base commit after the local gates pass
+and before publishing. Manifest-only and lockfile-only updates do not need this review.
 
 Unless the user limits the task to local work, commit, push, and open one PR following
 `.github/pull_request_template.md`. Include direct dependency version changes, migration fixes,

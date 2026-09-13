@@ -45,7 +45,7 @@ Each unit is an experiment: state the hypothesis, make the smallest change, meas
 
 ## Phase D: Keep the audit trail
 
-Log the run via the [show-me-your-work](../show-me-your-work/SKILL.md) skill, one canonical TSV with a row per decision and per unit, evidence as links. figure-it-out's work is usually ambitious enough to commit the trail so the reviewer can read it in the PR; commit it when confidence has to be shown. Prefer evidence produced by committed scripts so a reviewer can re-run it. The trail plus the diff is what lets the human come back and trust the work.
+Log the run via the [show-me-your-work](../show-me-your-work/SKILL.md) skill, one canonical local TSV with a row per decision and per unit, evidence as links. Convert the audited trail to Markdown and put its table in the PR description or a comment; keep the TSV and generated Markdown out of git. Prefer evidence produced by committed scripts so a reviewer can re-run it. The trail plus the diff is what lets the human come back and trust the work.
 
 ## Phase E: Verify and hand back
 
