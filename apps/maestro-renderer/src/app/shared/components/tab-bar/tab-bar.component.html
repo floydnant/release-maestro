@@ -1,6 +1,6 @@
 @for (tab of tabs(); track tab.key) {
     <a
-        class="tab-bar__tab | btn relative gap-1.5 text-content-secondary after:absolute after:inset-x-3 after:-bottom-1 after:h-1 after:rounded-full aria-[current=page]:text-content-primary aria-[current=page]:after:bg-action-primary hover:bg-action-quiet-hover hover:text-content-primary"
+        class="tab-bar__tab | btn relative gap-1.5 text-content-secondary after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full aria-[current=page]:text-content-primary aria-[current=page]:after:bg-action-primary hover:bg-action-quiet-hover hover:text-content-primary"
         [routerLink]="tab.link ?? '.'"
         [queryParams]="tab.queryParams ?? {}"
         [replaceUrl]="replaceUrl()"
