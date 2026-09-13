@@ -211,6 +211,9 @@ const defaultScenario = (): RendererScenario => ({
             value: EMPTY_ALBUM_FILTER_DESCRIPTION,
         },
         'library:get-album-detail': { kind: 'resolve', value: null },
+        'library:query-genres': { kind: 'resolve', value: { rows: [], offset: 0, total: 0 } },
+        'library:get-genre-detail': { kind: 'resolve', value: null },
+        'library:query-genre-related': { kind: 'resolve', value: { rows: [], offset: 0, total: 0 } },
     },
 })
 

@@ -211,3 +211,16 @@ ipc.handle(LibraryBrowseIpcChannel.getAlbumDetail, async (_event, request) => {
     const browseRepository = await diContainer.get(LibraryBrowseRepository)
     return browseRepository.getAlbumDetail(request.albumId)
 })
+
+ipc.handle(LibraryBrowseIpcChannel.queryGenres, async (_event, request) => {
+    const repository = await diContainer.get(LibraryBrowseRepository)
+    return repository.queryGenres(request)
+})
+ipc.handle(LibraryBrowseIpcChannel.getGenreDetail, async (_event, request) => {
+    const repository = await diContainer.get(LibraryBrowseRepository)
+    return repository.getGenreDetail(request.genreId)
+})
+ipc.handle(LibraryBrowseIpcChannel.queryGenreRelated, async (_event, request) => {
+    const repository = await diContainer.get(LibraryBrowseRepository)
+    return repository.queryGenreRelated(request)
+})

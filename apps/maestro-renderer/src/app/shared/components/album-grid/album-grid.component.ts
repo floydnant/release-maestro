@@ -17,9 +17,9 @@ import {
 } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import type { AlbumQuery, AlbumRow, BrowseWindow } from '@release-maestro/core'
-import type { BrowseResult } from '../../shared/browse/browse-query'
-import { IconComponent } from '../../shared/components/icon/icon.component'
-import { fileUrl } from '../../shared/utils/file-url.util'
+import type { BrowseResult } from '../../browse/browse-query'
+import { IconComponent } from '../icon/icon.component'
+import { fileUrl } from '../../utils/file-url.util'
 
 /**
  * The albums grid — the only grid in the library, because `albums.coverPath` is the

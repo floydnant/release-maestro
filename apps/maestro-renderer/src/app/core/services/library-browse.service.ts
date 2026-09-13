@@ -1,3 +1,10 @@
+import type {
+    GenreQuery,
+    GenreWindowResult,
+    GenreDetailResult,
+    GenreRelatedQuery,
+    GenreRelatedWindowResult,
+} from '@release-maestro/core'
 import { inject, Injectable } from '@angular/core'
 import {
     LibraryBrowseIpcChannel,
@@ -42,6 +49,26 @@ const EMPTY_ALBUM_FILTER_DESCRIPTION: AlbumFilterDescription = {
 @Injectable({ providedIn: 'root' })
 export class LibraryBrowseService {
     private electronService = inject(ElectronService)
+
+    queryGenres(query: GenreQuery, window: BrowseWindow): Promise<GenreWindowResult> {
+        if (!this.electronService.isElectron)
+            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryGenres, { query, window })
+    }
+
+    getGenreDetail(genreId: string): Promise<GenreDetailResult> {
+        if (!this.electronService.isElectron) return Promise.resolve(null)
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.getGenreDetail, { genreId })
+    }
+
+    queryGenreRelated(query: GenreRelatedQuery, window: BrowseWindow): Promise<GenreRelatedWindowResult> {
+        if (!this.electronService.isElectron)
+            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryGenreRelated, {
+            query,
+            window,
+        })
+    }
 
     querySongs(query: SongQuery, window: BrowseWindow): Promise<SongWindowResult> {
         if (!this.electronService.isElectron) {

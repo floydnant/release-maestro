@@ -47,8 +47,12 @@ import {
     type BrowseFilterState,
     type BrowseShellState,
 } from '../../shared/components/browse-shell/browse-shell.component'
-import { AlbumGridComponent, estimatedAlbumWindowOffsetAt, initialWindowLimit } from './album-grid.component'
-import { AlbumSortBarComponent } from './album-sort-bar.component'
+import {
+    AlbumGridComponent,
+    estimatedAlbumWindowOffsetAt,
+    initialWindowLimit,
+} from '../../shared/components/album-grid/album-grid.component'
+import { AlbumSortBarComponent } from '../../shared/components/album-grid/album-sort-bar.component'
 
 /**
  * The albums grid.

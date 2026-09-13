@@ -1,0 +1,39 @@
+@switch (detail().status) {
+    @case ('loading') {
+        <p class="type-body-sm p-8 text-content-secondary" role="status">Loading genre…</p>
+    }
+    @case ('missing') {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+            <p class="type-body-md text-content-primary">This genre is no longer in your library</p>
+            <a class="btn-primary" routerLink="/genres">Back to genres</a>
+        </div>
+    }
+    @case ('error') {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center" role="alert">
+            <p class="type-body-md text-content-primary">Could not load this genre</p>
+            <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
+            <a class="btn-neutral" routerLink="/genres">Back to genres</a>
+        </div>
+    }
+}
+@for (entry of content(); track entry.key) {
+    <header class="genre-detail__header | flex flex-col gap-4 px-6 pb-4 pt-5">
+        <h1 class="type-hero-title break-words text-content-primary">{{ entry.genre.name }}</h1>
+
+        <!-- Each tab carries its count, so the header does not repeat one of them as a
+             subtitle. -->
+        <app-tab-bar
+            class="genre-detail__sections |"
+            label="Genre sections"
+            [tabs]="sections()"
+            [active]="section()"
+        ></app-tab-bar>
+    </header>
+    @if (section() === 'albums') {
+        <app-genre-albums [genreId]="entry.genre.id"></app-genre-albums>
+    } @else if (relatedQuery(); as query) {
+        <app-genre-related [query]="query" [label]="relatedLabel()"></app-genre-related>
+    } @else {
+        <app-genre-songs [genreId]="entry.genre.id"></app-genre-songs>
+    }
+}

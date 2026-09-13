@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { AlbumSortField, type AlbumSort } from '@release-maestro/core'
-import { IconComponent } from '../../shared/components/icon/icon.component'
+import { IconComponent } from '../icon/icon.component'
 
 /**
  * The albums grid's sort control.
@@ -38,7 +38,7 @@ const SORT_OPTIONS: SortOption[] = [
     templateUrl: './album-sort-bar.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [IconComponent],
-    host: { class: 'flex shrink-0 items-center gap-2 px-4 pb-2' },
+    host: { class: 'flex shrink-0 items-center gap-2 px-4 py-2' },
 })
 export class AlbumSortBarComponent {
     sort = input.required<AlbumSort>()
