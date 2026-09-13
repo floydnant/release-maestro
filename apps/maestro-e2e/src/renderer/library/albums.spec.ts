@@ -184,6 +184,21 @@ test.describe('the first paint', () => {
     const paintsOf = (page: Page): Promise<GridPaint[]> =>
         page.evaluate(() => (window as WindowWithPaints).__gridPaints ?? [])
 
+    /**
+     * The recorded paints, once there is at least one.
+     *
+     * The recorder samples on `requestAnimationFrame`, and a tile being visible to the
+     * test driver does not mean a frame has been sampled since it appeared: reading the
+     * list straight after that came back empty on a loaded runner, failing the emptiness
+     * guard on the instrument rather than on the grid. Waiting for the recorder keeps
+     * that guard meaningful — a grid that never paints a visible row still records
+     * nothing, and still fails here.
+     */
+    const recordedPaints = async (page: Page): Promise<GridPaint[]> => {
+        await expect.poll(async () => (await paintsOf(page)).length).toBeGreaterThan(0)
+        return paintsOf(page)
+    }
+
     test('is at the measured column count, never at the placeholder geometry', async ({ page }) => {
         // The grid opens against a one-column placeholder so the scroll maths never
         // divides by zero. Drawing anything against it puts one enormous cover per row on
@@ -193,11 +208,10 @@ test.describe('the first paint', () => {
         await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
         await expect(tile(page, 'Album 0')).toBeVisible()
 
-        const paints = await paintsOf(page)
+        const paints = await recordedPaints(page)
         const settledColumns = Number(await grid(page).getAttribute('aria-colcount'))
 
         expect(settledColumns).toBeGreaterThan(1)
-        expect(paints.length).toBeGreaterThan(0)
         expect(paints.map(paint => paint.columns)).toEqual(paints.map(() => settledColumns))
     })
 
@@ -210,10 +224,9 @@ test.describe('the first paint', () => {
         await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
         await expect(tile(page, 'Album 0')).toBeVisible()
 
-        const paints = await paintsOf(page)
+        const paints = await recordedPaints(page)
         const fillsTheViewport = paints.map(paint => paint.rows * paint.rowHeight >= paint.viewportHeight)
 
-        expect(paints.length).toBeGreaterThan(0)
         expect(fillsTheViewport).toEqual(paints.map(() => true))
     })
 
@@ -248,6 +261,19 @@ interface GridPaint {
 
 type WindowWithPaints = typeof globalThis & { __gridPaints?: GridPaint[] }
 
+/** What a rendered row, the tile in it and its cover measure. */
+interface GridGeometry {
+    row: number
+    tile: number
+    coverWidth: number
+    coverHeight: number
+    /** Positive when the tile's own content does not fit the height it was given. */
+    overflow: number
+}
+
+/** How long the geometry is given to stop moving. A resize settles on the next frame. */
+const SETTLE_FRAMES = 60
+
 /**
  * That the grid's arithmetic still agrees with the browser.
  *
@@ -262,24 +288,61 @@ type WindowWithPaints = typeof globalThis & { __gridPaints?: GridPaint[] }
  * every tile overflowed its row, and once too large, so every tile carried dead space.
  */
 test.describe('geometry', () => {
+    /**
+     * The geometry once it has stopped moving, which is the only state the invariant
+     * below is about.
+     *
+     * A viewport change reflows the CSS grid on the spot — the cover is a square as wide
+     * as its column, so it takes its new size immediately — while the row's height comes
+     * from the component's own measurement and lands one render later. For exactly one
+     * frame the two disagree, and reading the geometry once after a resize is a coin
+     * toss on catching it: that frame is what the macOS runner kept sampling.
+     *
+     * So the sampling runs in the page and waits for two consecutive frames to agree.
+     * Giving up after {@link SETTLE_FRAMES} and answering with the last reading rather
+     * than never resolving keeps a geometry that genuinely never settles a failed
+     * assertion instead of a timeout.
+     */
     const geometryOf = (page: Page) =>
-        grid(page).evaluate(element => {
-            // By role and by position rather than by class name: a descriptor is never
-            // validated, so a test that reached for one would go quiet if it were renamed.
-            const row = element.querySelector<HTMLElement>('[role="row"]')
-            const tile = row?.querySelector<HTMLElement>('[role="gridcell"] a')
-            const cover = tile?.firstElementChild
-            if (!row || !tile || !cover) return null
+        grid(page).evaluate(
+            (element, settleFrames) =>
+                new Promise<GridGeometry | null>(resolve => {
+                    // By role and by position rather than by class name: a descriptor is
+                    // never validated, so a test that reached for one would go quiet if it
+                    // were renamed.
+                    const measure = (): GridGeometry | null => {
+                        const row = element.querySelector<HTMLElement>('[role="row"]')
+                        const tile = row?.querySelector<HTMLElement>('[role="gridcell"] a')
+                        const cover = tile?.firstElementChild
+                        if (!row || !tile || !cover) return null
 
-            return {
-                row: row.getBoundingClientRect().height,
-                tile: tile.getBoundingClientRect().height,
-                coverWidth: cover.getBoundingClientRect().width,
-                coverHeight: cover.getBoundingClientRect().height,
-                /** Positive when the tile's own content does not fit the height it was given. */
-                overflow: tile.scrollHeight - tile.clientHeight,
-            }
-        })
+                        return {
+                            row: row.getBoundingClientRect().height,
+                            tile: tile.getBoundingClientRect().height,
+                            coverWidth: cover.getBoundingClientRect().width,
+                            coverHeight: cover.getBoundingClientRect().height,
+                            /** Positive when the tile's own content does not fit the height it was given. */
+                            overflow: tile.scrollHeight - tile.clientHeight,
+                        }
+                    }
+
+                    let previous: string | null = null
+                    let frames = 0
+
+                    const sample = () => {
+                        const geometry = measure()
+                        const reading = JSON.stringify(geometry)
+
+                        if (geometry && reading == previous) return resolve(geometry)
+                        if (++frames >= settleFrames) return resolve(geometry)
+
+                        previous = reading
+                        requestAnimationFrame(sample)
+                    }
+                    requestAnimationFrame(sample)
+                }),
+            SETTLE_FRAMES,
+        )
 
     test('sizes a row to the tile in it, at every column count', async ({ page }) => {
         await openAlbums(page, scenarioBuilder().albumCatalog(page, 2_000).build())
@@ -290,7 +353,6 @@ test.describe('geometry', () => {
         // one column count and wrong at another would be invisible from a single size.
         for (const width of [1600, 1180, 900, 640, 1440]) {
             await page.setViewportSize({ width, height: 900 })
-            await expect.poll(() => geometryOf(page)).not.toBeNull()
 
             const geometry = await geometryOf(page)
             const at = `at ${width}px`
