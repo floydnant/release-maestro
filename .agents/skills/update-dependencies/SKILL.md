@@ -13,8 +13,8 @@ Preserve existing product behavior.
 
 1. Honor the requested scope. By default, update all tracked npm and Cargo packages to compatible
    stable releases, including majors. Keep prereleases opt-in and existing pinning conventions.
-2. Use a dedicated branch or worktree, record the base commit, and establish a verification baseline.
-   Reuse a matching branch and PR when resuming. Keep unrelated changes out.
+2. Start a dedicated branch or worktree from `origin/main`, record the base commit, and establish a
+   verification baseline. Reuse a matching branch and PR when resuming. Keep unrelated changes out.
 3. Check registries and official migration guides for versions, peer dependencies, and runtime
    requirements. Update coupled packages together, especially Angular/Nx/TypeScript, the test toolchain,
    and Electron/native modules. Use supported migration tools and regenerate the owning lockfiles.
