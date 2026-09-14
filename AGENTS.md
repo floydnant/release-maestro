@@ -12,6 +12,7 @@ Load guidance for the task at hand; do not load every document by default.
 | Product behavior or domain language | [CONTEXT-MAP.md](CONTEXT-MAP.md), then the relevant context glossary                         |
 | Architectural behavior              | [ADR index](docs/adr/README.md), then only relevant ADRs                                     |
 | Tests or verification               | [docs/testing.md](docs/testing.md) and the verification skill                                |
+| Inspecting the running dev app      | `inspect-running-app`, then `profiling` for CPU, traces, or memory                           |
 | Renderer TypeScript or templates    | `angular-patterns`; add `frontend-design` for user-facing UI                                 |
 | Async pipelines in either process   | `rxjs-streams`                                                                               |
 | Linear issues or PRDs               | [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) and the relevant workflow skill |
