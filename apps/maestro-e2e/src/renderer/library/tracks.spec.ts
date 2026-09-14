@@ -110,6 +110,7 @@ test.describe('rendering a window', () => {
         const longGenre = createSongRow({
             id: 'song-long',
             title: 'Sprawling',
+            genreText: 'Deep Progressive Melodic Organic House',
             genres: [{ id: 'g1', name: 'Deep Progressive Melodic Organic House' }],
         })
         await openTracks(page, scenarioBuilder().songs([longGenre]).build())
@@ -118,7 +119,7 @@ test.describe('rendering a window', () => {
         // produce one, because Chrome refuses `display: inline` on a `<button>` and
         // `text-overflow` has nothing to trim when the overflowing child is atomic —
         // which is why the value used to be clipped mid-letter with no ellipsis.
-        const genreLink = page.getByRole('button', { name: 'Deep Progressive Melodic Organic House' })
+        const genreLink = page.getByRole('link', { name: 'Deep Progressive Melodic Organic House' })
 
         await expect(genreLink).toHaveCSS('text-overflow', 'ellipsis')
         const { scrollWidth, clientWidth } = await genreLink.evaluate(link => ({
@@ -325,15 +326,8 @@ test.describe('filtering by entity', () => {
         await expect(page).toHaveURL(/artist=artist-2/)
     })
 
-    test('filters by genre and by record label from their cells', async ({ page }) => {
+    test('filters by record label from its cell', async ({ page }) => {
         const controller = await openTracks(page)
-
-        await page.getByRole('button', { name: 'Techno', exact: true }).first().click()
-        await expect
-            .poll(() => lastQuery(controller))
-            .toMatchObject({
-                query: { filter: { genreIds: ['genre-2'] } },
-            })
 
         await page.getByRole('button', { name: 'Hardwire', exact: true }).first().click()
         await expect
@@ -658,18 +652,18 @@ test.describe('selection', () => {
     test('does not resurrect a cleared selection when a filter is removed again', async ({ page }) => {
         const scenario = scenarioBuilder()
             .songs(createSongRows())
-            .songFilterDescription({ genres: [{ id: 'genre-2', name: 'Techno' }] })
+            .songFilterDescription({ recordLabels: [{ id: 'label-2', name: 'Hardwire' }] })
             .build()
         await createRendererScenario(page, scenario, '/tracks')
 
         await clickRow(page, 'Dawn')
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
 
-        await page.getByRole('button', { name: 'Techno', exact: true }).first().click()
+        await page.getByRole('button', { name: 'Hardwire', exact: true }).first().click()
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
 
-        await page.getByRole('button', { name: 'Remove Genre filter Techno' }).click()
-        await expect(page).not.toHaveURL(/genre=/)
+        await page.getByRole('button', { name: 'Remove Record label filter Hardwire' }).click()
+        await expect(page).not.toHaveURL(/recordLabel=/)
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
     })
 

@@ -111,13 +111,11 @@
         [title]="row().albumTitle || ''"
     >
         @if (row().albumId && row().albumTitle) {
-            <!-- The one entity cell that navigates rather than filters, because its detail
-                 page exists (MAE-119). The others stay filters until theirs land. -->
             <a
                 tabindex="-1"
-                class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline not-hover:no-underline"
+                class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                 [routerLink]="['/albums', row().albumId]"
-                (click)="onAlbumLink($event)"
+                (click)="onDetailLink($event)"
             >
                 {{ row().albumTitle }}
             </a>
@@ -134,22 +132,34 @@
         [style.width.px]="widths.genre"
         [title]="row().genreText || ''"
     >
-        @if (row().genres.length) {
-            @for (genre of row().genres; track genre.id; let last = $last) {
-                <button
-                    type="button"
+        @if (row().genres.length === 1) {
+            @for (genre of row().genres; track genre.id) {
+                <a
                     tabindex="-1"
-                    class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
-                    (click)="onEntity($event, 'genre', genre.id, genre.name)"
+                    class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                    [routerLink]="['/genres', genre.id]"
+                    (click)="onDetailLink($event)"
                 >
-                    {{ genre.name }}
-                </button>
-                @if (!last) {
-                    <span>, </span>
-                }
+                    {{ row().genreText || genre.name }}
+                </a>
             }
         } @else {
-            <span class="text-content-muted">—</span>
+            <span class="block truncate text-content-secondary">{{ row().genreText || '—' }}</span>
+            @if (row().genres.length > 1) {
+                <span class="genre-entities | flex gap-1">
+                    @for (genre of row().genres; track genre.id) {
+                        <a
+                            tabindex="-1"
+                            class="type-label-sm max-w-full truncate rounded-sm text-content-action hover:underline"
+                            [attr.aria-label]="'View genre ' + genre.name"
+                            [routerLink]="['/genres', genre.id]"
+                            (click)="onDetailLink($event)"
+                        >
+                            {{ genre.name }}
+                        </a>
+                    }
+                </span>
+            }
         }
     </span>
 }

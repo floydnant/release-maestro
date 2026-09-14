@@ -169,7 +169,16 @@ the metadata-engine boundary.
 
 Nothing in the triage or Linear sense of "label" belongs to this context.
 
-Artist and genre carry no ambiguity as entities and are not listed here.
+**Genre text** (`genreText`):
+The normalized whole genre tag displayed on a song. Ingest currently does not split compound tags:
+`Techno; Ambient` remains one genre entity with that whole name. Resolving or splitting genre text is
+separate from browsing it.
+_Avoid_: genre list, split genres
+
+**Genre membership** (`song_genres`):
+A song's link to a resolved genre entity. Browse filters and related track, artist, album, and record
+label counts use these entity IDs, not substring matches against genre text. A retained genre entity
+can have zero linked songs.
 
 ## Browsing
 

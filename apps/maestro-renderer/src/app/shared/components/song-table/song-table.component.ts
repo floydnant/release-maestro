@@ -17,6 +17,7 @@ import {
 } from '@angular/core'
 import type { BrowseWindow, SongQuery, SongRow, SongSortField } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
+import { LIST_ROW_HEIGHT as ROW_HEIGHT, listWindowAt } from '../../browse/list-window'
 import {
     applySongSelectionGesture,
     clearSelection,
@@ -30,6 +31,11 @@ import {
 } from '../../browse/song-selection'
 import { SongTableHeadingComponent } from './song-table-heading.component'
 import { SongTableRowComponent } from './song-table-row.component'
+
+export {
+    LIST_ROW_HEIGHT as ROW_HEIGHT,
+    listWindowOffsetAt as songWindowOffsetAt,
+} from '../../browse/list-window'
 
 /**
  * The track table, shared between `/tracks` and every detail tab in slices 2–5.
@@ -60,9 +66,6 @@ import { SongTableRowComponent } from './song-table-row.component'
  * already follow. A window of 60 rows would otherwise sit on ~240 tab stops that
  * change identity under the user as it scrolls.
  */
-
-/** Row height in pixels. Fixed, because virtualisation needs to map scroll offset to index. */
-export const ROW_HEIGHT = 40
 
 /**
  * Column widths in pixels, in visual order — the single declaration the header and
@@ -122,25 +125,9 @@ export const DEFAULT_SONG_TABLE_COLUMNS: readonly SongTableColumn[] = [
     'dateAdded',
 ]
 
-/** Rows fetched beyond the viewport on each side, so scrolling does not chase the data. */
-const OVERSCAN_ROWS = 20
-
-/**
- * The window a surface should open with to land at a remembered scroll position.
- *
- * Exported because the *page* has to ask for it, not the table: the table is created
- * after the first window has been requested, so a table that corrected the offset itself
- * would be correcting a round trip that had already happened — one throwaway query at
- * offset 0, and a visible flash of the top of the list before the real window arrives.
- *
- * Exact here, unlike the grid's estimate, because {@link ROW_HEIGHT} is a constant.
- */
-export const songWindowOffsetAt = (scrollTop: number): number =>
-    Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS)
-
 /**
  * Rows kept visible past the cursor when the keyboard moves it. Distinct from
- * {@link OVERSCAN_ROWS}, which is about what is *fetched*; this is about what the user
+ * the overscan in `list-window`, which is about what is *fetched*; this is about what the user
  * can see ahead of where they are.
  */
 const SCROLL_PADDING_ROWS = 4
@@ -375,10 +362,7 @@ export class SongTableComponent {
         // round trip seeding the page's window exists to avoid.
         const scrollTop = this.restoreScrollTop() ?? element.scrollTop
 
-        const firstVisible = Math.floor(scrollTop / ROW_HEIGHT)
-        const visibleCount = Math.ceil(element.clientHeight / ROW_HEIGHT)
-        const offset = Math.max(0, firstVisible - OVERSCAN_ROWS)
-        const limit = visibleCount + OVERSCAN_ROWS * 2
+        const { offset, limit } = listWindowAt(scrollTop, element.clientHeight)
 
         if (offset == this.lastWindow?.offset && limit == this.lastWindow.limit) return
 

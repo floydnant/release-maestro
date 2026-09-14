@@ -272,7 +272,9 @@ test('an album detail page lists its own tracks in album order', async ({}, test
     // The header's facts are the album's own, summed and collected over its songs.
     // `exact` because the table also keeps an sr-only "0 of 2 tracks selected" status.
     await expect(page.getByText('2 tracks', { exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Ambient' })).toBeVisible()
+    // Scoped to the header's own chips: since tracks link their genres too, an
+    // unscoped "Ambient" link now matches a chip and a cell in every row.
+    await expect(page.locator('.album-detail__genres').getByRole('link', { name: 'Ambient' })).toBeVisible()
     // A column heading re-sorts the album's tracks rather than sitting inert.
     await page.getByRole('button', { name: 'Sort by Title' }).click()
     await expect.poll(trackTitles).toEqual(['Dawn', 'Noon'])

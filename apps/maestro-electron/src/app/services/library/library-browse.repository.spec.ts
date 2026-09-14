@@ -139,6 +139,130 @@ describe('LibraryBrowseRepository', () => {
 
     afterEach(() => sqlite.close())
 
+    describe('genres', () => {
+        beforeEach(() => {
+            db.insert(genresTable)
+                .values([
+                    { id: 'ambient', name: 'Ambient' },
+                    { id: 'techno', name: 'Techno' },
+                    { id: 'compound', name: 'Techno; Ambient' },
+                    { id: 'empty', name: '100% Quiet' },
+                ])
+                .run()
+            db.insert(artistsTable)
+                .values([
+                    { id: 'a1', name: 'Artist one' },
+                    { id: 'a2', name: 'Artist two' },
+                ])
+                .run()
+            db.insert(recordLabelsTable)
+                .values([{ id: 'r1', name: 'Record label' }])
+                .run()
+            seedAlbum({ id: 'album1', title: 'Album one', recordLabelId: 'r1' })
+            seedAlbum({ id: 'album2', title: 'Album two' })
+            seedSong({ id: 's1', title: 'First', albumId: 'album1', genreText: 'Techno; Ambient' })
+            seedSong({ id: 's2', title: 'Missing', albumId: 'album1', present: false })
+            seedSong({ id: 's3', title: 'Unsplit', albumId: 'album2', genreText: 'Techno; Ambient' })
+            db.insert(songGenresTable)
+                .values([
+                    { songId: 's1', genreId: 'ambient' },
+                    { songId: 's1', genreId: 'techno' },
+                    { songId: 's2', genreId: 'ambient' },
+                    { songId: 's3', genreId: 'compound' },
+                ])
+                .run()
+            db.insert(songArtistsTable)
+                .values([
+                    { songId: 's1', artistId: 'a1', position: 0 },
+                    { songId: 's1', artistId: 'a2', position: 1 },
+                    { songId: 's2', artistId: 'a1', position: 0 },
+                ])
+                .run()
+        })
+
+        it('counts distinct related entities without multiplying tracks by credits, including missing files', () => {
+            expect(repository.getGenreDetail('ambient')).toEqual({
+                id: 'ambient',
+                name: 'Ambient',
+                songCount: 2,
+                artistCount: 2,
+                albumCount: 1,
+                recordLabelCount: 1,
+            })
+            expect(repository.getGenreDetail('empty')).toEqual({
+                id: 'empty',
+                name: '100% Quiet',
+                songCount: 0,
+                artistCount: 0,
+                albumCount: 0,
+                recordLabelCount: 0,
+            })
+            expect(repository.getGenreDetail('gone')).toBeNull()
+        })
+
+        it('windows genres in both name directions and searches literal wildcards', () => {
+            const query = { search: '', sort: { field: 'name', direction: 'asc' } } as const
+            expect(repository.queryGenres({ query, window: { offset: 1, limit: 2 } })).toMatchObject({
+                offset: 1,
+                total: 4,
+                rows: [
+                    { name: 'Ambient', songCount: 2 },
+                    { name: 'Techno', songCount: 1 },
+                ],
+            })
+            expect(
+                repository.queryGenres({
+                    query: { ...query, sort: { field: 'name', direction: 'desc' } },
+                    window: { offset: 0, limit: 1 },
+                }).rows[0]?.name,
+            ).toBe('Techno; Ambient')
+            expect(
+                repository
+                    .queryGenres({ query: { ...query, search: '%' }, window: { offset: 0, limit: 10 } })
+                    .rows.map(row => row.name),
+            ).toEqual(['100% Quiet'])
+            expect(repository.queryGenres({ query, window: { offset: 10, limit: 5 } })).toEqual({
+                offset: 10,
+                total: 4,
+                rows: [],
+            })
+        })
+
+        it('derives related lists by entity and keeps the compound tag separate', () => {
+            expect(
+                repository.queryGenreRelated({
+                    query: { genreId: 'ambient', kind: 'artists' },
+                    window: { offset: 0, limit: 1 },
+                }),
+            ).toEqual({
+                offset: 0,
+                total: 2,
+                rows: [{ id: 'a1', name: 'Artist one' }],
+            })
+            expect(
+                repository
+                    .queryAlbums({
+                        query: albumQuery({ filter: { genreIds: ['ambient'] } }),
+                        window: { offset: 0, limit: 10 },
+                    })
+                    .rows.map(row => row.id),
+            ).toEqual(['album1'])
+
+            expect(
+                repository.queryGenreRelated({
+                    query: { genreId: 'ambient', kind: 'recordLabels' },
+                    window: { offset: 0, limit: 10 },
+                }).rows,
+            ).toEqual([{ id: 'r1', name: 'Record label' }])
+            const songs = repository.querySongs({
+                query: query({ filter: { genreIds: ['ambient'] } }),
+                window: { offset: 0, limit: 10 },
+            })
+            expect(songs.rows.map(row => row.id).sort()).toEqual(['s1', 's2'])
+            expect(songs.rows.find(row => row.id == 's1')?.genreText).toBe('Techno; Ambient')
+        })
+    })
+
     describe('windowing', () => {
         beforeEach(() => {
             for (let index = 0; index < 25; index++) {

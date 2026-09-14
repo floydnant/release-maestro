@@ -61,6 +61,17 @@ export const appRoutes: Route[] = [
         canActivate: [libraryOnboardingGuard],
     },
     {
+        path: 'genres',
+        loadComponent: () => import('./pages/genres/genres.component').then(m => m.GenresComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
+        path: 'genres/:genreId',
+        loadComponent: () =>
+            import('./pages/genre-detail/genre-detail.component').then(m => m.GenreDetailComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
         path: 'import',
         loadComponent: () =>
             import('./pages/library-import/library-import.component').then(m => m.LibraryImportComponent),

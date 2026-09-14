@@ -1,3 +1,10 @@
+import type {
+    QueryGenresRequest,
+    GenreWindowResult,
+    GenreDetailResult,
+    QueryGenreRelatedRequest,
+    GenreRelatedWindowResult,
+} from '@release-maestro/core'
 import {
     AlbumSortField,
     BROWSE_WINDOW_MAX_LIMIT,
@@ -18,7 +25,7 @@ import {
     type SongQuery,
     type SongWindowResult,
 } from '@release-maestro/core'
-import { and, asc, count, desc, eq, exists, inArray, sum, type SQL } from 'drizzle-orm'
+import { and, asc, count, countDistinct, desc, eq, exists, inArray, sql, sum, type SQL } from 'drizzle-orm'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { DatabaseClient } from '../../database/database.client'
 import {
@@ -31,7 +38,7 @@ import {
     songGenresTable,
     songsTable,
 } from '../../database/drizzle.schema'
-import { albumSearchCondition, songSearchCondition } from './catalog-search'
+import { albumSearchCondition, genreSearchCondition, songSearchCondition } from './catalog-search'
 
 /**
  * The library read side: windowed catalog queries (ADR 0004).
@@ -46,6 +53,130 @@ import { albumSearchCondition, songSearchCondition } from './catalog-search'
  */
 export class LibraryBrowseRepository {
     constructor(private readonly database: DatabaseClient) {}
+
+    queryGenres(request: QueryGenresRequest): GenreWindowResult {
+        const { offset } = normalizeWindow(request.window)
+        const total =
+            this.database.db
+                .select({ value: count() })
+                .from(genresTable)
+                .where(genreSearchCondition(request.query.search))
+                .get()?.value ?? 0
+        const rows = this.genreWindowQuery(request).all()
+        const counts = this.genreCounts(rows.map(row => row.id))
+        return { rows: rows.map(row => ({ ...row, ...counts(row.id) })), offset, total }
+    }
+
+    /** The production window statement, exposed for index-plan verification. */
+    genreWindowSql(request: QueryGenresRequest): { sql: string; params: unknown[] } {
+        return this.genreWindowQuery(request).toSQL()
+    }
+
+    private genreWindowQuery({ query, window }: QueryGenresRequest) {
+        const { offset, limit } = normalizeWindow(window)
+        const direction = query.sort.direction == 'desc' ? desc : asc
+        // Name is unique, so it is already a stable ordering without an id tiebreaker.
+        return this.database.db
+            .select()
+            .from(genresTable)
+            .where(genreSearchCondition(query.search))
+            .orderBy(direction(genresTable.name))
+            .limit(limit)
+            .offset(offset)
+    }
+
+    getGenreDetail(genreId: string): GenreDetailResult {
+        const genre = this.database.db.select().from(genresTable).where(eq(genresTable.id, genreId)).get()
+        return genre ? { ...genre, ...this.genreCounts([genreId])(genreId) } : null
+    }
+
+    private genreCounts(genreIds: string[]) {
+        // Two aggregates per window, not per row. Separate aggregates avoid
+        // multiplying every song by its artist credits. Only visible IDs are counted.
+        const songs = this.database.db
+            .select({
+                genreId: songGenresTable.genreId,
+                songCount: count(),
+                albumCount: countDistinct(songsTable.albumId),
+                recordLabelCount: countDistinct(albumsTable.recordLabelId),
+            })
+            .from(songGenresTable)
+            .innerJoin(songsTable, eq(songGenresTable.songId, songsTable.id))
+            .leftJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
+            .where(inArray(songGenresTable.genreId, genreIds))
+            .groupBy(songGenresTable.genreId)
+            .all()
+        const artists = this.database.db
+            .select({ genreId: songGenresTable.genreId, value: countDistinct(songArtistsTable.artistId) })
+            .from(songGenresTable)
+            .innerJoin(songArtistsTable, eq(songArtistsTable.songId, songGenresTable.songId))
+            .where(inArray(songGenresTable.genreId, genreIds))
+            .groupBy(songGenresTable.genreId)
+            .all()
+        const songsByGenre = new Map(songs.map(row => [row.genreId, row]))
+        const artistsByGenre = new Map(artists.map(row => [row.genreId, row.value]))
+        return (genreId: string) => ({
+            songCount: songsByGenre.get(genreId)?.songCount ?? 0,
+            albumCount: songsByGenre.get(genreId)?.albumCount ?? 0,
+            artistCount: artistsByGenre.get(genreId) ?? 0,
+            recordLabelCount: songsByGenre.get(genreId)?.recordLabelCount ?? 0,
+        })
+    }
+
+    queryGenreRelated(request: QueryGenreRelatedRequest): GenreRelatedWindowResult {
+        const { offset } = normalizeWindow(request.window)
+        const members = this.genreRelatedMembers(request.query).as('genre_members')
+        const total = this.database.db.select({ value: count() }).from(members).get()?.value ?? 0
+        const rows = this.genreRelatedWindowQuery(request).all()
+        return { rows, offset, total }
+    }
+
+    /** The production related window statement, exposed for index-plan verification. */
+    genreRelatedWindowSql(request: QueryGenreRelatedRequest): { sql: string; params: unknown[] } {
+        return this.genreRelatedWindowQuery(request).toSQL()
+    }
+
+    private genreRelatedWindowQuery({ query, window }: QueryGenreRelatedRequest) {
+        const { offset, limit } = normalizeWindow(window)
+        const table = query.kind === 'artists' ? artistsTable : recordLabelsTable
+        const nameIndex = query.kind === 'artists' ? 'artists_name_key' : 'record_labels_name_key'
+        return (
+            this.database.db
+                .select({ id: sql<string>`${table.id}`, name: sql<string>`${table.name}` })
+                // Preserve ADR 0004's indexed ordering. Without the hint, SQLite chooses
+                // primary-key probes for IN and builds a temporary ordering. The uncorrelated
+                // membership set is built once, not by probing song links per candidate name.
+                .from(sql`${table} indexed by ${sql.identifier(nameIndex)}`)
+                .where(inArray(table.id, this.genreRelatedMembers(query)))
+                .orderBy(asc(table.name))
+                .limit(limit)
+                .offset(offset)
+        )
+    }
+
+    private genreRelatedMembers(query: QueryGenreRelatedRequest['query']) {
+        const db = this.database.db
+        switch (query.kind) {
+            case 'artists':
+                return db
+                    .selectDistinct({ id: songArtistsTable.artistId })
+                    .from(songGenresTable)
+                    .innerJoin(songArtistsTable, eq(songArtistsTable.songId, songGenresTable.songId))
+                    .where(eq(songGenresTable.genreId, query.genreId))
+            case 'recordLabels':
+                return db
+                    .selectDistinct({ id: recordLabelsTable.id })
+                    .from(songGenresTable)
+                    .innerJoin(songsTable, eq(songGenresTable.songId, songsTable.id))
+                    .innerJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
+                    .innerJoin(recordLabelsTable, eq(albumsTable.recordLabelId, recordLabelsTable.id))
+                    .where(eq(songGenresTable.genreId, query.genreId))
+            default: {
+                const unhandled: never = query.kind
+                throw new Error(`Unknown genre related kind: ${unhandled}`)
+            }
+        }
+    }
 
     querySongs({ query, window }: QuerySongsRequest): SongWindowResult {
         const where = this.songConditions(query)
