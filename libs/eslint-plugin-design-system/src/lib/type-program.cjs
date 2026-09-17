@@ -67,7 +67,7 @@ function parseConfig(configPath) {
     if (cached && cached.mtimeMs === mtimeMs) return cached.parsed
 
     /** @type {ts.ParsedCommandLine|null} */
-    let parsed = null
+    let parsed
     try {
         // A config that cannot be read is not a finding — the walk simply moves on to the next
         // candidate — so the diagnostic is swallowed rather than surfaced.
