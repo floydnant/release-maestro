@@ -17,9 +17,9 @@ import {
 } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import type { AlbumQuery, AlbumRow, BrowseWindow } from '@release-maestro/core'
-import type { BrowseResult } from '../../shared/browse/browse-query'
-import { IconComponent } from '../../shared/components/icon/icon.component'
-import { fileUrl } from '../../shared/utils/file-url.util'
+import type { BrowseResult } from '../../browse/browse-query'
+import { IconComponent } from '../icon/icon.component'
+import { fileUrl } from '../../utils/file-url.util'
 
 /**
  * The albums grid — the only grid in the library, because `albums.coverPath` is the
@@ -83,7 +83,7 @@ export const initialWindowLimit = (width: number, height: number): number => {
 
 /**
  * The window a surface should open with to land at a remembered scroll position — the
- * grid's counterpart to the track table's `songWindowOffsetAt`, and the *page's* to ask
+ * grid's counterpart to the track table's `listWindowOffsetAt`, and the *page's* to ask
  * for, because the grid is created after the first window has been requested.
  *
  * **An estimate, and the one part of scroll restoration that cannot be exact.** A tile's

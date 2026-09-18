@@ -108,6 +108,8 @@ test.describe('what the buttons offer', () => {
 test.describe('what counts as a history entry', () => {
     test('goes back past a sort, to the previous page', async ({ page }) => {
         await createRendererScenario(page, browsableLibrary(page), '/albums')
+        // A cancelled initial navigation is not a history entry. Let the origin settle.
+        await expect(albumGrid(page)).toBeVisible()
         await sidebarLink(page, 'Tracks').click()
         await expect(trackGrid(page)).toBeVisible()
 
