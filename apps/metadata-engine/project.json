@@ -22,6 +22,7 @@
         },
         "test": {
             "executor": "nx:run-commands",
+            "inputs": ["default", "{workspaceRoot}/fixtures/metadata/**/*"],
             "options": {
                 "command": "cargo test",
                 "cwd": "apps/metadata-engine"

@@ -12,6 +12,7 @@
 //! required so events can be correlated and operations cancelled.
 
 mod constants;
+mod custom_tags;
 mod image_format;
 mod metadata;
 mod protocol;

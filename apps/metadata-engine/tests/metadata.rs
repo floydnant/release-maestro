@@ -1,0 +1,237 @@
+mod support;
+
+use serde_json::{json, Value};
+use support::{fixtures, Engine, Library};
+
+fn cases() -> Vec<Value> {
+    serde_json::from_slice(&std::fs::read(fixtures().join("cases.json")).unwrap()).unwrap()
+}
+
+fn assert_fields(actual: &Value, expected: &Value, context: &str) {
+    for (key, value) in expected.as_object().unwrap() {
+        if value.is_number() && actual[key].is_number() {
+            assert_eq!(actual[key].as_f64(), value.as_f64(), "{context}: {key}");
+            continue;
+        }
+        assert_eq!(&actual[key], value, "{context}: {key}");
+    }
+}
+
+fn assert_extras(actual: &Value, case: &Value) {
+    if let Some(extras) = case["extras"].as_array() {
+        for extra in extras {
+            assert!(
+                actual["extraMetadata"].as_array().unwrap().contains(extra),
+                "{} missing {extra}: {}",
+                case["file"],
+                actual["extraMetadata"]
+            );
+        }
+    }
+}
+
+#[test]
+fn reads_independently_authored_metadata_across_formats_and_legacy_aliases() {
+    let library = Library::new();
+    let mut engine = Engine::new();
+    for case in cases() {
+        let name = case["file"].as_str().unwrap();
+        let path = library.copy(name);
+        let metadata = engine.request("read_file", library.params(&path));
+        assert_fields(&metadata, &case["expected"], name);
+        assert_extras(&metadata, &case);
+        assert_eq!(metadata["path"], path.to_str().unwrap());
+        assert_eq!(metadata["fileName"], name);
+        assert!(metadata["duration"].as_f64().unwrap() > 0.0, "{name}");
+        assert_eq!(metadata["fileInfo"]["channels"], 2, "{name}");
+        if case["artwork"] == true {
+            let cover = metadata["coverPath"].as_str().unwrap();
+            assert!(std::path::Path::new(cover).starts_with(library.0.join("cache")));
+            assert_eq!(
+                std::fs::read(cover).unwrap(),
+                std::fs::read(fixtures().join("cover.png")).unwrap()
+            );
+        }
+    }
+}
+
+#[test]
+fn edits_and_clears_tags_without_losing_unrelated_metadata_or_artwork() {
+    let library = Library::new();
+    let mut engine = Engine::new();
+    for case in cases().into_iter().filter(|case| case["writable"] == true) {
+        let name = case["file"].as_str().unwrap();
+        let path = library.copy(name);
+        let original = engine.request("read_file", library.params(&path));
+        let mut params = library.params(&path);
+        params["update"] = json!({"title": "Gökotta", "energy": "9", "comment": "New comment", "lyrics": "New lyrics"});
+        let written = engine.request("write_tags", params.clone());
+        assert_fields(&written, &params["update"], name);
+        // A fresh process must see persisted tags, not an in-memory update.
+        let reread = Engine::new().request("read_file", library.params(&path));
+        assert_fields(&reread, &params["update"], name);
+        for key in [
+            "artist",
+            "albumTitle",
+            "albumArtist",
+            "genre",
+            "track",
+            "bpm",
+            "musicalKey",
+            "catalogNumber",
+            "label",
+            "duration",
+            "coverPath",
+        ] {
+            assert_eq!(reread[key], original[key], "{name}: preserved {key}");
+        }
+        assert_extras(&reread, &case);
+        if ["mp3", "wav", "aiff"].iter().any(|ext| name.ends_with(ext)) {
+            assert!(
+                std::fs::read(&path)
+                    .unwrap()
+                    .windows(9)
+                    .any(|bytes| bytes == b"\x00\x01opaque\xff"),
+                "{name}: private ID3 frame preserved"
+            );
+        }
+        params["update"] = json!({"energy": null, "comment": null, "lyrics": null});
+        engine.request("write_tags", params.clone());
+        let cleared = Engine::new().request("read_file", library.params(&path));
+        assert_fields(&cleared, &params["update"], name);
+        assert_extras(&cleared, &case);
+        assert_eq!(cleared["title"], "Gökotta");
+        // Omitted fields do not trigger a rewrite.
+        let bytes = std::fs::read(&path).unwrap();
+        params["update"] = json!({});
+        engine.request("write_tags", params);
+        assert_eq!(std::fs::read(&path).unwrap(), bytes, "{name}: empty update");
+    }
+}
+
+#[test]
+fn clearing_legacy_aliases_does_not_resurrect_old_values() {
+    let library = Library::new();
+    let mut engine = Engine::new();
+    for case in cases().into_iter().filter(|case| {
+        matches!(
+            case["aliasField"].as_str(),
+            Some("energy" | "comment" | "lyrics")
+        )
+    }) {
+        let name = case["file"].as_str().unwrap();
+        let path = library.copy(name);
+        let field = case["aliasField"].as_str().unwrap();
+        let mut params = library.params(&path);
+        params["update"] = json!({field: null});
+        engine.request("write_tags", params);
+        let metadata = Engine::new().request("read_file", library.params(&path));
+        assert!(metadata[field].is_null(), "{name}: {metadata}");
+    }
+}
+
+#[test]
+fn creates_primary_tags_on_untagged_files() {
+    let library = Library::new();
+    let mut engine = Engine::new();
+    for case in cases().into_iter().filter(|case| case["createTag"] == true) {
+        let name = case["file"].as_str().unwrap();
+        let path = library.copy(name);
+        let mut params = library.params(&path);
+        params["update"] = json!({"title": "El sueño", "energy": "8"});
+        let result = engine.request("write_tags", params.clone());
+        assert_fields(&result, &params["update"], name);
+        assert_fields(
+            &Engine::new().request("read_file", library.params(&path)),
+            &params["update"],
+            name,
+        );
+    }
+}
+
+#[test]
+fn streams_successes_and_parse_errors_then_accepts_another_request() {
+    let library = Library::new();
+    let good = library.copy("vardae-invocacion-del-cielo.flac");
+    let bad = library.0.join("truncated.flac");
+    std::fs::write(&bad, b"fLaC\x80\x00\x00\x22").unwrap();
+    let mut engine = Engine::new();
+    let messages = engine.exchange(
+        "read_files",
+        json!({"paths": [good, bad], "coverArtCacheDir": library.0.join("cache")}),
+    );
+    assert_eq!(messages[0]["event"], "started");
+    let items: Vec<_> = messages.iter().filter(|m| m["event"] == "item").collect();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["data"]["metadata"]["energy"], "7");
+    let errors: Vec<_> = messages
+        .iter()
+        .filter(|m| m["event"] == "item_error")
+        .collect();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0]["data"]["code"], "PARSE_FAILED");
+    assert_eq!(
+        messages.last().unwrap()["result"],
+        json!({"count": 1, "total": 2})
+    );
+    assert_eq!(engine.request("ping", json!({}))["protocolVersion"], 1);
+}
+
+#[test]
+fn falls_back_to_folder_art_and_filename_without_tags() {
+    let library = Library::new();
+    let path = library.copy("spunoff-el-sueno-untagged.mp3");
+    let cover = library.copy("cover.png");
+    let result = Engine::new().request("read_file", library.params(&path));
+    assert_eq!(result["title"], "spunoff-el-sueno-untagged.mp3");
+    assert_eq!(result["coverPath"], cover.to_str().unwrap());
+}
+
+#[test]
+fn writes_numeric_fields_dates_and_renames_then_rejects_invalid_bpm_without_writing() {
+    let library = Library::new();
+    let mut engine = Engine::new();
+    let path = library.copy("vardae-invocacion-del-cielo.flac");
+    let mut params = library.params(&path);
+    params["update"] = json!({"track": 12, "bpm": 128.125, "date": "2025-03-04", "artist": " Fréquence Polaire ", "fileName": "frequence-polaire-gokotta.flac"});
+    let result = engine.request("write_tags", params);
+    assert!(!path.exists());
+    let renamed = library.0.join("frequence-polaire-gokotta.flac");
+    assert_eq!(result["path"], renamed.to_str().unwrap());
+    let reread = Engine::new().request("read_file", library.params(&renamed));
+    assert_fields(
+        &reread,
+        &json!({"track": 12, "bpm": 128.125, "date": "2025-03-04", "artist": "Fréquence Polaire"}),
+        "renamed FLAC",
+    );
+    let bytes = std::fs::read(&renamed).unwrap();
+    let mut params = library.params(&renamed);
+    params["update"] = json!({"title": "Must not persist", "bpm": -1});
+    let messages = engine.exchange("write_tags", params.clone());
+    assert_eq!(messages.last().unwrap()["ok"], false);
+    assert_eq!(std::fs::read(&renamed).unwrap(), bytes);
+    params["update"] = json!({"track": null, "bpm": null, "date": null, "artist": "   "});
+    let cleared = engine.request("write_tags", params);
+    assert_fields(
+        &cleared,
+        &json!({"track": null, "bpm": null, "date": null, "artist": null}),
+        "cleared FLAC",
+    );
+}
+
+#[test]
+fn mp4_tempo_edits_replace_native_integer_atoms_and_clear_persistently() {
+    let library = Library::new();
+    let path = library.copy("vardae-invocacion-del-cielo.m4a");
+    for update in [
+        json!({"bpm": null}),
+        json!({"bpm": 131.125}),
+        json!({"bpm": null}),
+    ] {
+        let mut params = library.params(&path);
+        params["update"] = update.clone();
+        Engine::new().request("write_tags", params);
+        let actual = Engine::new().request("read_file", library.params(&path));
+        assert_fields(&actual, &update, "MP4 tempo");
+    }
+}
