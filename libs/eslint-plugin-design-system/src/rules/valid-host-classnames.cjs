@@ -56,7 +56,7 @@ module.exports = {
     create(context) {
         const options = context.options[0] ?? {}
         const reportDynamic = options.reportDynamic ?? true
-        const sourceCode = context.sourceCode ?? context.getSourceCode()
+        const sourceCode = context.sourceCode
         const { isThemePath, isValid, suggest } = createClassChecker(options, {
             cwd: context.cwd,
             filePath: context.filename,

@@ -150,7 +150,7 @@ function componentFileFor(templatePath) {
     // `templateUrl` need not match the component's own file name.
     const dir = path.dirname(templatePath)
     /** @type {string[]} */
-    let entries = []
+    let entries
     try {
         entries = fs.readdirSync(dir)
     } catch {
