@@ -67,7 +67,6 @@ export class AppComponent {
     private settingsService = inject(SettingsService)
     private router = inject(Router)
 
-    readonly showDesignSystem = !webEnv.production
     readonly isElectron = this.electronService.isElectron
     readonly isMacos = this.isElectron && this.electronService.platform === 'darwin'
 

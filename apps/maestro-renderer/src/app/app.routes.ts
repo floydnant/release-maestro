@@ -6,7 +6,7 @@ import { HomeComponent } from './pages/home/home.component'
 import { PageNotFoundComponent } from './pages/page-not-found/page-not-found.component'
 import { SettingsComponent } from './pages/settings/settings.component'
 
-const developmentRoutes: Route[] = webEnv.production
+const developmentSettingsRoutes: Route[] = webEnv.production
     ? []
     : [
           {
@@ -16,11 +16,6 @@ const developmentRoutes: Route[] = webEnv.production
                       module => module.DesignSystemComponent,
                   ),
           },
-      ]
-
-const developmentSettingsRoutes: Route[] = webEnv.production
-    ? []
-    : [
           {
               path: 'debug',
               loadComponent: () =>
@@ -86,7 +81,6 @@ export const appRoutes: Route[] = [
             },
         ],
     },
-    ...developmentRoutes,
     {
         path: '**',
         component: PageNotFoundComponent,

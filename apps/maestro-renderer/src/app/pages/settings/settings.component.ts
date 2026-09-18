@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core'
 import { RouterModule } from '@angular/router'
+import { webEnv } from '../../../environments/environment'
 
 @Component({
     selector: 'app-import',
@@ -12,4 +13,6 @@ import { RouterModule } from '@angular/router'
     `,
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SettingsComponent {}
+export class SettingsComponent {
+    readonly showDesignSystem = !webEnv.production
+}

@@ -31,6 +31,20 @@
                 </a>
             </li>
         </ul>
+        @if (showDesignSystem) {
+            <p class="type-label-sm mb-3 mt-4 text-content-muted">Development</p>
+            <ul>
+                <li>
+                    <a
+                        routerLink="design-system"
+                        routerLinkActive="active-link"
+                        ariaCurrentWhenActive="page"
+                        class="btn-nkd-neutral block w-full text-left"
+                        >Design system</a
+                    >
+                </li>
+            </ul>
+        }
     </div>
     <div class="min-h-0 min-w-0 overflow-y-auto p-6">
         <router-outlet></router-outlet>
