@@ -61,7 +61,7 @@ export class GenreDetailComponent {
         ),
         { initialValue: LOADING },
     )
-    // Key the content by genre and section so retained windows cannot cross either boundary.
+    // Keep the header mounted across sections; only the section content resets its window.
     protected content = computed(() => {
         const state = this.detail()
         return state.status == 'ready'

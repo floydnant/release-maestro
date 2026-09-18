@@ -337,6 +337,24 @@ test.describe('filtering by entity', () => {
             })
     })
 
+    test('restores a genre filter from the URL and removes its chip', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .songs(createSongRows())
+            .songFilterDescription({ genres: [{ id: 'genre-1', name: 'Ambient' }] })
+            .build()
+        const controller = await createRendererScenario(page, scenario, '/tracks?genre=genre-1')
+        await expect
+            .poll(() => lastQuery(controller))
+            .toMatchObject({
+                query: { filter: { genreIds: ['genre-1'] } },
+            })
+        const chip = page.getByRole('button', { name: 'Remove Genre filter Ambient' })
+        await chip.click()
+        await expect(page).not.toHaveURL(/genre=/)
+        await expect.poll(async () => (await lastQuery(controller))?.query.filter.genreIds).toBeUndefined()
+        await expect(chip).toBeHidden()
+    })
+
     test('shows an applied filter as a removable chip', async ({ page }) => {
         const scenario = scenarioBuilder()
             .songs(createSongRows())

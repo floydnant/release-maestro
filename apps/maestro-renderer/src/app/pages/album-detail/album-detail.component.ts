@@ -34,6 +34,7 @@ import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
+import { listWindowOffsetAt } from '../../shared/browse/list-window'
 import { SongQueryParam, nextSort, songSortFromParams } from '../../shared/browse/song-query-params'
 import {
     emptySelection,
@@ -43,7 +44,6 @@ import {
 } from '../../shared/browse/song-selection'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import {
-    songWindowOffsetAt,
     SongTableComponent,
     type EntityFilterRequest,
     type SongTableColumn,
@@ -387,7 +387,7 @@ export class AlbumDetailComponent {
 
 /** Where a window has to start for a remembered scroll position to be inside it. */
 const offsetForRestore = (scrollTop: number | null): number =>
-    scrollTop == null ? 0 : songWindowOffsetAt(scrollTop)
+    scrollTop == null ? 0 : listWindowOffsetAt(scrollTop)
 
 /**
  * Which track-list query param addresses each entity kind. `album` is absent on purpose

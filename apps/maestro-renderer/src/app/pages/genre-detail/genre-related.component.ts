@@ -13,11 +13,9 @@ import type { BrowseWindow, GenreRelatedQuery } from '@release-maestro/core'
 import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
+import { listWindowOffsetAt } from '../../shared/browse/list-window'
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
-import {
-    CatalogListComponent,
-    catalogWindowOffsetAt,
-} from '../../shared/components/catalog-list/catalog-list.component'
+import { CatalogListComponent } from '../../shared/components/catalog-list/catalog-list.component'
 
 @Component({
     selector: 'app-genre-related',
@@ -39,7 +37,7 @@ export class GenreRelatedComponent {
     protected viewport = linkedSignal<GenreRelatedQuery, BrowseWindow>({
         source: this.query,
         computation: () => ({
-            offset: untracked(() => catalogWindowOffsetAt(this.restoreScrollTop() ?? 0)),
+            offset: untracked(() => listWindowOffsetAt(this.restoreScrollTop() ?? 0)),
             limit: 60,
         }),
     })

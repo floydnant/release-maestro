@@ -15,6 +15,7 @@ import { debounceTime, filter, Subject } from 'rxjs'
 import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
+import { listWindowOffsetAt } from '../../shared/browse/list-window'
 import {
     genreQueryFromParams,
     genreQueryToParams,
@@ -23,10 +24,7 @@ import {
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { BrowseShellComponent } from '../../shared/components/browse-shell/browse-shell.component'
-import {
-    CatalogListComponent,
-    catalogWindowOffsetAt,
-} from '../../shared/components/catalog-list/catalog-list.component'
+import { CatalogListComponent } from '../../shared/components/catalog-list/catalog-list.component'
 
 @Component({
     selector: 'app-genres',
@@ -50,7 +48,7 @@ export class GenresComponent {
     protected viewport = linkedSignal<GenreQuery, BrowseWindow>({
         source: this.query,
         computation: (_query, previous) => ({
-            offset: untracked(() => catalogWindowOffsetAt(this.restoreScrollTop() ?? 0)),
+            offset: untracked(() => listWindowOffsetAt(this.restoreScrollTop() ?? 0)),
             limit: previous?.value.limit ?? 60,
         }),
     })

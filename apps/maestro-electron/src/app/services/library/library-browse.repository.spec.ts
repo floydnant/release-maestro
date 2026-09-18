@@ -202,12 +202,12 @@ describe('LibraryBrowseRepository', () => {
 
         it('windows genres in both name directions and searches literal wildcards', () => {
             const query = { search: '', sort: { field: 'name', direction: 'asc' } } as const
-            expect(repository.queryGenres({ query, window: { offset: 1, limit: 2 } })).toMatchObject({
+            expect(repository.queryGenres({ query, window: { offset: 1, limit: 2 } })).toEqual({
                 offset: 1,
                 total: 4,
                 rows: [
-                    { name: 'Ambient', songCount: 2 },
-                    { name: 'Techno', songCount: 1 },
+                    { id: 'ambient', name: 'Ambient', songCount: 2, artistCount: 2, albumCount: 1 },
+                    { id: 'techno', name: 'Techno', songCount: 1, artistCount: 2, albumCount: 1 },
                 ],
             })
             expect(

@@ -274,7 +274,9 @@ test('an album detail page lists its own tracks in album order', async ({}, test
     await expect(page.getByText('2 tracks', { exact: true })).toBeVisible()
     // Scoped to the header's own chips: since tracks link their genres too, an
     // unscoped "Ambient" link now matches a chip and a cell in every row.
-    await expect(page.locator('.album-detail__genres').getByRole('link', { name: 'Ambient' })).toBeVisible()
+    await expect(
+        page.getByRole('group', { name: 'Album genres' }).getByRole('link', { name: 'Ambient' }),
+    ).toBeVisible()
     // A column heading re-sorts the album's tracks rather than sitting inert.
     await page.getByRole('button', { name: 'Sort by Title' }).click()
     await expect.poll(trackTitles).toEqual(['Dawn', 'Noon'])

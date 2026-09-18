@@ -127,39 +127,25 @@
 
 @if (shown().has('genre')) {
     <span
-        class="song-table__genre | shrink-0 truncate px-2"
+        class="song-table__genre | flex shrink-0 items-center truncate px-2"
         role="gridcell"
         [style.width.px]="widths.genre"
         [title]="row().genreText || ''"
     >
-        @if (row().genres.length === 1) {
-            @for (genre of row().genres; track genre.id) {
-                <a
-                    tabindex="-1"
-                    class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
-                    [routerLink]="['/genres', genre.id]"
-                    (click)="onDetailLink($event)"
-                >
-                    {{ row().genreText || genre.name }}
-                </a>
+        @for (genre of row().genres; track genre.id; let last = $last) {
+            <a
+                tabindex="-1"
+                class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary no-underline underline-offset-2 hover:text-content-action hover:underline"
+                [routerLink]="['/genres', genre.id]"
+                (click)="onDetailLink($event)"
+            >
+                {{ genre.name }}
+            </a>
+            @if (!last) {
+                <span class="text-content-secondary">, </span>
             }
-        } @else {
-            <span class="block truncate text-content-secondary">{{ row().genreText || '—' }}</span>
-            @if (row().genres.length > 1) {
-                <span class="genre-entities | flex gap-1">
-                    @for (genre of row().genres; track genre.id) {
-                        <a
-                            tabindex="-1"
-                            class="type-label-sm max-w-full truncate rounded-sm text-content-action hover:underline"
-                            [attr.aria-label]="'View genre ' + genre.name"
-                            [routerLink]="['/genres', genre.id]"
-                            (click)="onDetailLink($event)"
-                        >
-                            {{ genre.name }}
-                        </a>
-                    }
-                </span>
-            }
+        } @empty {
+            <span class="text-content-muted">—</span>
         }
     </span>
 }

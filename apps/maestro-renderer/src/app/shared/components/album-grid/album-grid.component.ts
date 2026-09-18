@@ -83,7 +83,7 @@ export const initialWindowLimit = (width: number, height: number): number => {
 
 /**
  * The window a surface should open with to land at a remembered scroll position — the
- * grid's counterpart to the track table's `songWindowOffsetAt`, and the *page's* to ask
+ * grid's counterpart to the track table's `listWindowOffsetAt`, and the *page's* to ask
  * for, because the grid is created after the first window has been requested.
  *
  * **An estimate, and the one part of scroll restoration that cannot be exact.** A tile's

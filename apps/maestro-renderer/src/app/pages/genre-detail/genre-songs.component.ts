@@ -15,6 +15,7 @@ import { type BrowseWindow, type SongQuery, type SongSortField } from '@release-
 import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
+import { listWindowOffsetAt } from '../../shared/browse/list-window'
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
 import { nextSort, songQueryFromParams, songQueryToParams } from '../../shared/browse/song-query-params'
 import {
@@ -25,7 +26,6 @@ import {
 } from '../../shared/browse/song-selection'
 import {
     SongTableComponent,
-    songWindowOffsetAt,
     type EntityFilterRequest,
 } from '../../shared/components/song-table/song-table.component'
 
@@ -58,7 +58,7 @@ export class GenreSongsComponent {
     protected viewport = linkedSignal<SongQuery, BrowseWindow>({
         source: this.query,
         computation: (_query, previous) => ({
-            offset: untracked(() => songWindowOffsetAt(this.restoreScrollTop() ?? 0)),
+            offset: untracked(() => listWindowOffsetAt(this.restoreScrollTop() ?? 0)),
             limit: previous?.value.limit ?? 60,
         }),
     })

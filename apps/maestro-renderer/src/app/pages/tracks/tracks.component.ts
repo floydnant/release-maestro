@@ -35,6 +35,7 @@ import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
+import { listWindowOffsetAt } from '../../shared/browse/list-window'
 import { nextSort, songQueryFromParams, songQueryToParams } from '../../shared/browse/song-query-params'
 import {
     emptySelection,
@@ -50,7 +51,6 @@ import {
     type BrowseShellState,
 } from '../../shared/components/browse-shell/browse-shell.component'
 import {
-    songWindowOffsetAt,
     SongTableComponent,
     type EntityFilterKind,
     type EntityFilterRequest,
@@ -421,7 +421,7 @@ export class TracksComponent {
 
 /** Where a window has to start for a remembered scroll position to be inside it. */
 const offsetForRestore = (scrollTop: number | null): number =>
-    scrollTop == null ? 0 : songWindowOffsetAt(scrollTop)
+    scrollTop == null ? 0 : listWindowOffsetAt(scrollTop)
 
 const EMPTY_DESCRIPTION: SongFilterDescription = {
     artists: [],

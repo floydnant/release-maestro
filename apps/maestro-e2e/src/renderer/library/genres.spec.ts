@@ -117,26 +117,42 @@ test('genre detail sorts tracks and recovers a failed related list', async ({ pa
     ).toBeVisible()
 })
 
-test('shows genreText verbatim with a detail link for each resolved genre', async ({ page }) => {
+test('keeps resolved genre links within one row and preserves the tag in a tooltip', async ({ page }) => {
     const controller = await createRendererScenario(
         page,
         scenarioBuilder()
             .songs([
                 createSongRow({
-                    genreText: 'Techno; Ambient',
+                    genreText: 'Techno; Ambient; Deep Progressive House',
                     genres: [
                         { id: 'techno', name: 'Techno' },
                         { id: 'ambient', name: 'Ambient' },
+                        { id: 'house', name: 'Deep Progressive House' },
                     ],
                 }),
             ])
             .build(),
         '/tracks',
     )
-    await expect(page.getByText('Techno; Ambient', { exact: true })).toBeVisible()
-    const ambient = page.getByRole('link', { name: 'View genre Ambient' })
+    const cell = page
+        .getByRole('gridcell')
+        .filter({ has: page.getByRole('link', { name: 'Deep Progressive House' }) })
+    await expect(cell).toHaveAttribute('title', 'Techno; Ambient; Deep Progressive House')
+    const bounds = await cell.boundingBox()
+    expect(bounds).not.toBeNull()
+    for (const link of await cell.getByRole('link').all()) {
+        await expect(link).toHaveCSS('text-overflow', 'ellipsis')
+        const box = await link.boundingBox()
+        expect(box).not.toBeNull()
+        if (!box || !bounds) throw new Error('Genre cell is not laid out')
+        expect(box.y).toBeGreaterThanOrEqual(bounds.y)
+        expect(box.y + box.height).toBeLessThanOrEqual(bounds.y + bounds.height)
+        expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width)
+        expect(box.height).toBeLessThanOrEqual(40)
+    }
+    const ambient = page.getByRole('link', { name: 'Ambient', exact: true })
     await expect(ambient).toHaveAttribute('href', '/genres/ambient')
-    await expect(page.getByRole('link', { name: 'View genre Techno' })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Techno', exact: true })).toHaveAttribute(
         'href',
         '/genres/techno',
     )
@@ -207,7 +223,7 @@ test('same-route navigation cannot retain another genre’s tracks', async ({ pa
     await expect(page.getByText('Loading tracks…')).toBeVisible()
 })
 
-test('Back restores a deep genre window after a delayed response', async ({ page }) => {
+test('Back restores a deep genre window after a failed load and retry', async ({ page }) => {
     const controller = await createRendererScenario(
         page,
         scenario()
@@ -222,8 +238,14 @@ test('Back restores a deep genre window after a delayed response', async ({ page
     const scrollTop = await list.evaluate(element => element.scrollTop)
     await list.getByRole('link', { name: /^Genre 5000 / }).click()
     await expect(page.getByRole('heading', { name: 'Ambient' })).toBeVisible()
-    await controller.setHandler('library:query-genres', { kind: 'pending' })
+    await controller.setHandler('library:query-genres', {
+        kind: 'reject',
+        message: 'Temporarily unavailable',
+    })
     await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await expect(page.getByText('Temporarily unavailable')).toBeVisible()
+    await controller.setHandler('library:query-genres', { kind: 'pending' })
+    await page.getByRole('button', { name: 'Try again' }).click()
     await expect(page.getByText('Loading genres…')).toBeVisible()
     await controller.resolveAllPending('library:query-genres', {
         offset: 4980,
@@ -265,4 +287,35 @@ test('genre albums use the shared grid and recover after a failed load', async (
     await expect
         .poll(async () => (await controller.lastCall('library:query-albums'))?.payload)
         .toMatchObject({ query: { sort: { field: 'title' }, filter: { genreIds: ['ambient'] } } })
+})
+
+test('section changes retain keyboard focus and reset the previous section sort', async ({ page }) => {
+    const controller = await createRendererScenario(
+        page,
+        scenario()
+            .handler('library:query-albums', {
+                kind: 'resolve',
+                value: { rows: [createAlbumRow()], total: 1, offset: 0 },
+            })
+            .build(),
+        '/genres/ambient?sort=year&dir=asc',
+    )
+    const tabs = page.getByRole('navigation', { name: 'Genre sections' })
+    const albums = tabs.getByRole('link', { name: /^Albums / })
+    await albums.focus()
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/genres\/ambient\?section=albums$/)
+    await expect(albums).toBeFocused()
+    await expect
+        .poll(async () => (await controller.lastCall('library:query-albums'))?.payload)
+        .toMatchObject({ query: { sort: { field: 'dateAdded', direction: 'desc' } } })
+    await page.getByLabel('Sort by').selectOption('year')
+    const tracks = tabs.getByRole('link', { name: /^Tracks / })
+    await tracks.focus()
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/genres\/ambient$/)
+    await expect(tracks).toBeFocused()
+    await expect
+        .poll(async () => (await controller.lastCall('library:query-songs'))?.payload)
+        .toMatchObject({ query: { sort: { field: 'dateAdded', direction: 'desc' } } })
 })

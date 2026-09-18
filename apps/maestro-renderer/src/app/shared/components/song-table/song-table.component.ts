@@ -32,11 +32,6 @@ import {
 import { SongTableHeadingComponent } from './song-table-heading.component'
 import { SongTableRowComponent } from './song-table-row.component'
 
-export {
-    LIST_ROW_HEIGHT as ROW_HEIGHT,
-    listWindowOffsetAt as songWindowOffsetAt,
-} from '../../browse/list-window'
-
 /**
  * The track table, shared between `/tracks` and every detail tab in slices 2–5.
  *

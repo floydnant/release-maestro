@@ -64,7 +64,14 @@ export class LibraryBrowseRepository {
                 .get()?.value ?? 0
         const rows = this.genreWindowQuery(request).all()
         const counts = this.genreCounts(rows.map(row => row.id))
-        return { rows: rows.map(row => ({ ...row, ...counts(row.id) })), offset, total }
+        return {
+            rows: rows.map(row => {
+                const { songCount, artistCount, albumCount } = counts(row.id)
+                return { ...row, songCount, artistCount, albumCount }
+            }),
+            offset,
+            total,
+        }
     }
 
     /** The production window statement, exposed for index-plan verification. */
@@ -77,7 +84,7 @@ export class LibraryBrowseRepository {
         const direction = query.sort.direction == 'desc' ? desc : asc
         // Name is unique, so it is already a stable ordering without an id tiebreaker.
         return this.database.db
-            .select()
+            .select({ id: genresTable.id, name: genresTable.name })
             .from(genresTable)
             .where(genreSearchCondition(query.search))
             .orderBy(direction(genresTable.name))
@@ -86,7 +93,11 @@ export class LibraryBrowseRepository {
     }
 
     getGenreDetail(genreId: string): GenreDetailResult {
-        const genre = this.database.db.select().from(genresTable).where(eq(genresTable.id, genreId)).get()
+        const genre = this.database.db
+            .select({ id: genresTable.id, name: genresTable.name })
+            .from(genresTable)
+            .where(eq(genresTable.id, genreId))
+            .get()
         return genre ? { ...genre, ...this.genreCounts([genreId])(genreId) } : null
     }
 

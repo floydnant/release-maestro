@@ -19,8 +19,6 @@ import type { BrowseWindow, CatalogEntityRef, GenreRow } from '@release-maestro/
 import type { BrowseResult } from '../../browse/browse-query'
 import { LIST_ROW_HEIGHT as ROW_HEIGHT, listWindowAt } from '../../browse/list-window'
 
-export { listWindowOffsetAt as catalogWindowOffsetAt } from '../../browse/list-window'
-
 export interface CatalogListRow extends CatalogEntityRef {
     link: string[]
     queryParams?: Params

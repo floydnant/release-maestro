@@ -71,7 +71,11 @@
     </p>
 
     @if (album().genres.length) {
-        <p class="album-detail__genres | flex min-w-0 flex-wrap items-center gap-1.5 pt-1">
+        <p
+            role="group"
+            aria-label="Album genres"
+            class="album-detail__genres | flex min-w-0 flex-wrap items-center gap-1.5 pt-1"
+        >
             @for (genre of album().genres; track genre.id) {
                 <a
                     class="badge !no-underline transition-colors hover:border-border-default hover:bg-background-elevated"
