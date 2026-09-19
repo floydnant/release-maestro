@@ -6,6 +6,7 @@ export const createScenarioRuntime = () => {
     const SCENARIO_SERIALIZED_DATE_TYPE = 'Date'
     const SCENARIO_SERIALIZED_UNDEFINED_TYPE = 'Undefined'
     const SCENARIO_SERIALIZED_HOLE_TYPE = 'ArrayHole'
+    const SCENARIO_SERIALIZED_ESCAPED_RECORD_TYPE = 'EscapedRecord'
 
     const isRecord = (value: unknown): value is Record<string, unknown> =>
         typeof value == 'object' && value != null
@@ -30,6 +31,12 @@ export const createScenarioRuntime = () => {
         if (typeof value == 'undefined') {
             return { [SCENARIO_SERIALIZED_TYPE_KEY]: SCENARIO_SERIALIZED_UNDEFINED_TYPE }
         }
+        if (isRecord(value) && Object.prototype.hasOwnProperty.call(value, SCENARIO_SERIALIZED_TYPE_KEY)) {
+            return {
+                [SCENARIO_SERIALIZED_TYPE_KEY]: SCENARIO_SERIALIZED_ESCAPED_RECORD_TYPE,
+                entries: Object.entries(value),
+            }
+        }
         return value
     }
 
@@ -39,6 +46,13 @@ export const createScenarioRuntime = () => {
         typeof value['value'] == 'string'
     const isSerializedUndefined = (value: unknown): boolean =>
         isRecord(value) && value[SCENARIO_SERIALIZED_TYPE_KEY] === SCENARIO_SERIALIZED_UNDEFINED_TYPE
+    const isSerializedEscapedRecord = (value: unknown): value is { entries: [string, unknown][] } =>
+        isRecord(value) &&
+        value[SCENARIO_SERIALIZED_TYPE_KEY] === SCENARIO_SERIALIZED_ESCAPED_RECORD_TYPE &&
+        Array.isArray(value['entries']) &&
+        Array.from(value['entries']).every(
+            entry => Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string',
+        )
 
     // A JSON.parse reviver returning undefined deletes the property or array slot.
     // Walk the parsed value instead so explicit undefined values survive intact.
@@ -49,6 +63,9 @@ export const createScenarioRuntime = () => {
             return date
         }
         if (isSerializedUndefined(value)) return undefined
+        if (isSerializedEscapedRecord(value)) {
+            return Object.fromEntries(value.entries.map(([key, entry]) => [key, reviveScenarioValue(entry)]))
+        }
         if (Array.isArray(value)) {
             const revived: unknown[] = new Array(value.length)
             value.forEach((entry: unknown, index) => {

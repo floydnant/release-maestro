@@ -42,6 +42,16 @@ describe('scenario serialization', () => {
         expect(parseScenarioValue(serializeScenarioValue(value))).toStrictEqual(value)
     })
 
+    it('preserves records that collide with reserved serialization tags', () => {
+        const value = [
+            { __maestroScenarioSerializedType: 'ArrayHole' },
+            { __maestroScenarioSerializedType: 'Undefined' },
+            { __maestroScenarioSerializedType: 'Date', value: capturedAt.toISOString() },
+        ]
+
+        expect(parseScenarioValue(serializeScenarioValue(value))).toStrictEqual(value)
+    })
+
     it('leaves unrecognized tags and date tags without a string value alone', () => {
         const value = [
             { __maestroScenarioSerializedType: 'Future', value: 'unchanged' },
