@@ -33,15 +33,6 @@ Do not mock Node modules such as `fs` or `child_process` in renderer E2E; render
 typed IPC. The default scenario has a configured library folder so unrelated tests are not redirected
 to onboarding. Override `get-settings` when onboarding is the scenario under test.
 
-### Stylesheet token checks
-
-`npx nx run maestro-renderer:design-tokens-check` runs the tooling Jest suite, generated-output
-checks, contrast validation, and stylesheet token checks. Any finding fails the target, which
-renderer build, lint, and test already depend on. See
-[the tooling notes](../apps/maestro-renderer/tools/README.md) for rule scope and exemptions.
-The contrast check enforces the design system's 3:1 project minimum; it does not claim WCAG AA
-compliance for normal text.
-
 ## Fast iteration
 
 Filtered runs are encouraged while iterating. They do not replace the relevant project or suite check
