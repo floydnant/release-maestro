@@ -22,6 +22,7 @@ tester.run('no-imperative-classes', rule, {
         "element.classList.contains('hidden')",
         'element.classList.item(0)',
         "collection.add('hidden'); collection.remove('hidden'); collection.toggle('hidden'); collection.replace('a', 'b')",
+        "collection.addClass(element, 'hidden'); collection.removeClass(element, 'hidden')",
         "renderer.setAttribute(element, 'role', 'button')",
         'const text = \'element.classList.add("hidden")\'',
         '// element.classList.add("hidden")',
@@ -65,17 +66,49 @@ tester.run('no-imperative-classes', rule, {
             "'class.hidden'",
             'hostBinding',
         ),
+        rejected('class Example { @HostBinding() className = "" }', 'className', 'hostBinding'),
+        rejected(
+            'import { HostBinding as Bind } from \'@angular/core\'; class Example { @Bind() className = "" }',
+            'className',
+            'hostBinding',
+        ),
+        rejected(
+            'import * as ng from \'@angular/core\'; class Example { @ng.HostBinding() className = "" }',
+            'className',
+            'hostBinding',
+        ),
         ...['add', 'remove', 'toggle', 'replace'].map(method =>
             rejected(`element.classList.${method}('hidden')`, method),
         ),
         ...['addClass', 'removeClass'].map(method =>
-            rejected(`this.renderer.${method}(element, 'hidden')`, method),
+            rejected(
+                `import { Renderer2 } from '@angular/core'; class Example { constructor(private renderer: Renderer2) {} apply() { this.renderer.${method}(element, 'hidden') } }`,
+                method,
+            ),
         ),
-        rejected("const alias = renderer; alias.addClass(element, 'hidden')", 'addClass'),
+        rejected(
+            "import { Renderer2 } from '@angular/core'; function apply(renderer: Renderer2) { const alias = renderer; alias.addClass(element, 'hidden') }",
+            'addClass',
+        ),
+        rejected(
+            "import { Renderer2 as DomRenderer } from '@angular/core'; function apply(renderer: DomRenderer) { renderer.removeClass(element, 'hidden') }",
+            'removeClass',
+        ),
+        rejected(
+            "import * as ng from '@angular/core'; class Example { private renderer: ng.Renderer2; apply() { this.renderer.addClass(element, 'hidden') } }",
+            'addClass',
+        ),
+        rejected(
+            "import { inject, Renderer2 } from '@angular/core'; class Example { private renderer = inject(Renderer2); apply() { this.renderer.addClass(element, 'hidden') } }",
+            'addClass',
+        ),
         rejected("element['classList']['add']('hidden')", "'add'"),
         rejected('element[`classList`][`remove`](`hidden`)', '`remove`'),
         rejected("element?.classList?.toggle('hidden')", 'toggle'),
-        rejected("renderer?.['removeClass']?.(element, 'hidden')", "'removeClass'"),
+        rejected(
+            "import { Renderer2 } from '@angular/core'; function apply(renderer: Renderer2) { renderer?.['removeClass']?.(element, 'hidden') }",
+            "'removeClass'",
+        ),
         rejected("getElement().classList.add('hidden')", 'add'),
     ],
 })

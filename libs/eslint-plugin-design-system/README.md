@@ -42,11 +42,11 @@ It rejects `@HostBinding` decorators for `class`, `className`, and `class.*`, `a
 `classList.add` / `remove` / `toggle` / `replace`. Diagnostics underline the binding argument or
 mutation method. Use a template binding or `host` metadata instead; both remain validated.
 
-The rule matches API spelling without type services. Renderer variable aliases, optional chaining,
-and literal bracket access are covered. Angular `HostBinding` import aliases and namespace imports
-are covered too. A different API named `addClass` or `removeClass` needs the same narrow, explained
-suppression as an exceptional DOM integration. Computed method names and detached method references
-are not resolved. Do not use them to bypass class validation.
+The rule resolves `Renderer2` through Angular imports, typed constructor or function parameters,
+`inject(Renderer2)`, and local aliases without type services. Optional chaining and literal bracket
+access are covered. Angular `HostBinding` import aliases and namespace imports are covered too.
+Unrelated APIs named `addClass` or `removeClass` are allowed. Computed method names and detached
+method references are not resolved. Do not use them to bypass class validation.
 
 Use `eslint-disable-next-line design-system/no-imperative-classes -- <reason>` at the operation,
 explaining the class source and why a binding cannot serve it. There are no ignore options.
