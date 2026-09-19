@@ -1,4 +1,4 @@
-import { entriesOf } from '@release-maestro/core'
+import { CalendarDay, entriesOf } from '@release-maestro/core'
 
 export const formatDuration = (duration: number): string => {
     // If the duration is longer than 10 hours, its probably in milliseconds
@@ -72,6 +72,25 @@ export const formatDateRelative = (date: Date, referenceDate: Date = new Date())
     const roundedDifference = Math.round(difference / conversionFactor)
 
     return relativeTimeFormatter.format(roundedDifference, unit)
+}
+
+const localCalendarDay = (date: Date): number => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+
+const formatCalendarDaysRelative = (days: number): string =>
+    Math.abs(days) <= 1
+        ? relativeTimeFormatter.format(days, 'day')
+        : formatDateRelative(new Date(days * conversionFactorMap.day), new Date(0))
+
+/** Compare Bandcamp's release day with the viewer's current calendar day. */
+export const formatReleaseDateRelative = (date: CalendarDay, referenceDate: Date = new Date()): string => {
+    const days = (Date.parse(`${date}T00:00:00Z`) - localCalendarDay(referenceDate)) / conversionFactorMap.day
+    return `${days < 0 ? 'released' : 'releases'} ${formatCalendarDaysRelative(days)}`
+}
+
+/** Format a timestamp at calendar-day precision in the viewer's timezone. */
+export const formatCalendarDateRelative = (date: Date, referenceDate: Date = new Date()): string => {
+    const days = (localCalendarDay(date) - localCalendarDay(referenceDate)) / conversionFactorMap.day
+    return formatCalendarDaysRelative(days)
 }
 
 const shortDateFormatter = new Intl.DateTimeFormat('en', { year: 'numeric', month: 'short', day: 'numeric' })

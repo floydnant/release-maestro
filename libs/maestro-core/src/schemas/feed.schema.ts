@@ -1,4 +1,5 @@
 import z from 'zod'
+import { CalendarDay } from './calendar-day.schema'
 import {
     bandcampEmailFansBoughtMusicFeedSourceItemSchema,
     bandcampEmailNewReleaseFeedSourceItemSchema,
@@ -47,7 +48,7 @@ export type FeedItemMaster = z.infer<typeof feedItemMasterSchema>
 export type HydratedBandcampReleaseFeedItem = {
     data: {
         releaseUrl: string
-        releaseDate: Date | null
+        releaseDate: CalendarDay | null
         emailReceivedAt: Date
         isEmailRead: boolean
         emailId: string

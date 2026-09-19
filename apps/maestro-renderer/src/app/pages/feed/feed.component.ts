@@ -19,7 +19,11 @@ import { IconComponent } from '../../shared/components/icon/icon.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
 import { IntersectionDirective } from '../../shared/directives/intersection.directive'
 import { SafePipe } from '../../shared/pipes/safe.pipe'
-import { formatDateRelative, formatDuration } from '../../shared/utils/formatting.utils'
+import {
+    formatCalendarDateRelative,
+    formatDuration,
+    formatReleaseDateRelative,
+} from '../../shared/utils/formatting.utils'
 
 const NUM_PREFETCH_ITEMS = 5
 const SEEK_BY_SECONDS = 30
@@ -406,10 +410,8 @@ export class FeedComponent {
     }
 
     formatDuration = formatDuration
-    formatDateRelative = formatDateRelative
-    isInThePast = (date: Date) => {
-        return new Date(date).getTime() < Date.now()
-    }
+    formatCalendarDateRelative = formatCalendarDateRelative
+    formatReleaseDateRelative = formatReleaseDateRelative
     isAfter = (date: Date, otherDate: Date) => {
         return new Date(date).getTime() > new Date(otherDate).getTime()
     }
