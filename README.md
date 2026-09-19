@@ -39,6 +39,8 @@ crates, and installs Playwright Chromium with its system dependencies. Linux sys
 require sudo. Chromium requires an OS supported by the installed Playwright version.
 
 `make dev` starts the Angular dev server and the Electron main process with hot reload.
+It also opens local debug endpoints for agent inspection. See
+[`inspect-running-app`](.agents/skills/inspect-running-app/SKILL.md) for attachment and profiling.
 
 ## Commands
 
