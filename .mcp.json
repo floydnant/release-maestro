@@ -4,7 +4,7 @@
             "command": "npx",
             "args": [
                 "-y",
-                "chrome-devtools-mcp",
+                "chrome-devtools-mcp@1.8.0",
                 "--browserUrl",
                 "http://127.0.0.1:9222",
                 "--usageStatistics=false",
