@@ -1,15 +1,14 @@
+/* Hover and programmatic glow share a parent state. Each segment supplies --color,
+   and entering/leaving that state uses different transition durations and easing. */
 .progress-container:is(:hover, .glow) .progress-segment {
     box-shadow: 0 0 12px color-mix(in srgb, var(--color) 55%, transparent);
     transition:
-        box-shadow var(--foundation-motion-duration-fast),
-        width var(--foundation-motion-duration-ambient) var(--foundation-motion-easing-emphasized),
-        border-radius var(--foundation-motion-duration-ambient);
+        box-shadow theme('transitionDuration.fast'),
+        width theme('transitionDuration.ambient') theme('transitionTimingFunction.emphasized'),
+        border-radius theme('transitionDuration.ambient');
 }
 .progress-segment {
     transition:
-        box-shadow var(--foundation-motion-duration-slow),
-        width var(--foundation-motion-duration-ambient) var(--foundation-motion-easing-standard);
-}
-.progress-container:is(:hover, .glow) .progress-number {
-    @apply text-content-muted;
+        box-shadow theme('transitionDuration.slow'),
+        width theme('transitionDuration.ambient') theme('transitionTimingFunction.standard');
 }

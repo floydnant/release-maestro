@@ -12,7 +12,7 @@ const DESCRIPTOR_SEPARATOR = '|'
 const BARE_TOKEN_VARIABLE = /var\(\s*(--(?:color|foundation|type)-[\w-]*)/g
 
 /** The validated alternative — but only validated if the path is real, hence `themeReferences`. */
-const THEME_REFERENCE = /theme\(\s*([^)]+?)\s*\)/g
+const THEME_PREFIX = 'theme('
 
 /**
  * @typedef {'descriptor'|'styling'|'partial'|'interpolated'} ClassTokenKind
@@ -108,11 +108,29 @@ function bareTokenVariables(token) {
  * @param {ClassToken} token
  */
 function themeReferences(token) {
-    return [...token.name.matchAll(THEME_REFERENCE)].map(match => ({
-        path: match[1],
-        start: token.start + match.index + match[0].indexOf(match[1]),
-        end: token.start + match.index + match[0].indexOf(match[1]) + match[1].length,
-    }))
+    /** @type {{ path: string, start: number, end: number }[]} */
+    const references = []
+
+    for (let searchFrom = 0; searchFrom < token.name.length; ) {
+        const referenceStart = token.name.indexOf(THEME_PREFIX, searchFrom)
+        if (referenceStart === -1) break
+
+        const valueStart = referenceStart + THEME_PREFIX.length
+        const close = token.name.indexOf(')', valueStart)
+        if (close === -1) break
+
+        const raw = token.name.slice(valueStart, close)
+        const path = raw.trim()
+        if (path) {
+            const leadingWhitespace = raw.length - raw.trimStart().length
+            const start = token.start + valueStart + leadingWhitespace
+            references.push({ path, start, end: start + path.length })
+        }
+
+        searchFrom = close + 1
+    }
+
+    return references
 }
 
 module.exports = { bareTokenVariables, DESCRIPTOR_SEPARATOR, themeReferences, tokenizeClassList }

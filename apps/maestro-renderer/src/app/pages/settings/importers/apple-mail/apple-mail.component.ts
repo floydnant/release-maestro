@@ -6,7 +6,6 @@ import { SettingsService } from '../../../../core/settings/settings.service'
     selector: 'app-apple-mail',
     imports: [FormsModule],
     templateUrl: './apple-mail.component.html',
-    styles: ``,
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppleMailImporterComponent {

@@ -3,7 +3,10 @@ import baseConfig from '../../eslint.config.mjs'
 
 export default [
     ...baseConfig,
-    playwright.configs['flat/recommended'],
+    {
+        ...playwright.configs['flat/recommended'],
+        files: ['**/*.spec.ts'],
+    },
     {
         files: ['**/*.ts', '**/*.js'],
         // Override or add rules here

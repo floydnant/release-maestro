@@ -28,7 +28,7 @@
                         aria-label="Add folders"
                         (click)="addFolders()"
                     >
-                        <app-icon name="octPlus" size="1rem"></app-icon>
+                        <app-icon name="add" size="1rem"></app-icon>
                         Add another folder
                     </button>
                 </app-folder-list>
@@ -87,11 +87,7 @@
                 <div class="mx-auto w-full max-w-2xl px-8 text-center">
                     @if (step() === 'done') {
                         <p class="text-content-success">
-                            <app-icon
-                                name="octCheckCircleFill"
-                                color="content.success"
-                                size="2.5rem"
-                            ></app-icon>
+                            <app-icon name="success" color="content.success" size="2.5rem"></app-icon>
                         </p>
                         <h1 class="type-hero-title mt-3 text-content-primary">Your library is ready</h1>
                     } @else if (terminalBanner(); as terminal) {
@@ -199,7 +195,7 @@
                         } @else {
                             <p class="type-body-md mt-6 text-content-danger">
                                 <app-icon
-                                    name="octXCircleFill"
+                                    name="error"
                                     color="content.danger"
                                     class="translate-y-px align-middle"
                                 ></app-icon>

@@ -45,7 +45,12 @@
             "command": "wait-on tcp:4200 && nx serve-internal maestro-electron"
         },
         "package": {
-            "dependsOn": ["maestro-renderer:build", "prepare-icons", "build"],
+            "dependsOn": [
+                "maestro-renderer:build",
+                "prepare-icons",
+                "build",
+                "metadata-engine:build-package"
+            ],
             "executor": "nx-electron:package",
             "cache": true,
             "outputs": ["{workspaceRoot}/dist/packages"],
@@ -64,7 +69,12 @@
             }
         },
         "make": {
-            "dependsOn": ["maestro-renderer:build", "prepare-icons", "build"],
+            "dependsOn": [
+                "maestro-renderer:build",
+                "prepare-icons",
+                "build",
+                "metadata-engine:build-package"
+            ],
             "executor": "nx-electron:make",
             "cache": true,
             "outputs": ["{workspaceRoot}/dist/executables"],

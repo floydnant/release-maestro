@@ -1,0 +1,604 @@
+[
+    {
+        "file": "vardae-invocacion-del-cielo.mp3",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle",
+            "energy": "7"
+        },
+        "artwork": true,
+        "extras": [["Custom: X-MAESTRO", "keep me"]],
+        "writable": true
+    },
+    {
+        "file": "vardae-invocacion-del-cielo.wav",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle",
+            "energy": "7"
+        },
+        "artwork": true,
+        "extras": [["Custom: X-MAESTRO", "keep me"]],
+        "writable": true
+    },
+    {
+        "file": "vardae-invocacion-del-cielo.aiff",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle",
+            "energy": "7"
+        },
+        "artwork": true,
+        "extras": [["Custom: X-MAESTRO", "keep me"]],
+        "writable": true
+    },
+    {
+        "file": "vardae-invocacion-del-cielo.flac",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle",
+            "energy": "7"
+        },
+        "artwork": true,
+        "extras": [["Custom: X-MAESTRO", "keep me"]],
+        "writable": true
+    },
+    {
+        "file": "vardae-invocacion-del-cielo.ogg",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle",
+            "energy": "7"
+        },
+        "artwork": false,
+        "extras": [["Custom: X-MAESTRO", "keep me"]],
+        "writable": true
+    },
+    {
+        "file": "vardae-invocacion-del-cielo.opus",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle",
+            "energy": "7"
+        },
+        "artwork": false,
+        "extras": [["Custom: X-MAESTRO", "keep me"]],
+        "writable": true
+    },
+    {
+        "file": "vardae-invocacion-del-cielo.wv",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle",
+            "energy": "7"
+        },
+        "artwork": false,
+        "extras": [["Custom: X-MAESTRO", "keep me"]],
+        "writable": true
+    },
+    {
+        "file": "vardae-invocacion-del-cielo.m4a",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 128,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle",
+            "energy": null
+        },
+        "artwork": true,
+        "extras": [["Custom: ----:com.apple.iTunes:X-MAESTRO", "keep me"]],
+        "writable": true
+    },
+    {
+        "file": "spunoff-el-sueno-untagged.mp3",
+        "expected": {
+            "title": "spunoff-el-sueno-untagged.mp3",
+            "artist": null,
+            "track": null,
+            "energy": null,
+            "bpm": null
+        }
+    },
+    {
+        "file": "alias-energy-0.mp3",
+        "expected": {
+            "energy": "7"
+        },
+        "aliasField": "energy"
+    },
+    {
+        "file": "alias-energy-1.mp3",
+        "expected": {
+            "energy": "7"
+        },
+        "aliasField": "energy"
+    },
+    {
+        "file": "alias-energy-2.mp3",
+        "expected": {
+            "energy": "7"
+        },
+        "aliasField": "energy"
+    },
+    {
+        "file": "alias-energy-3.mp3",
+        "expected": {
+            "energy": "7"
+        },
+        "aliasField": "energy"
+    },
+    {
+        "file": "alias-bpm-0.mp3",
+        "expected": {
+            "bpm": 127.5
+        },
+        "aliasField": "bpm"
+    },
+    {
+        "file": "alias-bpm-1.mp3",
+        "expected": {
+            "bpm": 127.5
+        },
+        "aliasField": "bpm"
+    },
+    {
+        "file": "alias-bpm-2.mp3",
+        "expected": {
+            "bpm": 127.5
+        },
+        "aliasField": "bpm"
+    },
+    {
+        "file": "alias-bpm-3.mp3",
+        "expected": {
+            "bpm": 127.5
+        },
+        "aliasField": "bpm"
+    },
+    {
+        "file": "alias-musicalKey-0.mp3",
+        "expected": {
+            "musicalKey": "Am"
+        },
+        "aliasField": "musicalKey"
+    },
+    {
+        "file": "alias-musicalKey-1.mp3",
+        "expected": {
+            "musicalKey": "Am"
+        },
+        "aliasField": "musicalKey"
+    },
+    {
+        "file": "alias-musicalKey-2.mp3",
+        "expected": {
+            "musicalKey": "Am"
+        },
+        "aliasField": "musicalKey"
+    },
+    {
+        "file": "alias-musicalKey-3.mp3",
+        "expected": {
+            "musicalKey": "Am"
+        },
+        "aliasField": "musicalKey"
+    },
+    {
+        "file": "alias-musicalKey-4.mp3",
+        "expected": {
+            "musicalKey": "Am"
+        },
+        "aliasField": "musicalKey"
+    },
+    {
+        "file": "alias-comment-0.mp3",
+        "expected": {
+            "comment": "First line\nSecond line"
+        },
+        "aliasField": "comment"
+    },
+    {
+        "file": "alias-comment-1.mp3",
+        "expected": {
+            "comment": "First line\nSecond line"
+        },
+        "aliasField": "comment"
+    },
+    {
+        "file": "alias-comment-2.mp3",
+        "expected": {
+            "comment": "First line\nSecond line"
+        },
+        "aliasField": "comment"
+    },
+    {
+        "file": "alias-catalogNumber-0.mp3",
+        "expected": {
+            "catalogNumber": "BNJS001"
+        },
+        "aliasField": "catalogNumber"
+    },
+    {
+        "file": "alias-catalogNumber-1.mp3",
+        "expected": {
+            "catalogNumber": "BNJS001"
+        },
+        "aliasField": "catalogNumber"
+    },
+    {
+        "file": "alias-catalogNumber-2.mp3",
+        "expected": {
+            "catalogNumber": "BNJS001"
+        },
+        "aliasField": "catalogNumber"
+    },
+    {
+        "file": "alias-catalogNumber-3.mp3",
+        "expected": {
+            "catalogNumber": "BNJS001"
+        },
+        "aliasField": "catalogNumber"
+    },
+    {
+        "file": "alias-catalogNumber-4.mp3",
+        "expected": {
+            "catalogNumber": "BNJS001"
+        },
+        "aliasField": "catalogNumber"
+    },
+    {
+        "file": "alias-catalogNumber-5.mp3",
+        "expected": {
+            "catalogNumber": "BNJS001"
+        },
+        "aliasField": "catalogNumber"
+    },
+    {
+        "file": "alias-catalogNumber-6.mp3",
+        "expected": {
+            "catalogNumber": "BNJS001"
+        },
+        "aliasField": "catalogNumber"
+    },
+    {
+        "file": "alias-catalogNumber-7.mp3",
+        "expected": {
+            "catalogNumber": "BNJS001"
+        },
+        "aliasField": "catalogNumber"
+    },
+    {
+        "file": "alias-catalogNumber-8.mp3",
+        "expected": {
+            "catalogNumber": "BNJS001"
+        },
+        "aliasField": "catalogNumber"
+    },
+    {
+        "file": "alias-lyrics-0.mp3",
+        "expected": {
+            "lyrics": "Words\nMore words"
+        },
+        "aliasField": "lyrics"
+    },
+    {
+        "file": "invalid-bpm.mp3",
+        "expected": {
+            "bpm": null
+        }
+    },
+    {
+        "file": "negative-bpm.mp3",
+        "expected": {
+            "bpm": null
+        }
+    },
+    {
+        "file": "nan-bpm.mp3",
+        "expected": {
+            "bpm": null
+        }
+    },
+    {
+        "file": "dj-swagger-stvol.mp3",
+        "expected": {
+            "title": "Ствол",
+            "artist": "DJ Swagger & DJ Ædidias",
+            "albumTitle": "Ствол EP"
+        }
+    },
+    {
+        "file": "repeated-id3.mp3",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [
+            ["Custom: X-MAESTRO", "first"],
+            ["Custom: X-MAESTRO", "second"]
+        ],
+        "writable": true
+    },
+    {
+        "file": "opaque-energy.mp3",
+        "expected": {
+            "energy": "eyJlbmVyZ3lMZXZlbCI6N30=",
+            "bpm": null
+        },
+        "extras": [["Custom: fBPM", "126.76999"]]
+    },
+    {
+        "file": "multiple.flac",
+        "expected": {
+            "date": "2024-02-03",
+            "track": null
+        },
+        "extras": [
+            ["Custom: X-MAESTRO", "first"],
+            ["Custom: X-MAESTRO", "second"]
+        ]
+    },
+    {
+        "file": "namespaced.m4a",
+        "expected": {
+            "musicalKey": "Fm",
+            "energy": "6"
+        },
+        "extras": [
+            ["Custom: ----:org.example:ENERGY", "unrelated"],
+            ["Custom: ----:org.example:VALUES", "first"],
+            ["Custom: ----:org.example:VALUES", "second"]
+        ],
+        "writable": true
+    },
+    {
+        "file": "id3v1-only.mp3",
+        "expected": {
+            "title": "El sueño",
+            "artist": "SpunOff",
+            "track": 5
+        }
+    },
+    {
+        "file": "id3-priority.mp3",
+        "expected": {
+            "title": "Gökotta",
+            "artist": null,
+            "track": null
+        }
+    },
+    {
+        "file": "spunoff-el-sueno-untagged.wav",
+        "expected": {
+            "title": "spunoff-el-sueno-untagged.wav",
+            "track": null
+        },
+        "createTag": true
+    },
+    {
+        "file": "spunoff-el-sueno-untagged.aiff",
+        "expected": {
+            "title": "spunoff-el-sueno-untagged.aiff",
+            "track": null
+        },
+        "createTag": true
+    },
+    {
+        "file": "spunoff-el-sueno-untagged.wv",
+        "expected": {
+            "title": "spunoff-el-sueno-untagged.wv",
+            "track": null
+        },
+        "createTag": true
+    },
+    {
+        "file": "url-alias-energy.mp3",
+        "expected": {
+            "energy": "https://example.com/value"
+        },
+        "aliasField": "energy"
+    },
+    {
+        "file": "url-alias-comment.mp3",
+        "expected": {
+            "comment": "https://example.com/value"
+        },
+        "aliasField": "comment"
+    },
+    {
+        "file": "url-alias-lyrics.mp3",
+        "expected": {
+            "lyrics": "https://example.com/value"
+        },
+        "aliasField": "lyrics"
+    },
+    {
+        "file": "external-reference.wv",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [["Custom: X-URL", "https://example.com/track"]],
+        "writable": true
+    },
+    {
+        "file": "musicbrainz-recording.mp3",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [["MusicBrainzRecordingId", "d74c6c09-74de-49b3-a931-e0e67e2040e5"]],
+        "writable": true
+    },
+    {
+        "file": "mixed-data.m4a",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 128,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
+    },
+    {
+        "file": "repeated-ape.wv",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [["Custom: X-MAESTRO", "first\u0000second"]],
+        "writable": true
+    },
+    {
+        "file": "editable-mixed.m4a",
+        "expected": {
+            "energy": "7"
+        }
+    },
+    {
+        "file": "editable-alias.m4a",
+        "expected": {
+            "energy": "7"
+        }
+    },
+    {
+        "file": "editable-aliases.m4a",
+        "expected": {
+            "energy": "7"
+        }
+    },
+    {
+        "file": "riff-aliases.wav",
+        "expected": {
+            "bpm": 127.5,
+            "musicalKey": "Am"
+        },
+        "extras": [["Custom: XTRA", "keep me"]]
+    }
+]

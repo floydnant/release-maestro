@@ -1,13 +1,13 @@
 /**
- * Every message both rules can emit, in one place — they overlap almost entirely, and wording that
- * drifts between two rules reporting the same mistake is worse than no wording at all.
+ * Every message the class-validation rules can emit, in one place. They overlap almost entirely,
+ * and wording that drifts between rules reporting the same mistake is worse than no wording at all.
  *
  * House style: name the failure, then the way out. No sentence explains the mechanism twice, and
  * none explains the pipe convention to someone who is already using it — that is the skill's job,
  * not the diagnostic's.
  */
 
-/** Shared by `valid-template-classnames` and `valid-host-classnames`. */
+/** Shared by the template, host-metadata and imperative class validators. */
 const CLASS_MESSAGES = {
     unknownClass: 'Unknown class `{{className}}`.',
     unknownClassWithSuggestion: 'Unknown class `{{className}}` — did you mean `{{suggestion}}`?',
@@ -68,8 +68,7 @@ const MEMBER_MESSAGES = {
         '`member` and `member()` resolve against the component. Give the whole class list its own ' +
         'member, or suppress with a reason.',
 
-    memberCallShape:
-        '`{{name}}` is {{declared}}, but the template reads it as {{read}} — write `{{fix}}`.',
+    memberCallShape: '`{{name}}` is {{declared}}, but the template reads it as {{read}} — write `{{fix}}`.',
 
     ambiguousMember:
         '`{{name}}` is declared by more than one component in this file — the template maps to the ' +

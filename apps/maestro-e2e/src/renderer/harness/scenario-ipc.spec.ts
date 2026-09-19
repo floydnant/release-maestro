@@ -99,6 +99,61 @@ test.describe('renderer scenario IPC harness', () => {
         })
     })
 
+    test('preserves dates, undefined values, and sparse array holes in both directions', async ({ page }) => {
+        const sparse: unknown[] = new Array(5)
+        sparse[1] = undefined
+        sparse[3] = new Date('2026-07-03T12:34:56.000Z')
+        const value = {
+            sparse,
+            nested: { capturedAt: new Date('2026-07-01T12:34:56.000Z'), missing: undefined },
+            values: [undefined, new Date('2026-07-02T12:34:56.000Z')],
+        }
+        const controller = await createRendererScenario(
+            page,
+            scenarioBuilder().handler('metadata:read', { kind: 'resolve', value }).build(),
+        )
+        const received = await page.evaluate(async () => {
+            const electronModule = window.require?.('electron') as {
+                ipcRenderer: {
+                    invoke: (channel: string) => Promise<{
+                        nested: { capturedAt: Date; missing?: unknown }
+                        values: unknown[]
+                        sparse: unknown[]
+                    }>
+                    send: (channel: string, payload: unknown) => void
+                }
+            }
+            const value = await electronModule.ipcRenderer.invoke('metadata:read')
+            electronModule.ipcRenderer.send('metadata:write', value)
+            return {
+                nestedDate: value.nested.capturedAt instanceof Date,
+                ownsMissing: Object.prototype.hasOwnProperty.call(value.nested, 'missing'),
+                missingIsUndefined: value.nested.missing === undefined,
+                ownsArrayElement: Object.prototype.hasOwnProperty.call(value.values, 0),
+                arrayElementIsUndefined: value.values[0] === undefined,
+                arrayDate: value.values[1] instanceof Date,
+                sparseLength: value.sparse.length,
+                sparseKeys: Object.keys(value.sparse),
+                sparseUndefined: value.sparse[1] === undefined,
+                sparseDate: value.sparse[3] instanceof Date,
+            }
+        })
+        expect(received).toEqual({
+            nestedDate: true,
+            ownsMissing: true,
+            missingIsUndefined: true,
+            ownsArrayElement: true,
+            arrayElementIsUndefined: true,
+            arrayDate: true,
+            sparseLength: 5,
+            sparseKeys: ['1', '3'],
+            sparseUndefined: true,
+            sparseDate: true,
+        })
+        expect((await controller.lastCall('metadata:write'))?.payload).toStrictEqual(value)
+        expect((await controller.calls('metadata:write'))[0]?.payload).toStrictEqual(value)
+    })
+
     test('answers from a responder running in Node, with the request', async ({ page }) => {
         // The point of `respond()` over a canned value: the answer depends on what was
         // asked. Anything that only ever returns a fixture can prove a caller asked
@@ -183,6 +238,43 @@ test.describe('renderer scenario IPC harness', () => {
         })
 
         expect(read).toEqual({ isDate: true, iso: capturedAt.toISOString() })
+    })
+
+    test('preserves sparse arrays across both responder directions', async ({ page }) => {
+        const seen: unknown[] = []
+        const scenario = scenarioBuilder()
+            .handler(
+                'metadata:read',
+                respond(page, 'sparse', (request: { values: unknown[] }) => {
+                    seen.push(request)
+                    const values: unknown[] = new Array(4)
+                    values[1] = undefined
+                    values[3] = request.values
+                    return { values }
+                }),
+            )
+            .build()
+        await createRendererScenario(page, scenario)
+
+        const received = await page.evaluate(async () => {
+            const request: unknown[] = new Array(4)
+            request[1] = undefined
+            request[3] = 'present'
+            const electronModule = window.require?.('electron') as {
+                ipcRenderer: { invoke: (channel: string, payload: unknown) => Promise<unknown> }
+            }
+            const response = (await electronModule.ipcRenderer.invoke('metadata:read', {
+                values: request,
+            })) as { values: unknown[] }
+            return {
+                keys: Object.keys(response.values),
+                nestedKeys: Object.keys(response.values[3] as unknown[]),
+            }
+        })
+
+        expect(seen).toHaveLength(1)
+        expect(Object.keys((seen[0] as { values: unknown[] }).values)).toEqual(['1', '3'])
+        expect(received).toEqual({ keys: ['1', '3'], nestedKeys: ['1', '3'] })
     })
 
     test('serves the window a song catalog was asked for', async ({ page }) => {

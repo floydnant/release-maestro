@@ -15,7 +15,7 @@
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
                     <p class="text-content-danger">
-                        <app-icon name="octXCircleFill" color="content.danger" size="3rem"></app-icon>
+                        <app-icon name="error" color="content.danger" size="3rem"></app-icon>
                     </p>
                     <p class="type-label-md mt-2 text-center text-content-danger">
                         {{ feedState.error }}
@@ -163,7 +163,7 @@
                                     <div class="error | mb-1.5 flex items-center gap-2">
                                         <p class="text-content-danger">
                                             <app-icon
-                                                name="octXCircleFill"
+                                                name="error"
                                                 color="content.danger"
                                                 size="1.3rem"
                                                 class="translate-y-[3px]"
@@ -198,18 +198,14 @@
                                             'released ' +
                                             (feedItem.data.releaseDate | date) +
                                             ', announced ' +
-                                            formatDateRelative(feedItem.data.emailReceivedAt)
+                                            formatCalendarDateRelative(feedItem.data.emailReceivedAt)
                                         "
                                     >
                                         @if (feedItem.data.releaseDate) {
-                                            {{
-                                                isInThePast(feedItem.data.releaseDate)
-                                                    ? 'released'
-                                                    : 'releases'
-                                            }}
-                                            {{ formatDateRelative(feedItem.data.releaseDate) + ', ' }}
+                                            {{ formatReleaseDateRelative(feedItem.data.releaseDate) + ', ' }}
                                         }
-                                        announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
+                                        announced
+                                        {{ formatCalendarDateRelative(feedItem.data.emailReceivedAt) }}
                                     </span>
                                 </p>
 

@@ -6,6 +6,26 @@ release feed loading, empty, error, retry, and progress-stream states.
 
 Full Electron E2E still owns real IPC, SQLite, filesystem, and worker integration coverage.
 
+```mermaid
+sequenceDiagram
+    participant Test as Playwright test / Node
+    participant CodecN as Shared runtime (Node)
+    participant Page as Browser init script
+    participant CodecB as Shared runtime (Browser)
+    participant App as Renderer code
+
+    Test->>CodecN: Serialize scenario
+    CodecN->>Page: addInitScript(runtime source, scenario)
+    Page->>CodecB: Create runtime and decode scenario
+    App->>Page: ipcRenderer.invoke(channel, payload)
+    Page->>CodecB: Serialize responder request
+    CodecB->>Test: __maestroRespond(encoded request)
+    Test->>CodecN: Decode request and run responder
+    CodecN->>Page: Encoded response
+    Page->>CodecB: Decode response
+    Page-->>App: Resolved IPC value
+```
+
 ## How It Works
 
 `createRendererScenario(page, scenario)` installs an init script before navigation. The script makes
@@ -27,7 +47,16 @@ The scenario backend lives in the browser page. Tests control it through the ret
 
 Scenario values are serialized with a tagged JSON codec before they cross the Playwright boundary.
 Nested `Date` instances are revived as real `Date` objects in the browser, so fixtures can use dates
-without adding channel-specific revival logic.
+without adding channel-specific revival logic. Explicit `undefined` properties and array elements
+also survive the round trip, while sparse array holes remain absent. Decoding returns `unknown`; the
+harness validates scenario behaviors and recorded calls at the boundary before using them.
+
+`scenario-runtime.ts` defines the codec and sequence selection in one self-contained factory. The
+init script receives that factory's source because it cannot capture module imports. Keep runtime
+imports and module-level dependencies out of the factory.
+
+Jest tests in `*.test.ts` cover the pure helpers with `npx nx test maestro-e2e`, also included in
+`make test` and `make sure`. Playwright runs `*.spec.ts` and checks the browser integration.
 
 ## Basic Usage
 

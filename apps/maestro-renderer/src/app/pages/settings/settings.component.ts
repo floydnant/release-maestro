@@ -6,11 +6,7 @@ import { webEnv } from '../../../environments/environment'
     selector: 'app-import',
     imports: [RouterModule],
     templateUrl: './settings.component.html',
-    styles: `
-        :host {
-            @apply flex h-full min-h-0 w-full;
-        }
-    `,
+    host: { class: 'flex h-full min-h-0 w-full' },
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsComponent {

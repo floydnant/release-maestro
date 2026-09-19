@@ -11,6 +11,9 @@ Chromium with its system dependencies before running the checks below.
 
 - Unit tests cover renderer components, Electron services, core schemas, and metadata-engine behavior
   close to the code under test.
+- Metadata-engine E2E tests run its compiled Rust worker over JSONL against independently authored
+  audio fixtures. They run with `npx nx test metadata-engine`, alongside its unit and protocol tests.
+  See [the metadata fixtures](../fixtures/metadata/README.md) for coverage and regeneration.
 - Renderer E2E uses a browser with mocked Electron IPC. Use it for UI state matrices—loading, empty,
   error, retry, settings, and progress—that are awkward to arrange through the real app.
 - Electron E2E launches the full app and covers renderer, IPC, filesystem, SQLite, and the metadata
@@ -19,7 +22,7 @@ Chromium with its system dependencies before running the checks below.
   designed for 50k–500k songs ([ADR 0004](adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md));
   adding a sortable column means adding its index and a case to `library-browse.scale.spec.ts`.
 
-Both E2E layers live in `apps/maestro-e2e/`. Do not use renderer E2E for routing smoke tests or happy
+Both application E2E layers live in `apps/maestro-e2e/`. Do not use renderer E2E for routing smoke tests or happy
 paths that need real IPC, files, database state, or the sidecar.
 
 ### Renderer scenario harness
@@ -28,6 +31,10 @@ paths that need real IPC, files, database state, or the sidecar.
 Angular starts. Scenario responders can run in Node when an answer depends on the request, such as a
 windowed query. See [the harness README](../apps/maestro-e2e/src/renderer/README.md) for builders,
 presets, pending handlers, sequences, and computed responders.
+
+Pure scenario helpers have Jest tests in `src/renderer/**/*.test.ts`. Run them with
+`npx nx test maestro-e2e`; `make test` and `make sure` include this target. Playwright owns
+`*.spec.ts`, including the browser integration contract in `harness/scenario-ipc.spec.ts`.
 
 Do not mock Node modules such as `fs` or `child_process` in renderer E2E; renderer behavior should use
 typed IPC. The default scenario has a configured library folder so unrelated tests are not redirected

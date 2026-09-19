@@ -58,4 +58,11 @@ export default [
             'design-system/valid-host-classnames': ['error', classValidationOptions],
         },
     },
+    {
+        basePath: projectRoot,
+        files: ['src/app/**/*.ts'],
+        rules: {
+            'design-system/valid-imperative-classnames': ['error', classValidationOptions],
+        },
+    },
 ]

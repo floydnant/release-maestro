@@ -69,13 +69,13 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
                         @for (revisionCell of [cell]; track revisionCell.revision) {
                             @if (revisionCell.previous; as previous) {
                                 <img
-                                    class="mosaic-tile mosaic-tile--leave"
+                                    class="mosaic-tile--leave absolute inset-0 size-full object-cover"
                                     [src]="fileUrl(previous.coverPath)"
                                     alt=""
                                 />
                             }
                             <img
-                                class="mosaic-tile mosaic-tile--enter"
+                                class="mosaic-tile--enter absolute inset-0 size-full object-cover"
                                 [src]="fileUrl(revisionCell.current.coverPath)"
                                 [title]="tileTitle(revisionCell.current)"
                                 alt=""
@@ -87,20 +87,14 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
         </div>
     `,
     styles: `
-        .mosaic-tile {
-            position: absolute;
-            inset: 0;
-            height: 100%;
-            width: 100%;
-            object-fit: cover;
-        }
-
+        /* Enter and leave animations coordinate replacement tiles, with distinct
+           fill modes and a reduced-motion fallback. Keep these keyframes together. */
         .mosaic-tile--enter {
-            animation: mosaic-tile-enter 650ms var(--foundation-motion-easing-emphasized) backwards;
+            animation: mosaic-tile-enter 650ms theme('transitionTimingFunction.emphasized') backwards;
         }
 
         .mosaic-tile--leave {
-            animation: mosaic-tile-leave 650ms var(--foundation-motion-easing-standard) forwards;
+            animation: mosaic-tile-leave 650ms theme('transitionTimingFunction.standard') forwards;
         }
 
         @keyframes mosaic-tile-enter {

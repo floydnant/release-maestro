@@ -13,14 +13,15 @@ authorities — the Tailwind config and the global stylesheets — arrive as rul
 makes it a library rather than a folder of scripts, and what would make publishing it a packaging
 question rather than a rewrite.
 
-## The two rules
+## The rules
 
-| Rule                                      | Surface                                                                                                                                                             |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `design-system/valid-template-classnames` | `class`, `ngClass`, `routerLinkActive`, `[class]`, `[ngClass]`, `[class.foo]`, in `.html` files and in inline templates (via the Angular inline-template processor) |
-| `design-system/valid-host-classnames`     | `@Component`/`@Directive` `host: { class: '…' }` and `host: { '[class.foo]': … }`                                                                                   |
+| Rule                                        | Surface                                                                                                                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `design-system/valid-template-classnames`   | `class`, `ngClass`, `routerLinkActive`, `[class]`, `[ngClass]`, `[class.foo]`, in `.html` files and in inline templates (via the Angular inline-template processor) |
+| `design-system/valid-host-classnames`       | `@Component`/`@Directive` `host: { class: '…' }` and `host: { '[class.foo]': … }`                                                                                   |
+| `design-system/valid-imperative-classnames` | `@HostBinding('class...')`, `Renderer2.addClass` / `removeClass`, and mutating `classList` calls in TypeScript                                                      |
 
-Both are registered at `error` in the renderer's
+The validators are registered at `error` in the renderer's
 [`eslint.config.mjs`](../../apps/maestro-renderer/eslint.config.mjs), which turns on typed member
 resolution and explains why registration is per-project.
 
@@ -32,8 +33,32 @@ resolution and explains why registration is per-project.
 | `resolveTypes`      | `false`    | Resolve an otherwise unenumerable component member through a `TypeChecker`. See [Dynamic class lists](#dynamic-class-lists). |
 | `tsconfig`          | discovered | The project `resolveTypes` builds from.                                                                                      |
 
-`resolveTypes` and `tsconfig` affect `valid-template-classnames` only; the host rule has no template
-member to resolve.
+`resolveTypes` and `tsconfig` affect `valid-template-classnames` only. The imperative rule reads type
+information from the TypeScript parser program already configured for renderer lint.
+
+## Imperative classes
+
+`design-system/valid-imperative-classnames` runs at `error` only for renderer `src/app/**/*.ts`.
+It validates `@HostBinding` decorators for `class`, `className`, and `class.*`, `Renderer2.addClass`
+/ `removeClass` calls, and `classList.add` / `remove` / `toggle` / `replace`. Literal arguments take
+the syntax path. Variables, calls, properties and getters pass when the TypeScript checker proves
+that their type is a closed string-literal union. A value widened to `string` is reported rather
+than accepted unchecked.
+
+Every possible class uses the same Tailwind, global stylesheet and component stylesheet authorities
+as template and host metadata. A diagnostic underlines the literal token when it appears at the call
+site. For a typed union, it underlines the expression whose type contains the invalid class.
+
+The rule resolves `Renderer2` through Angular imports, typed constructor or function parameters,
+`inject(Renderer2)`, and local aliases without type services. Optional chaining and literal bracket
+access are covered. Angular `HostBinding` import aliases and namespace imports are covered too.
+Unrelated APIs named `addClass` or `removeClass` are ignored. Computed method names and detached
+method references are not resolved. Do not use them to bypass class validation.
+
+Use `eslint-disable-next-line design-system/valid-imperative-classnames -- <reason>` only when an
+external class vocabulary cannot be expressed as a closed type. Explain the class source and why it
+cannot be narrowed. There are no ignore options. Other `classList` operations, such as `contains`,
+and non-class `HostBinding` decorators are ignored.
 
 ## What makes a class known
 
@@ -96,8 +121,8 @@ calling those "unknown" sends the reader to the Tailwind docs to discover that t
 Every message names the failure. Member-specific runtime messages also name the next edit; the bare
 `Runtime-built class list` is the fallback when the expression does not address a resolvable member.
 
-All wording lives in [`src/lib/diagnostics.cjs`](src/lib/diagnostics.cjs), shared by both rules —
-two rules reporting the same mistake in drifting words is worse than no wording at all. The rendered
+All wording lives in [`src/lib/diagnostics.cjs`](src/lib/diagnostics.cjs), shared by the rules. Two
+rules reporting the same mistake in drifting words is worse than no wording at all. The rendered
 member messages are asserted verbatim in the corpus; other findings are checked by message id and
 data.
 
@@ -216,7 +241,7 @@ had quietly papered over.
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Bare design tokens in `.css` files                              | **out of scope** — ESLint has no CSS language wired here; this is [MAE-109](https://linear.app/floyd-haremsa/issue/MAE-109) |
 | Class applied by a parent component's stylesheet or `::ng-deep` | **would be a false positive** — none exist in the renderer today                                                            |
-| Classes applied imperatively (`classList.add`)                  | **out of scope** — banned rather than validated, see [MAE-108](https://linear.app/floyd-haremsa/issue/MAE-108)              |
+| Classes applied imperatively (`classList.add`)                  | **validated** when their type is a closed string-literal set; wider runtime strings are rejected                            |
 
 **Cache invalidation is the one real hazard.** Tailwind's context is built once per ESLint process
 and stylesheets are cached by mtime, but ESLint's own per-file cache is keyed on the file the class

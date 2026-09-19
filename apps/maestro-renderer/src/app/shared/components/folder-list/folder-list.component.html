@@ -15,7 +15,7 @@
             aria-label="Add folders"
             (click)="browse.emit()"
         >
-            <app-icon name="octFileDirectory" size="1.75rem" class="text-content-muted"></app-icon>
+            <app-icon name="folder" size="1.75rem" class="text-content-muted"></app-icon>
             <span class="type-body-md mt-1 font-semibold text-content-primary">Drop folders here</span>
             <span class="type-body-sm -mt-2 text-content-muted">or click to browse</span>
         </button>
@@ -31,11 +31,7 @@
             <ul>
                 @for (folder of folders(); track folder) {
                     <li class="folder-row | group flex items-center gap-3 px-4 py-3 transition-colors">
-                        <app-icon
-                            name="octFileDirectory"
-                            size="1.1rem"
-                            class="shrink-0 text-content-muted"
-                        ></app-icon>
+                        <app-icon name="folder" size="1.1rem" class="shrink-0 text-content-muted"></app-icon>
                         <div class="min-w-0 grow">
                             <p class="type-body-md flex min-w-0" [title]="folder">
                                 <span class="truncate text-content-muted">{{ folderParent(folder) }}</span
@@ -64,7 +60,7 @@
                             title="Remove folder"
                             (click)="folderRemoved.emit(folder)"
                         >
-                            <app-icon name="octX" size="14"></app-icon>
+                            <app-icon name="close" size="14"></app-icon>
                         </button>
                     </li>
                 }
@@ -77,7 +73,7 @@
                 <div
                     class="dropzone-overlay | pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-[color-mix(in_srgb,theme(colors.status.info-background)_70%,transparent)] text-content-info backdrop-blur-sm"
                 >
-                    <app-icon name="octFileDirectoryFill" size="1.25rem"></app-icon>
+                    <app-icon name="folderFilled" size="1.25rem"></app-icon>
                     <span class="type-body-md font-semibold">Drop to add</span>
                 </div>
             }

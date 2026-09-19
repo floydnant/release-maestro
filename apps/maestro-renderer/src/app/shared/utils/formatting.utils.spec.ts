@@ -1,4 +1,9 @@
-import { formatTotalDuration } from './formatting.utils'
+import { calendarDaySchema } from '@release-maestro/core'
+import {
+    formatCalendarDateRelative,
+    formatReleaseDateRelative,
+    formatTotalDuration,
+} from './formatting.utils'
 
 describe('formatTotalDuration', () => {
     it.each([
@@ -29,5 +34,42 @@ describe('formatTotalDuration', () => {
     it('reads a fractional total as its nearest second', () => {
         // Durations are summed from a real column, so a total is rarely a whole number.
         expect(formatTotalDuration(2_819.6)).toBe('47 min')
+    })
+})
+
+describe('formatReleaseDateRelative', () => {
+    it.each([
+        ['2026-09-19T00:00:00', '2026-09-19T23:59:59', 'releases today'],
+        ['2026-09-18T23:59:59', '2026-09-19T00:00:00', 'released yesterday'],
+        ['2027-01-01T00:00:00', '2026-12-31T23:59:59', 'releases tomorrow'],
+        ['2024-03-01T00:00:00', '2024-02-29T23:59:59', 'releases tomorrow'],
+        ['2026-09-21T00:00:00', '2026-09-19T23:59:59', 'releases in 2 days'],
+        ['2026-09-05T12:00:00', '2026-09-19T12:00:00', 'released 2 weeks ago'],
+    ])('formats %s relative to %s as %s', (releaseDate, referenceDate, expected) => {
+        expect(
+            formatReleaseDateRelative(
+                calendarDaySchema.parse(releaseDate.slice(0, 10)),
+                new Date(referenceDate),
+            ),
+        ).toBe(expected)
+    })
+
+    it('uses the current day when the reference date is omitted', () => {
+        jest.useFakeTimers().setSystemTime(new Date('2026-09-19T23:59:59'))
+        try {
+            expect(formatReleaseDateRelative(calendarDaySchema.parse('2026-09-20'))).toBe('releases tomorrow')
+        } finally {
+            jest.useRealTimers()
+        }
+    })
+})
+
+describe('formatCalendarDateRelative', () => {
+    it.each([
+        ['2026-09-19T00:00:00', '2026-09-19T23:59:59', 'today'],
+        ['2026-09-18T23:59:59', '2026-09-19T00:00:00', 'yesterday'],
+        ['2026-03-28T23:59:59', '2026-03-30T00:00:00', '2 days ago'],
+    ])('formats %s relative to %s as %s', (date, reference, expected) => {
+        expect(formatCalendarDateRelative(new Date(date), new Date(reference))).toBe(expected)
     })
 })

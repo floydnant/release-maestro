@@ -3,8 +3,13 @@
         <aside
             class="sidebar | flex w-52 shrink-0 flex-col border-r border-border-subtle bg-background-surface shadow-lg"
         >
-            <div class="sidebar__title-bar | flex h-[2.25rem] shrink-0 items-center justify-end px-2">
-                <nav class="title-bar__nav | flex items-center gap-1" aria-label="History">
+            <div
+                class="sidebar__title-bar | flex h-[2.25rem] shrink-0 items-center justify-end px-2 [-webkit-app-region:drag]"
+            >
+                <nav
+                    class="title-bar__nav | flex items-center gap-1 [-webkit-app-region:no-drag]"
+                    aria-label="History"
+                >
                     <button
                         class="history-back-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard disabled:cursor-default disabled:text-content-muted hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed"
                         type="button"
@@ -33,7 +38,7 @@
                     <ul class="flex flex-col gap-1">
                         <li>
                             <a
-                                class="btn-nkd-neutral"
+                                class="btn-nkd-neutral w-full justify-start"
                                 routerLink="/home"
                                 routerLinkActive="active-link"
                                 [routerLinkActiveOptions]="{ exact: true }"
@@ -41,27 +46,42 @@
                             >
                         </li>
                         <li>
-                            <a class="btn-nkd-neutral" routerLink="/feed" routerLinkActive="active-link"
+                            <a
+                                class="btn-nkd-neutral w-full justify-start"
+                                routerLink="/feed"
+                                routerLinkActive="active-link"
                                 >Feed</a
                             >
                         </li>
                         <li>
-                            <a class="btn-nkd-neutral" routerLink="/tracks" routerLinkActive="active-link"
+                            <a
+                                class="btn-nkd-neutral w-full justify-start"
+                                routerLink="/tracks"
+                                routerLinkActive="active-link"
                                 >Tracks</a
                             >
                         </li>
                         <li>
-                            <a class="btn-nkd-neutral" routerLink="/albums" routerLinkActive="active-link"
+                            <a
+                                class="btn-nkd-neutral w-full justify-start"
+                                routerLink="/albums"
+                                routerLinkActive="active-link"
                                 >Albums</a
                             >
                         </li>
                         <li>
-                            <a class="btn-nkd-neutral" routerLink="/genres" routerLinkActive="active-link"
+                            <a
+                                class="btn-nkd-neutral w-full justify-start"
+                                routerLink="/genres"
+                                routerLinkActive="active-link"
                                 >Genres</a
                             >
                         </li>
                         <li>
-                            <a class="btn-nkd-neutral" routerLink="/settings" routerLinkActive="active-link"
+                            <a
+                                class="btn-nkd-neutral w-full justify-start"
+                                routerLink="/settings"
+                                routerLinkActive="active-link"
                                 >Settings</a
                             >
                         </li>
@@ -97,7 +117,7 @@
                         <hr />
                         <p class="type-body-sm text-content-success">
                             <app-icon
-                                name="octCheckCircleFill"
+                                name="success"
                                 color="content.success"
                                 class="translate-y-px align-middle text-content-success"
                             ></app-icon>
@@ -114,7 +134,7 @@
                         ></app-progress-bar>
                         <p class="type-body-sm mt-3 text-content-danger">
                             <app-icon
-                                name="octXCircleFill"
+                                name="error"
                                 color="content.danger"
                                 class="translate-y-px align-middle"
                             ></app-icon>
@@ -139,7 +159,14 @@
     }
 
     <div class="app-shell__content | flex min-w-0 flex-1 flex-col">
-        <header class="title-bar" [class.title-bar--overlay]="isImportRoute()">
+        <header
+            class="title-bar | flex h-[2.25rem] flex-none select-none items-stretch text-content-secondary [-webkit-app-region:drag]"
+            [class]="
+                isImportRoute()
+                    ? 'title-bar--overlay | absolute inset-x-0 top-0 z-50 border-b-current bg-transparent [border-bottom-style:none]'
+                    : 'border-b border-b-border-subtle bg-background-elevated'
+            "
+        >
             <div class="title-bar__drag-region | flex min-w-0 flex-1 items-center justify-start">
                 @if (scanIndicator(); as scan) {
                     <p class="type-body-sm flex items-center gap-1 px-2 text-content-secondary">
@@ -178,30 +205,31 @@
             </div>
 
             @if (isElectron && !isMacos) {
-                <div class="title-bar__controls">
+                <!-- Keep native :hover semantics. The project's hover: variant also matches keyboard focus. -->
+                <div class="title-bar__controls | flex [-webkit-app-region:no-drag]">
                     <button
-                        class="title-bar__button"
+                        class="title-bar__button | inline-flex h-full w-[2.875rem] items-center justify-center text-content-muted transition-[background-color,color] duration-fast ease-standard [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
                         type="button"
                         title="Minimize"
                         (click)="minimizeWindow()"
                     >
-                        <app-icon name="octDash" size="14"></app-icon>
+                        <app-icon name="windowMinimize" size="14"></app-icon>
                     </button>
                     <button
-                        class="title-bar__button"
+                        class="title-bar__button | inline-flex h-full w-[2.875rem] items-center justify-center text-content-muted transition-[background-color,color] duration-fast ease-standard [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
                         type="button"
                         title="Maximize"
                         (click)="toggleMaximizeWindow()"
                     >
-                        <app-icon name="octScreenFull" size="14"></app-icon>
+                        <app-icon name="windowMaximize" size="14"></app-icon>
                     </button>
                     <button
-                        class="title-bar__button title-bar__button--close"
+                        class="title-bar__button--close | inline-flex h-full w-[2.875rem] items-center justify-center text-content-muted transition-[background-color,color] duration-fast ease-standard [&:hover]:bg-status-danger-background [&:hover]:text-status-danger-content"
                         type="button"
                         title="Close"
                         (click)="closeWindow()"
                     >
-                        <app-icon name="octX" size="14"></app-icon>
+                        <app-icon name="close" size="14"></app-icon>
                     </button>
                 </div>
             }

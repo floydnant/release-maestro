@@ -114,10 +114,10 @@
     --foundation-typography-line-height-snug: 1.3;
     --foundation-typography-line-height-normal: 1.5;
     --foundation-typography-line-height-relaxed: 1.65;
-    --foundation-typography-letterSpacing-tight: -0.02em;
-    --foundation-typography-letterSpacing-normal: 0;
-    --foundation-typography-letterSpacing-wide: 0.04em;
-    --foundation-typography-letterSpacing-caps: 0.08em;
+    --foundation-typography-letter-spacing-tight: -0.02em;
+    --foundation-typography-letter-spacing-normal: 0;
+    --foundation-typography-letter-spacing-wide: 0.04em;
+    --foundation-typography-letter-spacing-caps: 0.08em;
 }
 
 :root,
@@ -170,37 +170,37 @@
     --type-hero-title-size: var(--foundation-typography-size-4xl);
     --type-hero-title-weight: var(--foundation-typography-weight-bold);
     --type-hero-title-line-height: var(--foundation-typography-line-height-tight);
-    --type-hero-title-letterSpacing: var(--foundation-typography-letterSpacing-tight);
+    --type-hero-title-letter-spacing: var(--foundation-typography-letter-spacing-tight);
     --type-section-title-family: var(--foundation-typography-family-sans);
     --type-section-title-size: var(--foundation-typography-size-xl);
     --type-section-title-weight: var(--foundation-typography-weight-semibold);
     --type-section-title-line-height: var(--foundation-typography-line-height-snug);
-    --type-section-title-letterSpacing: var(--foundation-typography-letterSpacing-tight);
+    --type-section-title-letter-spacing: var(--foundation-typography-letter-spacing-tight);
     --type-body-md-family: var(--foundation-typography-family-sans);
     --type-body-md-size: var(--foundation-typography-size-md);
     --type-body-md-weight: var(--foundation-typography-weight-regular);
     --type-body-md-line-height: var(--foundation-typography-line-height-normal);
-    --type-body-md-letterSpacing: var(--foundation-typography-letterSpacing-normal);
+    --type-body-md-letter-spacing: var(--foundation-typography-letter-spacing-normal);
     --type-body-sm-family: var(--foundation-typography-family-sans);
     --type-body-sm-size: var(--foundation-typography-size-sm);
     --type-body-sm-weight: var(--foundation-typography-weight-regular);
     --type-body-sm-line-height: var(--foundation-typography-line-height-normal);
-    --type-body-sm-letterSpacing: var(--foundation-typography-letterSpacing-normal);
+    --type-body-sm-letter-spacing: var(--foundation-typography-letter-spacing-normal);
     --type-label-md-family: var(--foundation-typography-family-sans);
     --type-label-md-size: var(--foundation-typography-size-sm);
     --type-label-md-weight: var(--foundation-typography-weight-semibold);
     --type-label-md-line-height: var(--foundation-typography-line-height-snug);
-    --type-label-md-letterSpacing: var(--foundation-typography-letterSpacing-wide);
+    --type-label-md-letter-spacing: var(--foundation-typography-letter-spacing-wide);
     --type-label-sm-family: var(--foundation-typography-family-sans);
     --type-label-sm-size: var(--foundation-typography-size-xs);
     --type-label-sm-weight: var(--foundation-typography-weight-semibold);
     --type-label-sm-line-height: var(--foundation-typography-line-height-snug);
-    --type-label-sm-letterSpacing: var(--foundation-typography-letterSpacing-caps);
+    --type-label-sm-letter-spacing: var(--foundation-typography-letter-spacing-caps);
     --type-code-sm-family: var(--foundation-typography-family-mono);
     --type-code-sm-size: var(--foundation-typography-size-sm);
     --type-code-sm-weight: var(--foundation-typography-weight-regular);
     --type-code-sm-line-height: var(--foundation-typography-line-height-normal);
-    --type-code-sm-letterSpacing: var(--foundation-typography-letterSpacing-normal);
+    --type-code-sm-letter-spacing: var(--foundation-typography-letter-spacing-normal);
 }
 
 .type-hero-title {
