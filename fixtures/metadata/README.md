@@ -46,6 +46,6 @@ The fixture manifest uses typed fields and rejects unknown keys, invalid flags, 
 `recording-date.wv` checks full APE recording dates alongside the year-only fixture. WAV and AIFF
 edit tests also check their container sizes after tags grow and shrink. Lofty 0.25.2 subtracts tag
 growth from the size of a container with a trailing ID3 chunk, and can panic on large growth in
-debug builds. The engine rewrites the file in memory, writes the result to a temporary file in the
-same directory, and replaces the original only after the complete write succeeds. Other chunks and
-trailing data are retained. This increases memory use and I/O for large WAV/AIFF files.
+debug builds. The engine streams the file into a temporary file in the same directory, rewrites the
+copy, and replaces the original only after the complete write succeeds. Other chunks and trailing
+data are retained. This adds I/O for large WAV/AIFF files without buffering the recording in memory.
