@@ -1,15 +1,3 @@
-/* Electron drag regions have no built-in Tailwind utility. Interactive descendants
-   must opt out so the window manager does not swallow their clicks. */
-.title-bar,
-.sidebar__title-bar {
-    -webkit-app-region: drag;
-}
-
-.title-bar__nav,
-.title-bar__controls {
-    -webkit-app-region: no-drag;
-}
-
 /* The layered gradient mixes a semantic surface color with transparency. Keep it
    scoped here; full-window onboarding uses a transparent title bar instead. */
 .title-bar:not(.title-bar--overlay) {
