@@ -429,3 +429,98 @@ fn unrelated_mp4_edits_preserve_every_value_in_mixed_native_atoms() {
         }
     }
 }
+
+#[test]
+fn clearing_riff_aliases_does_not_resurrect_secondary_values() {
+    let library = Library::new();
+    for field in ["bpm", "musicalKey"] {
+        let path = library.copy("riff-aliases.wav");
+        let mut params = library.params(&path);
+        let replacement = if field == "bpm" {
+            json!(130.5)
+        } else {
+            json!("Bm")
+        };
+        for value in [Value::Null, replacement, Value::Null] {
+            params["update"] = json!({field: value});
+            Engine::new().request("write_tags", params.clone());
+            let actual = Engine::new().request("read_file", library.params(&path));
+            assert_eq!(actual[field], value, "{field}: {actual}");
+            assert!(actual["extraMetadata"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(["Custom: XTRA", "keep me"])));
+        }
+    }
+}
+
+#[test]
+fn editing_mp4_text_retains_opaque_values_but_clearing_removes_the_atom() {
+    use lofty::{
+        config::ParseOptions,
+        file::AudioFile,
+        mp4::{AtomData, AtomIdent, Mp4File},
+    };
+    let library = Library::new();
+    for (fixture, count) in [
+        ("editable-mixed.m4a", 2),
+        ("editable-alias.m4a", 2),
+        ("editable-aliases.m4a", 4),
+    ] {
+        let path = library.copy(fixture);
+        let mut title_edit = library.params(&path);
+        title_edit["update"] = json!({"title": "Gökotta"});
+        Engine::new().request("write_tags", title_edit);
+        let before = Mp4File::read_from(
+            &mut std::fs::File::open(&path).unwrap(),
+            ParseOptions::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            before
+                .ilst()
+                .unwrap()
+                .into_iter()
+                .flat_map(|atom| atom.data())
+                .filter(
+                    |data| matches!(data, AtomData::Unknown { data, .. } if data == b"keep-energy")
+                )
+                .count(),
+            count
+        );
+        let ident = AtomIdent::Freeform {
+            mean: "com.apple.iTunes".into(),
+            name: "ENERGY".into(),
+        };
+        for value in [json!("7"), json!("8"), json!("9"), Value::Null] {
+            let mut params = library.params(&path);
+            params["update"] = json!({"energy": value});
+            Engine::new().request("write_tags", params);
+            let actual = Engine::new().request("read_file", library.params(&path));
+            assert_eq!(actual["energy"], value);
+            let native = Mp4File::read_from(
+                &mut std::fs::File::open(&path).unwrap(),
+                ParseOptions::new(),
+            )
+            .unwrap();
+            let atoms: Vec<_> = native
+                .ilst()
+                .unwrap()
+                .into_iter()
+                .filter(|atom| atom.ident() == &ident)
+                .collect();
+            if value.is_null() {
+                assert!(atoms.is_empty());
+            } else {
+                let opaque = atoms
+                .iter()
+                .flat_map(|atom| atom.data())
+                .filter(
+                    |data| matches!(data, AtomData::Unknown { data, .. } if data == b"keep-energy"),
+                )
+                .count();
+                assert_eq!(opaque, count, "editing ENERGY preserves every opaque entry");
+            }
+        }
+    }
+}

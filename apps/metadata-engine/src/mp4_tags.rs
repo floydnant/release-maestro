@@ -1,6 +1,7 @@
 //! Preserve native MP4 values that generic tag conversion cannot represent.
+use crate::custom_tags::LegacyField;
 use lofty::{
-    mp4::{Atom, AtomData, DataType, Ilst},
+    mp4::{Atom, AtomData, AtomIdent, DataType, Ilst},
     tag::Tag,
 };
 
@@ -43,8 +44,58 @@ impl Mp4Snapshot {
         for atom in &unchanged {
             edited.remove(atom.ident()).for_each(drop);
         }
-        for atom in unchanged {
-            edited.insert(atom.clone());
+        for atom in &unchanged {
+            edited.insert((*atom).clone());
+        }
+        // A text edit replaces text values, not opaque values sharing the atom.
+        // Match canonicalized aliases too; no remaining text means an explicit clear.
+        for atom in &self.original {
+            if unchanged
+                .iter()
+                .any(|original| original.ident() == atom.ident())
+            {
+                continue;
+            }
+            if !atom
+                .data()
+                .any(|data| matches!(data, AtomData::UTF8(_) | AtomData::UTF16(_)))
+            {
+                continue;
+            }
+            let ident = atom.ident();
+            let target = (&edited)
+                .into_iter()
+                .find(|item| {
+                    (item.ident() == ident || same_field(ident, item.ident()))
+                        && item
+                            .data()
+                            .any(|data| matches!(data, AtomData::UTF8(_) | AtomData::UTF16(_)))
+                })
+                .map(|item| item.ident().clone().into_owned());
+            let Some(target) = target else {
+                continue;
+            };
+            let opaque: Vec<_> = (&self.original)
+                .into_iter()
+                .filter(|item| item.ident() == ident || same_field(item.ident(), &target))
+                .flat_map(|item| item.data())
+                .filter(|data| !matches!(data, AtomData::UTF8(_) | AtomData::UTF16(_)))
+                .collect();
+            for (index, value) in opaque.iter().enumerate() {
+                let required = opaque[..=index]
+                    .iter()
+                    .filter(|candidate| *candidate == value)
+                    .count();
+                let present = (&edited)
+                    .into_iter()
+                    .filter(|item| item.ident() == &target)
+                    .flat_map(|item| item.data())
+                    .filter(|candidate| *candidate == *value)
+                    .count();
+                if present < required {
+                    edited.insert(Atom::new(target.clone(), (*value).clone()));
+                }
+            }
         }
         let mut encoded = Ilst::new();
         for atom in edited {
@@ -64,5 +115,24 @@ impl Mp4Snapshot {
             encoded.insert(Atom::from_collection(ident, data).expect("native atoms contain data"));
         }
         encoded
+    }
+}
+
+fn same_field(left: &AtomIdent<'_>, right: &AtomIdent<'_>) -> bool {
+    match (left, right) {
+        (
+            AtomIdent::Freeform { mean, name },
+            AtomIdent::Freeform {
+                mean: other_mean,
+                name: other_name,
+            },
+        ) if mean == "com.apple.iTunes" && mean == other_mean => LegacyField::from_name(name)
+            .is_some_and(|field| {
+                field
+                    .aliases()
+                    .iter()
+                    .any(|alias| other_name.eq_ignore_ascii_case(alias))
+            }),
+        _ => false,
     }
 }

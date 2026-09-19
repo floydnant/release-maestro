@@ -108,10 +108,30 @@ fn native_ape(tag: Tag) -> lofty::error::Result<ApeTag> {
     // Lofty 0.22's Tag -> ApeTag conversion drops unmapped items. Preserve them
     // explicitly before saving or reading custom fields.
     let mut custom = Vec::new();
+    let mut text_keys = std::collections::HashSet::new();
     for item in tag.items() {
         if item.key().map_key(TagType::Ape, false).is_none() {
             if let Some(name) = item.key().map_key(TagType::Ape, true) {
-                custom.push(ApeItem::new(name.to_owned(), item.value().clone())?);
+                let value = if item.value().text().is_some() {
+                    if !text_keys.insert(name.to_ascii_lowercase()) {
+                        continue;
+                    }
+                    // Some files repeat the item instead of using APE's NUL-separated values.
+                    let values: Vec<_> = tag
+                        .items()
+                        .filter(|candidate| {
+                            candidate
+                                .key()
+                                .map_key(TagType::Ape, true)
+                                .is_some_and(|key| key.eq_ignore_ascii_case(name))
+                        })
+                        .filter_map(|candidate| candidate.value().text())
+                        .collect();
+                    ItemValue::Text(values.join("\0"))
+                } else {
+                    item.value().clone()
+                };
+                custom.push(ApeItem::new(name.to_owned(), value)?);
             }
         }
     }
@@ -356,9 +376,51 @@ impl LegacyField {
     }
 }
 
+/// Remove legacy fields only when an explicit edit targets them.
+pub fn remove_riff_aliases(
+    mut native: RiffInfoList,
+    fields: &[LegacyField],
+) -> Option<RiffInfoList> {
+    let names: Vec<_> = (&native)
+        .into_iter()
+        .filter(|(name, _)| {
+            fields.iter().any(|field| {
+                field
+                    .aliases()
+                    .iter()
+                    .any(|alias| name.eq_ignore_ascii_case(alias))
+            })
+        })
+        .map(|(name, _)| name.clone())
+        .collect();
+    if names.is_empty() {
+        return None;
+    }
+    for name in names {
+        native.remove(&name);
+    }
+    Some(native)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn repeated_custom_ape_text_is_preserved_during_conversion() {
+        let mut tag = Tag::new(TagType::Ape);
+        for value in ["first", "second"] {
+            tag.push_unchecked(TagItem::new(
+                ItemKey::from_key(TagType::Ape, "X-MAESTRO"),
+                ItemValue::Text(value.into()),
+            ));
+        }
+        let native = native_ape(tag).unwrap();
+        assert_eq!(
+            native.get("X-MAESTRO").unwrap().value().text(),
+            Some("first\0second")
+        );
+    }
 
     #[test]
     fn invalid_ape_keys_fail_conversion_without_erasing_items() {

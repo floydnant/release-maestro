@@ -275,5 +275,46 @@ file["covr"] = [MP4Cover(PNG, imageformat=MP4Cover.FORMAT_PNG),
 file.save()
 case(path.name, FIELDS | {"bpm": 128}, writable=True)
 
+path = ROOT / "repeated-ape.wv"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wv", path)
+file = mutagen.File(path)
+file["X-MAESTRO"] = ["first", "second"]
+file.save()
+case(path.name, FIELDS, extras=[["Custom: X-MAESTRO", "first\0second"]], writable=True)
+
+for fixture, name in [("editable-mixed.m4a", "ENERGY"), ("editable-alias.m4a", "ENERGYLEVEL")]:
+    path = ROOT / fixture
+    shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.m4a", path)
+    file = mutagen.File(path)
+    file[f"----:com.apple.iTunes:{name}"] = [MP4FreeForm(b"7"), MP4FreeForm(b"keep-energy", dataformat=0), MP4FreeForm(b"keep-energy", dataformat=0)]
+    file.save()
+    case(path.name, {"energy": "7"})
+
+path = ROOT / "editable-aliases.m4a"
+shutil.copyfile(ROOT / "editable-mixed.m4a", path)
+file = mutagen.File(path)
+file["----:com.apple.iTunes:ENERGYLEVEL"] = [MP4FreeForm(b"7"), MP4FreeForm(b"keep-energy", dataformat=0), MP4FreeForm(b"keep-energy", dataformat=0)]
+file.save()
+case(path.name, {"energy": "7"})
+
+path = ROOT / "riff-aliases.wav"
+shutil.copyfile(ROOT / "spunoff-el-sueno-untagged.wav", path)
+content = bytearray(path.read_bytes())
+info = bytearray(b"INFO")
+for name, value in [(b"TBPM", b"127.5"), (b"TKEY", b"Am"), (b"XTRA", b"keep me")]:
+    value += b"\0"
+    info += name + len(value).to_bytes(4, "little") + value + (b"\0" if len(value) % 2 else b"")
+offset = 12
+while offset < len(content):
+    size = int.from_bytes(content[offset + 4:offset + 8], "little")
+    if content[offset:offset + 4] == b"LIST" and content[offset + 8:offset + 12] == b"INFO":
+        del content[offset:offset + 8 + size + size % 2]
+        break
+    offset += 8 + size + size % 2
+content += b"LIST" + len(info).to_bytes(4, "little") + info
+content[4:8] = (len(content) - 8).to_bytes(4, "little")
+path.write_bytes(content)
+case(path.name, {"bpm": 127.5, "musicalKey": "Am"}, extras=[["Custom: XTRA", "keep me"]])
+
 (ROOT / "cover.png").write_bytes(PNG)
 (ROOT / "cases.json").write_text(json.dumps(CASES, indent=4, ensure_ascii=False) + "\n")

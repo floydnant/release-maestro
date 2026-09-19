@@ -555,5 +555,50 @@
             "label": "Blue Night Jungle"
         },
         "writable": true
+    },
+    {
+        "file": "repeated-ape.wv",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [["Custom: X-MAESTRO", "first\u0000second"]],
+        "writable": true
+    },
+    {
+        "file": "editable-mixed.m4a",
+        "expected": {
+            "energy": "7"
+        }
+    },
+    {
+        "file": "editable-alias.m4a",
+        "expected": {
+            "energy": "7"
+        }
+    },
+    {
+        "file": "editable-aliases.m4a",
+        "expected": {
+            "energy": "7"
+        }
+    },
+    {
+        "file": "riff-aliases.wav",
+        "expected": {
+            "bpm": 127.5,
+            "musicalKey": "Am"
+        },
+        "extras": [["Custom: XTRA", "keep me"]]
     }
 ]

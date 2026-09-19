@@ -1,8 +1,10 @@
 use crate::custom_tags::{read_from_path, LegacyField};
 use crate::{constants::separator, custom_tags, image_format::ImageFormat};
 use lofty::{
+    config::WriteOptions,
     file::{AudioFile, FileType, TaggedFile, TaggedFileExt},
-    tag::{Accessor, ItemKey, Tag, TagType},
+    iff::wav::RiffInfoList,
+    tag::{Accessor, ItemKey, Tag, TagExt, TagType},
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
@@ -426,6 +428,20 @@ pub fn update_song_metadata(
     let file_path = Path::new(path);
     let (mut tagged_file, mp4) =
         read_from_path(file_path).map_err(|error| format!("Failed to read file: {}", error))?;
+    let edited_fields: Vec<_> = [
+        (LegacyField::Energy, song.energy.is_some()),
+        (LegacyField::Bpm, song.bpm.is_some()),
+        (LegacyField::MusicalKey, song.musical_key.is_some()),
+        (LegacyField::CatalogNumber, song.catalog_number.is_some()),
+        (LegacyField::Comment, song.comment.is_some()),
+        (LegacyField::Lyrics, song.lyrics.is_some()),
+    ]
+    .into_iter()
+    .filter_map(|(field, edited)| edited.then_some(field))
+    .collect();
+    let riff_update = tagged_file.tag(TagType::RiffInfo).and_then(|tag| {
+        custom_tags::remove_riff_aliases(RiffInfoList::from(tag.clone()), &edited_fields)
+    });
     let tag = get_or_create_primary_tag(&mut tagged_file)?;
     let mut has_changes = false;
 
@@ -523,6 +539,11 @@ pub fn update_song_metadata(
     if has_changes {
         custom_tags::save(tag, file_path, mp4.as_ref())
             .map_err(|error| format!("Failed to save file: {}", error))?;
+    }
+
+    if let Some(riff) = riff_update {
+        riff.save_to_path(file_path, WriteOptions::new().remove_others(false))
+            .map_err(|error| format!("Failed to save RIFF aliases: {error}"))?;
     }
 
     let final_path = if let Some(file_name) = song.file_name {
