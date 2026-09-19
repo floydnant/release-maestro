@@ -32,6 +32,14 @@ curl -s http://127.0.0.1:9222/json/list   # renderer page target
 curl -s http://127.0.0.1:5858/json/list   # main process
 ```
 
+That uses this checkout's `.app-data.dev`, which suits onboarding and import work. For populated
+browse data, resolve the main worktree instead of hard-coding its path:
+
+```bash
+main_worktree="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+RELEASE_MAESTRO_APP_DATA_DIR="$main_worktree/.app-data.dev" make dev
+```
+
 Wait for a renderer page at `http://localhost:4200`. Before evaluating scripts, confirm the
 listener's process command names this checkout's `dist/apps/maestro-electron/main.js`; the Node
 discovery response can report only `file://`, so its URL alone cannot identify the checkout.
@@ -49,7 +57,8 @@ These constraints cost time when you meet them cold:
   exists and it is already open.
 - `list_network_requests` reports traffic from the moment it attached. Attach first, then trigger
   the request, or reload the page.
-- `take_heapsnapshot` writes only to a `filePath` inside a workspace root.
+- Browse snapshots can contain hundreds of grid nodes. Filter first, or use `evaluate_script` for
+  one narrow fact.
 - Screenshots are DPR 2 on Retina, so one CSS pixel is two image pixels.
 
 ### Client configuration
@@ -67,8 +76,18 @@ Keep `--usageStatistics=false`. The server reports usage data to Google by defau
 Both clients enable this server for the project, including its extra heap tools. Those tool
 definitions cost context even when the app is not running; browser attachment is lazy.
 
-`@playwright/mcp` suits interaction-heavy work and has no performance tracing. Add it with
-`npx -y @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:9222` when you need it.
+For interaction-heavy work, attach the repository's pinned `playwright` directly. This adds no MCP
+tool definitions to context, but provides no performance tracing:
+
+```js
+import { chromium } from 'playwright'
+
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9222')
+const page = browser.contexts()[0].pages()[0]
+```
+
+Prefer exact accessible names for navigation links, such as
+`getByRole('link', { name: 'Tracks', exact: true })`; result cards can include the same word.
 
 The upstream skills ship under `node_modules/chrome-devtools-mcp/skills/`. These local skills
 adapt them for Electron: attach to the existing window, use the separate Node inspector for
@@ -83,6 +102,7 @@ Inspect names and reading order with `take_snapshot`, then exercise keyboard nav
 
 `list_console_messages` with `types: ["issue"]` adds Chrome's reported issues. Set
 `includePreservedMessages: true` only when issues from the last three navigations are relevant.
+It reads the renderer console; startup and main-process logs stay in the `make dev` terminal.
 For a Lighthouse accessibility audit, use `lighthouse_audit` with `mode: "snapshot"` to audit
 the current state without reloading. Read failures from the JSON report path returned by the
 tool; `outputDirPath` specifies a directory, not a report filename. Automated audits supplement

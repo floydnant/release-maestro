@@ -42,18 +42,15 @@ and remain useful in the running app.
 
 ## Main-process CPU profiles
 
-No MCP server drives the Node inspector, so use raw CDP against
-`http://127.0.0.1:5858/json/list`:
+Run the repository helper, then exercise the app during its sampling window:
 
-```
-Profiler.enable
-Profiler.start
-  exercise the app
-Profiler.stop
+```bash
+node apps/maestro-electron/tools/profile-main-process.cjs 15
 ```
 
-`nodes[].callFrame` with `hitCount` gives the attributed hot frames. `HeapProfiler.enable` and
-`HeapProfiler.takeHeapSnapshot` answer main-process allocation questions.
+It connects to `http://127.0.0.1:5858` and prints the hottest sampled leaf frames as bounded JSON.
+`HeapProfiler.enable` and `HeapProfiler.takeHeapSnapshot` over raw CDP answer main-process allocation
+questions.
 
 ## Heap snapshots and leaks
 
@@ -64,6 +61,9 @@ tools are absent from your tool list, the server started without the flag.
 
 Read snapshots through the MCP tools. A raw `.heapsnapshot` file is large enough to swamp your
 context, so never open one directly. Call `close_heapsnapshot` when you finish with each.
+Use an absolute path under the directory returned by `node -p "require('os').tmpdir()"`. Codex may
+not advertise a workspace root to the MCP server, and `/tmp` is not the same canonical directory on
+macOS.
 
 Amplify before you measure:
 
@@ -72,7 +72,9 @@ Amplify before you measure:
 3. `take_heapsnapshot` again.
 4. Revert to the starting state, then take a third snapshot. Check persistent growth and retainers;
    retained memory can also be an intentional cache.
-5. `compare_heapsnapshots` without a `classIndex` first, then drill into one suspicious class.
+5. Call `get_heapsnapshot_summary` on all three snapshots. If growth persists, select a class with a
+   retained-object filter, then call `compare_heapsnapshots` with its `classIndex`. An unfiltered
+   comparison can return thousands of rows.
 
 `get_heapsnapshot_class_nodes` takes a `filterName` that maps directly onto the usual causes:
 `objectsRetainedByDetachedDomNodes`, `objectsRetainedByEventHandlers`,
