@@ -16,7 +16,15 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
-import { albumsTable, songsTable } from '../../database/drizzle.schema'
+import {
+    albumsTable,
+    artistsTable,
+    genresTable,
+    recordLabelsTable,
+    songArtistsTable,
+    songGenresTable,
+    songsTable,
+} from '../../database/drizzle.schema'
 import { LibraryBrowseRepository } from './library-browse.repository'
 
 /**
@@ -129,6 +137,7 @@ describe('LibraryBrowseRepository at library scale', () => {
                 title: `Track ${(index * 7919) % SONG_COUNT}`,
                 artistText: `Artist ${index % 2_000}`,
                 albumTitle: `Album ${index % 5_000}`,
+                albumId: `genre-album-${Math.floor(index / 50)}`,
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 genreText: GENRES[index % GENRES.length]!,
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -142,6 +151,30 @@ describe('LibraryBrowseRepository at library scale', () => {
             } satisfies typeof songsTable.$inferInsert
         })
 
+        db.transaction(tx => {
+            for (let index = 0; index < 17; index++) {
+                tx.insert(recordLabelsTable)
+                    .values({ id: `genre-label-${index}`, name: `Record label ${index}` })
+                    .run()
+            }
+            for (let index = 0; index < 1_000; index++) {
+                tx.insert(albumsTable)
+                    .values({
+                        id: `genre-album-${index}`,
+                        identityKey: `genre-album-${index}`,
+                        title: `Album ${index}`,
+                        recordLabelId: `genre-label-${index % 17}`,
+                    })
+                    .run()
+                tx.insert(genresTable)
+                    .values({ id: `genre-scale-${index}`, name: `Genre ${String(index).padStart(4, '0')}` })
+                    .run()
+                tx.insert(artistsTable)
+                    .values({ id: `artist-scale-${index}`, name: `Artist ${index}` })
+                    .run()
+            }
+        })
+
         // Chunked because SQLite caps bound parameters per statement, and 50k rows of
         // twenty columns is far past it.
         db.transaction(tx => {
@@ -149,12 +182,71 @@ describe('LibraryBrowseRepository at library scale', () => {
                 tx.insert(songsTable)
                     .values(rows.slice(start, start + 500))
                     .run()
+                tx.insert(songGenresTable)
+                    .values(
+                        rows.slice(start, start + 500).map((row, index) => ({
+                            songId: row.id,
+                            genreId: `genre-scale-${(start + index) % 1_000}`,
+                        })),
+                    )
+                    .run()
+                tx.insert(songArtistsTable)
+                    .values(
+                        rows.slice(start, start + 500).map((row, index) => ({
+                            songId: row.id,
+                            artistId: `artist-scale-${(start + index) % 997}`,
+                            position: 0,
+                        })),
+                    )
+                    .run()
             }
         })
         sqlite.exec('ANALYZE')
 
         repository = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
     })
+
+    it.each(['asc', 'desc'] as const)('windows a large genre catalog by indexed name %s', direction => {
+        const statement = repository.genreWindowSql({
+            query: { search: '', sort: { field: 'name', direction } },
+            window: { offset: 900, limit: 20 },
+        })
+        const plan = JSON.stringify(
+            sqlite.prepare(`EXPLAIN QUERY PLAN ${statement.sql}`).all(...statement.params),
+        )
+        expect(plan).toContain('genres_name_key')
+        expect(plan).not.toMatch(/TEMP B-TREE/i)
+        const result = repository.queryGenres({
+            query: { search: '', sort: { field: 'name', direction } },
+            window: { offset: 0, limit: 10_000 },
+        })
+        expect(result.rows).toHaveLength(500)
+        expect(result.total).toBe(1_000)
+        expect(
+            result.rows.every(row => row.songCount === 50 && row.artistCount === 50 && row.albumCount === 50),
+        ).toBe(true)
+    })
+
+    it.each(['artists', 'recordLabels'] as const)(
+        'builds %s membership once while keeping name ordering indexed',
+        kind => {
+            const request = {
+                query: { genreId: 'genre-scale-0', kind },
+                window: { offset: 0, limit: 20 },
+            }
+            const statement = repository.genreRelatedWindowSql(request)
+            const plan = JSON.stringify(
+                sqlite.prepare(`EXPLAIN QUERY PLAN ${statement.sql}`).all(...statement.params),
+            )
+            expect(plan).toContain(kind === 'artists' ? 'artists_name_key' : 'record_labels_name_key')
+            expect(plan).toContain('song_genres_genre_id_idx')
+            expect(plan).toContain('LIST SUBQUERY')
+            expect(plan).not.toMatch(/CORRELATED|TEMP B-TREE FOR ORDER BY/i)
+            const result = repository.queryGenreRelated(request)
+            expect(result.total).toBe(kind === 'artists' ? 50 : 17)
+            expect(result.rows).toHaveLength(kind === 'artists' ? 20 : 17)
+        },
+    )
 
     afterAll(() => sqlite.close())
 

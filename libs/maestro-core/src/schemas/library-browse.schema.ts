@@ -17,6 +17,9 @@
 // ---------------------------------------------------------------------------
 
 export const LibraryBrowseIpcChannel = {
+    queryGenres: 'library:query-genres',
+    getGenreDetail: 'library:get-genre-detail',
+    queryGenreRelated: 'library:query-genre-related',
     querySongs: 'library:query-songs',
     describeSongFilter: 'library:describe-song-filter',
     queryAlbums: 'library:query-albums',
@@ -466,3 +469,41 @@ export const emptySongSelection = (query: SongQuery): SongSelection => ({
     excluded: [],
     included: [],
 })
+
+/** Genres are ordered by their unique, indexed name. Counts are derived after windowing. */
+export interface GenreQuery {
+    search: string
+    sort: { field: 'name'; direction: SortDirection }
+}
+
+export interface GenreRow extends CatalogEntityRef {
+    songCount: number
+    artistCount: number
+    albumCount: number
+}
+
+export interface QueryGenresRequest {
+    query: GenreQuery
+    window: BrowseWindow
+}
+
+export type GenreWindowResult = BrowseWindowResult<GenreRow>
+export interface GetGenreDetailRequest {
+    genreId: string
+}
+export interface GenreDetail extends GenreRow {
+    recordLabelCount: number
+}
+export type GenreDetailResult = GenreDetail | null
+
+/** Membership is derived through resolved song genres, never through genreText. */
+export type GenreRelatedKind = 'artists' | 'recordLabels'
+export interface GenreRelatedQuery {
+    genreId: string
+    kind: GenreRelatedKind
+}
+export interface QueryGenreRelatedRequest {
+    query: GenreRelatedQuery
+    window: BrowseWindow
+}
+export type GenreRelatedWindowResult = BrowseWindowResult<CatalogEntityRef>

@@ -6,7 +6,7 @@ import { HomeComponent } from './pages/home/home.component'
 import { PageNotFoundComponent } from './pages/page-not-found/page-not-found.component'
 import { SettingsComponent } from './pages/settings/settings.component'
 
-const developmentRoutes: Route[] = webEnv.production
+const developmentSettingsRoutes: Route[] = webEnv.production
     ? []
     : [
           {
@@ -16,11 +16,6 @@ const developmentRoutes: Route[] = webEnv.production
                       module => module.DesignSystemComponent,
                   ),
           },
-      ]
-
-const developmentSettingsRoutes: Route[] = webEnv.production
-    ? []
-    : [
           {
               path: 'debug',
               loadComponent: () =>
@@ -61,6 +56,17 @@ export const appRoutes: Route[] = [
         canActivate: [libraryOnboardingGuard],
     },
     {
+        path: 'genres',
+        loadComponent: () => import('./pages/genres/genres.component').then(m => m.GenresComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
+        path: 'genres/:genreId',
+        loadComponent: () =>
+            import('./pages/genre-detail/genre-detail.component').then(m => m.GenreDetailComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
         path: 'import',
         loadComponent: () =>
             import('./pages/library-import/library-import.component').then(m => m.LibraryImportComponent),
@@ -86,7 +92,6 @@ export const appRoutes: Route[] = [
             },
         ],
     },
-    ...developmentRoutes,
     {
         path: '**',
         component: PageNotFoundComponent,

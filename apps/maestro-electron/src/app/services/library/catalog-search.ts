@@ -1,6 +1,6 @@
 import { or, sql, type SQL } from 'drizzle-orm'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
-import { albumsTable, songsTable } from '../../database/drizzle.schema'
+import { albumsTable, genresTable, songsTable } from '../../database/drizzle.schema'
 
 /**
  * The seam free-text catalog search lives behind.
@@ -90,3 +90,6 @@ export const albumSearchCondition = (search: string): SQL | undefined => {
         )`,
     )
 }
+
+export const genreSearchCondition = (search: string): SQL | undefined =>
+    searchCondition(search, [genresTable.name])
