@@ -202,12 +202,7 @@
                                         "
                                     >
                                         @if (feedItem.data.releaseDate) {
-                                            {{
-                                                isInThePast(feedItem.data.releaseDate)
-                                                    ? 'released'
-                                                    : 'releases'
-                                            }}
-                                            {{ formatDateRelative(feedItem.data.releaseDate) + ', ' }}
+                                            {{ formatReleaseDateRelative(feedItem.data.releaseDate) + ', ' }}
                                         }
                                         announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
                                     </span>

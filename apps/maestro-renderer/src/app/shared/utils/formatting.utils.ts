@@ -74,6 +74,21 @@ export const formatDateRelative = (date: Date, referenceDate: Date = new Date())
     return relativeTimeFormatter.format(roundedDifference, unit)
 }
 
+/** Release dates describe local calendar days, regardless of their time or daylight saving. */
+export const formatReleaseDateRelative = (date: Date, referenceDate: Date = new Date()): string => {
+    const releaseDay = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const referenceDay = new Date(
+        Date.UTC(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate()),
+    )
+    const days = (releaseDay.valueOf() - referenceDay.valueOf()) / conversionFactorMap.day
+    const relativeDate =
+        Math.abs(days) <= 1
+            ? relativeTimeFormatter.format(days, 'day')
+            : formatDateRelative(releaseDay, referenceDay)
+
+    return `${days < 0 ? 'released' : 'releases'} ${relativeDate}`
+}
+
 const shortDateFormatter = new Intl.DateTimeFormat('en', { year: 'numeric', month: 'short', day: 'numeric' })
 
 /**
