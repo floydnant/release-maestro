@@ -7,6 +7,7 @@ if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
 }
 
 const inspectorUrl = 'http://127.0.0.1:5858/json/list'
+const requestTimeoutMs = 5_000
 
 async function main() {
     const response = await fetch(inspectorUrl)
@@ -22,25 +23,49 @@ async function main() {
     })
 
     let nextId = 0
-    const pending = new Map()
-
-    socket.addEventListener('message', event => {
-        const message = JSON.parse(event.data)
-        const callback = pending.get(message.id)
-        if (!callback) return
-
-        pending.delete(message.id)
-        callback(message)
-    })
 
     const send = (method, params = {}) =>
         new Promise((resolve, reject) => {
             const id = ++nextId
-            pending.set(id, message => {
-                if (message.error) reject(new Error(message.error.message))
+            const cleanup = () => {
+                clearTimeout(timeout)
+                socket.removeEventListener('message', onMessage)
+                socket.removeEventListener('error', onDisconnect)
+                socket.removeEventListener('close', onDisconnect)
+            }
+            const onMessage = event => {
+                let message
+                try {
+                    message = JSON.parse(event.data)
+                } catch {
+                    cleanup()
+                    reject(new Error(`Node inspector sent invalid JSON during ${method}`))
+                    return
+                }
+                if (message?.id !== id) return
+
+                cleanup()
+                if (message.error) reject(new Error(message.error.message ?? `${method} failed`))
                 else resolve(message.result)
-            })
-            socket.send(JSON.stringify({ id, method, params }))
+            }
+            const onDisconnect = () => {
+                cleanup()
+                reject(new Error(`Node inspector disconnected during ${method}`))
+            }
+            const timeout = setTimeout(() => {
+                cleanup()
+                reject(new Error(`Node inspector timed out during ${method}`))
+            }, requestTimeoutMs)
+
+            socket.addEventListener('message', onMessage)
+            socket.addEventListener('error', onDisconnect, { once: true })
+            socket.addEventListener('close', onDisconnect, { once: true })
+            try {
+                socket.send(JSON.stringify({ id, method, params }))
+            } catch (error) {
+                cleanup()
+                reject(error)
+            }
         })
 
     await send('Profiler.enable')
