@@ -310,6 +310,29 @@ module.exports = {
             if (!services?.getTypeAtLocation || !checker) return null
             /** @type {import('typescript').Type} */
             const type = services.getTypeAtLocation(node)
+            if (process.env.CI && elements) {
+                const tsNode = services.esTreeNodeToTSNodeMap?.get(node)
+                const checkerType = tsNode ? checker.getTypeAtLocation(tsNode) : undefined
+                /** @type {import('typescript').Type[]} */
+                const debugTypeArguments = checker.getTypeArguments(type)
+                console.error(
+                    '[DEBUG-mae108]',
+                    JSON.stringify({
+                        source: sourceCode.getText(node),
+                        serviceType: checker.typeToString(type),
+                        checkerType: checkerType ? checker.typeToString(checkerType) : null,
+                        sameType: checkerType === type,
+                        isArray: checker.isArrayType(type),
+                        isTuple: checker.isTupleType(type),
+                        typeArguments: debugTypeArguments.map(argument => checker.typeToString(argument)),
+                        numberIndex: type.getNumberIndexType()
+                            ? checker.typeToString(type.getNumberIndexType())
+                            : null,
+                        symbol: type.symbol?.name ?? null,
+                        flags: type.flags,
+                    }),
+                )
+            }
             /** @type {import('typescript').Type[]} */
             const checkedTypes = elements
                 ? (type.isUnion() ? type.types : [type]).flatMap(part =>
