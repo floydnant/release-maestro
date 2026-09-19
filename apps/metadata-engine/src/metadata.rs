@@ -8,7 +8,7 @@ use lofty::{
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
-use std::{fmt, fs, io, path::Path, time::SystemTime};
+use std::{error::Error, fmt, fs, io, path::Path, time::SystemTime};
 
 type NullableField<T> = Option<Option<T>>;
 
@@ -360,6 +360,17 @@ fn parse_bpm_value(value: &str) -> Option<f64> {
         .and_then(|parsed| normalize_bpm_value(parsed).ok())
 }
 
+fn format_error_chain(error: &dyn Error) -> String {
+    let mut message = error.to_string();
+    let mut source = error.source();
+    while let Some(error) = source {
+        message.push_str(": ");
+        message.push_str(&error.to_string());
+        source = error.source();
+    }
+    message
+}
+
 fn apply_bpm_update(
     tag: &mut Tag,
     native: &mut NativeTags,
@@ -637,7 +648,7 @@ pub fn read_song_metadata_v2(
             } else {
                 ReadSongMetadataError::MetadataParseFailed {
                     path: path.clone(),
-                    message: error.to_string(),
+                    message: format_error_chain(&error),
                 }
             }
         }

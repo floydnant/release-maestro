@@ -133,7 +133,11 @@ fn reads_independently_authored_metadata_across_formats_and_legacy_aliases() {
                 .as_array()
                 .unwrap()
                 .iter()
-                .filter(|entry| entry[0].as_str().is_some_and(|key| key.contains("X-MAESTRO")))
+                .filter(|entry| {
+                    entry[0]
+                        .as_str()
+                        .is_some_and(|key| key.contains("X-MAESTRO"))
+                })
                 .count();
             assert_eq!(custom_field_count, 1, "{name}: duplicate custom field");
         }
@@ -283,6 +287,11 @@ fn streams_successes_and_parse_errors_then_accepts_another_request() {
         .collect();
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0]["data"]["code"], "PARSE_FAILED");
+    let message = errors[0]["data"]["error"].as_str().unwrap();
+    assert!(
+        message.starts_with("Failed to read file metadata: failed to parse Flac file: "),
+        "missing parse-error detail: {message}"
+    );
     assert_eq!(
         messages.last().unwrap()["result"],
         json!({"count": 1, "total": 2})
