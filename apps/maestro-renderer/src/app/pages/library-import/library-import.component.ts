@@ -34,11 +34,8 @@ type ImportStep = 'pick' | 'scanning' | 'done'
     ],
     templateUrl: './library-import.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
+    host: { class: 'block size-full' },
     styles: `
-        :host {
-            @apply block size-full;
-        }
-
         /* Fades the full-window mosaic gently toward the top and bottom edges (pure
            black so the covers pop against it). */
         .mosaic-veil {

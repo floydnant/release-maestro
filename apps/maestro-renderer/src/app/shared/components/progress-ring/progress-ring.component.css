@@ -1,3 +1,5 @@
+/* The two rings share keyframes but rotate from different per-ring offsets.
+   Keep their SVG stroke and animation rules together around --rotation. */
 .progress-ring {
     transition: stroke-dashoffset theme('transitionDuration.slow') theme('transitionTimingFunction.standard');
     --rotation: -90deg;

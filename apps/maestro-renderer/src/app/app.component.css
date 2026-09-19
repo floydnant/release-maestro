@@ -1,78 +1,11 @@
-:host {
-    display: block;
-    min-height: 100%;
-}
-
-.title-bar {
-    display: flex;
-    height: 2.25rem;
-    flex: 0 0 auto;
-    align-items: stretch;
-    border-bottom: 1px solid theme('colors.border.subtle');
-    background:
+/* The layered gradient mixes a semantic surface color with transparency. Keep it
+   scoped here; full-window onboarding uses a transparent title bar instead. */
+.title-bar:not(.title-bar--overlay) {
+    background-image:
         linear-gradient(
             90deg,
             color-mix(in srgb, theme('colors.background.surface') 94%, transparent),
             transparent
         ),
-        theme('colors.background.elevated');
-    color: theme('colors.content.secondary');
-    user-select: none;
-    -webkit-app-region: drag;
-}
-
-/* Full-window routes (library onboarding): the bar floats transparently over the
-   content so the window stays draggable while the page owns every pixel. */
-.title-bar--overlay {
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: 0;
-    z-index: 50;
-    border-bottom: none;
-    background: transparent;
-}
-
-/* The sidebar owns the left part of the window chrome, including the native macOS
-   controls. This is the draggable space between those controls and History. */
-.sidebar__title-bar {
-    -webkit-app-region: drag;
-}
-
-/* Window drag regions swallow clicks: anything interactive inside one has to opt out,
-   or it is a dead zone that never receives them. Not expressible in Tailwind. */
-.title-bar__nav,
-.title-bar__controls {
-    -webkit-app-region: no-drag;
-}
-
-.title-bar__controls {
-    display: flex;
-}
-
-.title-bar__button {
-    display: inline-flex;
-    width: 2.875rem;
-    height: 100%;
-    align-items: center;
-    justify-content: center;
-    color: theme('colors.content.muted');
-    transition:
-        background-color theme('transitionDuration.fast') theme('transitionTimingFunction.standard'),
-        color theme('transitionDuration.fast') theme('transitionTimingFunction.standard');
-}
-
-.title-bar__button:hover {
-    background: theme('colors.action.quiet-hover');
-    color: theme('colors.content.primary');
-}
-
-.title-bar__button--close:hover {
-    background: theme('colors.status.danger-background');
-    color: theme('colors.status.danger-content');
-}
-
-.sidebar nav a {
-    width: 100%;
-    justify-content: flex-start;
+        none;
 }
