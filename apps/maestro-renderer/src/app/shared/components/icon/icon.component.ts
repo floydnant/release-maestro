@@ -39,8 +39,8 @@ const icons = {
     search: octSearch,
     sortDescending: octTriangleDown,
     sortAscending: octTriangleUp,
-    /** A missing song file or an album that is no longer in the library. */
-    missing: octUnlink,
+    missingSong: octUnlink,
+    unavailableAlbum: octUnlink,
     close: octX,
     error: octXCircleFill,
     play: solarPlayBold,
