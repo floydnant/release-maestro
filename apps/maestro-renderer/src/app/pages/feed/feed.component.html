@@ -198,13 +198,14 @@
                                             'released ' +
                                             (feedItem.data.releaseDate | date) +
                                             ', announced ' +
-                                            formatDateRelative(feedItem.data.emailReceivedAt)
+                                            formatAnnouncementDateRelative(feedItem.data.emailReceivedAt)
                                         "
                                     >
                                         @if (feedItem.data.releaseDate) {
                                             {{ formatReleaseDateRelative(feedItem.data.releaseDate) + ', ' }}
                                         }
-                                        announced {{ formatDateRelative(feedItem.data.emailReceivedAt) }}
+                                        announced
+                                        {{ formatAnnouncementDateRelative(feedItem.data.emailReceivedAt) }}
                                     </span>
                                 </p>
 

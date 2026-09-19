@@ -22,7 +22,7 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
         error: error?.userFacingMessage ? { message: error.userFacingMessage } : null,
         data: {
             releaseUrl: data.tralbumUrl,
-            releaseDate: tralbum?.releaseDate ? new Date(tralbum?.releaseDate) : null,
+            releaseDate: tralbum?.releaseDate ?? null,
             emailReceivedAt: new Date(source.dateReceived),
             isEmailRead: source.isRead,
             emailId: source.messageId,

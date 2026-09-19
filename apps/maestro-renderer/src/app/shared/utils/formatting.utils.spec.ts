@@ -1,4 +1,10 @@
-import { formatDateRelative, formatReleaseDateRelative, formatTotalDuration } from './formatting.utils'
+import { calendarDaySchema } from '@release-maestro/core'
+import {
+    formatAnnouncementDateRelative,
+    formatDateRelative,
+    formatReleaseDateRelative,
+    formatTotalDuration,
+} from './formatting.utils'
 
 describe('formatTotalDuration', () => {
     it.each([
@@ -51,13 +57,18 @@ describe('formatReleaseDateRelative', () => {
         ['2026-03-30T00:00:00', '2026-03-28T23:59:59', 'releases in 2 days'],
         ['2026-10-26T00:00:00', '2026-10-24T23:59:59', 'releases in 2 days'],
     ])('formats %s relative to %s as %s', (releaseDate, referenceDate, expected) => {
-        expect(formatReleaseDateRelative(new Date(releaseDate), new Date(referenceDate))).toBe(expected)
+        expect(
+            formatReleaseDateRelative(
+                calendarDaySchema.parse(releaseDate.slice(0, 10)),
+                new Date(referenceDate),
+            ),
+        ).toBe(expected)
     })
 
     it('uses the current day when the reference date is omitted', () => {
         jest.useFakeTimers().setSystemTime(new Date('2026-09-19T23:59:59'))
         try {
-            expect(formatReleaseDateRelative(new Date('2026-09-20T00:00:00'))).toBe('releases tomorrow')
+            expect(formatReleaseDateRelative(calendarDaySchema.parse('2026-09-20'))).toBe('releases tomorrow')
         } finally {
             jest.useRealTimers()
         }
@@ -71,5 +82,18 @@ describe('formatDateRelative', () => {
         ['2026-09-19T11:59:30', '30 seconds ago'],
     ])('preserves timestamp precision for %s', (date, expected) => {
         expect(formatDateRelative(new Date(date), new Date('2026-09-19T12:00:00'))).toBe(expected)
+    })
+})
+
+describe('formatAnnouncementDateRelative', () => {
+    it.each([
+        ['2026-09-19T00:00:00', '2026-09-19T23:59:59', 'today'],
+        ['2026-09-19T23:50:00', '2026-09-19T23:55:00', 'today'],
+        ['2026-09-18T23:59:59', '2026-09-19T00:00:00', 'yesterday'],
+        ['2026-09-20T00:00:00', '2026-09-19T23:59:59', 'tomorrow'],
+        ['2026-03-28T23:59:59', '2026-03-30T00:00:00', '2 days ago'],
+        ['2026-10-24T23:59:59', '2026-10-26T00:00:00', '2 days ago'],
+    ])('formats %s relative to %s as %s', (announcement, reference, expected) => {
+        expect(formatAnnouncementDateRelative(new Date(announcement), new Date(reference))).toBe(expected)
     })
 })
