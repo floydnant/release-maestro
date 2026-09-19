@@ -6,6 +6,7 @@ import { concatMap, defaultIfEmpty, lastValueFrom, Observable, Subject } from 'r
 import { Email, EmailImportStreamPacket, emailSchema } from '@release-maestro/core'
 import { appPaths } from '../../app-env'
 import { SettingsBackendService } from '../settings.backend.service'
+import { createAppleMailExportDirectory } from './apple-mail-export-directory'
 // Import will be fixed after creating email.backend.repository.ts
 export interface EmailImporterPlugin {
     loadEmails(signal: AbortSignal): Observable<EmailImportStreamPacket>
@@ -47,7 +48,7 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
 }
 
 export class AppleMailRepository implements EmailImporterPlugin {
-    // EmailBackendRepository creates a new plugin for each call, but exports share one directory.
+    // Reserve this process until its export, reads, and cleanup have all finished.
     private static exportActive = false
 
     constructor(private settings: SettingsBackendService) {}
@@ -98,12 +99,9 @@ export class AppleMailRepository implements EmailImporterPlugin {
         abortSignal: AbortSignal,
         result$: Subject<EmailImportStreamPacket>,
     ): Promise<void> {
-        const exportPath = join(app.getPath('temp'), 'apple-mail-export')
         const appleScriptPath = join(appPaths.resources, 'apple-scripts', 'export-emails.applescript')
 
-        // A failed or interrupted previous run can leave files behind.
-        await fs.rm(exportPath, { recursive: true, force: true })
-        if (abortSignal.aborted) return
+        const exportPath = await createAppleMailExportDirectory(app.getPath('temp'))
 
         const output$ = new Subject<string>()
         const readsDone = lastValueFrom(
@@ -117,6 +115,7 @@ export class AppleMailRepository implements EmailImporterPlugin {
             ),
         )
         try {
+            if (abortSignal.aborted) return
             await new Promise<void>((resolve, reject) => {
                 let processError: Error | null = null
                 const childProcess = execFile(

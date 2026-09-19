@@ -6,7 +6,6 @@ import { join } from 'path'
 import { PassThrough } from 'stream'
 import { lastValueFrom, toArray } from 'rxjs'
 import { AppSettings } from '@release-maestro/core'
-import { appleMailData } from '../../../test/fixtures/apple-mail.fixture'
 import { InMemoryStore } from '../../utils/persistent-store.util'
 import { SettingsBackendService } from '../settings.backend.service'
 import { AppleMailRepository } from './apple-mail.repository'
@@ -37,7 +36,7 @@ describe('AppleMailRepository export lifecycle', () => {
         jest.spyOn(console, 'log').mockImplementation(() => undefined)
         jest.spyOn(console, 'error').mockImplementation(() => undefined)
         tempPath = await fs.mkdtemp(join(tmpdir(), 'maestro-mail-test-'))
-        exportPath = join(tempPath, 'apple-mail-export')
+        exportPath = join(tempPath, `apple-mail-export-${process.pid}-stale`)
         jest.mocked(app.getPath).mockReturnValue(tempPath)
         settings = new SettingsBackendService(new InMemoryStore<AppSettings>())
         settings.patchSettings({ emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Releases' } } })
@@ -47,7 +46,8 @@ describe('AppleMailRepository export lifecycle', () => {
         child.stderr = stderr
         child.stdout = new PassThrough()
         started = new Promise(resolve => {
-            mockExecFile.mockImplementation((_command, _args, _options, callback) => {
+            mockExecFile.mockImplementation((_command, args, _options, callback) => {
+                exportPath = args[2] ?? ''
                 finish = error => {
                     callback(error ?? null)
                     child.emit('close', error ? 1 : 0, null)
@@ -70,11 +70,12 @@ describe('AppleMailRepository export lifecycle', () => {
     it('removes stale exports before starting osascript and exports once for multiple subscribers', async () => {
         await fs.mkdir(exportPath)
         await fs.writeFile(join(exportPath, 'stale.txt'), 'previous failed run')
+        const stalePath = exportPath
         const stream = repository.loadEmails(new AbortController().signal)
         const first = lastValueFrom(stream.pipe(toArray()))
         const second = lastValueFrom(stream.pipe(toArray()))
         await started
-        await expect(fs.stat(exportPath)).rejects.toMatchObject({ code: 'ENOENT' })
+        await expect(fs.stat(stalePath)).rejects.toMatchObject({ code: 'ENOENT' })
         expect(mockExecFile).toHaveBeenCalledTimes(1)
         expect(mockExecFile).toHaveBeenCalledWith(
             'osascript',
@@ -90,9 +91,19 @@ describe('AppleMailRepository export lifecycle', () => {
     it('accepts a missing export directory and removes newly exported files after the last read', async () => {
         const result = collect(repository)
         await started
-        await fs.mkdir(exportPath)
         const dataPath = join(exportPath, 'message.txt')
-        await fs.writeFile(dataPath, appleMailData)
+        await fs.writeFile(
+            dataPath,
+            `messageId: message-1
+subject: New release
+sender: artist@example.com
+dateReceived: 2026-09-19
+isRead: false
+==========================================
+==========================================
+A new release is available.
+`,
+        )
         stderr.write(`Processed email 1/1: ${dataPath}\n`)
         finish()
         await expect(result).resolves.toMatchObject([
@@ -102,6 +113,7 @@ describe('AppleMailRepository export lifecycle', () => {
     })
 
     it('does not launch osascript when startup cleanup fails, and permits a retry', async () => {
+        await fs.mkdir(exportPath)
         const failure = new Error('permission denied')
         jest.spyOn(fs, 'rm').mockRejectedValueOnce(failure)
         await expect(collect(repository)).rejects.toBe(failure)
@@ -115,7 +127,6 @@ describe('AppleMailRepository export lifecycle', () => {
     it('rejects another plugin instance while the shared export directory is in use', async () => {
         const first = collect(repository)
         await started
-        await fs.mkdir(exportPath)
         const activePath = join(exportPath, 'active.txt')
         await fs.writeFile(activePath, 'in use')
         await expect(collect(new AppleMailRepository(settings))).rejects.toThrow('already running')
@@ -141,7 +152,6 @@ describe('AppleMailRepository export lifecycle', () => {
         const result = collect(repository)
         const assertion = expect(result).rejects.toThrow('[AppleMailImporter] Missing mailbox')
         await started
-        await fs.mkdir(exportPath)
         await fs.writeFile(join(exportPath, 'partial.txt'), 'incomplete')
         finish(new Error('Mail got an error: Missing mailbox'))
         await assertion
@@ -159,14 +169,21 @@ describe('AppleMailRepository export lifecycle', () => {
 
     it('does not launch osascript if canceled while startup cleanup is pending', async () => {
         const controller = new AbortController()
+        await fs.mkdir(exportPath)
         let finishCleanup: () => void = () => undefined
+        let cleanupStarted: () => void = () => undefined
+        const cleaning = new Promise<void>(resolve => {
+            cleanupStarted = resolve
+        })
         jest.spyOn(fs, 'rm').mockImplementationOnce(
             () =>
                 new Promise<void>(resolve => {
                     finishCleanup = resolve
+                    cleanupStarted()
                 }),
         )
         const result = collect(repository, controller.signal)
+        await cleaning
         controller.abort()
         finishCleanup()
         await expect(result).resolves.toEqual([])
@@ -177,7 +194,6 @@ describe('AppleMailRepository export lifecycle', () => {
         const controller = new AbortController()
         const result = collect(repository, controller.signal)
         await started
-        await fs.mkdir(exportPath)
         const partialPath = join(exportPath, 'partial.txt')
         await fs.writeFile(partialPath, 'incomplete')
         controller.abort()
@@ -213,7 +229,6 @@ describe('AppleMailRepository export lifecycle', () => {
     it('logs final cleanup errors and lets the next import remove the leftover files', async () => {
         const result = collect(repository)
         await started
-        await fs.mkdir(exportPath)
         const stalePath = join(exportPath, 'partial.txt')
         await fs.writeFile(stalePath, 'incomplete')
         const failure = new Error('directory busy')
