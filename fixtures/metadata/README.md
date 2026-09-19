@@ -48,4 +48,6 @@ edit tests also check their container sizes after tags grow and shrink. Lofty 0.
 growth from the size of a container with a trailing ID3 chunk, and can panic on large growth in
 debug builds. The engine streams the file into a temporary file in the same directory, rewrites the
 copy, and replaces the original only after the complete write succeeds. Other chunks and trailing
-data are retained. This adds I/O for large WAV/AIFF files without buffering the recording in memory.
+data are retained. This adds I/O for large WAV/AIFF files, while Lofty's append path still buffers
+the full container in memory. Replacing the file can also discard inode metadata such as ACLs and
+extended attributes.
