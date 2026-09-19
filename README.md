@@ -24,7 +24,9 @@ A desktop app for your music. Scan your local collection into a searchable libra
 
 - Node.js >= 22.22.3 (see `.node-version`)
 - npm
-- A Rust toolchain — `apps/metadata-engine` is a Cargo crate built into a sidecar binary
+- A Rust toolchain (`cargo` and `rustc`) for the metadata-engine sidecar. Development builds only the
+  host architecture; `make dev` does not require `rustup`.
+- `rustup` for macOS packaging, which builds the sidecar for both Apple Silicon and Intel
 - macOS (required for Apple Mail email import; the app itself builds on all platforms)
 
 ## Getting Started
@@ -38,7 +40,12 @@ make dev
 crates, and installs Playwright Chromium with its system dependencies. Linux system dependencies may
 require sudo. Chromium requires an OS supported by the installed Playwright version.
 
-`make dev` starts the Angular dev server and the Electron main process with hot reload.
+`make dev` builds the host metadata-engine binary and starts the Angular dev server and Electron
+main process with hot reload. The host binary lives in `apps/metadata-engine/target/dev/release`,
+separate from the packaging binary in `target/release`. Development always uses this host path.
+If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
+
+Use `npx nx build metadata-engine` to build only the host sidecar.
 
 ## Commands
 
@@ -102,6 +109,10 @@ feed) cut across `maestro-electron`, `maestro-renderer`, and `maestro-core`. See
 ```bash
 make package
 ```
+
+On macOS, packaging requires `rustup` to install both Rust targets and creates a universal sidecar.
+`make package-dir`, `make package`, and `make build-engine` use the packaging-only
+`metadata-engine:build-package` target and retain that requirement.
 
 Produces platform-specific distributables in `dist/executables/`:
 
