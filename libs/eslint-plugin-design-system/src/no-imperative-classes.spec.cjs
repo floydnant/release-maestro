@@ -50,6 +50,11 @@ tester.run('no-imperative-classes', rule, {
             "'class.hidden'",
             'hostBinding',
         ),
+        rejected(
+            "class Example { @Bind('class.hidden') hidden = true }; import { HostBinding as Bind } from '@angular/core'",
+            "'class.hidden'",
+            'hostBinding',
+        ),
         ...['add', 'remove', 'toggle', 'replace'].map(method =>
             rejected(`element.classList.${method}('hidden')`, method),
         ),
@@ -93,7 +98,7 @@ describe('renderer registration', () => {
                         ['../../libs/example.ts', false],
                     ]) {
                         const config = await eslint.calculateConfigForFile(path.join(renderer, file));
-                        assert.equal(config.rules['design-system/no-imperative-classes']?.[0] === 2, enabled, file);
+                        assert.equal(config?.rules['design-system/no-imperative-classes']?.[0] === 2, enabled, file);
                     }
                 }
             })().catch(error => { console.error(error); process.exitCode = 1; });

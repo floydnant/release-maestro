@@ -47,19 +47,22 @@ module.exports = {
         const angularNamespaces = new Set()
 
         return {
-            /** @param {import('estree').ImportDeclaration} node */
-            ImportDeclaration(node) {
-                if (node.source.value !== '@angular/core') return
-                for (const specifier of node.specifiers) {
-                    if (specifier.type === 'ImportNamespaceSpecifier') {
-                        angularNamespaces.add(specifier.local.name)
-                    } else if (
-                        specifier.type === 'ImportSpecifier' &&
-                        (specifier.imported.type === 'Identifier'
-                            ? specifier.imported.name
-                            : specifier.imported.value) === 'HostBinding'
-                    ) {
-                        hostBindings.add(specifier.local.name)
+            /** @param {import('estree').Program} program */
+            Program(program) {
+                // Imports are hoisted, even when written after the decorated class.
+                for (const node of program.body) {
+                    if (node.type !== 'ImportDeclaration' || node.source.value !== '@angular/core') continue
+                    for (const specifier of node.specifiers) {
+                        if (specifier.type === 'ImportNamespaceSpecifier') {
+                            angularNamespaces.add(specifier.local.name)
+                        } else if (
+                            specifier.type === 'ImportSpecifier' &&
+                            (specifier.imported.type === 'Identifier'
+                                ? specifier.imported.name
+                                : specifier.imported.value) === 'HostBinding'
+                        ) {
+                            hostBindings.add(specifier.local.name)
+                        }
                     }
                 }
             },
