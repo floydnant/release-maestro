@@ -12,7 +12,7 @@
 
     @case ('missing') {
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-            <app-icon name="octUnlink" size="28" color="content.muted"></app-icon>
+            <app-icon name="missing" size="28" color="content.muted"></app-icon>
             <p class="type-body-md text-content-primary">This album is no longer in your library</p>
             <p class="type-body-sm max-w-md text-content-secondary">
                 A rescan can re-key an album when its tags change, which leaves a link like this one pointing
@@ -24,7 +24,7 @@
 
     @case ('error') {
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-            <app-icon name="octXCircleFill" size="28" color="content.danger"></app-icon>
+            <app-icon name="error" size="28" color="content.danger"></app-icon>
             <p class="type-body-md text-content-primary">Could not load this album</p>
             <p class="type-body-sm max-w-md text-content-secondary">The library did not answer.</p>
             <a class="btn-neutral" routerLink="/albums">Back to albums</a>
@@ -44,7 +44,7 @@
                  speak for. -->
             @if (result().status === 'error' && (!result().loaded || !songWindowMatchesAlbum())) {
                 <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-                    <app-icon name="octXCircleFill" size="28" color="content.danger"></app-icon>
+                    <app-icon name="error" size="28" color="content.danger"></app-icon>
                     <p class="type-body-md text-content-primary">Could not load this album’s tracks</p>
                     <p class="type-body-sm max-w-md text-content-secondary">
                         {{ result().error || 'The library did not answer.' }}

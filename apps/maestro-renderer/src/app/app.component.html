@@ -97,7 +97,7 @@
                         <hr />
                         <p class="type-body-sm text-content-success">
                             <app-icon
-                                name="octCheckCircleFill"
+                                name="success"
                                 color="content.success"
                                 class="translate-y-px align-middle text-content-success"
                             ></app-icon>
@@ -114,7 +114,7 @@
                         ></app-progress-bar>
                         <p class="type-body-sm mt-3 text-content-danger">
                             <app-icon
-                                name="octXCircleFill"
+                                name="error"
                                 color="content.danger"
                                 class="translate-y-px align-middle"
                             ></app-icon>
@@ -185,7 +185,7 @@
                         title="Minimize"
                         (click)="minimizeWindow()"
                     >
-                        <app-icon name="octDash" size="14"></app-icon>
+                        <app-icon name="windowMinimize" size="14"></app-icon>
                     </button>
                     <button
                         class="title-bar__button"
@@ -193,7 +193,7 @@
                         title="Maximize"
                         (click)="toggleMaximizeWindow()"
                     >
-                        <app-icon name="octScreenFull" size="14"></app-icon>
+                        <app-icon name="windowMaximize" size="14"></app-icon>
                     </button>
                     <button
                         class="title-bar__button title-bar__button--close"
@@ -201,7 +201,7 @@
                         title="Close"
                         (click)="closeWindow()"
                     >
-                        <app-icon name="octX" size="14"></app-icon>
+                        <app-icon name="close" size="14"></app-icon>
                     </button>
                 </div>
             }
