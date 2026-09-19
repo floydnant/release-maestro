@@ -30,10 +30,10 @@ Tests copy inputs into temporary libraries and run the compiled worker over JSON
 in a fresh worker, check unrelated fields and private ID3 payloads, and remove temporary files afterward.
 The fixture directory is an explicit input to the Nx test cache.
 
-Lofty 0.22.4 drops additional values in an MP4 atom when converting it to a generic tag.
-The engine restores text values for reading and retains the native atoms through the write path.
-Unchanged atoms keep all data variants, including opaque binary and numeric values. `namespaced.m4a`
-and `mixed-data.m4a` check repeated and mixed values through edits. The suite also checks MusicBrainz UFID values and preserves the ID3v1 footer byte for
-byte when editing a file with an ID3v2 primary tag.
+The engine retains native MP4 atoms through the write path. Unchanged atoms keep all data variants,
+including opaque binary and numeric values. `namespaced.m4a` and `mixed-data.m4a` check repeated and
+mixed values through edits. The suite also checks MusicBrainz UFID values and preserves the secondary
+ID3v1 footer byte for byte. Native Vorbis, APE and RIFF tags are retained separately because generic
+conversion discards their custom fields.
 
 The fixture manifest uses typed fields and rejects unknown keys, invalid flags, and unknown aliases.
