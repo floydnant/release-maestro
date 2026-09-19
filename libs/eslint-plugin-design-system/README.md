@@ -13,14 +13,14 @@ authorities — the Tailwind config and the global stylesheets — arrive as rul
 makes it a library rather than a folder of scripts, and what would make publishing it a packaging
 question rather than a rewrite.
 
-## The two rules
+## The rules
 
 | Rule                                      | Surface                                                                                                                                                             |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `design-system/valid-template-classnames` | `class`, `ngClass`, `routerLinkActive`, `[class]`, `[ngClass]`, `[class.foo]`, in `.html` files and in inline templates (via the Angular inline-template processor) |
 | `design-system/valid-host-classnames`     | `@Component`/`@Directive` `host: { class: '…' }` and `host: { '[class.foo]': … }`                                                                                   |
 
-Both are registered at `error` in the renderer's
+The two validators are registered at `error` in the renderer's
 [`eslint.config.mjs`](../../apps/maestro-renderer/eslint.config.mjs), which turns on typed member
 resolution and explains why registration is per-project.
 
@@ -34,6 +34,25 @@ resolution and explains why registration is per-project.
 
 `resolveTypes` and `tsconfig` affect `valid-template-classnames` only; the host rule has no template
 member to resolve.
+
+## Imperative classes
+
+`design-system/no-imperative-classes` runs at `error` only for renderer `src/app/**/*.ts`.
+It rejects class `@HostBinding` decorators, `addClass` / `removeClass` calls, and
+`classList.add` / `remove` / `toggle` / `replace`. Diagnostics underline the binding argument or
+mutation method. Use a template binding or `host` metadata instead; both remain validated.
+
+The rule matches API spelling without type services. Renderer variable aliases, optional chaining,
+and literal bracket access are covered. Angular `HostBinding` import aliases and namespace imports
+are covered too. A different API named `addClass` or `removeClass` needs the same narrow, explained
+suppression as an exceptional DOM integration. Computed method names and detached method references
+are not resolved. Do not use them to bypass class validation.
+
+Use `eslint-disable-next-line design-system/no-imperative-classes -- <reason>` at the operation,
+explaining the class source and why a binding cannot serve it. There are no ignore options.
+The existing renderer inventory contains one exception: `AlbumGridComponent.onCoverLoad` removes
+the template's validated `opacity-0` after load without retaining state for virtualized covers.
+Other `classList` operations, such as `contains`, and non-class `HostBinding` decorators are allowed.
 
 ## What makes a class known
 
@@ -216,7 +235,7 @@ had quietly papered over.
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Bare design tokens in `.css` files                              | **out of scope** — ESLint has no CSS language wired here; this is [MAE-109](https://linear.app/floyd-haremsa/issue/MAE-109) |
 | Class applied by a parent component's stylesheet or `::ng-deep` | **would be a false positive** — none exist in the renderer today                                                            |
-| Classes applied imperatively (`classList.add`)                  | **out of scope** — banned rather than validated, see [MAE-108](https://linear.app/floyd-haremsa/issue/MAE-108)              |
+| Classes applied imperatively (`classList.add`)                  | **rejected** by `no-imperative-classes` in renderer app code, with narrow explained exceptions                              |
 
 **Cache invalidation is the one real hazard.** Tailwind's context is built once per ESLint process
 and stylesheets are cached by mtime, but ESLint's own per-file cache is keyed on the file the class

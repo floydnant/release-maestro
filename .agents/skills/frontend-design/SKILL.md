@@ -62,6 +62,19 @@ Layer discipline is unchecked too: product code consumes **semantic** tokens
 (`bg-background-surface`, `text-content-muted`). Foundation tokens belong to token infrastructure,
 to shared primitives where there is a stated reason, and to the design-system specimen.
 
+## Apply classes through templates and host metadata
+
+Classes reach the DOM through templates and `host` metadata only. In renderer `src/app`,
+`design-system/no-imperative-classes` rejects `@HostBinding('class...')`, `addClass` / `removeClass`
+calls, and `classList.add` / `remove` / `toggle` / `replace`. Use `[class.foo]` for a condition or
+`host: { '[class.foo]': 'condition' }` for host state. Static host classes use `host: { class: '…' }`.
+
+An exceptional DOM integration needs an `eslint-disable-next-line design-system/no-imperative-classes`
+comment with a `--` explanation on that operation. Name the class source and why a binding cannot
+serve the integration. Do not add file-wide disables, ignore patterns, or a global exception list.
+The album grid's cover-load handler is an exception: it removes the template's validated `opacity-0`
+without retaining state for virtualized covers.
+
 ## Keep runtime class vocabularies closed
 
 A runtime class vocabulary must be **closed**: every whole class list the binding can produce is

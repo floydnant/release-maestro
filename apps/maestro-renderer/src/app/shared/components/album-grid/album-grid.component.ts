@@ -586,6 +586,7 @@ export class AlbumGridComponent {
      * element could set on itself — and would have to be evicted as tiles scroll away.
      */
     protected onCoverLoad(event: Event): void {
+        // eslint-disable-next-line design-system/no-imperative-classes -- Remove the template's validated opacity-0 after load without retaining state for virtualized covers.
         ;(event.target as HTMLElement).classList.remove('opacity-0')
     }
 
