@@ -654,3 +654,44 @@ fn growing_and_shrinking_iff_tags_keeps_container_sizes_valid() {
         }
     }
 }
+
+#[test]
+fn writes_iff_tags_through_a_relative_basename_path() {
+    let temporary = tempfile::Builder::new()
+        .prefix("maestro-relative-")
+        .suffix(".wav")
+        .tempfile_in(".")
+        .unwrap()
+        .into_temp_path();
+    std::fs::copy(fixtures().join("spunoff-el-sueno-untagged.wav"), &temporary).unwrap();
+    let relative = std::path::PathBuf::from(temporary.file_name().unwrap());
+    let cache = tempfile::tempdir().unwrap();
+    let mut params = json!({"path": relative, "coverArtCacheDir": cache.path()});
+    params["update"] = json!({"title": "Gökotta"});
+
+    let actual = Engine::new().request("write_tags", params);
+
+    assert_eq!(actual["title"], "Gökotta");
+}
+
+#[cfg(unix)]
+#[test]
+fn writes_iff_tags_through_a_symlink_without_replacing_it() {
+    use std::os::unix::fs::symlink;
+
+    let library = Library::new();
+    let target = library.copy("spunoff-el-sueno-untagged.wav");
+    let link = library.0.join("linked.wav");
+    symlink(&target, &link).unwrap();
+    let mut params = library.params(&link);
+    params["update"] = json!({"title": "Gökotta"});
+
+    Engine::new().request("write_tags", params);
+
+    assert!(std::fs::symlink_metadata(&link)
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    let actual = Engine::new().request("read_file", library.params(&target));
+    assert_eq!(actual["title"], "Gökotta");
+}

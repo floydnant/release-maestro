@@ -211,7 +211,8 @@ impl NativeTags {
 // Remove the old chunk first so the writer uses its append path instead.
 fn save_id3(tag: &Tag, path: &Path, options: WriteOptions) -> Result<(), FileEncodingError> {
     use std::io::{Cursor, Read, Seek, Write};
-    let bytes = std::fs::read(path)?;
+    let write_path = std::fs::canonicalize(path)?;
+    let bytes = std::fs::read(&write_path)?;
     let mut file = Cursor::new(bytes);
     let mut header = [0; 12];
     file.read_exact(&mut header)?;
@@ -226,20 +227,22 @@ fn save_id3(tag: &Tag, path: &Path, options: WriteOptions) -> Result<(), FileEnc
         TagType::Id3v2.remove_from(&mut file, options)?;
         file.rewind()?;
         tag.save_to(&mut file, options)?;
-        let permissions = std::fs::metadata(path)?.permissions();
-        let parent = path.parent().unwrap_or_else(|| Path::new("."));
+        let permissions = std::fs::metadata(&write_path)?.permissions();
+        let parent = write_path.parent().unwrap_or_else(|| Path::new("."));
         let mut replacement = tempfile::NamedTempFile::new_in(parent)?;
         replacement.as_file().set_permissions(permissions)?;
         replacement.write_all(&file.into_inner())?;
         replacement.as_file().sync_all()?;
-        replacement.persist(path).map_err(|error| error.error)?;
+        replacement
+            .persist(&write_path)
+            .map_err(|error| error.error)?;
         return Ok(());
     }
 
     let mut file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .open(path)?;
+        .open(write_path)?;
     tag.save_to(&mut file, options)
 }
 
