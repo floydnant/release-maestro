@@ -33,6 +33,24 @@ it('rejects circular aliases', () => {
     expect(() => resolveValue('{color.a}', circular)).toThrow(/Circular token alias/)
 })
 
+it('rejects contrast pairs below WCAG AA', () => {
+    expect(() =>
+        generate({
+            foundations: {
+                color: { ink: { 500: '#777777', 900: '#111111' } },
+            },
+            semantic: {
+                color: {
+                    content: { muted: '{color.ink.500}' },
+                    background: { canvas: '{color.ink.900}' },
+                },
+                typography: {},
+            },
+            contrastPairs: [['content.muted', 'background.canvas']],
+        }),
+    ).toThrow('WCAG AA contrast failed for content.muted on background.canvas')
+})
+
 it('rejects duplicate flattened paths', () => {
     expect(() => flatten({ primary: '#ffffff' }, ['color'], { 'color.primary': '#000000' })).toThrow(
         /Duplicate token/,
@@ -294,14 +312,15 @@ it('reports malformed CSS with its source position', () => {
     expect(scan('.x {\n color red;\n}')[0]).toMatchObject({ rule: 'css-syntax', line: 2, column: 2 })
 })
 
-it('warns by default at the CLI boundary and fails only in strict mode', () => {
+it('reports stylesheet findings as errors and fails the check', () => {
     const findings = scan('.x { color: var(--color-missing); }')
     const write = jest.fn()
-    expect(() => reportStyleDiagnostics(findings, 'warn', write)).not.toThrow()
-    expect(write).toHaveBeenCalledWith(expect.stringContaining(`${componentFile}:1:13: warn [unknown-token]`))
-    expect(() => reportStyleDiagnostics(findings, 'error', write)).toThrow('1 stylesheet token violations')
-    expect(() => reportStyleDiagnostics([], 'error', write)).not.toThrow()
-    expect(() => reportStyleDiagnostics([], 'off', write)).toThrow('Style severity must be warn or error')
+    expect(() => reportStyleDiagnostics(findings, write)).toThrow('1 stylesheet token violations')
+    expect(write).toHaveBeenCalledWith(
+        expect.stringContaining(`${componentFile}:1:13: error [unknown-token]`),
+    )
+    expect(write.mock.calls[0][0]).toMatch(/^\u001B\[31m.*\u001B\[39m$/)
+    expect(() => reportStyleDiagnostics([], write)).not.toThrow()
 })
 
 it('leaves generated and global style token references resolvable', () => {

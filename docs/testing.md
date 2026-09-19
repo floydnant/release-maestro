@@ -36,11 +36,9 @@ to onboarding. Override `get-settings` when onboarding is the scenario under tes
 ### Stylesheet token checks
 
 `npx nx run maestro-renderer:design-tokens-check` runs the tooling Jest suite, generated-output
-checks, and stylesheet token checks. The new stylesheet rules warn during rollout. Use
-`npx nx run maestro-renderer:design-tokens-check --args=error` to fail on those findings.
-See [the tooling rollout notes](../apps/maestro-renderer/tools/README.md) for the remaining findings
-and the condition for making errors the default. Renderer build, lint, and test already depend on
-this target.
+checks, contrast validation, and stylesheet token checks. Any finding fails the target, which
+renderer build, lint, and test already depend on. See
+[the tooling notes](../apps/maestro-renderer/tools/README.md) for rule scope and exemptions.
 
 ## Fast iteration
 

@@ -96,11 +96,11 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
         }
 
         .mosaic-tile--enter {
-            animation: mosaic-tile-enter 650ms var(--foundation-motion-easing-emphasized) backwards;
+            animation: mosaic-tile-enter 650ms theme('transitionTimingFunction.emphasized') backwards;
         }
 
         .mosaic-tile--leave {
-            animation: mosaic-tile-leave 650ms var(--foundation-motion-easing-standard) forwards;
+            animation: mosaic-tile-leave 650ms theme('transitionTimingFunction.standard') forwards;
         }
 
         @keyframes mosaic-tile-enter {

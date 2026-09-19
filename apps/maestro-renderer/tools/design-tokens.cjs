@@ -12,6 +12,7 @@ const generatedElectronTsPath = path.resolve(
     '../maestro-electron/src/app/design-tokens.generated.ts',
 )
 const sourceFiles = ['foundations.json', 'semantic.dark.json', 'contrast-pairs.json']
+const red = message => `\u001B[31m${message}\u001B[39m`
 
 const readJson = file => JSON.parse(fs.readFileSync(path.join(sourceDir, file), 'utf8'))
 
@@ -142,8 +143,7 @@ const generate = ({ foundations, semantic, contrastPairs }) => {
             throw new Error(`Unknown contrast pair: ${foregroundPath}, ${backgroundPath}`)
         const ratio = contrastRatio(foreground, background)
         if (ratio < 4.5) {
-            // throw new Error(
-            console.log(
+            throw new Error(
                 `WCAG AA contrast failed for ${foregroundPath} on ${backgroundPath}: ${ratio.toFixed(2)}:1`,
             )
         }
@@ -361,7 +361,7 @@ const checkRawColorUsage = () => {
     }
 }
 
-const checkStyles = (severity = 'warn') => {
+const checkStyles = () => {
     const policy = tokenPolicy(
         fs.readFileSync(generatedCssPath, 'utf8'),
         JSON.parse(fs.readFileSync(generatedTailwindPath, 'utf8')),
@@ -383,19 +383,24 @@ const checkStyles = (severity = 'warn') => {
         }
     }
     visit(path.join(projectRoot, 'src'))
-    reportStyleDiagnostics(diagnostics, severity, message => console.warn(message))
+    reportStyleDiagnostics(diagnostics, message => console.error(message))
 }
 
 if (require.main === module) {
     const command = process.argv[2]
-    if (command === 'generate') writeGenerated()
-    else if (command === 'watch') watchGenerated()
-    else if (command === 'check') {
-        checkGenerated()
-        checkRawColorUsage()
-        checkStyles(process.argv[3] ?? 'warn')
-    } else {
-        console.error('Usage: node tools/design-tokens.cjs <generate|watch|check> [warn|error]')
+    try {
+        if (command === 'generate') writeGenerated()
+        else if (command === 'watch') watchGenerated()
+        else if (command === 'check') {
+            if (process.argv[3]) throw new Error('Usage: node tools/design-tokens.cjs check')
+            checkGenerated()
+            checkRawColorUsage()
+            checkStyles()
+        } else {
+            throw new Error('Usage: node tools/design-tokens.cjs <generate|watch|check>')
+        }
+    } catch (error) {
+        console.error(red(error instanceof Error ? error.message : String(error)))
         process.exitCode = 1
     }
 }

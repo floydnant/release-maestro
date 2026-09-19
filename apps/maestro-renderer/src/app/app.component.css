@@ -58,8 +58,8 @@
     justify-content: center;
     color: theme('colors.content.muted');
     transition:
-        background-color var(--foundation-motion-duration-fast) var(--foundation-motion-easing-standard),
-        color var(--foundation-motion-duration-fast) var(--foundation-motion-easing-standard);
+        background-color theme('transitionDuration.fast') theme('transitionTimingFunction.standard'),
+        color theme('transitionDuration.fast') theme('transitionTimingFunction.standard');
 }
 
 .title-bar__button:hover {

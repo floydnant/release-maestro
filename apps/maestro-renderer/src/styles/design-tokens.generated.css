@@ -128,7 +128,7 @@
     --color-background-overlay: rgb(25 21 31 / 0.82);
     --color-content-primary: var(--foundation-color-neutral-100);
     --color-content-secondary: var(--foundation-color-neutral-300);
-    --color-content-muted: var(--foundation-color-neutral-500);
+    --color-content-muted: var(--foundation-color-neutral-400);
     --color-content-inverse: var(--foundation-color-neutral-900);
     --color-content-action: var(--foundation-color-purple-200);
     --color-content-success: var(--foundation-color-green-400);

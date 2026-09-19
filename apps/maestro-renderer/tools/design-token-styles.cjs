@@ -3,6 +3,7 @@ const valueParser = require('postcss-value-parser')
 const ts = require('typescript')
 
 const tokenPrefix = /^--(?:color|foundation|type)-/
+const red = message => `\u001B[31m${message}\u001B[39m`
 
 // Read declarations from the expected generated output, never from product CSS overrides.
 const tokenPolicy = (css, tailwind) => {
@@ -197,13 +198,11 @@ const scanStyleSource = ({ file, source, policy }) => {
     return diagnostics
 }
 
-const reportStyleDiagnostics = (diagnostics, severity, write) => {
-    if (!['warn', 'error'].includes(severity)) throw new Error('Style severity must be warn or error')
+const reportStyleDiagnostics = (diagnostics, write) => {
     for (const { file, line, column, rule, message } of diagnostics) {
-        write(`${file}:${line}:${column}: ${severity} [${rule}] ${message}`)
+        write(red(`${file}:${line}:${column}: error [${rule}] ${message}`))
     }
-    if (diagnostics.length && severity === 'error')
-        throw new Error(`${diagnostics.length} stylesheet token violations`)
+    if (diagnostics.length) throw new Error(`${diagnostics.length} stylesheet token violations`)
 }
 
 module.exports = { tokenPolicy, scanStyleSource, reportStyleDiagnostics }
