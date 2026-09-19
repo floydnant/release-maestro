@@ -42,7 +42,7 @@ type FeedState =
 @Component({
     selector: 'app-feed',
     templateUrl: './feed.component.html',
-    styleUrls: ['./feed.component.css'],
+    host: { class: 'flex min-h-0 w-full' },
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         CommonModule,

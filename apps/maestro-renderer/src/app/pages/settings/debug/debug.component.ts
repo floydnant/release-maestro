@@ -32,11 +32,7 @@ const MAX_SCAN_LOG_ENTRIES = 200
     imports: [FormsModule, JsonPipe, ProgressBarComponent],
     templateUrl: './debug.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    styles: `
-        :host {
-            @apply block h-full;
-        }
-    `,
+    host: { class: 'block h-full' },
 })
 export class DebugComponent {
     private readonly metadataService = inject(MetadataService)

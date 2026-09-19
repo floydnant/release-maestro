@@ -53,7 +53,7 @@ const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contentedit
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.css'],
     standalone: true,
-    host: { '(document:keydown)': 'onDocumentKeydown($event)' },
+    host: { class: 'block min-h-full', '(document:keydown)': 'onDocumentKeydown($event)' },
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [RouterModule, ProgressBarComponent, ProgressRingComponent, IconComponent],
 })

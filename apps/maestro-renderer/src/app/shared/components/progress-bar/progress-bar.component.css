@@ -1,3 +1,5 @@
+/* Hover and programmatic glow share a parent state. Each segment supplies --color,
+   and entering/leaving that state uses different transition durations and easing. */
 .progress-container:is(:hover, .glow) .progress-segment {
     box-shadow: 0 0 12px color-mix(in srgb, var(--color) 55%, transparent);
     transition:
@@ -9,7 +11,4 @@
     transition:
         box-shadow var(--foundation-motion-duration-slow),
         width var(--foundation-motion-duration-ambient) var(--foundation-motion-easing-standard);
-}
-.progress-container:is(:hover, .glow) .progress-number {
-    @apply text-content-muted;
 }
