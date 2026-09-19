@@ -1,148 +1,18 @@
-//! Custom fields live in format-specific tags, outside Lofty's generic ItemKey model.
+//! Custom fields in ID3v2 and MP4 companion tags.
 //! Converting back retains the companion tag, including opaque frames and artwork.
 
-use crate::mp4_tags::Mp4Snapshot;
 use lofty::{
-    ape::{ApeItem, ApeTag},
-    config::{ParseOptions, WriteOptions},
-    file::{AudioFile, FileType, TaggedFile, TaggedFileExt},
     id3::v2::{Frame, Id3v2Tag},
     iff::wav::RiffInfoList,
-    mp4::{Atom, AtomData, AtomIdent, Ilst, Mp4File},
-    ogg::VorbisComments,
-    probe::Probe,
-    tag::{ItemKey, ItemValue, Tag, TagExt, TagItem, TagType},
+    mp4::{Atom, AtomData, AtomIdent, Ilst},
+    tag::{ItemKey, Tag, TagType},
 };
 
-// Lofty 0.22 consumes only the first value of each MP4 atom during conversion.
-// Restore the other text values before the native tag is discarded.
-fn from_mp4(native: Ilst) -> Tag {
-    let mut tag = Tag::from(native.clone());
-    for atom in &native {
-        let name = match atom.ident() {
-            AtomIdent::Freeform { mean, name } => format!("----:{mean}:{name}"),
-            AtomIdent::Fourcc(bytes) => bytes.iter().map(|byte| char::from(*byte)).collect(),
-        };
-        if matches!(
-            atom.data().next(),
-            Some(AtomData::UTF8(_) | AtomData::UTF16(_))
-        ) {
-            for value in atom.data().skip(1) {
-                if let AtomData::UTF8(value) | AtomData::UTF16(value) = value {
-                    tag.push_unchecked(TagItem::new(
-                        ItemKey::from_key(TagType::Mp4Ilst, &name),
-                        ItemValue::Text(value.clone()),
-                    ));
-                }
-            }
-        }
-    }
-    tag
-}
-
-pub fn read_from_path(
-    path: &std::path::Path,
-) -> lofty::error::Result<(TaggedFile, Option<Mp4Snapshot>)> {
-    let probe = Probe::open(path)?.guess_file_type()?;
-    if probe.file_type() == Some(FileType::Mp4) {
-        let file = Mp4File::read_from(&mut probe.into_inner(), ParseOptions::new())?;
-        let has_tag = file.ilst().is_some();
-        let original = file.ilst().cloned().unwrap_or_else(Ilst::new);
-        let tag = from_mp4(original.clone());
-        let snapshot = Mp4Snapshot::new(original, &tag);
-        let mut file: TaggedFile = file.into();
-        if has_tag {
-            file.insert_tag(tag);
-        }
-        Ok((file, Some(snapshot)))
-    } else {
-        probe.read().map(|file| (file, None))
-    }
-}
-
-pub fn save(
-    tag: &Tag,
-    path: &std::path::Path,
-    mp4: Option<&Mp4Snapshot>,
-) -> lofty::error::Result<()> {
-    let options = WriteOptions::new().remove_others(false);
-    if let Some(mp4) = mp4.filter(|_| tag.tag_type() == TagType::Mp4Ilst) {
-        mp4.merge(tag).save_to_path(path, options)
-    } else if tag.tag_type() == TagType::Id3v2 {
-        native_id3(tag.clone()).save_to_path(path, options)
-    } else if tag.tag_type() == TagType::Ape {
-        native_ape(tag.clone())?.save_to_path(path, options)
-    } else {
-        tag.save_to_path(path, options)
-    }
-}
-
 pub fn is_custom_key(tag_type: TagType, name: &str) -> bool {
-    ItemKey::from_key(tag_type, name)
-        .map_key(tag_type, false)
-        .is_none()
+    ItemKey::from_key(tag_type, name).is_none()
 }
 
-fn native_id3(mut tag: Tag) -> Id3v2Tag {
-    // Lofty 0.22 merges known multi-value fields but replaces repeated custom
-    // text items. Join their values before conversion so none are discarded.
-    let keys: Vec<_> = tag
-        .items()
-        .filter(|item| item.key().map_key(TagType::Id3v2, false).is_none())
-        .map(|item| item.key().clone())
-        .collect();
-    for key in keys {
-        if tag.get_strings(&key).count() > 1
-            && tag
-                .get_items(&key)
-                .all(|item| item.value().text().is_some())
-        {
-            let values: Vec<_> = tag.take_strings(&key).collect();
-            tag.insert_unchecked(TagItem::new(key, ItemValue::Text(values.join("\0"))));
-        }
-    }
-    Id3v2Tag::from(tag)
-}
-
-fn native_ape(tag: Tag) -> lofty::error::Result<ApeTag> {
-    // Lofty 0.22's Tag -> ApeTag conversion drops unmapped items. Preserve them
-    // explicitly before saving or reading custom fields.
-    let mut custom = Vec::new();
-    let mut text_keys = std::collections::HashSet::new();
-    for item in tag.items() {
-        if item.key().map_key(TagType::Ape, false).is_none() {
-            if let Some(name) = item.key().map_key(TagType::Ape, true) {
-                let value = if item.value().text().is_some() {
-                    if !text_keys.insert(name.to_ascii_lowercase()) {
-                        continue;
-                    }
-                    // Some files repeat the item instead of using APE's NUL-separated values.
-                    let values: Vec<_> = tag
-                        .items()
-                        .filter(|candidate| {
-                            candidate
-                                .key()
-                                .map_key(TagType::Ape, true)
-                                .is_some_and(|key| key.eq_ignore_ascii_case(name))
-                        })
-                        .filter_map(|candidate| candidate.value().text())
-                        .collect();
-                    ItemValue::Text(values.join("\0"))
-                } else {
-                    item.value().clone()
-                };
-                custom.push(ApeItem::new(name.to_owned(), value)?);
-            }
-        }
-    }
-    let mut native = ApeTag::from(tag);
-    for item in custom {
-        native.insert(item);
-    }
-    Ok(native)
-}
-
-pub fn read(tag: &Tag, mp4: Option<&Mp4Snapshot>) -> lofty::error::Result<Vec<(String, String)>> {
+pub fn read(tag: &Tag, mp4: Option<&Ilst>) -> Vec<(String, String)> {
     let mut fields = Vec::new();
     let mut push = |name: &str, value: &str, force: bool| {
         if !name.is_empty() && (force || is_custom_key(tag.tag_type(), name)) {
@@ -159,7 +29,7 @@ pub fn read(tag: &Tag, mp4: Option<&Mp4Snapshot>) -> lofty::error::Result<Vec<(S
     };
     match tag.tag_type() {
         TagType::Id3v2 => {
-            let native = native_id3(tag.clone());
+            let native = Id3v2Tag::from(tag.clone());
             for frame in &native {
                 match frame {
                     Frame::UserText(frame) => push(
@@ -178,28 +48,8 @@ pub fn read(tag: &Tag, mp4: Option<&Mp4Snapshot>) -> lofty::error::Result<Vec<(S
                 }
             }
         }
-        TagType::VorbisComments => {
-            for (name, value) in VorbisComments::from(tag.clone()).items() {
-                push(name, value, false);
-            }
-        }
-        TagType::Ape => {
-            let native = native_ape(tag.clone())?;
-            for item in &native {
-                push(
-                    item.key(),
-                    item.value()
-                        .text()
-                        .or_else(|| item.value().locator())
-                        .unwrap_or_default(),
-                    false,
-                );
-            }
-        }
         TagType::Mp4Ilst => {
-            let native = mp4
-                .map(|snapshot| snapshot.original().clone())
-                .unwrap_or_else(|| Ilst::from(tag.clone()));
+            let native = mp4.cloned().unwrap_or_else(|| Ilst::from(tag.clone()));
             for atom in &native {
                 let name = match atom.ident() {
                     AtomIdent::Freeform { mean, name } => format!("----:{mean}:{name}"),
@@ -228,34 +78,23 @@ pub fn read(tag: &Tag, mp4: Option<&Mp4Snapshot>) -> lofty::error::Result<Vec<(S
                 }
             }
         }
-        TagType::RiffInfo => {
-            let native = RiffInfoList::from(tag.clone());
-            for (name, value) in &native {
-                push(name, value, false);
-            }
-        }
         _ => {}
     }
-    Ok(fields)
+    fields
 }
 
 /// Replace all case variants of the aliases with one canonical custom text field.
 /// `None` removes them. Standard fields must be updated after alias removal.
-pub fn replace_text(
-    tag: &mut Tag,
-    canonical: &str,
-    aliases: &[&str],
-    value: Option<String>,
-) -> lofty::error::Result<()> {
+pub fn replace_text(tag: &mut Tag, canonical: &str, aliases: &[&str], value: Option<String>) {
     let matches = |name: &str| {
         name.eq_ignore_ascii_case(canonical)
             || aliases.iter().any(|alias| name.eq_ignore_ascii_case(alias))
     };
     let tag_type = tag.tag_type();
-    let owned = tag.clone();
+    let owned = std::mem::replace(tag, Tag::new(tag_type));
     *tag = match tag_type {
         TagType::Id3v2 => {
-            let mut native = native_id3(owned);
+            let mut native = Id3v2Tag::from(owned);
             native.retain(|frame| match frame {
                 Frame::UserText(text) => !matches(&text.description),
                 Frame::UserUrl(url) => !matches(&url.description),
@@ -263,26 +102,6 @@ pub fn replace_text(
             });
             if let Some(value) = value {
                 native.insert_user_text(canonical.to_owned(), value);
-            }
-            native.into()
-        }
-        TagType::VorbisComments => {
-            let mut native = VorbisComments::from(owned);
-            for alias in std::iter::once(canonical).chain(aliases.iter().copied()) {
-                native.remove(alias).for_each(drop);
-            }
-            if let Some(value) = value {
-                native.insert(canonical.to_owned(), value);
-            }
-            native.into()
-        }
-        TagType::Ape => {
-            let mut native = native_ape(owned)?;
-            for alias in std::iter::once(canonical).chain(aliases.iter().copied()) {
-                native.remove(alias);
-            }
-            if let Some(value) = value {
-                native.insert(ApeItem::new(canonical.to_owned(), ItemValue::Text(value))?);
             }
             native.into()
         }
@@ -301,24 +120,20 @@ pub fn replace_text(
                     AtomData::UTF8(value),
                 ));
             }
-            from_mp4(native)
+            native.into()
         }
         _ => owned,
     };
-    Ok(())
 }
 
 /// Integer MP4 tempo can live outside the generic tag in Lofty's companion data.
-pub fn remove_bpm(tag: &mut Tag) -> lofty::error::Result<()> {
-    let aliases = LegacyField::Bpm.aliases();
-    replace_text(tag, aliases[0], &aliases[1..], None)?;
+pub fn remove_bpm(tag: &mut Tag) {
     if tag.tag_type() == TagType::Mp4Ilst {
         let owned = std::mem::replace(tag, Tag::new(TagType::Mp4Ilst));
         let mut native = Ilst::from(owned);
         native.remove(&AtomIdent::Fourcc(*b"tmpo")).for_each(drop);
-        *tag = from_mp4(native);
+        *tag = native.into();
     }
-    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -370,9 +185,14 @@ impl LegacyField {
         })
     }
 
-    pub fn replace(self, tag: &mut Tag, value: Option<String>) -> Result<(), String> {
+    pub fn replace(
+        self,
+        tag: &mut Tag,
+        native: &mut crate::native_tags::NativeTags,
+        value: Option<String>,
+    ) -> Result<(), String> {
         let aliases = self.aliases();
-        replace_text(tag, aliases[0], &aliases[1..], value).map_err(|error| error.to_string())
+        native.replace_text(tag, aliases[0], &aliases[1..], value)
     }
 }
 
@@ -400,44 +220,4 @@ pub fn remove_riff_aliases(
         native.remove(&name);
     }
     Some(native)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn repeated_custom_ape_text_is_preserved_during_conversion() {
-        let mut tag = Tag::new(TagType::Ape);
-        for value in ["first", "second"] {
-            tag.push_unchecked(TagItem::new(
-                ItemKey::from_key(TagType::Ape, "X-MAESTRO"),
-                ItemValue::Text(value.into()),
-            ));
-        }
-        let native = native_ape(tag).unwrap();
-        assert_eq!(
-            native.get("X-MAESTRO").unwrap().value().text(),
-            Some("first\0second")
-        );
-    }
-
-    #[test]
-    fn invalid_ape_keys_fail_conversion_without_erasing_items() {
-        let mut tag = Tag::new(TagType::Ape);
-        let key = ItemKey::from_key(TagType::Ape, "x");
-        tag.push_unchecked(TagItem::new(key.clone(), ItemValue::Text("keep me".into())));
-        assert!(read(&tag, None).is_err());
-        assert!(LegacyField::Energy
-            .replace(&mut tag, Some("7".into()))
-            .is_err());
-        assert_eq!(tag.get_string(&key), Some("keep me"));
-    }
-
-    #[test]
-    fn invalid_replacement_ape_key_returns_an_error() {
-        let mut tag = Tag::new(TagType::Ape);
-        assert!(replace_text(&mut tag, "x", &[], Some("value".into())).is_err());
-        assert!(tag.is_empty());
-    }
 }

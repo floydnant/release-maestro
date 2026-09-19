@@ -557,6 +557,68 @@
         "writable": true
     },
     {
+        "file": "secondary-ape.mp3",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [
+            ["Custom: X-URL", "https://example.com/secondary"],
+            ["Custom: X-BLOB", ""]
+        ],
+        "writable": true,
+        "binaryMarker": "maestro-opaque-ape-payload"
+    },
+    {
+        "file": "secondary-riff.wav",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [["Custom: XTRA", "keep the RIFF field"]],
+        "writable": true
+    },
+    {
+        "file": "year.wv",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle",
+            "year": 2024,
+            "date": null
+        },
+        "writable": true
+    },
+    {
         "file": "repeated-ape.wv",
         "expected": {
             "title": "Invocación Del Cielo",

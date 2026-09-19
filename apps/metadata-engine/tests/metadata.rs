@@ -19,6 +19,7 @@ struct Fixture {
     #[serde(default)]
     create_tag: bool,
     alias_field: Option<AliasField>,
+    binary_marker: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Eq, PartialEq, Ord, PartialOrd)]
@@ -167,12 +168,23 @@ fn edits_and_clears_tags_without_losing_unrelated_metadata_or_artwork() {
             "musicalKey",
             "catalogNumber",
             "label",
+            "year",
+            "date",
             "duration",
             "coverPath",
         ] {
             assert_eq!(reread[key], original[key], "{name}: preserved {key}");
         }
         assert_extras(&reread, &case);
+        if let Some(marker) = &case.binary_marker {
+            assert!(
+                std::fs::read(&path)
+                    .unwrap()
+                    .windows(marker.len())
+                    .any(|bytes| bytes == marker.as_bytes()),
+                "{name}: opaque payload preserved"
+            );
+        }
         if ["mp3", "wav", "aiff"].iter().any(|ext| name.ends_with(ext)) {
             assert!(
                 std::fs::read(&path)
@@ -369,7 +381,7 @@ fn fractional_id3_tempo_keeps_the_standard_integer_frame() {
             native
                 .primary_tag()
                 .unwrap()
-                .get_string(&ItemKey::IntegerBpm),
+                .get_string(ItemKey::IntegerBpm),
             Some("132"),
             "{name}: standard TBPM"
         );
@@ -426,6 +438,55 @@ fn unrelated_mp4_edits_preserve_every_value_in_mixed_native_atoms() {
                 "{:?} lost native MP4 data during {update}",
                 atom.ident()
             );
+        }
+    }
+}
+
+#[test]
+fn year_edits_preserve_month_and_day_and_clear_recording_dates() {
+    let library = Library::new();
+    let path = library.copy("multiple.flac");
+    let mut params = library.params(&path);
+    params["update"] = json!({"year": 2026});
+    Engine::new().request("write_tags", params.clone());
+    let actual = Engine::new().request("read_file", library.params(&path));
+    assert_eq!(actual["date"], "2026-02-03");
+    params["update"] = json!({"year": null});
+    Engine::new().request("write_tags", params);
+    let actual = Engine::new().request("read_file", library.params(&path));
+    assert!(actual["date"].is_null());
+    assert!(actual["year"].is_null());
+}
+
+#[test]
+fn ape_year_edits_and_clears_preserve_the_year_field() {
+    let library = Library::new();
+    let path = library.copy("year.wv");
+    for year in [json!(2026), Value::Null] {
+        let mut params = library.params(&path);
+        params["update"] = json!({"year": year});
+        Engine::new().request("write_tags", params);
+        let actual = Engine::new().request("read_file", library.params(&path));
+        assert_eq!(actual["year"], year);
+        assert!(actual["date"].is_null());
+    }
+}
+
+#[test]
+fn label_edits_and_clears_replace_the_formats_publisher_mapping() {
+    let library = Library::new();
+    for name in [
+        "vardae-invocacion-del-cielo.mp3",
+        "vardae-invocacion-del-cielo.wv",
+        "vardae-invocacion-del-cielo.flac",
+    ] {
+        let path = library.copy(name);
+        for update in [json!({"label": "Butter Side Up"}), json!({"label": null})] {
+            let mut params = library.params(&path);
+            params["update"] = update.clone();
+            Engine::new().request("write_tags", params);
+            let actual = Engine::new().request("read_file", library.params(&path));
+            assert_fields(&actual, &update, name);
         }
     }
 }
