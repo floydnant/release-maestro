@@ -62,18 +62,23 @@ Layer discipline is unchecked too: product code consumes **semantic** tokens
 (`bg-background-surface`, `text-content-muted`). Foundation tokens belong to token infrastructure,
 to shared primitives where there is a stated reason, and to the design-system specimen.
 
-## Apply classes through templates and host metadata
+## Keep imperative class vocabularies closed
 
-Classes reach the DOM through templates and `host` metadata only. In renderer `src/app`,
-`design-system/no-imperative-classes` rejects `@HostBinding('class...')`, `addClass` / `removeClass`
-calls, and `classList.add` / `remove` / `toggle` / `replace`. Use `[class.foo]` for a condition or
-`host: { '[class.foo]': 'condition' }` for host state. Static host classes use `host: { class: '…' }`.
+In renderer `src/app`, `design-system/valid-imperative-classnames` checks `@HostBinding('class...')`,
+`Renderer2.addClass` / `removeClass`, and `classList.add` / `remove` / `toggle` / `replace`. Literal
+classes and closed string-literal unions use the same Tailwind and stylesheet authorities as
+templates and `host` metadata. A value typed as plain `string` is rejected because its possible
+classes cannot be enumerated.
 
-An exceptional DOM integration needs an `eslint-disable-next-line design-system/no-imperative-classes`
-comment with a `--` explanation on that operation. Name the class source and why a binding cannot
-serve the integration. Do not add file-wide disables, ignore patterns, or a global exception list.
-The album grid's cover-load handler is an exception: it removes the template's validated `opacity-0`
-without retaining state for virtualized covers.
+Prefer `[class.foo]` for a condition or `host: { '[class.foo]': 'condition' }` for host state. Static
+host classes use `host: { class: '…' }`. Use an imperative operation when the DOM event or integration
+is genuinely the cleaner owner, as in the album grid removing its validated `opacity-0` after an
+image loads.
+
+An unresolved third-party class vocabulary needs an
+`eslint-disable-next-line design-system/valid-imperative-classnames` comment with a `--` explanation
+on that operation. Name the class source and why the type cannot express a closed vocabulary. Do not
+add file-wide disables, ignore patterns, or a global exception list.
 
 ## Keep runtime class vocabularies closed
 

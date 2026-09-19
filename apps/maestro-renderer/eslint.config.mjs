@@ -62,7 +62,7 @@ export default [
         basePath: projectRoot,
         files: ['src/app/**/*.ts'],
         rules: {
-            'design-system/no-imperative-classes': 'error',
+            'design-system/valid-imperative-classnames': ['error', classValidationOptions],
         },
     },
 ]

@@ -1,8 +1,14 @@
 /**
- * Keep class application on the template and host-metadata surfaces the class validators inspect.
- * Resolve Renderer2 from its Angular import and typed injection sites so unrelated APIs with the
- * same method names remain available. Aliases and optional chaining must not hide a mutation.
+ * Validate class names applied through TypeScript. Literal arguments take the cheap syntax path;
+ * variables and calls use the parser's TypeChecker and remain valid only when their type is a
+ * closed string-literal union. The same Tailwind and stylesheet authorities decide validity here
+ * as in templates and host metadata.
  */
+const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
+const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
+const { CLASS_MESSAGES, describeUnknownClass } = require('../lib/diagnostics.cjs')
+const { stringLiteralsOf } = require('../lib/string-literal-types.cjs')
+
 const CLASS_LIST_MUTATIONS = new Set(['add', 'remove', 'toggle', 'replace'])
 const RENDERER_MUTATIONS = new Set(['addClass', 'removeClass'])
 
@@ -32,18 +38,26 @@ module.exports = {
     meta: {
         type: 'problem',
         docs: {
-            description: 'Apply classes through validated templates and host metadata only',
+            description: 'Every imperatively applied class must be a valid, closed vocabulary',
         },
-        schema: [],
+        schema: [sharedSchema],
         messages: {
-            hostBinding:
-                'Apply classes through host metadata instead of @HostBinding. Use host: { class: "…" } or host: { "[class.foo]": "condition" }.',
-            mutation:
-                'Apply classes through a template binding or host metadata instead of {{method}}. These surfaces validate class names.',
+            ...CLASS_MESSAGES,
+            dynamicClass:
+                'Imperative class value is typed `{{type}}`, which is not a closed set of class names. Narrow it to a string-literal union, or suppress with a reason.',
+            untypedClass:
+                'Imperative class value cannot be enumerated without TypeScript type information. Use a literal, enable typed parsing, or suppress with a reason.',
         },
     },
     create(context) {
+        const options = context.options[0] ?? {}
         const sourceCode = context.sourceCode
+        const services = sourceCode.parserServices
+        const checker = services?.program?.getTypeChecker()
+        const { isThemePath, isValid, suggest } = createClassChecker(options, {
+            cwd: context.cwd,
+            filePath: context.filename,
+        })
         const hostBindings = new Set(['HostBinding'])
         const angularNamespaces = new Set()
         const rendererTypes = new Set()
@@ -165,6 +179,102 @@ module.exports = {
             return isInject && injected?.type !== 'SpreadElement' && isRendererConstructor(injected)
         }
 
+        /** @param {import('estree').Node} node */
+        const fallbackLoc = node => node.loc ?? { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } }
+
+        /** @param {number} start @param {number} end */
+        const locFor = (start, end) => ({
+            start: sourceCode.getLocFromIndex(start),
+            end: sourceCode.getLocFromIndex(end),
+        })
+
+        /**
+         * @param {string} className
+         * @param {import('eslint').AST.SourceLocation} loc
+         */
+        const checkClassName = (className, loc) => {
+            const token = {
+                name: className,
+                start: 0,
+                end: className.length,
+                kind: /** @type {const} */ ('styling'),
+                inDescriptorPosition: false,
+            }
+            for (const bare of bareTokenVariables(token)) {
+                context.report({ messageId: 'bareTokenVariable', data: { variable: bare.variable }, loc })
+            }
+            for (const reference of themeReferences(token)) {
+                if (!isThemePath(reference.path)) {
+                    context.report({
+                        messageId: 'unknownThemePath',
+                        data: { themePath: reference.path },
+                        loc,
+                    })
+                }
+            }
+            if (!isValid(className)) {
+                context.report({ ...describeUnknownClass(className, suggest(className)), loc })
+            }
+        }
+
+        /**
+         * @param {string} value
+         * @param {import('eslint').AST.SourceLocation} fallback
+         * @param {number|null} [offset]
+         */
+        const checkClassList = (value, fallback, offset = null) => {
+            const { tokens, malformed } = tokenizeClassList(value, { offset: offset ?? 0 })
+            if (malformed) {
+                context.report({
+                    messageId: malformed.reason,
+                    loc: offset === null ? fallback : locFor(malformed.start, malformed.end),
+                })
+            }
+            for (const token of tokens) {
+                if (token.kind === 'styling') {
+                    checkClassName(token.name, offset === null ? fallback : locFor(token.start, token.end))
+                }
+            }
+        }
+
+        /**
+         * @param {import('estree').Node} node
+         * @returns {{ literals: string[] } | { type: string } | null}
+         */
+        const typedStrings = node => {
+            if (!services?.getTypeAtLocation || !checker) return null
+            const type = services.getTypeAtLocation(node)
+            const literals = stringLiteralsOf(type)
+            return literals ? { literals } : { type: checker.typeToString(type) }
+        }
+
+        /**
+         * @param {import('estree').Node} node
+         * @param {'list'|'token'} shape
+         * @param {boolean} [syntaxLiteral]
+         */
+        const checkExpression = (node, shape, syntaxLiteral = true) => {
+            const literal = syntaxLiteral ? literalString(node) : undefined
+            const resolved = literal === undefined ? typedStrings(node) : { literals: [literal] }
+            const fallback = fallbackLoc(node)
+
+            if (!resolved) {
+                context.report({ node, messageId: 'untypedClass' })
+                return
+            }
+            if ('type' in resolved) {
+                context.report({ node, messageId: 'dynamicClass', data: { type: resolved.type } })
+                return
+            }
+            for (const value of resolved.literals) {
+                const offset = literal !== undefined && node.range ? node.range[0] + 1 : null
+                if (shape === 'list') checkClassList(value, fallback, offset)
+                else {
+                    checkClassName(value, offset === null ? fallback : locFor(offset, offset + value.length))
+                }
+            }
+        }
+
         return {
             /** @param {import('estree').Program} program */
             Program(program) {
@@ -195,27 +305,33 @@ module.exports = {
                         callee.object.type === 'Identifier' &&
                         angularNamespaces.has(callee.object.name) &&
                         memberName(callee) === 'HostBinding')
+                if (!isHostBinding) return
+
                 const binding = literalString(node.arguments[0])
                 const decorated = /** @type {any} */ (node).parent?.parent
                 const implicitBinding =
-                    node.arguments.length === 0 &&
-                    decorated &&
-                    'key' in decorated &&
-                    decorated.key.type === 'Identifier'
-                        ? decorated.key.name
+                    node.arguments.length === 0 && decorated && 'key' in decorated
+                        ? decorated.key.type === 'Identifier'
+                            ? decorated.key.name
+                            : literalString(decorated.key)
                         : undefined
-                if (
-                    isHostBinding &&
-                    (binding === 'class' ||
-                        binding === 'className' ||
-                        binding?.startsWith('class.') ||
-                        implicitBinding === 'class' ||
-                        implicitBinding === 'className')
-                ) {
-                    context.report({
-                        node: node.arguments[0] ?? decorated.key,
-                        messageId: 'hostBinding',
-                    })
+                const target = binding ?? implicitBinding
+
+                if (target?.startsWith('class.')) {
+                    const bindingNode = node.arguments[0]
+                    if (!bindingNode || bindingNode.type === 'SpreadElement') return
+                    const className = target.slice('class.'.length)
+                    const offset = bindingNode.range ? bindingNode.range[0] + 1 + 'class.'.length : null
+                    checkClassName(
+                        className,
+                        offset === null
+                            ? fallbackLoc(bindingNode)
+                            : locFor(offset, offset + className.length),
+                    )
+                } else if ((target === 'class' || target === 'className') && decorated?.key) {
+                    // The member name's type describes every value Angular can apply, including
+                    // later assignments and getter returns. An initializer alone would be weaker.
+                    checkExpression(decorated.key, 'list', false)
                 }
             },
             /** @param {import('estree').CallExpression} node */
@@ -224,12 +340,29 @@ module.exports = {
                 if (callee.type !== 'MemberExpression') return
                 const method = memberName(callee)
                 if (!method) return
+
                 const classList =
                     callee.object.type === 'MemberExpression' && memberName(callee.object) === 'classList'
+                if (classList && CLASS_LIST_MUTATIONS.has(method)) {
+                    const argumentsToCheck =
+                        method === 'add' || method === 'remove' ? node.arguments : node.arguments.slice(0, 2)
+                    for (const argument of argumentsToCheck) {
+                        checkExpression(
+                            argument.type === 'SpreadElement' ? argument.argument : argument,
+                            'token',
+                        )
+                    }
+                    return
+                }
+
                 const rendererMutation =
                     RENDERER_MUTATIONS.has(method) && isRendererExpression(callee.object, new Set())
-                if (rendererMutation || (classList && CLASS_LIST_MUTATIONS.has(method))) {
-                    context.report({ node: callee.property, messageId: 'mutation', data: { method } })
+                const classArgument = rendererMutation ? node.arguments[1] : undefined
+                if (classArgument) {
+                    checkExpression(
+                        classArgument.type === 'SpreadElement' ? classArgument.argument : classArgument,
+                        'token',
+                    )
                 }
             },
         }

@@ -27,6 +27,7 @@
  */
 const ts = require('typescript')
 const { componentSourceFile, decoratedClasses } = require('./component-metadata.cjs')
+const { stringLiteralsOf } = require('./string-literal-types.cjs')
 const { programFor } = require('./type-program.cjs')
 
 /**
@@ -240,26 +241,6 @@ function componentMembers(tsPath) {
 }
 
 // --- the typed tier ------------------------------------------------------------------------------
-
-/**
- * Every string a type can be, or null the moment one of its parts is not a string literal. A union
- * of literals is the shape being looked for; anything wider — `string`, a template literal type, a
- * union with a non-literal in it — is not a closed vocabulary.
- *
- * @param {ts.Type} type
- * @returns {string[]|null}
- */
-function stringLiteralsOf(type) {
-    const parts = type.isUnion() ? type.types : [type]
-
-    /** @type {string[]} */
-    const literals = []
-    for (const part of parts) {
-        if (!part.isStringLiteral()) return null
-        literals.push(part.value)
-    }
-    return literals.length > 0 ? literals : null
-}
 
 /**
  * @typedef {{ kind: 'literals', invoked: boolean, literals: string[] }
