@@ -29,6 +29,10 @@ Angular starts. Scenario responders can run in Node when an answer depends on th
 windowed query. See [the harness README](../apps/maestro-e2e/src/renderer/README.md) for builders,
 presets, pending handlers, sequences, and computed responders.
 
+Pure scenario helpers have Jest tests in `src/renderer/**/*.test.ts`. Run them with
+`npx nx test maestro-e2e`; `make test` and `make sure` include this target. Playwright owns
+`*.spec.ts`, including the browser integration contract in `harness/scenario-ipc.spec.ts`.
+
 Do not mock Node modules such as `fs` or `child_process` in renderer E2E; renderer behavior should use
 typed IPC. The default scenario has a configured library folder so unrelated tests are not redirected
 to onboarding. Override `get-settings` when onboarding is the scenario under test.

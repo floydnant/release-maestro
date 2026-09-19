@@ -17,7 +17,7 @@ const baseURL = process.env['BASE_URL'] || `http://localhost:${rendererE2EPort}`
 export default defineConfig({
     ...nxE2EPreset(__filename, { testDir: './src/renderer' }),
     outputDir: `${workspaceRoot}/dist/.playwright/maestro-e2e-renderer/test-output`,
-    testIgnore: 'electron/**',
+    testIgnore: ['electron/**', '**/*.test.ts'],
     /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
     use: {
         baseURL,
