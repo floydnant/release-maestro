@@ -240,6 +240,43 @@ test.describe('renderer scenario IPC harness', () => {
         expect(read).toEqual({ isDate: true, iso: capturedAt.toISOString() })
     })
 
+    test('preserves sparse arrays across both responder directions', async ({ page }) => {
+        const seen: unknown[] = []
+        const scenario = scenarioBuilder()
+            .handler(
+                'metadata:read',
+                respond(page, 'sparse', (request: { values: unknown[] }) => {
+                    seen.push(request)
+                    const values: unknown[] = new Array(4)
+                    values[1] = undefined
+                    values[3] = request.values
+                    return { values }
+                }),
+            )
+            .build()
+        await createRendererScenario(page, scenario)
+
+        const received = await page.evaluate(async () => {
+            const request: unknown[] = new Array(4)
+            request[1] = undefined
+            request[3] = 'present'
+            const electronModule = window.require?.('electron') as {
+                ipcRenderer: { invoke: (channel: string, payload: unknown) => Promise<unknown> }
+            }
+            const response = (await electronModule.ipcRenderer.invoke('metadata:read', {
+                values: request,
+            })) as { values: unknown[] }
+            return {
+                keys: Object.keys(response.values),
+                nestedKeys: Object.keys(response.values[3] as unknown[]),
+            }
+        })
+
+        expect(seen).toHaveLength(1)
+        expect(Object.keys((seen[0] as { values: unknown[] }).values)).toEqual(['1', '3'])
+        expect(received).toEqual({ keys: ['1', '3'], nestedKeys: ['1', '3'] })
+    })
+
     test('serves the window a song catalog was asked for', async ({ page }) => {
         const scenario = scenarioBuilder().songCatalog(page, 1_000).build()
         await createRendererScenario(page, scenario)

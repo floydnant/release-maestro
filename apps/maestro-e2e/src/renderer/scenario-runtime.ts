@@ -43,7 +43,11 @@ export const createScenarioRuntime = () => {
     // A JSON.parse reviver returning undefined deletes the property or array slot.
     // Walk the parsed value instead so explicit undefined values survive intact.
     const reviveScenarioValue = (value: unknown): unknown => {
-        if (isSerializedDate(value)) return new Date(value.value)
+        if (isSerializedDate(value)) {
+            const date = new Date(value.value)
+            if (Number.isNaN(date.valueOf())) throw new Error('Invalid serialized scenario date')
+            return date
+        }
         if (isSerializedUndefined(value)) return undefined
         if (Array.isArray(value)) {
             const revived: unknown[] = new Array(value.length)

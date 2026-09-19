@@ -94,7 +94,10 @@ declare global {
          * `page.exposeFunction`, which is what lets a scenario answer with real code
          * instead of a value serialised in ahead of time.
          */
-        __maestroRespond: (responder: string, request: unknown) => Promise<unknown>
+        __maestroRespond: (
+            responder: string,
+            request: ScenarioSerializedValue,
+        ) => Promise<ScenarioSerializedValue>
         __maestroScenario: {
             calls: (channel?: string) => IpcCall[]
             lastCall: (channel: string) => IpcCall | undefined
@@ -682,12 +685,12 @@ export const respond = <TRequest, TResponse>(
     responders.set(page, registry)
 
     if (isFirst) {
-        // Serialising the response keeps `Date` and `undefined` intact across the
-        // boundary, exactly as the scenario's own payloads are handled.
-        void page.exposeFunction('__maestroRespond', async (target: string, request: unknown) => {
+        // Use the scenario codec in both directions. Playwright's exposed-function transport
+        // cannot distinguish a sparse array hole from an explicit undefined element.
+        void page.exposeFunction('__maestroRespond', async (target: string, request: string) => {
             const handler = responders.get(page)?.get(target)
             if (!handler) throw new Error(`No scenario responder registered for ${target}`)
-            return await handler(request)
+            return serializeScenarioValue(await handler(parseScenarioValue(request)))
         })
     }
 
@@ -805,7 +808,9 @@ export const createRendererScenario = async (
                     return Promise.reject(error)
                 }
                 if (behavior.kind === 'respond') {
-                    return window.__maestroRespond(behavior.responder, payload)
+                    return window
+                        .__maestroRespond(behavior.responder, serializeScenarioValue(payload))
+                        .then(parseScenarioValue)
                 }
 
                 return new Promise(resolve => {

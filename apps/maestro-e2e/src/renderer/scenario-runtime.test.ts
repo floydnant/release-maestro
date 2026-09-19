@@ -49,6 +49,14 @@ describe('scenario serialization', () => {
         ]
         expect(parseScenarioValue(serializeScenarioValue(value))).toStrictEqual(value)
     })
+
+    it('rejects a date tag whose string is not a valid date', () => {
+        const value = JSON.stringify({
+            __maestroScenarioSerializedType: 'Date',
+            value: 'not-a-date',
+        })
+        expect(() => parseScenarioValue(value)).toThrow('Invalid serialized scenario date')
+    })
 })
 
 describe('scenario behavior selection', () => {
