@@ -58,74 +58,90 @@ export class AppleMailRepository implements EmailImporterPlugin {
             return result$
         }
 
-        const exportPath = join(app.getPath('temp'), 'apple-mail-export')
         const appleScriptPath = join(appPaths.resources, 'apple-scripts', 'export-emails.applescript')
 
-        const childProcess = exec(
-            `osascript "${appleScriptPath}" "${mailboxName}" "${exportPath}"`,
-            { signal: abortSignal },
-            error => {
-                if (error) {
-                    // Only forward the error if it wasn't due to the abort signal
-                    if (!abortSignal.aborted) {
-                        const parsedErrorMessage = error.message.match(/Mail got an error: (.+)/)?.[1]
-                        if (parsedErrorMessage) {
-                            console.error('[AppleMailImporter] ', parsedErrorMessage)
-                            result$.error(new Error(`[AppleMailImporter] ${parsedErrorMessage}`))
-                        } else {
-                            console.error('[AppleMailImporter] ', error)
-                            result$.error(error)
+        void fs.mkdtemp(join(app.getPath('temp'), 'apple-mail-export-')).then(
+            exportPath => {
+                const childProcess = exec(
+                    `osascript "${appleScriptPath}" "${mailboxName}" "${exportPath}"`,
+                    { signal: abortSignal },
+                    error => {
+                        if (error) {
+                            // Only forward the error if it wasn't due to the abort signal
+                            if (!abortSignal.aborted) {
+                                const parsedErrorMessage = error.message.match(/Mail got an error: (.+)/)?.[1]
+                                if (parsedErrorMessage) {
+                                    console.error('[AppleMailImporter] ', parsedErrorMessage)
+                                    result$.error(new Error(`[AppleMailImporter] ${parsedErrorMessage}`))
+                                } else {
+                                    console.error('[AppleMailImporter] ', error)
+                                    result$.error(error)
+                                }
+                            }
                         }
+
+                        result$.complete()
+
+                        fs.rm(exportPath, { recursive: true }).catch(err => {
+                            console.error(
+                                '[AppleMailImporter] Error removing export directory',
+                                exportPath,
+                                ':',
+                                err,
+                            )
+                        })
+                    },
+                )
+
+                childProcess.stdout?.on('data', async data => {
+                    const str = String(data)
+                    console.log('[AppleMailImporter] ', str.replace(/\n$/, ''))
+                })
+                childProcess.stderr?.on('data', async data => {
+                    const str = String(data)
+
+                    const match = str.match(/Processed email (\d+)\/(\d+): (.+)/)
+                    if (match) {
+                        const [_, current, total, filePath] = match
+                        if (!filePath) {
+                            console.error('[AppleMailImporter] No file path found in output:', str)
+                            return
+                        }
+
+                        const [dataFileContents, htmlFileContents] = await Promise.all([
+                            fs.readFile(filePath, 'utf-8').catch(err => {
+                                console.error(
+                                    '[AppleMailImporter] Error reading data file',
+                                    filePath,
+                                    ':',
+                                    err,
+                                )
+                                return null
+                            }),
+                            fs.readFile(filePath.replace(/\.txt$/, '.html'), 'utf-8').catch(() => {
+                                // HTML file may not exist if the email had no HTML body
+                                return ''
+                            }),
+                        ])
+                        if (!dataFileContents) {
+                            return
+                        }
+
+                        const email = parseAppleMailFile(dataFileContents, htmlFileContents)
+                        if (email) {
+                            result$.next({ current: Number(current), total: Number(total), email })
+                        } else {
+                            console.error('[AppleMailImporter] Failed to parse email from', filePath)
+                        }
+                    } else {
+                        console.error('[AppleMailImporter] ', str.replace(/\n$/, ''))
                     }
-                }
-
-                result$.complete()
-
-                fs.rm(exportPath, { recursive: true }).catch(err => {
-                    console.error('[AppleMailImporter] Error removing export directory', exportPath, ':', err)
                 })
             },
+            error => {
+                result$.error(error)
+            },
         )
-
-        childProcess.stdout?.on('data', async data => {
-            const str = String(data)
-            console.log('[AppleMailImporter] ', str.replace(/\n$/, ''))
-        })
-        childProcess.stderr?.on('data', async data => {
-            const str = String(data)
-
-            const match = str.match(/Processed email (\d+)\/(\d+): (.+)/)
-            if (match) {
-                const [_, current, total, filePath] = match
-                if (!filePath) {
-                    console.error('[AppleMailImporter] No file path found in output:', str)
-                    return
-                }
-
-                const [dataFileContents, htmlFileContents] = await Promise.all([
-                    fs.readFile(filePath, 'utf-8').catch(err => {
-                        console.error('[AppleMailImporter] Error reading data file', filePath, ':', err)
-                        return null
-                    }),
-                    fs.readFile(filePath.replace(/\.txt$/, '.html'), 'utf-8').catch(() => {
-                        // HTML file may not exist if the email had no HTML body
-                        return ''
-                    }),
-                ])
-                if (!dataFileContents) {
-                    return
-                }
-
-                const email = parseAppleMailFile(dataFileContents, htmlFileContents)
-                if (email) {
-                    result$.next({ current: Number(current), total: Number(total), email })
-                } else {
-                    console.error('[AppleMailImporter] Failed to parse email from', filePath)
-                }
-            } else {
-                console.error('[AppleMailImporter] ', str.replace(/\n$/, ''))
-            }
-        })
 
         return result$
     }
