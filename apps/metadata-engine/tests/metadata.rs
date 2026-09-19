@@ -128,6 +128,15 @@ fn reads_independently_authored_metadata_across_formats_and_legacy_aliases() {
             name,
         );
         assert_extras(&metadata, &case);
+        if name == "vardae-invocacion-del-cielo.mp3" {
+            let custom_field_count = metadata["extraMetadata"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|entry| entry[0].as_str().is_some_and(|key| key.contains("X-MAESTRO")))
+                .count();
+            assert_eq!(custom_field_count, 1, "{name}: duplicate custom field");
+        }
         assert_eq!(metadata["path"], path.to_str().unwrap());
         assert_eq!(metadata["fileName"], name);
         assert!(metadata["duration"].as_f64().unwrap() > 0.0, "{name}");
@@ -493,9 +502,22 @@ fn label_edits_and_clears_replace_the_formats_publisher_mapping() {
 
 #[test]
 fn clearing_riff_aliases_does_not_resurrect_secondary_values() {
+    use lofty::{
+        config::{ParseOptions, WriteOptions},
+        file::AudioFile,
+        iff::wav::WavFile,
+        tag::TagExt,
+    };
+
     let library = Library::new();
     for field in ["bpm", "musicalKey"] {
         let path = library.copy("riff-aliases.wav");
+        let mut source = std::fs::File::open(&path).unwrap();
+        let wav = WavFile::read_from(&mut source, ParseOptions::new()).unwrap();
+        let mut riff = wav.riff_info().cloned().unwrap();
+        riff.insert("INAM".into(), "Original title".into());
+        riff.save_to_path(&path, WriteOptions::new().remove_others(false))
+            .unwrap();
         let mut params = library.params(&path);
         let replacement = if field == "bpm" {
             json!(130.5)
