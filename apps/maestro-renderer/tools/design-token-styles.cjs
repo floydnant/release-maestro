@@ -75,7 +75,7 @@ const scanStyleSource = ({ file, source, policy }) => {
         }
         const scanValue = (value, offset) => {
             valueParser(value).walk(node => {
-                if (node.type !== 'function' || node.value !== 'var') return
+                if (node.type !== 'function' || !/^[vV][aA][rR]$/.test(node.value)) return
                 const name = node.nodes.find(part => part.type !== 'space' && part.type !== 'comment')
                 if (name?.type !== 'word' || !tokenPrefix.test(name.value)) return
                 const position = sourceOffset(offset + node.sourceIndex)
@@ -140,6 +140,12 @@ const scanStyleSource = ({ file, source, policy }) => {
             )
         }
     }
+    const reportDynamicMetadata = expression =>
+        report(
+            expression.getStart(sourceFile),
+            'dynamic-styles',
+            'Use literal component metadata without spreads or dynamic keys so design-tokens-check can validate styles.',
+        )
     const visit = node => {
         if (ts.isDecorator(node) && ts.isCallExpression(node.expression)) {
             const call = node.expression
@@ -151,16 +157,34 @@ const scanStyleSource = ({ file, source, policy }) => {
                     namespaces.has(callee.expression.text) &&
                     callee.name.text === 'Component')
             const metadata = call.arguments[0]
-            if (isComponent && metadata && ts.isObjectLiteralExpression(metadata)) {
+            if (isComponent && metadata && !ts.isObjectLiteralExpression(metadata)) {
+                reportDynamicMetadata(metadata)
+            } else if (isComponent && metadata) {
                 for (const property of metadata.properties) {
+                    if (ts.isSpreadAssignment(property)) {
+                        reportDynamicMetadata(property)
+                        continue
+                    }
                     const name = property.name
-                    const propertyName = name && ts.isComputedPropertyName(name) ? name.expression : name
+                    const computed = name && ts.isComputedPropertyName(name)
+                    const propertyName = computed ? name.expression : name
+                    if (
+                        computed &&
+                        !ts.isStringLiteralLike(propertyName) &&
+                        !ts.isNumericLiteral(propertyName)
+                    ) {
+                        reportDynamicMetadata(property)
+                        continue
+                    }
                     if (!propertyName || propertyName.text !== 'styles') continue
                     if (ts.isShorthandPropertyAssignment(property)) {
                         scanLiteral(property.name)
                         continue
                     }
-                    if (!ts.isPropertyAssignment(property)) continue
+                    if (!ts.isPropertyAssignment(property)) {
+                        reportDynamicMetadata(property)
+                        continue
+                    }
                     if (ts.isArrayLiteralExpression(property.initializer))
                         property.initializer.elements.forEach(scanLiteral)
                     else scanLiteral(property.initializer)

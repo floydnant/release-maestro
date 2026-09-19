@@ -47,6 +47,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 const postcss = require('postcss')
 const tailwindcss = require('tailwindcss')
+const ts = require('typescript')
+const vm = require('node:vm')
 const { tokenPolicy, scanStyleSource, reportStyleDiagnostics } = require('./design-token-styles.cjs')
 const tokenSources = {
     foundations: require('../design-tokens/foundations.json'),
@@ -65,8 +67,54 @@ it('generates matching typography declaration, alias, class, and helper names', 
         '--type-body-md-letter-spacing: var(--foundation-typography-letter-spacing-normal)',
     )
     expect(output.css).toContain('--foundation-typography-letter-spacing-normal:')
-    expect(output.ts).toContain(".replace(/letterSpacing/g, 'letter-spacing')")
     expect(scan(output.css, 'src/styles/design-tokens.generated.css')).toEqual([])
+})
+
+it('uses the same camelCase normalization in declarations, aliases, Tailwind and generated helpers', () => {
+    const generated = generate({
+        foundations: {
+            color: { deepBlue: '#000000' },
+            typography: { fontStretch: { semiExpanded: '112.5%' } },
+        },
+        semantic: {
+            color: { background: { canvas: '{color.deepBlue}' }, focusRing: '{color.deepBlue}' },
+            typography: {
+                bodyCompact: {
+                    family: 'sans-serif',
+                    size: '12px',
+                    weight: '400',
+                    lineHeight: '1.5',
+                    letterSpacing: '0',
+                },
+            },
+        },
+        contrastPairs: [],
+    })
+    const exports = {}
+    const { outputText } = ts.transpileModule(generated.ts, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    })
+    vm.runInNewContext(outputText, { exports })
+    expect(generated.css).toContain('--foundation-typography-font-stretch-semi-expanded: 112.5%')
+    expect(generated.css).toContain('--color-focus-ring: var(--foundation-color-deep-blue)')
+    expect(JSON.parse(generated.tailwind).colors.focusRing).toBe('var(--color-focus-ring)')
+    expect(generated.css).toContain('--type-body-compact-size: 12px')
+    expect(generated.css).toContain('font-size: var(--type-body-compact-size)')
+    expect(JSON.parse(generated.tailwind).fontSize.bodyCompact[0]).toBe('var(--type-body-compact-size)')
+    expect(exports.foundationToken('typography.fontStretch.semiExpanded')).toBe(
+        'var(--foundation-typography-font-stretch-semi-expanded)',
+    )
+    expect(exports.semanticColor('focusRing')).toBe('var(--color-focus-ring)')
+})
+
+it.each(['VAR', 'VaR', 'vAr'])('checks %s functions without changing custom-property case', name => {
+    const findings = scan(`.x {
+    color: ${name}(--color-content-primary);
+    background: ${name}(--color-content-Primary);
+    border-color: ${name}(--color-missing);
+}`)
+    expect(findings.map(({ rule }) => rule)).toEqual(['bare-design-token', 'unknown-token', 'unknown-token'])
+    expect(findings[1].message).toContain('--color-content-Primary')
 })
 
 it('reports every nested token reference with exact positions and concrete replacements', () => {
@@ -271,4 +319,34 @@ it('preserves at-rule comment positions and recognizes computed inline style key
 it('reports shorthand component styles as dynamic', () => {
     const source = component('styles').replace('styles: styles', 'styles')
     expect(scan(source, 'src/app/example.component.ts')[0]).toMatchObject({ rule: 'dynamic-styles' })
+})
+
+it.each([
+    'metadata',
+    'createMetadata()',
+    '{ ...metadata }',
+    "{ ...{ styles: '.x { color: var(--color-missing); }' } }",
+    "{ [styleKey]: '.x { color: var(--color-missing); }' }",
+    "{ ['sty' + 'les']: '.x { color: var(--color-missing); }' }",
+    "{ get styles() { return '.x { color: var(--color-missing); }'; } }",
+])('reports metadata it cannot inspect: %s', metadata => {
+    const source = `import { Component } from '@angular/core';\n@Component(${metadata})\nclass Example {}`
+    expect(scan(source, 'src/app/example.component.ts')).toEqual([
+        expect.objectContaining({
+            rule: 'dynamic-styles',
+            line: 2,
+            column: metadata.startsWith('{') ? 14 : 12,
+        }),
+    ])
+})
+
+it('continues checking literal styles alongside unresolved metadata spreads', () => {
+    const source = component('`.x { color: var(--color-missing); }`').replace(
+        '{ styles:',
+        '{ ...metadata, styles:',
+    )
+    expect(scan(source, 'src/app/example.component.ts').map(({ rule }) => rule)).toEqual([
+        'dynamic-styles',
+        'unknown-token',
+    ])
 })

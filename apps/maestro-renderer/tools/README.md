@@ -2,8 +2,9 @@
 
 `design-tokens-check` validates generated files and raw color utilities, then checks CSS with
 PostCSS. A TypeScript AST extracts literal Angular `Component` styles, including string arrays.
-The value parser ignores comments and strings. Diagnostics name the file, line, column, rule,
-and a `theme(...)` replacement when Tailwind exposes that token.
+The value parser ignores comments and strings. CSS function names are case-insensitive; token names
+are case-sensitive. Diagnostics name the file, line, column, rule, and a `theme(...)` replacement
+when Tailwind exposes that token.
 
 The token inventory comes from generated declarations after the stale-output check passes.
 The replacement paths come from generated Tailwind tokens, including fractional spacing keys.
@@ -19,7 +20,9 @@ exceptions, all of which still receive the existence check:
 - `src/app/pages/design-system/`
 
 CSS parse failures and dynamic component styles also produce diagnostics. Use literal component
-styles to allow validation. The checker does not evaluate arbitrary TypeScript expressions.
+styles and object metadata without spreads to allow validation. Nonliteral metadata, spreads, and
+computed metadata keys that are not literal names produce diagnostics because they can hide styles.
+The checker does not evaluate arbitrary TypeScript expressions.
 It does not enforce token layers or validate classes inside `@apply`.
 
 ## Warning rollout
@@ -58,6 +61,6 @@ findings; the other twelve require targeted token substitutions and visual verif
 error promotion. No file suppression hides this debt.
 
 The first scan also found ten unknown letter-spacing references in generated classes and global
-styles. The generator now normalizes `letterSpacing` to `letter-spacing` for declarations, aliases,
-and its TypeScript helper. Regenerated outputs resolve all ten references. The original semantic
-values now apply instead of an unresolved CSS custom property.
+styles. The generator now converts camelCase token paths to kebab-case for declarations, aliases,
+and its TypeScript helpers using the same normalization function. Regenerated outputs resolve all
+ten references. The original semantic values now apply instead of an unresolved CSS custom property.
