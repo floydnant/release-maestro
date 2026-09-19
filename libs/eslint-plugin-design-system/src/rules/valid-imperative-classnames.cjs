@@ -8,6 +8,7 @@ const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
 const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
 const { CLASS_MESSAGES, describeUnknownClass } = require('../lib/diagnostics.cjs')
 const { stringLiteralsOf } = require('../lib/string-literal-types.cjs')
+const ts = require('typescript')
 
 const CLASS_LIST_MUTATIONS = new Set(['add', 'remove', 'toggle', 'replace'])
 const RENDERER_MUTATIONS = new Set(['addClass', 'removeClass'])
@@ -189,6 +190,70 @@ module.exports = {
         })
 
         /**
+         * Map a boundary in a literal's cooked value back to its raw source offset.
+         *
+         * @param {import('estree').Node} node
+         * @param {number} boundary
+         */
+        const literalSourceOffset = (node, boundary) => {
+            if (!node.range) return null
+            const raw = sourceCode.text.slice(node.range[0] + 1, node.range[1] - 1)
+            let cookedOffset = 0
+            let rawOffset = 0
+
+            while (rawOffset < raw.length && cookedOffset < boundary) {
+                if (raw[rawOffset] !== '\\') {
+                    rawOffset += 1
+                    cookedOffset += 1
+                    continue
+                }
+
+                const escaped = raw[rawOffset + 1]
+                if (escaped === '\r' || escaped === '\n' || escaped === '\u2028' || escaped === '\u2029') {
+                    rawOffset += escaped === '\r' && raw[rawOffset + 2] === '\n' ? 3 : 2
+                    continue
+                }
+                if (escaped === 'x' && /^[0-9a-fA-F]{2}/.test(raw.slice(rawOffset + 2))) {
+                    rawOffset += 4
+                    cookedOffset += 1
+                    continue
+                }
+                if (escaped === 'u' && raw[rawOffset + 2] === '{') {
+                    const close = raw.indexOf('}', rawOffset + 3)
+                    if (close !== -1) {
+                        const codePoint = Number.parseInt(raw.slice(rawOffset + 3, close), 16)
+                        rawOffset = close + 1
+                        cookedOffset += codePoint > 0xffff ? 2 : 1
+                        continue
+                    }
+                }
+                if (escaped === 'u' && /^[0-9a-fA-F]{4}/.test(raw.slice(rawOffset + 2))) {
+                    rawOffset += 6
+                    cookedOffset += 1
+                    continue
+                }
+
+                rawOffset += 2
+                cookedOffset += 1
+            }
+
+            return node.range[0] + 1 + rawOffset
+        }
+
+        /**
+         * @param {import('estree').Node} node
+         * @param {number} start
+         * @param {number} end
+         */
+        const literalLocFor = (node, start, end) => {
+            const sourceStart = literalSourceOffset(node, start)
+            const sourceEnd = literalSourceOffset(node, end)
+            return sourceStart === null || sourceEnd === null
+                ? fallbackLoc(node)
+                : locFor(sourceStart, sourceEnd)
+        }
+
+        /**
          * @param {string} className
          * @param {import('eslint').AST.SourceLocation} loc
          */
@@ -220,42 +285,45 @@ module.exports = {
         /**
          * @param {string} value
          * @param {import('eslint').AST.SourceLocation} fallback
-         * @param {number|null} [offset]
+         * @param {((start: number, end: number) => import('eslint').AST.SourceLocation)|null} [locate]
          */
-        const checkClassList = (value, fallback, offset = null) => {
-            const { tokens, malformed } = tokenizeClassList(value, { offset: offset ?? 0 })
+        const checkClassList = (value, fallback, locate = null) => {
+            const { tokens, malformed } = tokenizeClassList(value)
             if (malformed) {
                 context.report({
                     messageId: malformed.reason,
-                    loc: offset === null ? fallback : locFor(malformed.start, malformed.end),
+                    loc: locate ? locate(malformed.start, malformed.end) : fallback,
                 })
             }
             for (const token of tokens) {
                 if (token.kind === 'styling') {
-                    checkClassName(token.name, offset === null ? fallback : locFor(token.start, token.end))
+                    checkClassName(token.name, locate ? locate(token.start, token.end) : fallback)
                 }
             }
         }
 
         /**
          * @param {import('estree').Node} node
+         * @param {boolean} [elements]
          * @returns {{ literals: string[] } | { type: string } | null}
          */
-        const typedStrings = node => {
+        const typedStrings = (node, elements = false) => {
             if (!services?.getTypeAtLocation || !checker) return null
             const type = services.getTypeAtLocation(node)
-            const literals = stringLiteralsOf(type)
-            return literals ? { literals } : { type: checker.typeToString(type) }
+            const checkedType = elements ? checker.getIndexTypeOfType(type, ts.IndexKind.Number) : type
+            const literals = checkedType ? stringLiteralsOf(checkedType) : null
+            return literals ? { literals } : { type: checker.typeToString(checkedType ?? type) }
         }
 
         /**
          * @param {import('estree').Node} node
          * @param {'list'|'token'} shape
          * @param {boolean} [syntaxLiteral]
+         * @param {boolean} [elements]
          */
-        const checkExpression = (node, shape, syntaxLiteral = true) => {
+        const checkExpression = (node, shape, syntaxLiteral = true, elements = false) => {
             const literal = syntaxLiteral ? literalString(node) : undefined
-            const resolved = literal === undefined ? typedStrings(node) : { literals: [literal] }
+            const resolved = literal === undefined ? typedStrings(node, elements) : { literals: [literal] }
             const fallback = fallbackLoc(node)
 
             if (!resolved) {
@@ -267,10 +335,11 @@ module.exports = {
                 return
             }
             for (const value of resolved.literals) {
-                const offset = literal !== undefined && node.range ? node.range[0] + 1 : null
-                if (shape === 'list') checkClassList(value, fallback, offset)
+                /** @type {((start: number, end: number) => import('eslint').AST.SourceLocation)|null} */
+                const locate = literal === undefined ? null : (start, end) => literalLocFor(node, start, end)
+                if (shape === 'list') checkClassList(value, fallback, locate)
                 else {
-                    checkClassName(value, offset === null ? fallback : locFor(offset, offset + value.length))
+                    checkClassName(value, locate ? locate(0, value.length) : fallback)
                 }
             }
         }
@@ -321,12 +390,9 @@ module.exports = {
                     const bindingNode = node.arguments[0]
                     if (!bindingNode || bindingNode.type === 'SpreadElement') return
                     const className = target.slice('class.'.length)
-                    const offset = bindingNode.range ? bindingNode.range[0] + 1 + 'class.'.length : null
                     checkClassName(
                         className,
-                        offset === null
-                            ? fallbackLoc(bindingNode)
-                            : locFor(offset, offset + className.length),
+                        literalLocFor(bindingNode, 'class.'.length, target.length),
                     )
                 } else if ((target === 'class' || target === 'className') && decorated?.key) {
                     // The member name's type describes every value Angular can apply, including
@@ -345,11 +411,17 @@ module.exports = {
                     callee.object.type === 'MemberExpression' && memberName(callee.object) === 'classList'
                 if (classList && CLASS_LIST_MUTATIONS.has(method)) {
                     const argumentsToCheck =
-                        method === 'add' || method === 'remove' ? node.arguments : node.arguments.slice(0, 2)
+                        method === 'add' || method === 'remove'
+                            ? node.arguments
+                            : method === 'replace'
+                              ? node.arguments.slice(0, 2)
+                              : node.arguments.slice(0, 1)
                     for (const argument of argumentsToCheck) {
                         checkExpression(
                             argument.type === 'SpreadElement' ? argument.argument : argument,
                             'token',
+                            true,
+                            argument.type === 'SpreadElement',
                         )
                     }
                     return

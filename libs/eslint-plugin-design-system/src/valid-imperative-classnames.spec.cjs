@@ -89,7 +89,11 @@ tester.run('valid-imperative-classnames', rule, {
         example("element.classList.add('scoped-only')"),
         example("element.classList.remove('hidden')"),
         example("element.classList.toggle('hidden')"),
+        example("declare const shouldHide: boolean; element.classList.toggle('hidden', shouldHide)"),
         example("element.classList.replace('hidden', 'flex')"),
+        example(
+            "declare const classes: ('hidden' | 'flex')[]; element.classList.add(...classes)",
+        ),
         example(
             "type Classes = 'hidden' | 'flex'; declare function pick(): Classes; element.classList.add(pick())",
         ),
@@ -113,6 +117,7 @@ tester.run('valid-imperative-classnames', rule, {
         example("class Example { @HostBinding('class.fleex') active = true }", {
             errors: [fleex],
         }),
+        atToken("class Example { @HostBinding('cl\\x61ss.fleex') active = true }", 'fleex', fleex),
         example(
             "import { HostBinding as Bind } from '@angular/core'; class Example { @Bind('class.fleex') active = true }",
             { errors: [fleex] },
@@ -138,6 +143,13 @@ tester.run('valid-imperative-classnames', rule, {
             return atToken(code, 'fleex', fleex)
         }),
         example("element.classList.replace('hidden', 'fleex')", { errors: [fleex] }),
+        example("declare const classes: ('hidden' | 'fleex')[]; element.classList.add(...classes)", {
+            errors: [fleex],
+        }),
+        example('declare const classes: string[]; element.classList.add(...classes)', {
+            errors: [{ messageId: 'dynamicClass', data: { type: 'string' } }],
+        }),
+        atToken("element.classList.add('fl\\x65ex')", 'fl\\x65ex', fleex),
         example(
             "type Classes = 'hidden' | 'fleex'; declare function pick(): Classes; element.classList.add(pick())",
             { errors: [fleex] },
