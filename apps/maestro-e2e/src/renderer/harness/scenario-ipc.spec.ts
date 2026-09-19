@@ -99,6 +99,47 @@ test.describe('renderer scenario IPC harness', () => {
         })
     })
 
+    test('preserves dates and explicit undefined values in both directions', async ({ page }) => {
+        const value = {
+            nested: { capturedAt: new Date('2026-07-01T12:34:56.000Z'), missing: undefined },
+            values: [undefined, new Date('2026-07-02T12:34:56.000Z')],
+        }
+        const controller = await createRendererScenario(
+            page,
+            scenarioBuilder().handler('metadata:read', { kind: 'resolve', value }).build(),
+        )
+        const received = await page.evaluate(async () => {
+            const electronModule = window.require?.('electron') as {
+                ipcRenderer: {
+                    invoke: (channel: string) => Promise<{
+                        nested: { capturedAt: Date; missing?: unknown }
+                        values: unknown[]
+                    }>
+                    send: (channel: string, payload: unknown) => void
+                }
+            }
+            const value = await electronModule.ipcRenderer.invoke('metadata:read')
+            electronModule.ipcRenderer.send('metadata:write', value)
+            return {
+                nestedDate: value.nested.capturedAt instanceof Date,
+                ownsMissing: Object.prototype.hasOwnProperty.call(value.nested, 'missing'),
+                missingIsUndefined: value.nested.missing === undefined,
+                ownsArrayElement: Object.prototype.hasOwnProperty.call(value.values, 0),
+                arrayElementIsUndefined: value.values[0] === undefined,
+                arrayDate: value.values[1] instanceof Date,
+            }
+        })
+        expect(received).toEqual({
+            nestedDate: true,
+            ownsMissing: true,
+            missingIsUndefined: true,
+            ownsArrayElement: true,
+            arrayElementIsUndefined: true,
+            arrayDate: true,
+        })
+        expect((await controller.lastCall('metadata:write'))?.payload).toStrictEqual(value)
+    })
+
     test('answers from a responder running in Node, with the request', async ({ page }) => {
         // The point of `respond()` over a canned value: the answer depends on what was
         // asked. Anything that only ever returns a fixture can prove a caller asked

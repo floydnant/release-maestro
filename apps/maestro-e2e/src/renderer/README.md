@@ -27,7 +27,15 @@ The scenario backend lives in the browser page. Tests control it through the ret
 
 Scenario values are serialized with a tagged JSON codec before they cross the Playwright boundary.
 Nested `Date` instances are revived as real `Date` objects in the browser, so fixtures can use dates
-without adding channel-specific revival logic.
+without adding channel-specific revival logic. Explicit `undefined` properties and array elements
+also survive the round trip.
+
+`scenario-runtime.ts` defines the codec and sequence selection in one self-contained factory. The
+init script receives that factory's source because it cannot capture module imports. Keep runtime
+imports and module-level dependencies out of the factory.
+
+Jest tests in `*.test.ts` cover the pure helpers with `npx nx test maestro-e2e`, also included in
+`make test` and `make sure`. Playwright runs `*.spec.ts` and checks the browser integration.
 
 ## Basic Usage
 
