@@ -726,7 +726,13 @@ pub fn read_song_metadata_v2(
                 }
             }
             ItemKey::Year | ItemKey::RecordingDate
-                if item.key() == ItemKey::Year || tag.tag_type() == TagType::Ape =>
+                if item.key() == ItemKey::Year
+                    || (tag.tag_type() == TagType::Ape
+                        && item
+                            .value()
+                            .text()
+                            .and_then(|value| value.parse::<i32>().ok())
+                            .is_some()) =>
             {
                 if allow_overwrite || (!has_primary_tag && year.is_none()) {
                     year = item

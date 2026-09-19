@@ -355,5 +355,12 @@ file["Year"] = "2024"
 file.save()
 case(path.name, {**FIELDS, "year": 2024, "date": None}, writable=True)
 
+path = ROOT / "recording-date.wv"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wv", path)
+file = mutagen.File(path)
+file["Year"] = "2026-02-03"
+file.save()
+case(path.name, {**FIELDS, "year": None, "date": "2026-02-03"}, writable=True)
+
 (ROOT / "cover.png").write_bytes(PNG)
 (ROOT / "cases.json").write_text(json.dumps(CASES, indent=4, ensure_ascii=False) + "\n")

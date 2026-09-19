@@ -505,6 +505,11 @@ fn clearing_riff_aliases_does_not_resurrect_secondary_values() {
         for value in [Value::Null, replacement, Value::Null] {
             params["update"] = json!({field: value, "title": "Gökotta", "artist": "SpunOff"});
             Engine::new().request("write_tags", params.clone());
+            let bytes = std::fs::read(&path).unwrap();
+            assert_eq!(
+                u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize + 8,
+                bytes.len()
+            );
             let actual = Engine::new().request("read_file", library.params(&path));
             assert_eq!(actual[field], value, "{field}: {actual}");
             assert_eq!(actual["title"], "Gökotta");
@@ -584,6 +589,37 @@ fn editing_mp4_text_retains_opaque_values_but_clearing_removes_the_atom() {
                 .count();
                 assert_eq!(opaque, count, "editing ENERGY preserves every opaque entry");
             }
+        }
+    }
+}
+
+#[test]
+fn growing_and_shrinking_iff_tags_keeps_container_sizes_valid() {
+    let library = Library::new();
+    for (name, big) in [
+        ("spunoff-el-sueno-untagged.wav", false),
+        ("spunoff-el-sueno-untagged.aiff", true),
+    ] {
+        let path = library.copy(name);
+        for update in [
+            json!({"title": "Gökotta"}),
+            json!({"artist": "SpunOff", "bpm": 130.5, "lyrics": "Words".repeat(10_000)}),
+            json!({"artist": null, "bpm": null, "lyrics": null}),
+        ] {
+            let mut params = library.params(&path);
+            params["update"] = update.clone();
+            Engine::new().request("write_tags", params);
+            let bytes = std::fs::read(&path).unwrap();
+            let size_bytes = bytes[4..8].try_into().unwrap();
+            let size = if big {
+                u32::from_be_bytes(size_bytes)
+            } else {
+                u32::from_le_bytes(size_bytes)
+            };
+            assert_eq!(size as usize + 8, bytes.len(), "{name}: container size");
+            let actual = Engine::new().request("read_file", library.params(&path));
+            assert_fields(&actual, &update, name);
+            assert_eq!(actual["title"], "Gökotta");
         }
     }
 }
