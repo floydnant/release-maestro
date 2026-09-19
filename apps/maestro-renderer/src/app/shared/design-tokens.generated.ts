@@ -210,4 +210,4 @@ export const typographyVariantIdentifiers = [
 ] as const
 
 export const foundationToken = (identifier: string): string =>
-    `var(--foundation-${identifier.replace(/\./g, '-').replace(/lineHeight/g, 'line-height')})`
+    `var(--foundation-${identifier.replace(/\./g, '-').replace(/lineHeight/g, 'line-height').replace(/letterSpacing/g, 'letter-spacing')})`
