@@ -42,3 +42,10 @@ retain opaque siblings across alias canonicalization and that clears remove the 
 secondary RIFF aliases do not reappear.
 
 The fixture manifest uses typed fields and rejects unknown keys, invalid flags, and unknown aliases.
+
+`recording-date.wv` checks full APE recording dates alongside the year-only fixture. WAV and AIFF
+edit tests also check their container sizes after tags grow and shrink. Lofty 0.25.2 subtracts tag
+growth from the size of a container with a trailing ID3 chunk, and can panic on large growth in
+debug builds. The engine validates tag encoding, removes the old ID3 chunk, then writes its replacement
+to avoid that path. Other chunks and trailing data are retained. This uses Lofty's full-file rewrite
+path, increasing memory use and I/O for large WAV/AIFF files.
