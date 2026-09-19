@@ -12,7 +12,7 @@ const generatedElectronTsPath = path.resolve(
     '../maestro-electron/src/app/design-tokens.generated.ts',
 )
 const sourceFiles = ['foundations.json', 'semantic.dark.json', 'contrast-pairs.json']
-const minimumContrastRatio = 3
+const minimumContrastRatio = 3.5
 const red = message => `\u001B[31m${message}\u001B[39m`
 
 const readJson = file => JSON.parse(fs.readFileSync(path.join(sourceDir, file), 'utf8'))
