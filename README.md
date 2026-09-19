@@ -24,7 +24,7 @@ A desktop app for your music. Scan your local collection into a searchable libra
 
 - Node.js >= 22.22.3 (see `.node-version`)
 - npm
-- A Rust toolchain — `apps/metadata-engine` is a Cargo crate built into a sidecar binary
+- Rust 1.89 or newer — `apps/metadata-engine` is a Cargo crate built into a sidecar binary
 - macOS (required for Apple Mail email import; the app itself builds on all platforms)
 
 ## Getting Started
