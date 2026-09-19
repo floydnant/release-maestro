@@ -7,6 +7,11 @@ synthetic test data.
 directly. It does not import Lofty, run the metadata engine, or derive expected values from either.
 `cases.json` declares the expected fields and custom values.
 
+The generator uses Python for Mutagen's coverage of the audio formats and unusual tag variants in
+this suite. Using an independent tag writer prevents Lofty's reader and writer from hiding matching
+bugs. A JavaScript generator would need other writers or more handwritten format code for the same
+cases. Python and Mutagen are regeneration tools, not application or test-runtime dependencies.
+
 Regenerate from the repository root with `uv run fixtures/metadata/generate.py`. FFmpeg and uv are
 needed only for regeneration. The generated files are committed, so Cargo tests need neither tool nor
 network access. Ogg stream serials and encoder versions can change binary output between regenerations.
@@ -26,8 +31,9 @@ in a fresh worker, check unrelated fields and private ID3 payloads, and remove t
 The fixture directory is an explicit input to the Nx test cache.
 
 Lofty 0.22.4 drops additional values in an MP4 atom when converting it to a generic tag.
-The engine restores those text values during conversion. `namespaced.m4a` checks both values before
-and after edits. The suite also checks MusicBrainz UFID values and preserves the ID3v1 footer byte for
+The engine restores text values for reading and retains the native atoms through the write path.
+Unchanged atoms keep all data variants, including opaque binary and numeric values. `namespaced.m4a`
+and `mixed-data.m4a` check repeated and mixed values through edits. The suite also checks MusicBrainz UFID values and preserves the ID3v1 footer byte for
 byte when editing a file with an ID3v2 primary tag.
 
 The fixture manifest uses typed fields and rejects unknown keys, invalid flags, and unknown aliases.

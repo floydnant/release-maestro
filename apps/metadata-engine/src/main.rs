@@ -15,6 +15,7 @@ mod constants;
 mod custom_tags;
 mod image_format;
 mod metadata;
+mod mp4_tags;
 mod protocol;
 
 use metadata::{

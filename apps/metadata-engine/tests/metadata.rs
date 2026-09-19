@@ -375,3 +375,57 @@ fn fractional_id3_tempo_keeps_the_standard_integer_frame() {
         );
     }
 }
+
+#[test]
+fn unrelated_mp4_edits_preserve_every_value_in_mixed_native_atoms() {
+    use lofty::{
+        config::ParseOptions,
+        file::AudioFile,
+        mp4::{AtomIdent, Mp4File},
+    };
+    fn read(path: &std::path::Path) -> Mp4File {
+        Mp4File::read_from(&mut std::fs::File::open(path).unwrap(), ParseOptions::new()).unwrap()
+    }
+    let library = Library::new();
+    let path = library.copy("mixed-data.m4a");
+    let original = read(&path);
+    let atoms: Vec<_> = original
+        .ilst()
+        .unwrap()
+        .into_iter()
+        .filter(|atom| {
+            matches!(atom.ident(), AtomIdent::Freeform { mean, .. } if mean == "org.example")
+                || atom.ident() == &AtomIdent::Fourcc(*b"covr")
+        })
+        .collect();
+    assert_eq!(atoms.len(), 7);
+    for atom in &atoms {
+        assert_eq!(atom.data().count(), 2);
+    }
+    for update in [
+        json!({"title": "Gökotta"}),
+        json!({"energy": "8"}),
+        json!({"comment": null}),
+        json!({"bpm": null}),
+    ] {
+        let mut params = library.params(&path);
+        params["update"] = update.clone();
+        Engine::new().request("write_tags", params);
+        let edited = read(&path);
+        for atom in &atoms {
+            let actual: Vec<_> = edited
+                .ilst()
+                .unwrap()
+                .into_iter()
+                .filter(|candidate| candidate.ident() == atom.ident())
+                .flat_map(|atom| atom.data())
+                .collect();
+            let expected: Vec<_> = atom.data().collect();
+            assert!(
+                actual == expected,
+                "{:?} lost native MP4 data during {update}",
+                atom.ident()
+            );
+        }
+    }
+}

@@ -1,6 +1,7 @@
 //! Custom fields live in format-specific tags, outside Lofty's generic ItemKey model.
 //! Converting back retains the companion tag, including opaque frames and artwork.
 
+use crate::mp4_tags::Mp4Snapshot;
 use lofty::{
     ape::{ApeItem, ApeTag},
     config::{ParseOptions, WriteOptions},
@@ -39,24 +40,35 @@ fn from_mp4(native: Ilst) -> Tag {
     tag
 }
 
-pub fn read_from_path(path: &std::path::Path) -> lofty::error::Result<TaggedFile> {
+pub fn read_from_path(
+    path: &std::path::Path,
+) -> lofty::error::Result<(TaggedFile, Option<Mp4Snapshot>)> {
     let probe = Probe::open(path)?.guess_file_type()?;
     if probe.file_type() == Some(FileType::Mp4) {
         let file = Mp4File::read_from(&mut probe.into_inner(), ParseOptions::new())?;
-        let tag = file.ilst().cloned().map(from_mp4);
+        let has_tag = file.ilst().is_some();
+        let original = file.ilst().cloned().unwrap_or_else(Ilst::new);
+        let tag = from_mp4(original.clone());
+        let snapshot = Mp4Snapshot::new(original, &tag);
         let mut file: TaggedFile = file.into();
-        if let Some(tag) = tag {
+        if has_tag {
             file.insert_tag(tag);
         }
-        Ok(file)
+        Ok((file, Some(snapshot)))
     } else {
-        probe.read()
+        probe.read().map(|file| (file, None))
     }
 }
 
-pub fn save(tag: &Tag, path: &std::path::Path) -> lofty::error::Result<()> {
+pub fn save(
+    tag: &Tag,
+    path: &std::path::Path,
+    mp4: Option<&Mp4Snapshot>,
+) -> lofty::error::Result<()> {
     let options = WriteOptions::new().remove_others(false);
-    if tag.tag_type() == TagType::Id3v2 {
+    if let Some(mp4) = mp4.filter(|_| tag.tag_type() == TagType::Mp4Ilst) {
+        mp4.merge(tag).save_to_path(path, options)
+    } else if tag.tag_type() == TagType::Id3v2 {
         native_id3(tag.clone()).save_to_path(path, options)
     } else if tag.tag_type() == TagType::Ape {
         native_ape(tag.clone())?.save_to_path(path, options)
@@ -110,7 +122,7 @@ fn native_ape(tag: Tag) -> lofty::error::Result<ApeTag> {
     Ok(native)
 }
 
-pub fn read(tag: &Tag) -> lofty::error::Result<Vec<(String, String)>> {
+pub fn read(tag: &Tag, mp4: Option<&Mp4Snapshot>) -> lofty::error::Result<Vec<(String, String)>> {
     let mut fields = Vec::new();
     let mut push = |name: &str, value: &str, force: bool| {
         if !name.is_empty() && (force || is_custom_key(tag.tag_type(), name)) {
@@ -165,7 +177,9 @@ pub fn read(tag: &Tag) -> lofty::error::Result<Vec<(String, String)>> {
             }
         }
         TagType::Mp4Ilst => {
-            let native = Ilst::from(tag.clone());
+            let native = mp4
+                .map(|snapshot| snapshot.original().clone())
+                .unwrap_or_else(|| Ilst::from(tag.clone()));
             for atom in &native {
                 let name = match atom.ident() {
                     AtomIdent::Freeform { mean, name } => format!("----:{mean}:{name}"),
@@ -351,7 +365,7 @@ mod tests {
         let mut tag = Tag::new(TagType::Ape);
         let key = ItemKey::from_key(TagType::Ape, "x");
         tag.push_unchecked(TagItem::new(key.clone(), ItemValue::Text("keep me".into())));
-        assert!(read(&tag).is_err());
+        assert!(read(&tag, None).is_err());
         assert!(LegacyField::Energy
             .replace(&mut tag, Some("7".into()))
             .is_err());

@@ -258,5 +258,22 @@ tags.add(id3.UFID(owner="http://musicbrainz.org", data=recording_id.encode("asci
 tags.save(path)
 case(path.name, FIELDS, extras=[["MusicBrainzRecordingId", recording_id]], writable=True)
 
+path = ROOT / "mixed-data.m4a"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.m4a", path)
+file = mutagen.File(path)
+for name, values in {
+    "TEXT-BINARY": [(b"visible", 1), (b"opaque-after-text", 0)],
+    "BINARY-TEXT": [(b"opaque-before-text", 0), (b"visible", 1)],
+    "BINARY-BINARY": [(b"opaque-first", 0), (b"opaque-second", 0)],
+    "TEXT-INTEGER": [(b"visible", 1), ((42).to_bytes(4, "big"), 21)],
+    "TEXT-UNSIGNED": [(b"visible", 1), ((42).to_bytes(4, "big"), 22)],
+    "TEXT-UTF16": [(b"visible", 1), ("Gökotta".encode("utf-16-be"), 2)],
+}.items():
+    file[f"----:org.example:{name}"] = [MP4FreeForm(value, dataformat=kind) for value, kind in values]
+file["covr"] = [MP4Cover(PNG, imageformat=MP4Cover.FORMAT_PNG),
+                MP4Cover(PNG, imageformat=MP4Cover.FORMAT_PNG)]
+file.save()
+case(path.name, FIELDS | {"bpm": 128}, writable=True)
+
 (ROOT / "cover.png").write_bytes(PNG)
 (ROOT / "cases.json").write_text(json.dumps(CASES, indent=4, ensure_ascii=False) + "\n")

@@ -82,6 +82,24 @@ impl Engine {
         }
     }
 
+    fn receive_line(&mut self, remaining: Duration) -> String {
+        match self.lines.recv_timeout(remaining) {
+            Ok(line) => line,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                panic!("engine response deadline elapsed after ten seconds")
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => match self.child.try_wait() {
+                Ok(Some(status)) => {
+                    panic!("engine stdout disconnected; child exited with {status}")
+                }
+                Ok(None) => panic!("engine stdout disconnected; child is still running"),
+                Err(error) => {
+                    panic!("engine stdout disconnected; could not read child status: {error}")
+                }
+            },
+        }
+    }
+
     pub fn exchange(&mut self, method: &str, params: Value) -> Vec<Value> {
         self.next_id += 1;
         let id = self.next_id.to_string();
@@ -95,10 +113,8 @@ impl Engine {
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
         let mut messages = Vec::new();
         loop {
-            let line = self
-                .lines
-                .recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))
-                .expect("engine must respond within ten seconds");
+            let line =
+                self.receive_line(deadline.saturating_duration_since(std::time::Instant::now()));
             let message: Value = serde_json::from_str(&line).expect("stdout contains only JSONL");
             let terminal = message["type"] == "response";
             assert_eq!(message[if terminal { "id" } else { "requestId" }], id);
@@ -121,5 +137,48 @@ impl Drop for Engine {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    fn panic_message(action: impl FnOnce()) -> String {
+        let payload =
+            catch_unwind(AssertUnwindSafe(action)).expect_err("expected diagnostic panic");
+        payload
+            .downcast_ref::<String>()
+            .cloned()
+            .or_else(|| {
+                payload
+                    .downcast_ref::<&str>()
+                    .map(|message| message.to_string())
+            })
+            .expect("panic contains a message")
+    }
+
+    #[test]
+    fn disconnected_stdout_reports_the_exited_child_status() {
+        let mut engine = Engine::new();
+        engine.child.kill().unwrap();
+        let status = engine.child.wait().unwrap();
+        let message = panic_message(|| {
+            engine.receive_line(Duration::from_secs(10));
+        });
+        assert!(message.contains("stdout disconnected"), "{message}");
+        assert!(message.contains(&status.to_string()), "{message}");
+        assert!(!message.contains("deadline"), "{message}");
+    }
+
+    #[test]
+    fn live_worker_without_a_response_reports_the_deadline() {
+        let mut engine = Engine::new();
+        let message = panic_message(|| {
+            engine.receive_line(Duration::ZERO);
+        });
+        assert!(message.contains("response deadline elapsed"), "{message}");
+        assert!(!message.contains("disconnected"), "{message}");
     }
 }

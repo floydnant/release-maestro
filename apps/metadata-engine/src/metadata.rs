@@ -424,7 +424,7 @@ pub fn update_song_metadata(
     cover_art_cache_dir: String,
 ) -> Result<SongMetadata, String> {
     let file_path = Path::new(path);
-    let mut tagged_file =
+    let (mut tagged_file, mp4) =
         read_from_path(file_path).map_err(|error| format!("Failed to read file: {}", error))?;
     let tag = get_or_create_primary_tag(&mut tagged_file)?;
     let mut has_changes = false;
@@ -521,7 +521,7 @@ pub fn update_song_metadata(
     has_changes |= apply_energy_update(tag, song.energy)?;
 
     if has_changes {
-        custom_tags::save(tag, file_path)
+        custom_tags::save(tag, file_path, mp4.as_ref())
             .map_err(|error| format!("Failed to save file: {}", error))?;
     }
 
@@ -553,7 +553,7 @@ pub fn read_song_metadata_v2(
             .map(|d| d.as_millis())
     });
 
-    let tagged_file = read_from_path(file_path).map_err(|error| {
+    let (tagged_file, mp4) = read_from_path(file_path).map_err(|error| {
         let extension = file_path
             .extension()
             .and_then(|extension| extension.to_str())
@@ -728,12 +728,12 @@ pub fn read_song_metadata_v2(
                 }
             }
         });
-        for (field_name, value) in
-            custom_tags::read(tag).map_err(|error| ReadSongMetadataError::MetadataParseFailed {
+        for (field_name, value) in custom_tags::read(tag, mp4.as_ref()).map_err(|error| {
+            ReadSongMetadataError::MetadataParseFailed {
                 path: path.clone(),
                 message: error.to_string(),
-            })?
-        {
+            }
+        })? {
             // Only Apple's namespace carries the conventional MP4 aliases.
             let alias = field_name
                 .strip_prefix("----:com.apple.iTunes:")
