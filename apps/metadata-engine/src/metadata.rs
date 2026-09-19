@@ -1,9 +1,9 @@
-use crate::custom_tags::{read_from_path, LegacyField};
+use crate::custom_tags::LegacyField;
+use crate::native_tags::{self, NativeTags};
 use crate::{constants::separator, custom_tags, image_format::ImageFormat};
 use lofty::{
     config::WriteOptions,
     file::{AudioFile, FileType, TaggedFile, TaggedFileExt},
-    iff::wav::RiffInfoList,
     tag::{Accessor, ItemKey, Tag, TagExt, TagType},
 };
 use serde::{Deserialize, Deserializer, Serialize};
@@ -284,10 +284,10 @@ fn apply_item_key_update(tag: &mut Tag, key: ItemKey, update: NullableField<Stri
         Some(value) => {
             match normalize_text(value) {
                 Some(value) => {
-                    tag.insert_text(key.clone(), value);
+                    tag.insert_text(key, value);
                 }
                 None => {
-                    tag.remove_key(&key);
+                    tag.remove_key(key);
                 }
             }
             true
@@ -298,20 +298,21 @@ fn apply_item_key_update(tag: &mut Tag, key: ItemKey, update: NullableField<Stri
 
 fn apply_item_key_update_with_alias_removal(
     tag: &mut Tag,
+    native: &mut NativeTags,
     key: ItemKey,
     field: LegacyField,
     update: NullableField<String>,
 ) -> Result<bool, String> {
     match update {
         Some(value) => {
-            field.replace(tag, None)?;
+            field.replace(tag, native, None)?;
 
             match normalize_text(value) {
                 Some(value) => {
-                    tag.insert_text(key.clone(), value);
+                    tag.insert_text(key, value);
                 }
                 None => {
-                    tag.remove_key(&key);
+                    tag.remove_key(key);
                 }
             }
 
@@ -323,7 +324,7 @@ fn apply_item_key_update_with_alias_removal(
 
 fn remove_item_keys(tag: &mut Tag, keys: &[ItemKey]) {
     for key in keys {
-        tag.remove_key(key);
+        tag.remove_key(*key);
     }
 }
 
@@ -359,10 +360,15 @@ fn parse_bpm_value(value: &str) -> Option<f64> {
         .and_then(|parsed| normalize_bpm_value(parsed).ok())
 }
 
-fn apply_bpm_update(tag: &mut Tag, update: NullableField<f64>) -> Result<bool, String> {
+fn apply_bpm_update(
+    tag: &mut Tag,
+    native: &mut NativeTags,
+    update: NullableField<f64>,
+) -> Result<bool, String> {
     match update {
         Some(value) => {
-            custom_tags::remove_bpm(tag).map_err(|error| error.to_string())?;
+            LegacyField::Bpm.replace(tag, native, None)?;
+            custom_tags::remove_bpm(tag);
             remove_item_keys(tag, &[ItemKey::Bpm, ItemKey::IntegerBpm]);
 
             if let Some(value) = value {
@@ -370,12 +376,12 @@ fn apply_bpm_update(tag: &mut Tag, update: NullableField<f64>) -> Result<bool, S
                 let integer_bpm = normalized_bpm.round() as u32;
 
                 let value = format_bpm_value(normalized_bpm);
-                if ItemKey::Bpm.map_key(tag.tag_type(), false).is_some() {
+                if ItemKey::Bpm.map_key(tag.tag_type()).is_some() {
                     tag.insert_text(ItemKey::Bpm, value);
                 } else {
-                    LegacyField::Bpm.replace(tag, Some(value))?;
+                    LegacyField::Bpm.replace(tag, native, Some(value))?;
                 }
-                if ItemKey::IntegerBpm.map_key(tag.tag_type(), false).is_some() {
+                if ItemKey::IntegerBpm.map_key(tag.tag_type()).is_some() {
                     tag.insert_text(ItemKey::IntegerBpm, integer_bpm.to_string());
                 }
             }
@@ -386,10 +392,14 @@ fn apply_bpm_update(tag: &mut Tag, update: NullableField<f64>) -> Result<bool, S
     }
 }
 
-fn apply_energy_update(tag: &mut Tag, update: NullableField<String>) -> Result<bool, String> {
+fn apply_energy_update(
+    tag: &mut Tag,
+    native: &mut NativeTags,
+    update: NullableField<String>,
+) -> Result<bool, String> {
     match update {
         Some(value) => {
-            LegacyField::Energy.replace(tag, normalize_text(value))?;
+            LegacyField::Energy.replace(tag, native, normalize_text(value))?;
             Ok(true)
         }
         None => Ok(false),
@@ -426,8 +436,8 @@ pub fn update_song_metadata(
     cover_art_cache_dir: String,
 ) -> Result<SongMetadata, String> {
     let file_path = Path::new(path);
-    let (mut tagged_file, mp4) =
-        read_from_path(file_path).map_err(|error| format!("Failed to read file: {}", error))?;
+    let (mut tagged_file, mut native) = native_tags::read_file(file_path)
+        .map_err(|error| format!("Failed to read file: {}", error))?;
     let edited_fields: Vec<_> = [
         (LegacyField::Energy, song.energy.is_some()),
         (LegacyField::Bpm, song.bpm.is_some()),
@@ -439,9 +449,7 @@ pub fn update_song_metadata(
     .into_iter()
     .filter_map(|(field, edited)| edited.then_some(field))
     .collect();
-    let riff_update = tagged_file.tag(TagType::RiffInfo).and_then(|tag| {
-        custom_tags::remove_riff_aliases(RiffInfoList::from(tag.clone()), &edited_fields)
-    });
+    let riff_update = native.riff_alias_update(&edited_fields);
     let tag = get_or_create_primary_tag(&mut tagged_file)?;
     let mut has_changes = false;
 
@@ -475,8 +483,24 @@ pub fn update_song_metadata(
 
     if let Some(year) = song.year {
         match year {
-            Some(year) => tag.set_year(year as u32),
-            None => tag.remove_year(),
+            Some(year) => {
+                // Preserve month/day when only the year was edited, as the old
+                // set_year accessor did. set_date would replace the whole date.
+                if let Some(suffix) = tag
+                    .get_string(ItemKey::RecordingDate)
+                    .and_then(|date| date.get(4..))
+                {
+                    tag.insert_text(ItemKey::RecordingDate, format!("{year}{suffix}"));
+                } else {
+                    let key = if ItemKey::Year.map_key(tag.tag_type()).is_some() {
+                        ItemKey::Year
+                    } else {
+                        ItemKey::RecordingDate
+                    };
+                    tag.insert_text(key, year.to_string());
+                }
+            }
+            None => remove_item_keys(tag, &[ItemKey::Year, ItemKey::RecordingDate]),
         }
         has_changes = true;
     }
@@ -499,6 +523,7 @@ pub fn update_song_metadata(
 
     has_changes |= apply_item_key_update_with_alias_removal(
         tag,
+        &mut native,
         ItemKey::Comment,
         LegacyField::Comment,
         song.comment,
@@ -514,30 +539,49 @@ pub fn update_song_metadata(
         has_changes = true;
     }
 
+    if song.label.is_some() {
+        if tag.tag_type() == TagType::Id3v2 {
+            tag.remove_key(ItemKey::Publisher);
+        } else if tag.tag_type() == TagType::Ape {
+            native.replace_text(tag, "Publisher", &[], None)?;
+        }
+    }
     has_changes |= apply_item_key_update(tag, ItemKey::Label, song.label);
     has_changes |= apply_item_key_update_with_alias_removal(
         tag,
+        &mut native,
         ItemKey::CatalogNumber,
         LegacyField::CatalogNumber,
         song.catalog_number,
     )?;
     has_changes |= apply_item_key_update_with_alias_removal(
         tag,
+        &mut native,
         ItemKey::InitialKey,
         LegacyField::MusicalKey,
         song.musical_key,
     )?;
+    if song.lyrics.is_some() {
+        remove_item_keys(tag, &[ItemKey::Lyrics, ItemKey::UnsyncLyrics]);
+    }
+    let lyrics_key = if tag.tag_type() == TagType::Id3v2 {
+        ItemKey::UnsyncLyrics
+    } else {
+        ItemKey::Lyrics
+    };
     has_changes |= apply_item_key_update_with_alias_removal(
         tag,
-        ItemKey::Lyrics,
+        &mut native,
+        lyrics_key,
         LegacyField::Lyrics,
         song.lyrics,
     )?;
-    has_changes |= apply_bpm_update(tag, song.bpm)?;
-    has_changes |= apply_energy_update(tag, song.energy)?;
+    has_changes |= apply_bpm_update(tag, &mut native, song.bpm)?;
+    has_changes |= apply_energy_update(tag, &mut native, song.energy)?;
 
     if has_changes {
-        custom_tags::save(tag, file_path, mp4.as_ref())
+        native
+            .save(tag, file_path)
             .map_err(|error| format!("Failed to save file: {}", error))?;
     }
 
@@ -574,7 +618,7 @@ pub fn read_song_metadata_v2(
             .map(|d| d.as_millis())
     });
 
-    let (tagged_file, mp4) = read_from_path(file_path).map_err(|error| {
+    let (tagged_file, native) = native_tags::read_file(file_path).map_err(|error| {
         let extension = file_path
             .extension()
             .and_then(|extension| extension.to_str())
@@ -585,18 +629,16 @@ pub fn read_song_metadata_v2(
                 extension,
             }
         } else {
-            match error.kind() {
-                lofty::error::ErrorKind::UnsupportedTag
-                | lofty::error::ErrorKind::UnknownFormat => {
-                    ReadSongMetadataError::UnsupportedFormat {
-                        path: path.clone(),
-                        extension,
-                    }
+            if error.is_unknown_format() {
+                ReadSongMetadataError::UnsupportedFormat {
+                    path: path.clone(),
+                    extension,
                 }
-                _ => ReadSongMetadataError::MetadataParseFailed {
+            } else {
+                ReadSongMetadataError::MetadataParseFailed {
                     path: path.clone(),
                     message: error.to_string(),
-                },
+                }
             }
         }
     })?;
@@ -678,12 +720,14 @@ pub fn read_song_metadata_v2(
                     comment = item.value().to_owned().into_string();
                 }
             }
-            ItemKey::Lyrics => {
+            ItemKey::Lyrics | ItemKey::UnsyncLyrics => {
                 if allow_overwrite || (!has_primary_tag && lyrics.is_none()) {
                     lyrics = item.value().to_owned().into_string();
                 }
             }
-            ItemKey::Year => {
+            ItemKey::Year | ItemKey::RecordingDate
+                if item.key() == ItemKey::Year || tag.tag_type() == TagType::Ape =>
+            {
                 if allow_overwrite || (!has_primary_tag && year.is_none()) {
                     year = item
                         .value()
@@ -711,7 +755,9 @@ pub fn read_song_metadata_v2(
                     catalog_number = item.value().to_owned().into_string();
                 }
             }
-            ItemKey::Label => {
+            ItemKey::Label | ItemKey::Publisher
+                if item.key() == ItemKey::Label || tag.tag_type() == TagType::Id3v2 =>
+            {
                 if allow_overwrite || (!has_primary_tag && label.is_none()) {
                     label = item.value().to_owned().into_string();
                 }
@@ -737,28 +783,23 @@ pub fn read_song_metadata_v2(
                 }
             }
             item_key => {
-                // Special frames such as MusicBrainz UFID have no ordinary key mapping.
-                // Only custom names map with allow_unknown=true but not false.
-                if item_key.map_key(tag.tag_type(), false).is_some()
-                    || item_key.map_key(tag.tag_type(), true).is_none()
-                {
-                    extra_metadata_tags.push((
-                        format!("{item_key:?}"),
-                        item.value().to_owned().into_string().unwrap_or_default(),
-                    ));
-                }
+                extra_metadata_tags.push((
+                    format!("{item_key:?}"),
+                    item.value().to_owned().into_string().unwrap_or_default(),
+                ));
             }
         });
-        for (field_name, value) in custom_tags::read(tag, mp4.as_ref()).map_err(|error| {
-            ReadSongMetadataError::MetadataParseFailed {
-                path: path.clone(),
-                message: error.to_string(),
-            }
-        })? {
+        for (field_name, value) in native.read(tag) {
             // Only Apple's namespace carries the conventional MP4 aliases.
             let alias = field_name
                 .strip_prefix("----:com.apple.iTunes:")
                 .unwrap_or(&field_name);
+            if tag.tag_type() == TagType::Ape && alias.eq_ignore_ascii_case("Publisher") {
+                if label.is_none() {
+                    label = Some(value);
+                }
+                continue;
+            }
             match LegacyField::from_name(alias) {
                 Some(LegacyField::Energy) => {
                     if energy.is_none() {
@@ -798,11 +839,10 @@ pub fn read_song_metadata_v2(
                 }
             }
         }
-        Ok::<(), ReadSongMetadataError>(())
     };
 
     if let Some(primary_tag) = primary_tag {
-        apply_tag(primary_tag, true)?;
+        apply_tag(primary_tag, true);
     }
 
     for tag in tagged_file.tags() {
@@ -810,7 +850,7 @@ pub fn read_song_metadata_v2(
             continue;
         }
 
-        apply_tag(tag, false)?;
+        apply_tag(tag, false);
     }
 
     let cover_path = tagged_file
@@ -897,6 +937,7 @@ mod tests {
         FileInfo, ReadSongMetadataError, SongMetadata, SongMetadataUpdateable,
     };
     use crate::custom_tags::LegacyField;
+    use crate::native_tags::NativeTags;
     use lofty::{
         id3::v2::Id3v2Tag,
         tag::{ItemKey, Tag},
@@ -1067,6 +1108,7 @@ mod tests {
 
         assert!(apply_item_key_update_with_alias_removal(
             &mut tag,
+            &mut NativeTags::default(),
             ItemKey::Comment,
             LegacyField::Comment,
             Some(Some("fresh comment".to_string())),
@@ -1074,14 +1116,15 @@ mod tests {
         .unwrap());
         assert!(apply_item_key_update_with_alias_removal(
             &mut tag,
+            &mut NativeTags::default(),
             ItemKey::Lyrics,
             LegacyField::Lyrics,
             Some(None),
         )
         .unwrap());
 
-        assert_eq!(tag.get_string(&ItemKey::Comment), Some("fresh comment"));
-        assert_eq!(tag.get_string(&ItemKey::Lyrics), None);
+        assert_eq!(tag.get_string(ItemKey::Comment), Some("fresh comment"));
+        assert_eq!(tag.get_string(ItemKey::Lyrics), None);
         let native = Id3v2Tag::from(tag);
         assert_eq!(native.get_user_text("COMMENT"), None);
         assert_eq!(native.get_user_text("LYRICS"), None);
@@ -1093,7 +1136,10 @@ mod tests {
         native.insert_user_text("EnergyLevel".into(), "3".into());
         native.insert_user_text("ENERGYLEVEL".into(), "5".into());
         let mut tag: Tag = native.into();
-        assert!(apply_energy_update(&mut tag, Some(Some("8".into()))).unwrap());
+        assert!(
+            apply_energy_update(&mut tag, &mut NativeTags::default(), Some(Some("8".into())))
+                .unwrap()
+        );
         let native = Id3v2Tag::from(tag);
         assert_eq!(native.get_user_text("ENERGY"), Some("8"));
         assert_eq!(native.get_user_text("EnergyLevel"), None);
