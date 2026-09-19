@@ -62,30 +62,12 @@ Layer discipline is unchecked too: product code consumes **semantic** tokens
 (`bg-background-surface`, `text-content-muted`). Foundation tokens belong to token infrastructure,
 to shared primitives where there is a stated reason, and to the design-system specimen.
 
-## Keep imperative class vocabularies closed
-
-In renderer `src/app`, `design-system/valid-imperative-classnames` checks `@HostBinding('class...')`,
-`Renderer2.addClass` / `removeClass`, and `classList.add` / `remove` / `toggle` / `replace`. Literal
-classes and closed string-literal unions use the same Tailwind and stylesheet authorities as
-templates and `host` metadata. A value typed as plain `string` is rejected because its possible
-classes cannot be enumerated.
-
-Prefer `[class.foo]` for a condition or `host: { '[class.foo]': 'condition' }` for host state. Static
-host classes use `host: { class: '…' }`. Use an imperative operation when the DOM event or integration
-is genuinely the cleaner owner, as in the album grid removing its validated `opacity-0` after an
-image loads.
-
-An unresolved third-party class vocabulary needs an
-`eslint-disable-next-line design-system/valid-imperative-classnames` comment with a `--` explanation
-on that operation. Name the class source and why the type cannot express a closed vocabulary. Do not
-add file-wide disables, ignore patterns, or a global exception list.
-
 ## Keep runtime class vocabularies closed
 
-A runtime class vocabulary must be **closed**: every whole class list the binding can produce is
-enumerable. Prefer literal branches in the template; otherwise use a component member with literal
-branches or a string-literal union. Return whole class names — gluing a runtime fragment into one is
-not resolvable.
+A runtime class vocabulary must be **closed**: every whole class list a template binding or
+TypeScript class operation can produce is enumerable. Prefer literal branches in the template;
+otherwise use a component member with literal branches or a string-literal union. Return whole class
+names — gluing a runtime fragment into one is not resolvable.
 
 Follow the diagnostic's named edit before suppressing. Suppress only for the bare
 `Runtime-built class list`, or to defer a named edit against a tracked issue. State the closed
