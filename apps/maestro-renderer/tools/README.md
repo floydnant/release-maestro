@@ -14,7 +14,7 @@ only in:
 Angular component styles must be literals so the checker can inspect them. It does not validate
 classes inside `@apply` or enforce the semantic and foundation token layers.
 
-Contrast pairs use the project's 3:1 minimum. This is not WCAG AA compliance for normal text,
+Contrast pairs use the project's 3.5:1 minimum. This is not WCAG AA compliance for normal text,
 which requires 4.5:1.
 
 ```sh
