@@ -442,10 +442,12 @@ fn clearing_riff_aliases_does_not_resurrect_secondary_values() {
             json!("Bm")
         };
         for value in [Value::Null, replacement, Value::Null] {
-            params["update"] = json!({field: value});
+            params["update"] = json!({field: value, "title": "Gökotta", "artist": "SpunOff"});
             Engine::new().request("write_tags", params.clone());
             let actual = Engine::new().request("read_file", library.params(&path));
             assert_eq!(actual[field], value, "{field}: {actual}");
+            assert_eq!(actual["title"], "Gökotta");
+            assert_eq!(actual["artist"], "SpunOff");
             assert!(actual["extraMetadata"]
                 .as_array()
                 .unwrap()
