@@ -18,7 +18,7 @@ build: ## Build all projects (development config)
 build-prod: ## Build all projects (production config)
 	npx nx run-many -t build -p maestro-renderer maestro-electron -c production
 build-engine: ## Build the Rust metadata-engine worker binary (release)
-	npx nx build metadata-engine
+	npx nx run metadata-engine:build-package
 
 # Package & Release
 generate-icons: ## Generate app icon variants from app-icon.png

@@ -45,7 +45,7 @@ main process with hot reload. The host binary lives in `apps/metadata-engine/tar
 separate from the packaging binary in `target/release`. Development always uses this host path.
 If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
 
-Use `npx nx run metadata-engine:build-dev` to build only the host sidecar.
+Use `npx nx build metadata-engine` to build only the host sidecar.
 
 ## Commands
 
@@ -111,7 +111,8 @@ make package
 ```
 
 On macOS, packaging requires `rustup` to install both Rust targets and creates a universal sidecar.
-`make package-dir`, `make package`, and `make build-engine` retain that requirement.
+`make package-dir`, `make package`, and `make build-engine` use the packaging-only
+`metadata-engine:build-package` target and retain that requirement.
 
 Produces platform-specific distributables in `dist/executables/`:
 

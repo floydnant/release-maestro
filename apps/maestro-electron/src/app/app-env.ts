@@ -32,7 +32,7 @@ const metadataEngineBinaryName = process.platform == 'win32' ? 'metadata-engine.
 /**
  * Resolves the `metadata-engine` Rust worker binary.
  * - Packaged: shipped alongside the app via electron-builder `extraFiles`.
- * - Dev: the host build produced by `nx run metadata-engine:build-dev`.
+ * - Dev: the host build produced by `nx build metadata-engine`.
  */
 export const resolveMetadataEngineBinaryPath = async (): Promise<string> => {
     if (app.isPackaged) {
