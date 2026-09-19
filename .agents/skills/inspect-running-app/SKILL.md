@@ -58,8 +58,10 @@ Claude Code uses `.mcp.json`; Codex uses `.codex/config.toml` after the project 
 Both configs include the memory tools used by `profiling`. Restart the client after changing
 its server configuration. Codex's `/mcp` shows the active servers.
 
-Keep the executable version in both configs aligned with `package.json` when updating it.
-Explicit pins make startup reproducible even before dependencies are installed.
+Run `make install` before starting an agent client from the repository root. Both configs run
+the installed MCP package directly with Node, so the dependency manifest and lockfile control
+its version. Dependency updates take effect after reinstalling and restarting the client.
+If dependencies are missing, startup fails without downloading a fallback package.
 
 Keep `--usageStatistics=false`. The server reports usage data to Google by default.
 Both clients enable this server for the project, including its extra heap tools. Those tool
