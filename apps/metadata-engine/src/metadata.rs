@@ -1,7 +1,7 @@
+use crate::custom_tags::{read_from_path, LegacyField};
 use crate::{constants::separator, custom_tags, image_format::ImageFormat};
 use lofty::{
     file::{AudioFile, FileType, TaggedFile, TaggedFileExt},
-    read_from_path,
     tag::{Accessor, ItemKey, Tag, TagType},
 };
 use serde::{Deserialize, Deserializer, Serialize};
@@ -297,12 +297,12 @@ fn apply_item_key_update(tag: &mut Tag, key: ItemKey, update: NullableField<Stri
 fn apply_item_key_update_with_alias_removal(
     tag: &mut Tag,
     key: ItemKey,
-    alias: &str,
+    field: LegacyField,
     update: NullableField<String>,
-) -> bool {
+) -> Result<bool, String> {
     match update {
         Some(value) => {
-            custom_tags::replace_text(tag, alias, &[], None);
+            field.replace(tag, None)?;
 
             match normalize_text(value) {
                 Some(value) => {
@@ -313,9 +313,9 @@ fn apply_item_key_update_with_alias_removal(
                 }
             }
 
-            true
+            Ok(true)
         }
-        None => false,
+        None => Ok(false),
     }
 }
 
@@ -360,15 +360,22 @@ fn parse_bpm_value(value: &str) -> Option<f64> {
 fn apply_bpm_update(tag: &mut Tag, update: NullableField<f64>) -> Result<bool, String> {
     match update {
         Some(value) => {
-            custom_tags::remove_bpm(tag);
+            custom_tags::remove_bpm(tag).map_err(|error| error.to_string())?;
             remove_item_keys(tag, &[ItemKey::Bpm, ItemKey::IntegerBpm]);
 
             if let Some(value) = value {
                 let normalized_bpm = normalize_bpm_value(value)?;
                 let integer_bpm = normalized_bpm.round() as u32;
 
-                tag.insert_text(ItemKey::Bpm, format_bpm_value(normalized_bpm));
-                tag.insert_text(ItemKey::IntegerBpm, integer_bpm.to_string());
+                let value = format_bpm_value(normalized_bpm);
+                if ItemKey::Bpm.map_key(tag.tag_type(), false).is_some() {
+                    tag.insert_text(ItemKey::Bpm, value);
+                } else {
+                    LegacyField::Bpm.replace(tag, Some(value))?;
+                }
+                if ItemKey::IntegerBpm.map_key(tag.tag_type(), false).is_some() {
+                    tag.insert_text(ItemKey::IntegerBpm, integer_bpm.to_string());
+                }
             }
 
             Ok(true)
@@ -377,13 +384,13 @@ fn apply_bpm_update(tag: &mut Tag, update: NullableField<f64>) -> Result<bool, S
     }
 }
 
-fn apply_energy_update(tag: &mut Tag, update: NullableField<String>) -> bool {
+fn apply_energy_update(tag: &mut Tag, update: NullableField<String>) -> Result<bool, String> {
     match update {
         Some(value) => {
-            custom_tags::replace_text(tag, "ENERGY", &["ENERGYLEVEL"], normalize_text(value));
-            true
+            LegacyField::Energy.replace(tag, normalize_text(value))?;
+            Ok(true)
         }
-        None => false,
+        None => Ok(false),
     }
 }
 
@@ -474,8 +481,12 @@ pub fn update_song_metadata(
         has_changes = true;
     }
 
-    has_changes |=
-        apply_item_key_update_with_alias_removal(tag, ItemKey::Comment, "COMMENT", song.comment);
+    has_changes |= apply_item_key_update_with_alias_removal(
+        tag,
+        ItemKey::Comment,
+        LegacyField::Comment,
+        song.comment,
+    )?;
 
     if let Some(date) = song.date {
         match normalize_text(date) {
@@ -488,18 +499,30 @@ pub fn update_song_metadata(
     }
 
     has_changes |= apply_item_key_update(tag, ItemKey::Label, song.label);
-    has_changes |= apply_item_key_update(tag, ItemKey::CatalogNumber, song.catalog_number);
-    has_changes |= apply_item_key_update(tag, ItemKey::InitialKey, song.musical_key);
-    has_changes |=
-        apply_item_key_update_with_alias_removal(tag, ItemKey::Lyrics, "LYRICS", song.lyrics);
+    has_changes |= apply_item_key_update_with_alias_removal(
+        tag,
+        ItemKey::CatalogNumber,
+        LegacyField::CatalogNumber,
+        song.catalog_number,
+    )?;
+    has_changes |= apply_item_key_update_with_alias_removal(
+        tag,
+        ItemKey::InitialKey,
+        LegacyField::MusicalKey,
+        song.musical_key,
+    )?;
+    has_changes |= apply_item_key_update_with_alias_removal(
+        tag,
+        ItemKey::Lyrics,
+        LegacyField::Lyrics,
+        song.lyrics,
+    )?;
     has_changes |= apply_bpm_update(tag, song.bpm)?;
-    has_changes |= apply_energy_update(tag, song.energy);
+    has_changes |= apply_energy_update(tag, song.energy)?;
 
     if has_changes {
-        for tag in tagged_file.tags() {
-            custom_tags::save(tag, file_path)
-                .map_err(|error| format!("Failed to save file: {}", error))?;
-        }
+        custom_tags::save(tag, file_path)
+            .map_err(|error| format!("Failed to save file: {}", error))?;
     }
 
     let final_path = if let Some(file_name) = song.file_name {
@@ -602,6 +625,7 @@ pub fn read_song_metadata_v2(
     let has_primary_tag = primary_tag.is_some();
 
     let mut apply_tag = |tag: &Tag, allow_overwrite: bool| {
+        let mut bpm_from_integer = false;
         tag.items().for_each(|item| match item.key() {
             ItemKey::TrackTitle => {
                 if allow_overwrite || (!has_primary_tag && title.is_none()) {
@@ -678,22 +702,25 @@ pub fn read_song_metadata_v2(
             }
             ItemKey::Bpm => {
                 if allow_overwrite || (!has_primary_tag && bpm.is_none()) {
-                    bpm = item
-                        .value()
-                        .to_owned()
-                        .into_string()
-                        .and_then(|value| parse_bpm_value(&value))
-                        .or(bpm);
+                    if let Some(value) = item.value().text().and_then(parse_bpm_value) {
+                        bpm = Some(value);
+                        bpm_from_integer = false;
+                    }
                 }
             }
             ItemKey::IntegerBpm => {
                 // Prefer the fractional field even if the integer item comes later.
                 if bpm.is_none() && (allow_overwrite || !has_primary_tag) {
                     bpm = item.value().text().and_then(parse_bpm_value);
+                    bpm_from_integer = bpm.is_some();
                 }
             }
             item_key => {
-                if item_key.map_key(tag.tag_type(), false).is_some() {
+                // Special frames such as MusicBrainz UFID have no ordinary key mapping.
+                // Only custom names map with allow_unknown=true but not false.
+                if item_key.map_key(tag.tag_type(), false).is_some()
+                    || item_key.map_key(tag.tag_type(), true).is_none()
+                {
                     extra_metadata_tags.push((
                         format!("{item_key:?}"),
                         item.value().to_owned().into_string().unwrap_or_default(),
@@ -701,61 +728,69 @@ pub fn read_song_metadata_v2(
                 }
             }
         });
-        for (field_name, value) in custom_tags::read(tag) {
+        for (field_name, value) in
+            custom_tags::read(tag).map_err(|error| ReadSongMetadataError::MetadataParseFailed {
+                path: path.clone(),
+                message: error.to_string(),
+            })?
+        {
             // Only Apple's namespace carries the conventional MP4 aliases.
             let alias = field_name
                 .strip_prefix("----:com.apple.iTunes:")
                 .unwrap_or(&field_name);
-            match alias {
-                "ENERGY" | "ENERGYLEVEL" | "Energylevel" | "EnergyLevel" => {
+            match LegacyField::from_name(alias) {
+                Some(LegacyField::Energy) => {
                     if energy.is_none() {
                         energy = Some(value);
                     }
                 }
-                "BPM" | "TBPM" | "Bpm" | "bpm" => {
-                    if bpm.is_none() {
-                        bpm = parse_bpm_value(&value);
+                Some(LegacyField::Bpm) => {
+                    if bpm.is_none() || bpm_from_integer {
+                        if let Some(value) = parse_bpm_value(&value) {
+                            bpm = Some(value);
+                            bpm_from_integer = false;
+                        }
                     }
                 }
-                "KEY" | "TKEY" | "INITIALKEY" | "INITIAL KEY" | "Initial key" => {
+                Some(LegacyField::MusicalKey) => {
                     if key.is_none() {
                         key = Some(value);
                     }
                 }
-                "COMMENT" | "Comment" | "comment" => {
+                Some(LegacyField::Comment) => {
                     if comment.is_none() {
                         comment = Some(value);
                     }
                 }
-                "CATALOGUENUMBER" | "CATALOGID" | "CATALOG" | "Catalog" | "CATALOG NUMBER"
-                | "Catalog ID" | "CATALOG #" | "Catalog #" | "CAT#" => {
+                Some(LegacyField::CatalogNumber) => {
                     if catalog_number.is_none() {
                         catalog_number = Some(value);
                     }
                 }
-                "LYRICS" => {
+                Some(LegacyField::Lyrics) => {
                     if lyrics.is_none() {
                         lyrics = Some(value);
                     }
                 }
-                _ => {
+                None => {
                     extra_metadata_tags.push((format!("Custom: {field_name}"), value));
                 }
             }
         }
+        Ok::<(), ReadSongMetadataError>(())
     };
 
     if let Some(primary_tag) = primary_tag {
-        apply_tag(primary_tag, true);
+        apply_tag(primary_tag, true)?;
     }
 
-    tagged_file.tags().iter().for_each(|tag| {
+    for tag in tagged_file.tags() {
         if primary_tag.is_some_and(|primary_tag| std::ptr::eq(primary_tag, tag)) {
-            return;
+            continue;
         }
 
-        apply_tag(tag, false);
-    });
+        apply_tag(tag, false)?;
+    }
 
     let cover_path = tagged_file
         .primary_tag()
@@ -840,6 +875,7 @@ mod tests {
         is_audio_file_extension, is_supported_audio_file_extension, read_song_metadata_v2,
         FileInfo, ReadSongMetadataError, SongMetadata, SongMetadataUpdateable,
     };
+    use crate::custom_tags::LegacyField;
     use lofty::{
         id3::v2::Id3v2Tag,
         tag::{ItemKey, Tag},
@@ -1011,15 +1047,17 @@ mod tests {
         assert!(apply_item_key_update_with_alias_removal(
             &mut tag,
             ItemKey::Comment,
-            "COMMENT",
+            LegacyField::Comment,
             Some(Some("fresh comment".to_string())),
-        ));
+        )
+        .unwrap());
         assert!(apply_item_key_update_with_alias_removal(
             &mut tag,
             ItemKey::Lyrics,
-            "LYRICS",
+            LegacyField::Lyrics,
             Some(None),
-        ));
+        )
+        .unwrap());
 
         assert_eq!(tag.get_string(&ItemKey::Comment), Some("fresh comment"));
         assert_eq!(tag.get_string(&ItemKey::Lyrics), None);
@@ -1034,7 +1072,7 @@ mod tests {
         native.insert_user_text("EnergyLevel".into(), "3".into());
         native.insert_user_text("ENERGYLEVEL".into(), "5".into());
         let mut tag: Tag = native.into();
-        assert!(apply_energy_update(&mut tag, Some(Some("8".into()))));
+        assert!(apply_energy_update(&mut tag, Some(Some("8".into()))).unwrap());
         let native = Id3v2Tag::from(tag);
         assert_eq!(native.get_user_text("ENERGY"), Some("8"));
         assert_eq!(native.get_user_text("EnergyLevel"), None);

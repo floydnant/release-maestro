@@ -1,9 +1,79 @@
 mod support;
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use support::{fixtures, Engine, Library};
 
-fn cases() -> Vec<Value> {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Fixture {
+    file: String,
+    expected: BTreeMap<MetadataField, ExpectedValue>,
+    #[serde(default)]
+    extras: Vec<[String; 2]>,
+    #[serde(default)]
+    artwork: bool,
+    #[serde(default)]
+    writable: bool,
+    #[serde(default)]
+    create_tag: bool,
+    alias_field: Option<AliasField>,
+}
+
+#[derive(Deserialize, Serialize, Eq, PartialEq, Ord, PartialOrd)]
+#[serde(rename_all = "camelCase")]
+enum MetadataField {
+    Title,
+    Artist,
+    AlbumTitle,
+    AlbumArtist,
+    Genre,
+    Track,
+    Comment,
+    Lyrics,
+    MusicalKey,
+    Bpm,
+    CatalogNumber,
+    Label,
+    Energy,
+    Date,
+    Year,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(untagged)]
+enum ExpectedValue {
+    Text(String),
+    Number(f64),
+    Null,
+}
+
+#[derive(Deserialize, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+enum AliasField {
+    Energy,
+    Bpm,
+    MusicalKey,
+    Comment,
+    CatalogNumber,
+    Lyrics,
+}
+
+impl AliasField {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Energy => "energy",
+            Self::Bpm => "bpm",
+            Self::MusicalKey => "musicalKey",
+            Self::Comment => "comment",
+            Self::CatalogNumber => "catalogNumber",
+            Self::Lyrics => "lyrics",
+        }
+    }
+}
+
+fn cases() -> Vec<Fixture> {
     serde_json::from_slice(&std::fs::read(fixtures().join("cases.json")).unwrap()).unwrap()
 }
 
@@ -17,16 +87,29 @@ fn assert_fields(actual: &Value, expected: &Value, context: &str) {
     }
 }
 
-fn assert_extras(actual: &Value, case: &Value) {
-    if let Some(extras) = case["extras"].as_array() {
-        for extra in extras {
-            assert!(
-                actual["extraMetadata"].as_array().unwrap().contains(extra),
-                "{} missing {extra}: {}",
-                case["file"],
-                actual["extraMetadata"]
-            );
-        }
+fn assert_extras(actual: &Value, case: &Fixture) {
+    for extra in &case.extras {
+        assert!(
+            actual["extraMetadata"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(extra)),
+            "{} missing {extra:?}: {}",
+            case.file,
+            actual["extraMetadata"]
+        );
+    }
+}
+
+#[test]
+fn fixture_manifest_rejects_unknown_fields_and_invalid_flags() {
+    for source in [
+        r#"{"file":"x.mp3","expected":{},"writeable":true}"#,
+        r#"{"file":"x.mp3","expected":{"titel":"x"}}"#,
+        r#"{"file":"x.mp3","expected":{},"writable":"yes"}"#,
+        r#"{"file":"x.mp3","expected":{},"aliasField":"musicalkey"}"#,
+    ] {
+        assert!(serde_json::from_str::<Fixture>(source).is_err(), "{source}");
     }
 }
 
@@ -35,16 +118,20 @@ fn reads_independently_authored_metadata_across_formats_and_legacy_aliases() {
     let library = Library::new();
     let mut engine = Engine::new();
     for case in cases() {
-        let name = case["file"].as_str().unwrap();
+        let name = case.file.as_str();
         let path = library.copy(name);
         let metadata = engine.request("read_file", library.params(&path));
-        assert_fields(&metadata, &case["expected"], name);
+        assert_fields(
+            &metadata,
+            &serde_json::to_value(&case.expected).unwrap(),
+            name,
+        );
         assert_extras(&metadata, &case);
         assert_eq!(metadata["path"], path.to_str().unwrap());
         assert_eq!(metadata["fileName"], name);
         assert!(metadata["duration"].as_f64().unwrap() > 0.0, "{name}");
         assert_eq!(metadata["fileInfo"]["channels"], 2, "{name}");
-        if case["artwork"] == true {
+        if case.artwork {
             let cover = metadata["coverPath"].as_str().unwrap();
             assert!(std::path::Path::new(cover).starts_with(library.0.join("cache")));
             assert_eq!(
@@ -59,8 +146,8 @@ fn reads_independently_authored_metadata_across_formats_and_legacy_aliases() {
 fn edits_and_clears_tags_without_losing_unrelated_metadata_or_artwork() {
     let library = Library::new();
     let mut engine = Engine::new();
-    for case in cases().into_iter().filter(|case| case["writable"] == true) {
-        let name = case["file"].as_str().unwrap();
+    for case in cases().into_iter().filter(|case| case.writable) {
+        let name = case.file.as_str();
         let path = library.copy(name);
         let original = engine.request("read_file", library.params(&path));
         let mut params = library.params(&path);
@@ -113,20 +200,25 @@ fn edits_and_clears_tags_without_losing_unrelated_metadata_or_artwork() {
 fn clearing_legacy_aliases_does_not_resurrect_old_values() {
     let library = Library::new();
     let mut engine = Engine::new();
-    for case in cases().into_iter().filter(|case| {
-        matches!(
-            case["aliasField"].as_str(),
-            Some("energy" | "comment" | "lyrics")
-        )
-    }) {
-        let name = case["file"].as_str().unwrap();
+    for case in cases()
+        .into_iter()
+        .filter(|case| case.alias_field.is_some())
+    {
+        let name = case.file.as_str();
         let path = library.copy(name);
-        let field = case["aliasField"].as_str().unwrap();
+        let field = case.alias_field.unwrap().name();
         let mut params = library.params(&path);
-        params["update"] = json!({field: null});
-        engine.request("write_tags", params);
-        let metadata = Engine::new().request("read_file", library.params(&path));
-        assert!(metadata[field].is_null(), "{name}: {metadata}");
+        let replacement = if field == "bpm" {
+            json!(132.25)
+        } else {
+            json!("updated value")
+        };
+        for value in [replacement, Value::Null] {
+            params["update"] = json!({field: value});
+            engine.request("write_tags", params.clone());
+            let metadata = Engine::new().request("read_file", library.params(&path));
+            assert_eq!(metadata[field], value, "{name}: {metadata}");
+        }
     }
 }
 
@@ -134,8 +226,8 @@ fn clearing_legacy_aliases_does_not_resurrect_old_values() {
 fn creates_primary_tags_on_untagged_files() {
     let library = Library::new();
     let mut engine = Engine::new();
-    for case in cases().into_iter().filter(|case| case["createTag"] == true) {
-        let name = case["file"].as_str().unwrap();
+    for case in cases().into_iter().filter(|case| case.create_tag) {
+        let name = case.file.as_str();
         let path = library.copy(name);
         let mut params = library.params(&path);
         params["update"] = json!({"title": "El sueño", "energy": "8"});
@@ -233,5 +325,53 @@ fn mp4_tempo_edits_replace_native_integer_atoms_and_clear_persistently() {
         Engine::new().request("write_tags", params);
         let actual = Engine::new().request("read_file", library.params(&path));
         assert_fields(&actual, &update, "MP4 tempo");
+    }
+}
+
+#[test]
+fn edits_preserve_the_secondary_id3v1_tag() {
+    let library = Library::new();
+    let path = library.copy("id3-priority.mp3");
+    let bytes = std::fs::read(&path).unwrap();
+    let footer = &bytes[bytes.len() - 128..];
+    assert_eq!(&footer[..3], b"TAG");
+    for update in [
+        json!({"title": "Invocación Del Cielo"}),
+        json!({"comment": null}),
+    ] {
+        let mut params = library.params(&path);
+        params["update"] = update.clone();
+        Engine::new().request("write_tags", params);
+        let actual = Engine::new().request("read_file", library.params(&path));
+        assert_fields(&actual, &update, "ID3v2 edit");
+        let edited = std::fs::read(&path).unwrap();
+        assert_eq!(&edited[edited.len() - 128..], footer);
+    }
+}
+
+#[test]
+fn fractional_id3_tempo_keeps_the_standard_integer_frame() {
+    use lofty::{file::TaggedFileExt, tag::ItemKey};
+    let library = Library::new();
+    for name in [
+        "vardae-invocacion-del-cielo.mp3",
+        "vardae-invocacion-del-cielo.wav",
+        "vardae-invocacion-del-cielo.aiff",
+    ] {
+        let path = library.copy(name);
+        let mut params = library.params(&path);
+        params["update"] = json!({"bpm": 132.25});
+        Engine::new().request("write_tags", params);
+        let actual = Engine::new().request("read_file", library.params(&path));
+        assert_eq!(actual["bpm"], 132.25, "{name}");
+        let native = lofty::read_from_path(&path).unwrap();
+        assert_eq!(
+            native
+                .primary_tag()
+                .unwrap()
+                .get_string(&ItemKey::IntegerBpm),
+            Some("132"),
+            "{name}: standard TBPM"
+        );
     }
 }

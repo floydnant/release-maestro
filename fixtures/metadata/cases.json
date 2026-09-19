@@ -434,7 +434,8 @@
         },
         "extras": [
             ["Custom: ----:org.example:ENERGY", "unrelated"],
-            ["Custom: ----:org.example:VALUES", "first"]
+            ["Custom: ----:org.example:VALUES", "first"],
+            ["Custom: ----:org.example:VALUES", "second"]
         ],
         "writable": true
     },
@@ -516,6 +517,25 @@
             "label": "Blue Night Jungle"
         },
         "extras": [["Custom: X-URL", "https://example.com/track"]],
+        "writable": true
+    },
+    {
+        "file": "musicbrainz-recording.mp3",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [["MusicBrainzRecordingId", "d74c6c09-74de-49b3-a931-e0e67e2040e5"]],
         "writable": true
     }
 ]

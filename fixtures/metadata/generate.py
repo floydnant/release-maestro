@@ -207,6 +207,7 @@ file.save()
 case(path.name, {"musicalKey": "Fm", "energy": "6"}, extras=[
     ["Custom: ----:org.example:ENERGY", "unrelated"],
     ["Custom: ----:org.example:VALUES", "first"],
+    ["Custom: ----:org.example:VALUES", "second"],
 ], writable=True)
 
 for name, primary in [("id3v1-only.mp3", False), ("id3-priority.mp3", True)]:
@@ -248,6 +249,14 @@ file = mutagen.File(path)
 file["X-URL"] = APEExtValue("https://example.com/track")
 file.save()
 case(path.name, FIELDS, extras=[["Custom: X-URL", "https://example.com/track"]], writable=True)
+
+path = ROOT / "musicbrainz-recording.mp3"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.mp3", path)
+tags = id3.ID3(path)
+recording_id = "d74c6c09-74de-49b3-a931-e0e67e2040e5"
+tags.add(id3.UFID(owner="http://musicbrainz.org", data=recording_id.encode("ascii")))
+tags.save(path)
+case(path.name, FIELDS, extras=[["MusicBrainzRecordingId", recording_id]], writable=True)
 
 (ROOT / "cover.png").write_bytes(PNG)
 (ROOT / "cases.json").write_text(json.dumps(CASES, indent=4, ensure_ascii=False) + "\n")
