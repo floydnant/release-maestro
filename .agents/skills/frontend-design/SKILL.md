@@ -64,10 +64,10 @@ to shared primitives where there is a stated reason, and to the design-system sp
 
 ## Keep runtime class vocabularies closed
 
-A runtime class vocabulary must be **closed**: every whole class list the binding can produce is
-enumerable. Prefer literal branches in the template; otherwise use a component member with literal
-branches or a string-literal union. Return whole class names — gluing a runtime fragment into one is
-not resolvable.
+A runtime class vocabulary must be **closed**: every whole class list a template binding or
+TypeScript class operation can produce is enumerable. Prefer literal branches in the template;
+otherwise use a component member with literal branches or a string-literal union. Return whole class
+names — gluing a runtime fragment into one is not resolvable.
 
 Follow the diagnostic's named edit before suppressing. Suppress only for the bare
 `Runtime-built class list`, or to defer a named edit against a tracked issue. State the closed
