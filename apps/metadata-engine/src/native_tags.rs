@@ -210,10 +210,9 @@ impl NativeTags {
 // chunk, corrupting its size or panicking on large growth in debug builds.
 // Remove the old chunk first so the writer uses its append path instead.
 fn save_id3(tag: &Tag, path: &Path, options: WriteOptions) -> Result<(), FileEncodingError> {
-    use std::io::{Cursor, Read, Seek, Write};
+    use std::io::{Read, Seek};
     let write_path = std::fs::canonicalize(path)?;
-    let bytes = std::fs::read(&write_path)?;
-    let mut file = Cursor::new(bytes);
+    let mut file = std::fs::File::open(&write_path)?;
     let mut header = [0; 12];
     file.read_exact(&mut header)?;
     let chunk_file = matches!(
@@ -224,14 +223,15 @@ fn save_id3(tag: &Tag, path: &Path, options: WriteOptions) -> Result<(), FileEnc
     if chunk_file {
         // Check encoding before deleting the existing tag.
         tag.dump_to(&mut std::io::sink(), options)?;
-        TagType::Id3v2.remove_from(&mut file, options)?;
-        file.rewind()?;
-        tag.save_to(&mut file, options)?;
         let permissions = std::fs::metadata(&write_path)?.permissions();
         let parent = write_path.parent().unwrap_or_else(|| Path::new("."));
         let mut replacement = tempfile::NamedTempFile::new_in(parent)?;
+        std::io::copy(&mut file, replacement.as_file_mut())?;
+        replacement.as_file_mut().rewind()?;
+        TagType::Id3v2.remove_from(replacement.as_file_mut(), options)?;
+        replacement.as_file_mut().rewind()?;
+        tag.save_to(replacement.as_file_mut(), options)?;
         replacement.as_file().set_permissions(permissions)?;
-        replacement.write_all(&file.into_inner())?;
         replacement.as_file().sync_all()?;
         replacement
             .persist(&write_path)
