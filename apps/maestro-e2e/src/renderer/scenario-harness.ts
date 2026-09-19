@@ -104,11 +104,12 @@ declare global {
             emit: (channel: string, payload?: IpcPayload) => void
             deserialize: (value: ScenarioSerializedValue) => unknown
             serialize: (value: unknown) => ScenarioSerializedValue
+            isBehavior: ReturnType<typeof createScenarioRuntime>['isScenarioBehavior']
         }
     }
 }
 
-const { serializeScenarioValue, parseScenarioValue } = createScenarioRuntime()
+const { serializeScenarioValue, parseScenarioValue, isIpcCall, isIpcCalls } = createScenarioRuntime()
 
 const EMPTY_FILTER_DESCRIPTION: SongFilterDescription = {
     artists: [],
@@ -572,7 +573,9 @@ export class RendererScenarioController {
                 window.__maestroScenario.serialize(window.__maestroScenario.calls(selectedChannel)),
             channel,
         )
-        return parseScenarioValue(serializedCalls)
+        const calls = parseScenarioValue(serializedCalls)
+        if (!isIpcCalls(calls)) throw new Error('Invalid scenario IPC calls')
+        return calls
     }
 
     async lastCall(channel: string): Promise<IpcCall | undefined> {
@@ -581,14 +584,18 @@ export class RendererScenarioController {
                 window.__maestroScenario.serialize(window.__maestroScenario.lastCall(selectedChannel)),
             channel,
         )
-        return parseScenarioValue(serializedCall)
+        const call = parseScenarioValue(serializedCall)
+        if (call !== undefined && !isIpcCall(call)) throw new Error('Invalid scenario IPC call')
+        return call
     }
 
     setHandler(channel: MainIpcChannel, behavior: ScenarioBehavior): Promise<void> {
         const serializedBehavior = serializeScenarioValue(behavior)
         return this.page.evaluate(
             ({ selectedChannel, nextBehavior }) => {
-                const behavior = window.__maestroScenario.deserialize(nextBehavior) as ScenarioBehavior
+                const behavior = window.__maestroScenario.deserialize(nextBehavior)
+                if (!window.__maestroScenario.isBehavior(behavior))
+                    throw new Error('Invalid scenario behavior')
                 window.__maestroScenario.setHandler(selectedChannel, behavior)
             },
             { selectedChannel: channel, nextBehavior: serializedBehavior },
@@ -598,11 +605,15 @@ export class RendererScenarioController {
     updateState(handlers: Partial<Record<MainIpcChannel, ScenarioBehavior>>): Promise<void> {
         const serializedHandlers = serializeScenarioValue(handlers)
         return this.page.evaluate(nextHandlers => {
-            const handlers = window.__maestroScenario.deserialize(nextHandlers) as Partial<
-                Record<MainIpcChannel, ScenarioBehavior>
-            >
+            const handlers = window.__maestroScenario.deserialize(nextHandlers)
+            if (typeof handlers !== 'object' || handlers === null || Array.isArray(handlers)) {
+                throw new Error('Invalid scenario handlers')
+            }
             for (const [channel, behavior] of Object.entries(handlers)) {
-                if (behavior) window.__maestroScenario.setHandler(channel, behavior)
+                if (behavior === undefined) continue
+                if (!window.__maestroScenario.isBehavior(behavior))
+                    throw new Error('Invalid scenario behavior')
+                window.__maestroScenario.setHandler(channel, behavior)
             }
         }, serializedHandlers)
     }
@@ -737,9 +748,16 @@ export const createRendererScenario = async (
 ): Promise<RendererScenarioController> => {
     const initializeScenario = (createRuntime: typeof createScenarioRuntime, scenario: string) => {
         type Listener = (event: unknown, payload?: unknown) => void
-        const { serializeScenarioValue, parseScenarioValue, nextBehavior } = createRuntime()
+        const {
+            serializeScenarioValue,
+            parseScenarioValue,
+            isScenarioBehavior,
+            isRendererScenario,
+            nextBehavior,
+        } = createRuntime()
 
-        const hydratedScenario = parseScenarioValue(scenario) as RendererScenario
+        const hydratedScenario = parseScenarioValue(scenario)
+        if (!isRendererScenario(hydratedScenario)) throw new Error('Invalid renderer scenario')
         const getSettingsBehavior = hydratedScenario.handlers['get-settings']
         if (getSettingsBehavior?.kind !== 'resolve') {
             throw new Error('Renderer scenarios require a resolving get-settings handler')
@@ -847,6 +865,7 @@ export const createRendererScenario = async (
             },
             deserialize: parseScenarioValue,
             serialize: serializeScenarioValue,
+            isBehavior: isScenarioBehavior,
         }
     }
 

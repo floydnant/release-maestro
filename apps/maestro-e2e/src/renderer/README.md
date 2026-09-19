@@ -28,7 +28,8 @@ The scenario backend lives in the browser page. Tests control it through the ret
 Scenario values are serialized with a tagged JSON codec before they cross the Playwright boundary.
 Nested `Date` instances are revived as real `Date` objects in the browser, so fixtures can use dates
 without adding channel-specific revival logic. Explicit `undefined` properties and array elements
-also survive the round trip.
+also survive the round trip, while sparse array holes remain absent. Decoding returns `unknown`; the
+harness validates scenario behaviors and recorded calls at the boundary before using them.
 
 `scenario-runtime.ts` defines the codec and sequence selection in one self-contained factory. The
 init script receives that factory's source because it cannot capture module imports. Keep runtime

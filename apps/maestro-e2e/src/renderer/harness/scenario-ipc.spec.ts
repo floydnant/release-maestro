@@ -99,8 +99,12 @@ test.describe('renderer scenario IPC harness', () => {
         })
     })
 
-    test('preserves dates and explicit undefined values in both directions', async ({ page }) => {
+    test('preserves dates, undefined values, and sparse array holes in both directions', async ({ page }) => {
+        const sparse: unknown[] = new Array(5)
+        sparse[1] = undefined
+        sparse[3] = new Date('2026-07-03T12:34:56.000Z')
         const value = {
+            sparse,
             nested: { capturedAt: new Date('2026-07-01T12:34:56.000Z'), missing: undefined },
             values: [undefined, new Date('2026-07-02T12:34:56.000Z')],
         }
@@ -114,6 +118,7 @@ test.describe('renderer scenario IPC harness', () => {
                     invoke: (channel: string) => Promise<{
                         nested: { capturedAt: Date; missing?: unknown }
                         values: unknown[]
+                        sparse: unknown[]
                     }>
                     send: (channel: string, payload: unknown) => void
                 }
@@ -127,6 +132,10 @@ test.describe('renderer scenario IPC harness', () => {
                 ownsArrayElement: Object.prototype.hasOwnProperty.call(value.values, 0),
                 arrayElementIsUndefined: value.values[0] === undefined,
                 arrayDate: value.values[1] instanceof Date,
+                sparseLength: value.sparse.length,
+                sparseKeys: Object.keys(value.sparse),
+                sparseUndefined: value.sparse[1] === undefined,
+                sparseDate: value.sparse[3] instanceof Date,
             }
         })
         expect(received).toEqual({
@@ -136,8 +145,13 @@ test.describe('renderer scenario IPC harness', () => {
             ownsArrayElement: true,
             arrayElementIsUndefined: true,
             arrayDate: true,
+            sparseLength: 5,
+            sparseKeys: ['1', '3'],
+            sparseUndefined: true,
+            sparseDate: true,
         })
         expect((await controller.lastCall('metadata:write'))?.payload).toStrictEqual(value)
+        expect((await controller.calls('metadata:write'))[0]?.payload).toStrictEqual(value)
     })
 
     test('answers from a responder running in Node, with the request', async ({ page }) => {

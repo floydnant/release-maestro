@@ -1,10 +1,11 @@
-import type { ScenarioBehavior } from './scenario-harness'
+import type { IpcCall, RendererScenario, ScenarioBehavior } from './scenario-harness'
 
 /** Kept self-contained so the same helpers can run in Node and a Playwright init script. */
 export const createScenarioRuntime = () => {
     const SCENARIO_SERIALIZED_TYPE_KEY = '__maestroScenarioSerializedType'
     const SCENARIO_SERIALIZED_DATE_TYPE = 'Date'
     const SCENARIO_SERIALIZED_UNDEFINED_TYPE = 'Undefined'
+    const SCENARIO_SERIALIZED_HOLE_TYPE = 'ArrayHole'
 
     const isRecord = (value: unknown): value is Record<string, unknown> =>
         typeof value == 'object' && value != null
@@ -22,6 +23,9 @@ export const createScenarioRuntime = () => {
                 [SCENARIO_SERIALIZED_TYPE_KEY]: SCENARIO_SERIALIZED_DATE_TYPE,
                 value: originalValue.toISOString(),
             }
+        }
+        if (Array.isArray(this) && !Object.prototype.hasOwnProperty.call(this, key)) {
+            return { [SCENARIO_SERIALIZED_TYPE_KEY]: SCENARIO_SERIALIZED_HOLE_TYPE }
         }
         if (typeof value == 'undefined') {
             return { [SCENARIO_SERIALIZED_TYPE_KEY]: SCENARIO_SERIALIZED_UNDEFINED_TYPE }
@@ -41,7 +45,19 @@ export const createScenarioRuntime = () => {
     const reviveScenarioValue = (value: unknown): unknown => {
         if (isSerializedDate(value)) return new Date(value.value)
         if (isSerializedUndefined(value)) return undefined
-        if (Array.isArray(value)) return value.map(reviveScenarioValue)
+        if (Array.isArray(value)) {
+            const revived: unknown[] = new Array(value.length)
+            value.forEach((entry: unknown, index) => {
+                if (
+                    isRecord(entry) &&
+                    entry[SCENARIO_SERIALIZED_TYPE_KEY] === SCENARIO_SERIALIZED_HOLE_TYPE
+                ) {
+                    return
+                }
+                revived[index] = reviveScenarioValue(entry)
+            })
+            return revived
+        }
         if (isRecord(value)) {
             return Object.fromEntries(
                 Object.entries(value).map(([key, entry]) => [key, reviveScenarioValue(entry)]),
@@ -52,7 +68,50 @@ export const createScenarioRuntime = () => {
 
     const serializeScenarioValue = (value: unknown): string => JSON.stringify(value, scenarioJsonReplacer)
 
-    const parseScenarioValue = <T>(value: string): T => reviveScenarioValue(JSON.parse(value)) as T
+    const parseScenarioValue = (value: string): unknown => reviveScenarioValue(JSON.parse(value))
+
+    const isScenarioBehavior = (value: unknown): value is ScenarioBehavior => {
+        if (!isRecord(value) || Array.isArray(value)) return false
+        switch (value['kind']) {
+            case 'resolve':
+            case 'set-settings':
+            case 'patch-settings':
+            case 'pending':
+                return true
+            case 'reject':
+                return (
+                    typeof value['message'] === 'string' &&
+                    (value['userFacingMessage'] === undefined ||
+                        typeof value['userFacingMessage'] === 'string')
+                )
+            case 'respond':
+                return typeof value['responder'] === 'string'
+            case 'sequence':
+                return (
+                    Array.isArray(value['steps']) &&
+                    Array.from(value['steps']).every(isScenarioBehavior) &&
+                    (value['fallback'] === undefined || isScenarioBehavior(value['fallback']))
+                )
+            default:
+                return false
+        }
+    }
+
+    const isScenarioHandlers = (value: unknown): value is Record<string, ScenarioBehavior> =>
+        isRecord(value) && !Array.isArray(value) && Object.values(value).every(isScenarioBehavior)
+
+    const isRendererScenario = (value: unknown): value is RendererScenario =>
+        isRecord(value) && !Array.isArray(value) && isScenarioHandlers(value['handlers'])
+
+    const isIpcCall = (value: unknown): value is IpcCall =>
+        isRecord(value) &&
+        !Array.isArray(value) &&
+        typeof value['id'] === 'number' &&
+        typeof value['channel'] === 'string' &&
+        Object.prototype.hasOwnProperty.call(value, 'payload')
+
+    const isIpcCalls = (value: unknown): value is IpcCall[] =>
+        Array.isArray(value) && Array.from(value).every(isIpcCall)
 
     const nextBehavior = (handlers: Record<string, ScenarioBehavior>, channel: string): ScenarioBehavior => {
         const behavior = handlers[channel]
@@ -70,5 +129,13 @@ export const createScenarioRuntime = () => {
         )
     }
 
-    return { serializeScenarioValue, parseScenarioValue, nextBehavior }
+    return {
+        serializeScenarioValue,
+        parseScenarioValue,
+        isScenarioBehavior,
+        isRendererScenario,
+        isIpcCall,
+        isIpcCalls,
+        nextBehavior,
+    }
 }

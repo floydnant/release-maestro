@@ -33,6 +33,15 @@ describe('scenario serialization', () => {
         expect(parseScenarioValue(serializeScenarioValue(value))).toStrictEqual(value)
     })
 
+    it('preserves holes separately from explicit undefined array elements', () => {
+        const sparse: unknown[] = new Array(5)
+        sparse[1] = undefined
+        sparse[3] = capturedAt
+        const value = { sparse, empty: new Array(2), nested: [sparse] }
+
+        expect(parseScenarioValue(serializeScenarioValue(value))).toStrictEqual(value)
+    })
+
     it('leaves unrecognized tags and date tags without a string value alone', () => {
         const value = [
             { __maestroScenarioSerializedType: 'Future', value: 'unchanged' },
@@ -96,5 +105,51 @@ describe('scenario behavior selection', () => {
             kind: 'reject',
             message: 'No scenario handler configured for missing',
         })
+    })
+})
+
+describe('scenario boundary validation', () => {
+    const { isScenarioBehavior, isRendererScenario, isIpcCall, isIpcCalls } = createScenarioRuntime()
+
+    it.each([
+        null,
+        { kind: 'unknown' },
+        { kind: 'reject', message: 42 },
+        { kind: 'reject', message: 'failed', userFacingMessage: 42 },
+        { kind: 'respond', responder: false },
+        { kind: 'sequence', steps: [{ kind: 'reject' }] },
+        { kind: 'sequence', steps: [], fallback: { kind: 'unknown' } },
+        { kind: 'sequence', steps: new Array(1) },
+    ])('rejects invalid behavior %j after decoding', value => {
+        expect(isScenarioBehavior(parseScenarioValue(serializeScenarioValue(value)))).toBe(false)
+    })
+
+    it('validates nested behaviors in a decoded scenario', () => {
+        const scenario = {
+            handlers: {
+                retry: {
+                    kind: 'sequence',
+                    steps: [{ kind: 'pending' }, { kind: 'reject', message: 'retry' }],
+                    fallback: { kind: 'resolve', value: undefined },
+                },
+                responder: { kind: 'respond', responder: 'catalog' },
+                settings: { kind: 'set-settings' },
+                patch: { kind: 'patch-settings' },
+            },
+        }
+        expect(isRendererScenario(parseScenarioValue(serializeScenarioValue(scenario)))).toBe(true)
+        expect(isRendererScenario({ handlers: { broken: { kind: 'reject' } } })).toBe(false)
+        expect(isRendererScenario({ handlers: [] })).toBe(false)
+    })
+
+    it('validates recorded calls without restricting their payload', () => {
+        const call = { id: 1, channel: 'metadata:read', payload: undefined }
+        expect(isIpcCall(parseScenarioValue(serializeScenarioValue(call)))).toBe(true)
+        expect(isIpcCalls(parseScenarioValue(serializeScenarioValue([call])))).toBe(true)
+        expect(isIpcCalls([{ id: '1', channel: 'metadata:read' }])).toBe(false)
+        expect(isIpcCalls([{ id: 1, channel: null }])).toBe(false)
+        expect(isIpcCalls({})).toBe(false)
+        expect(isIpcCall({ id: 1, channel: 'metadata:read' })).toBe(false)
+        expect(isIpcCalls(new Array(1))).toBe(false)
     })
 })
