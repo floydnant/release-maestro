@@ -8,7 +8,6 @@ const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
 const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
 const { CLASS_MESSAGES, describeUnknownClass } = require('../lib/diagnostics.cjs')
 const { stringLiteralsOf } = require('../lib/string-literal-types.cjs')
-const ts = require('typescript')
 
 const CLASS_LIST_MUTATIONS = new Set(['add', 'remove', 'toggle', 'replace'])
 const RENDERER_MUTATIONS = new Set(['addClass', 'removeClass'])
@@ -309,10 +308,22 @@ module.exports = {
          */
         const typedStrings = (node, elements = false) => {
             if (!services?.getTypeAtLocation || !checker) return null
+            /** @type {import('typescript').Type} */
             const type = services.getTypeAtLocation(node)
-            const checkedType = elements ? checker.getIndexTypeOfType(type, ts.IndexKind.Number) : type
-            const literals = checkedType ? stringLiteralsOf(checkedType) : null
-            return literals ? { literals } : { type: checker.typeToString(checkedType ?? type) }
+            /** @type {import('typescript').Type[]} */
+            const checkedTypes = elements
+                ? (type.isUnion() ? type.types : [type]).flatMap(part =>
+                      checker.isArrayType(part) || checker.isTupleType(part)
+                          ? checker.getTypeArguments(part)
+                          : (part.getNumberIndexType() ?? []),
+                  )
+                : [type]
+            const literalGroups = checkedTypes.map(stringLiteralsOf)
+            if (checkedTypes.length > 0 && literalGroups.every(literals => literals !== null)) {
+                return { literals: literalGroups.flat() }
+            }
+            const displayedTypes = checkedTypes.length > 0 ? checkedTypes : [type]
+            return { type: displayedTypes.map(checkedType => checker.typeToString(checkedType)).join(' | ') }
         }
 
         /**
