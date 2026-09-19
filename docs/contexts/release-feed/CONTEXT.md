@@ -76,17 +76,6 @@ which of the two is meant. A release is _announced_ and not necessarily owned; a
 from a file on disk. Neither converts to the other. See
 [CONTEXT-MAP](../../../CONTEXT-MAP.md).
 
-**Release date**:
-The calendar day Bandcamp assigns to a release, preserved as written regardless of the viewer's
-timezone (`releaseDate`). The feed compares that day with the viewer's current day to say
-"releases today", "releases tomorrow", or "released yesterday".
-_Avoid_: release timestamp, release time
-
-**Announcement date**:
-The day the notification email arrived, shown in the viewer's timezone with day-level wording such
-as "announced today". Its underlying email timestamp remains precise for ordering feed items.
-_Avoid_: release date, import date
-
 **Release feed**:
 The browsable collection of imported and hydrated releases shown to the user.
 
