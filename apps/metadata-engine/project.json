@@ -33,6 +33,21 @@
                 "command": "cargo clippy --all-targets",
                 "cwd": "apps/metadata-engine"
             }
+        },
+        "build-dev": {
+            "executor": "nx:run-commands",
+            "cache": true,
+            "inputs": [
+                "production",
+                {
+                    "runtime": "rustc -vV"
+                }
+            ],
+            "outputs": ["{projectRoot}/target/dev/release"],
+            "options": {
+                "command": "cargo build --release --target-dir target/dev",
+                "cwd": "apps/metadata-engine"
+            }
         }
     }
 }

@@ -7,7 +7,7 @@
         "build": {
             "executor": "nx-electron:build",
             "outputs": ["{options.outputPath}"],
-            "dependsOn": ["^build", "metadata-engine:build"],
+            "dependsOn": ["^build", "metadata-engine:build-dev"],
             "options": {
                 "outputPath": "dist/apps/maestro-electron",
                 "main": "apps/maestro-electron/src/main.ts",
@@ -38,11 +38,11 @@
             }
         },
         "serve": {
-            "dependsOn": ["maestro-renderer:serve", "metadata-engine:build"],
+            "dependsOn": ["maestro-renderer:serve", "metadata-engine:build-dev"],
             "command": "wait-on tcp:4200 && nx serve-internal maestro-electron"
         },
         "package": {
-            "dependsOn": ["maestro-renderer:build", "prepare-icons", "build"],
+            "dependsOn": ["maestro-renderer:build", "prepare-icons", "build", "metadata-engine:build"],
             "executor": "nx-electron:package",
             "cache": true,
             "outputs": ["{workspaceRoot}/dist/packages"],
@@ -61,7 +61,7 @@
             }
         },
         "make": {
-            "dependsOn": ["maestro-renderer:build", "prepare-icons", "build"],
+            "dependsOn": ["maestro-renderer:build", "prepare-icons", "build", "metadata-engine:build"],
             "executor": "nx-electron:make",
             "cache": true,
             "outputs": ["{workspaceRoot}/dist/executables"],
