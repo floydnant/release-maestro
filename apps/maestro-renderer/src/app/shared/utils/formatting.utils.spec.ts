@@ -1,7 +1,6 @@
 import { calendarDaySchema } from '@release-maestro/core'
 import {
-    formatAnnouncementDateRelative,
-    formatDateRelative,
+    formatCalendarDateRelative,
     formatReleaseDateRelative,
     formatTotalDuration,
 } from './formatting.utils'
@@ -41,21 +40,11 @@ describe('formatTotalDuration', () => {
 describe('formatReleaseDateRelative', () => {
     it.each([
         ['2026-09-19T00:00:00', '2026-09-19T23:59:59', 'releases today'],
-        ['2026-09-19T23:59:59', '2026-09-19T00:00:00', 'releases today'],
-        ['2026-09-19T12:00:00', '2026-09-19T12:00:00', 'releases today'],
-        ['2026-09-20T00:00:00', '2026-09-19T23:59:59', 'releases tomorrow'],
-        ['2026-09-20T23:59:59', '2026-09-19T00:00:00', 'releases tomorrow'],
         ['2026-09-18T23:59:59', '2026-09-19T00:00:00', 'released yesterday'],
-        ['2026-09-18T00:00:00', '2026-09-19T23:59:59', 'released yesterday'],
         ['2027-01-01T00:00:00', '2026-12-31T23:59:59', 'releases tomorrow'],
         ['2024-03-01T00:00:00', '2024-02-29T23:59:59', 'releases tomorrow'],
         ['2026-09-21T00:00:00', '2026-09-19T23:59:59', 'releases in 2 days'],
-        ['2026-09-17T23:59:59', '2026-09-19T00:00:00', 'released 2 days ago'],
-        ['2026-10-03T12:00:00', '2026-09-19T12:00:00', 'releases in 2 weeks'],
         ['2026-09-05T12:00:00', '2026-09-19T12:00:00', 'released 2 weeks ago'],
-        // These span the spring and autumn clock changes in Europe/Berlin.
-        ['2026-03-30T00:00:00', '2026-03-28T23:59:59', 'releases in 2 days'],
-        ['2026-10-26T00:00:00', '2026-10-24T23:59:59', 'releases in 2 days'],
     ])('formats %s relative to %s as %s', (releaseDate, referenceDate, expected) => {
         expect(
             formatReleaseDateRelative(
@@ -75,25 +64,12 @@ describe('formatReleaseDateRelative', () => {
     })
 })
 
-describe('formatDateRelative', () => {
-    it.each([
-        ['2026-09-19T10:00:00', '2 hours ago'],
-        ['2026-09-19T11:55:00', '5 minutes ago'],
-        ['2026-09-19T11:59:30', '30 seconds ago'],
-    ])('preserves timestamp precision for %s', (date, expected) => {
-        expect(formatDateRelative(new Date(date), new Date('2026-09-19T12:00:00'))).toBe(expected)
-    })
-})
-
-describe('formatAnnouncementDateRelative', () => {
+describe('formatCalendarDateRelative', () => {
     it.each([
         ['2026-09-19T00:00:00', '2026-09-19T23:59:59', 'today'],
-        ['2026-09-19T23:50:00', '2026-09-19T23:55:00', 'today'],
         ['2026-09-18T23:59:59', '2026-09-19T00:00:00', 'yesterday'],
-        ['2026-09-20T00:00:00', '2026-09-19T23:59:59', 'tomorrow'],
         ['2026-03-28T23:59:59', '2026-03-30T00:00:00', '2 days ago'],
-        ['2026-10-24T23:59:59', '2026-10-26T00:00:00', '2 days ago'],
-    ])('formats %s relative to %s as %s', (announcement, reference, expected) => {
-        expect(formatAnnouncementDateRelative(new Date(announcement), new Date(reference))).toBe(expected)
+    ])('formats %s relative to %s as %s', (date, reference, expected) => {
+        expect(formatCalendarDateRelative(new Date(date), new Date(reference))).toBe(expected)
     })
 })

@@ -20,7 +20,7 @@ import { ProgressRingComponent } from '../../shared/components/progress-ring/pro
 import { IntersectionDirective } from '../../shared/directives/intersection.directive'
 import { SafePipe } from '../../shared/pipes/safe.pipe'
 import {
-    formatAnnouncementDateRelative,
+    formatCalendarDateRelative,
     formatDuration,
     formatReleaseDateRelative,
 } from '../../shared/utils/formatting.utils'
@@ -410,7 +410,7 @@ export class FeedComponent {
     }
 
     formatDuration = formatDuration
-    formatAnnouncementDateRelative = formatAnnouncementDateRelative
+    formatCalendarDateRelative = formatCalendarDateRelative
     formatReleaseDateRelative = formatReleaseDateRelative
     isAfter = (date: Date, otherDate: Date) => {
         return new Date(date).getTime() > new Date(otherDate).getTime()

@@ -87,8 +87,8 @@ export const formatReleaseDateRelative = (date: CalendarDay, referenceDate: Date
     return `${days < 0 ? 'released' : 'releases'} ${formatCalendarDaysRelative(days)}`
 }
 
-/** Announcement timestamps are displayed at calendar-day precision in the viewer's timezone. */
-export const formatAnnouncementDateRelative = (date: Date, referenceDate: Date = new Date()): string => {
+/** Format a timestamp at calendar-day precision in the viewer's timezone. */
+export const formatCalendarDateRelative = (date: Date, referenceDate: Date = new Date()): string => {
     const days = (localCalendarDay(date) - localCalendarDay(referenceDate)) / conversionFactorMap.day
     return formatCalendarDaysRelative(days)
 }
