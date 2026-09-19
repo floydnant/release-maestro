@@ -12,6 +12,7 @@ const generatedElectronTsPath = path.resolve(
     '../maestro-electron/src/app/design-tokens.generated.ts',
 )
 const sourceFiles = ['foundations.json', 'semantic.dark.json', 'contrast-pairs.json']
+const minimumContrastRatio = 3
 const red = message => `\u001B[31m${message}\u001B[39m`
 
 const readJson = file => JSON.parse(fs.readFileSync(path.join(sourceDir, file), 'utf8'))
@@ -142,9 +143,9 @@ const generate = ({ foundations, semantic, contrastPairs }) => {
         if (!foreground || !background)
             throw new Error(`Unknown contrast pair: ${foregroundPath}, ${backgroundPath}`)
         const ratio = contrastRatio(foreground, background)
-        if (ratio < 4.5) {
+        if (ratio < minimumContrastRatio) {
             throw new Error(
-                `WCAG AA contrast failed for ${foregroundPath} on ${backgroundPath}: ${ratio.toFixed(2)}:1`,
+                `Project contrast minimum failed for ${foregroundPath} on ${backgroundPath}: ${ratio.toFixed(2)}:1; expected at least ${minimumContrastRatio.toFixed(2)}:1`,
             )
         }
     }

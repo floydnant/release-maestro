@@ -29,6 +29,8 @@ It does not enforce token layers or validate classes inside `@apply`.
 
 `design-tokens-check` reports stylesheet findings in red and exits with an error if any remain.
 Generated-output, contrast, and raw-color violations fail the same check.
+Contrast pairs must meet the project's 3:1 minimum. This threshold does not assert WCAG AA
+compliance for normal text, which requires 4.5:1.
 
 ```sh
 npx nx run maestro-renderer:design-tokens-check

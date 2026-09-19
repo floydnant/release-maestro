@@ -39,6 +39,8 @@ to onboarding. Override `get-settings` when onboarding is the scenario under tes
 checks, contrast validation, and stylesheet token checks. Any finding fails the target, which
 renderer build, lint, and test already depend on. See
 [the tooling notes](../apps/maestro-renderer/tools/README.md) for rule scope and exemptions.
+The contrast check enforces the design system's 3:1 project minimum; it does not claim WCAG AA
+compliance for normal text.
 
 ## Fast iteration
 

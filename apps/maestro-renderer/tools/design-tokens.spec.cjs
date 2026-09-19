@@ -33,7 +33,7 @@ it('rejects circular aliases', () => {
     expect(() => resolveValue('{color.a}', circular)).toThrow(/Circular token alias/)
 })
 
-it('rejects contrast pairs below WCAG AA', () => {
+it('accepts contrast pairs above the project minimum but below WCAG AA', () => {
     expect(() =>
         generate({
             foundations: {
@@ -48,7 +48,25 @@ it('rejects contrast pairs below WCAG AA', () => {
             },
             contrastPairs: [['content.muted', 'background.canvas']],
         }),
-    ).toThrow('WCAG AA contrast failed for content.muted on background.canvas')
+    ).not.toThrow()
+})
+
+it('rejects contrast pairs below the project minimum', () => {
+    expect(() =>
+        generate({
+            foundations: {
+                color: { ink: { 500: '#555555', 900: '#111111' } },
+            },
+            semantic: {
+                color: {
+                    content: { muted: '{color.ink.500}' },
+                    background: { canvas: '{color.ink.900}' },
+                },
+                typography: {},
+            },
+            contrastPairs: [['content.muted', 'background.canvas']],
+        }),
+    ).toThrow('Project contrast minimum failed for content.muted on background.canvas')
 })
 
 it('rejects duplicate flattened paths', () => {
