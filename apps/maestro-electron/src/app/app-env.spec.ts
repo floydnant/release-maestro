@@ -53,10 +53,11 @@ describe('resolveMetadataEngineBinaryPath', () => {
     })
 
     it.each([
-        { builds: ['dev/release', 'release', 'debug'], expected: 'dev/release' },
-        { builds: ['release', 'debug'], expected: 'release' },
-        { builds: ['debug'], expected: 'debug' },
-    ])('selects $expected from available builds $builds', async ({ builds, expected }) => {
+        { builds: ['dev/release', 'release', 'debug'] },
+        { builds: ['release', 'debug'] },
+        { builds: ['debug'] },
+        { builds: [] },
+    ])('resolves the canonical host binary with existing builds $builds', async ({ builds }) => {
         const { resolveMetadataEngineBinaryPath } = await import('./app-env')
         const target = join(workspace, 'apps', 'metadata-engine', 'target')
         for (const build of builds) {
@@ -65,7 +66,9 @@ describe('resolveMetadataEngineBinaryPath', () => {
         }
         jest.spyOn(process, 'cwd').mockReturnValue(workspace)
 
-        await expect(resolveMetadataEngineBinaryPath()).resolves.toBe(join(target, expected, binaryName))
+        await expect(resolveMetadataEngineBinaryPath()).resolves.toBe(
+            join(target, 'dev', 'release', binaryName),
+        )
     })
 
     it('resolves the shipped binary for a packaged app', async () => {
