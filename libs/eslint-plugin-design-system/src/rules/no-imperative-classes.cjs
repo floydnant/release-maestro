@@ -76,7 +76,10 @@ module.exports = {
                         angularNamespaces.has(callee.object.name) &&
                         memberName(callee) === 'HostBinding')
                 const binding = literalString(node.arguments[0])
-                if (isHostBinding && (binding === 'class' || binding?.startsWith('class.'))) {
+                if (
+                    isHostBinding &&
+                    (binding === 'class' || binding === 'className' || binding?.startsWith('class.'))
+                ) {
                     context.report({ node: node.arguments[0], messageId: 'hostBinding' })
                 }
             },

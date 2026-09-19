@@ -18,7 +18,6 @@ tester.run('no-imperative-classes', rule, {
     valid: [
         "@Component({ host: { class: 'flex', '[class.hidden]': 'hidden' }, template: '<div [class.hidden]=\"hidden\"></div>' }) class Example {}",
         "class Example { @HostBinding('attr.role') role = 'button' }",
-        "class Example { @HostBinding('className') name = '' }",
         'class Example { @HostBinding() title = "Title" }',
         "element.classList.contains('hidden')",
         'element.classList.item(0)',
@@ -29,6 +28,17 @@ tester.run('no-imperative-classes', rule, {
         "// eslint-disable-next-line rule-to-test/no-imperative-classes -- Remove a class applied by a third-party widget.\nelement.classList.remove('widget-loading')",
     ],
     invalid: [
+        rejected("class Example { @HostBinding('className') name = '' }", "'className'", 'hostBinding'),
+        rejected(
+            "import { HostBinding as Bind } from '@angular/core'; class Example { @Bind('className') classes = '' }",
+            "'className'",
+            'hostBinding',
+        ),
+        rejected(
+            "import * as ng from '@angular/core'; class Example { @ng.HostBinding('className') classes = '' }",
+            "'className'",
+            'hostBinding',
+        ),
         rejected("class Example { @HostBinding('class') classes = '' }", "'class'", 'hostBinding'),
         rejected(
             "class Example { @HostBinding('class.hidden') hidden = true }",

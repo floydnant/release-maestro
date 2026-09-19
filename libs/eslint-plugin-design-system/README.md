@@ -38,7 +38,7 @@ member to resolve.
 ## Imperative classes
 
 `design-system/no-imperative-classes` runs at `error` only for renderer `src/app/**/*.ts`.
-It rejects class `@HostBinding` decorators, `addClass` / `removeClass` calls, and
+It rejects `@HostBinding` decorators for `class`, `className`, and `class.*`, `addClass` / `removeClass` calls, and
 `classList.add` / `remove` / `toggle` / `replace`. Diagnostics underline the binding argument or
 mutation method. Use a template binding or `host` metadata instead; both remain validated.
 
