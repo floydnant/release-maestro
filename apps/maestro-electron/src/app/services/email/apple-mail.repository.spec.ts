@@ -36,7 +36,7 @@ describe('AppleMailRepository export lifecycle', () => {
         jest.spyOn(console, 'log').mockImplementation(() => undefined)
         jest.spyOn(console, 'error').mockImplementation(() => undefined)
         tempPath = await fs.mkdtemp(join(tmpdir(), 'maestro-mail-test-'))
-        exportPath = join(tempPath, `apple-mail-export-${process.pid}-stale`)
+        exportPath = join(tempPath, 'apple-mail-export')
         jest.mocked(app.getPath).mockReturnValue(tempPath)
         settings = new SettingsBackendService(new InMemoryStore<AppSettings>())
         settings.patchSettings({ emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Releases' } } })
@@ -124,28 +124,31 @@ A new release is available.
         await expect(retry).resolves.toEqual([])
     })
 
-    it('rejects another plugin instance while the shared export directory is in use', async () => {
-        const first = collect(repository)
-        await started
-        const activePath = join(exportPath, 'active.txt')
-        await fs.writeFile(activePath, 'in use')
-        await expect(collect(new AppleMailRepository(settings))).rejects.toThrow('already running')
-        await expect(fs.readFile(activePath, 'utf8')).resolves.toBe('in use')
-        expect(mockExecFile).toHaveBeenCalledTimes(1)
-        finish()
-        await first
-        const retry = collect(new AppleMailRepository(settings))
-        await new Promise<void>(resolve => {
-            mockExecFile.mockImplementationOnce((_command, _args, _options, callback) => {
-                queueMicrotask(() => {
-                    callback(null)
-                    child.emit('close', 0, null)
-                })
-                resolve()
-                return child
-            })
+    it('runs concurrent imports in separate export directories', async () => {
+        const launches: { child: ChildProcess; callback: (error: Error | null) => void; path: string }[] = []
+        let bothStarted: () => void = () => undefined
+        const startedBoth = new Promise<void>(resolve => {
+            bothStarted = resolve
         })
-        await expect(retry).resolves.toEqual([])
+        mockExecFile.mockImplementation((_command, args, _options, callback) => {
+            const launchedChild = new ChildProcess()
+            launchedChild.stderr = new PassThrough()
+            launchedChild.stdout = new PassThrough()
+            launches.push({ child: launchedChild, callback, path: args[2] ?? '' })
+            if (launches.length === 2) bothStarted()
+            return launchedChild
+        })
+
+        const first = collect(repository)
+        const second = collect(new AppleMailRepository(settings))
+        await startedBoth
+        expect(launches[0]?.path).not.toBe(launches[1]?.path)
+        for (const launch of launches) {
+            await fs.writeFile(join(launch.path, 'active.txt'), 'in use')
+            launch.callback(null)
+            launch.child.emit('close', 0, null)
+        }
+        await expect(Promise.all([first, second])).resolves.toEqual([[], []])
     })
 
     it('removes partial files after a process failure and preserves the Mail error', async () => {
@@ -190,7 +193,7 @@ A new release is available.
         expect(mockExecFile).not.toHaveBeenCalled()
     })
 
-    it('waits for the aborted child to close before removing files and releasing the directory', async () => {
+    it('waits for the aborted child to close before removing its files', async () => {
         const controller = new AbortController()
         const result = collect(repository, controller.signal)
         await started
@@ -200,30 +203,9 @@ A new release is available.
         const callback = mockExecFile.mock.calls[0]?.[3]
         callback?.(new Error('The operation was aborted'))
         await expect(fs.readFile(partialPath, 'utf8')).resolves.toBe('incomplete')
-        await expect(collect(new AppleMailRepository(settings))).rejects.toThrow('already running')
         child.emit('close', null, 'SIGTERM')
         await expect(result).resolves.toEqual([])
         await expect(fs.stat(exportPath)).rejects.toMatchObject({ code: 'ENOENT' })
-    })
-
-    it('keeps the directory reserved until final cleanup finishes', async () => {
-        const result = collect(repository)
-        await started
-        let finishCleanup: () => void = () => undefined
-        const cleanupStarted = new Promise<void>(resolveStarted => {
-            jest.spyOn(fs, 'rm').mockImplementationOnce(
-                () =>
-                    new Promise<void>(resolveCleanup => {
-                        finishCleanup = resolveCleanup
-                        resolveStarted()
-                    }),
-            )
-        })
-        finish()
-        await cleanupStarted
-        await expect(collect(new AppleMailRepository(settings))).rejects.toThrow('already running')
-        finishCleanup()
-        await expect(result).resolves.toEqual([])
     })
 
     it('logs final cleanup errors and lets the next import remove the leftover files', async () => {

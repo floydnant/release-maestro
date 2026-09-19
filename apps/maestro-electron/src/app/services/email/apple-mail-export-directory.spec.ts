@@ -51,19 +51,20 @@ describe('Apple Mail export directory ownership', () => {
         }
     })
 
-    it("removes this process's abandoned files while preserving unowned and unrelated directories", async () => {
+    it("removes legacy and this process's abandoned files while preserving unrelated directories", async () => {
         const abandoned = join(tempPath, `apple-mail-export-${process.pid}-abandoned`)
         const legacy = join(tempPath, 'apple-mail-export')
         const unrelated = join(tempPath, 'other-export')
         const incomplete = join(tempPath, `apple-mail-export-${process.pid}-`)
         const invalidPid = join(tempPath, 'apple-mail-export-9999999999999999999999-abcdef')
-        const preserved = [legacy, unrelated, incomplete, invalidPid]
-        for (const directory of [abandoned, ...preserved]) {
+        const preserved = [unrelated, incomplete, invalidPid]
+        for (const directory of [abandoned, legacy, ...preserved]) {
             await fs.mkdir(directory)
             await fs.writeFile(join(directory, 'message.txt'), 'contents')
         }
         const exportPath = await createAppleMailExportDirectory(tempPath)
         await expect(fs.stat(abandoned)).rejects.toMatchObject({ code: 'ENOENT' })
+        await expect(fs.stat(legacy)).rejects.toMatchObject({ code: 'ENOENT' })
         await expect(fs.readdir(exportPath)).resolves.toEqual([])
         for (const directory of preserved) {
             await expect(fs.readFile(join(directory, 'message.txt'), 'utf8')).resolves.toBe('contents')

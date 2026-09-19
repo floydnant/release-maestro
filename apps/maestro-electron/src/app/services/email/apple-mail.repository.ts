@@ -6,7 +6,7 @@ import { concatMap, defaultIfEmpty, lastValueFrom, Observable, Subject } from 'r
 import { Email, EmailImportStreamPacket, emailSchema } from '@release-maestro/core'
 import { appPaths } from '../../app-env'
 import { SettingsBackendService } from '../settings.backend.service'
-import { createAppleMailExportDirectory } from './apple-mail-export-directory'
+import { createAppleMailExportDirectory, removeAppleMailExportDirectory } from './apple-mail-export-directory'
 // Import will be fixed after creating email.backend.repository.ts
 export interface EmailImporterPlugin {
     loadEmails(signal: AbortSignal): Observable<EmailImportStreamPacket>
@@ -48,9 +48,6 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
 }
 
 export class AppleMailRepository implements EmailImporterPlugin {
-    // Reserve this process until its export, reads, and cleanup have all finished.
-    private static exportActive = false
-
     constructor(private settings: SettingsBackendService) {}
 
     loadEmails(abortSignal: AbortSignal): Observable<EmailImportStreamPacket> {
@@ -66,19 +63,9 @@ export class AppleMailRepository implements EmailImporterPlugin {
             result$.complete()
             return result$
         }
-        if (AppleMailRepository.exportActive) {
-            result$.error(new Error('[AppleMailImporter] An email export is already running'))
-            return result$
-        }
-
-        AppleMailRepository.exportActive = true
         void this.exportEmails(mailboxName, abortSignal, result$).then(
-            () => {
-                AppleMailRepository.exportActive = false
-                result$.complete()
-            },
+            () => result$.complete(),
             error => {
-                AppleMailRepository.exportActive = false
                 if (abortSignal.aborted) {
                     result$.complete()
                     return
@@ -142,7 +129,7 @@ export class AppleMailRepository implements EmailImporterPlugin {
             // Readers must finish before cleanup removes the files reported by the process.
             output$.complete()
             await readsDone
-            await fs.rm(exportPath, { recursive: true, force: true }).catch(error => {
+            await removeAppleMailExportDirectory(exportPath).catch(error => {
                 console.error('[AppleMailImporter] Error removing export directory', exportPath, ':', error)
             })
         }
