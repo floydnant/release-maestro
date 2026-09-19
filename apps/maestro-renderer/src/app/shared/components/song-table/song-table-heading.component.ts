@@ -35,7 +35,7 @@ import { IconComponent } from '../icon/icon.component'
             <span class="truncate">{{ label() }}</span>
             @if (isActive()) {
                 <app-icon
-                    [name]="sort().direction === 'asc' ? 'octTriangleUp' : 'octTriangleDown'"
+                    [name]="sort().direction === 'asc' ? 'sortAscending' : 'sortDescending'"
                     size="12"
                     color="content.action"
                 ></app-icon>

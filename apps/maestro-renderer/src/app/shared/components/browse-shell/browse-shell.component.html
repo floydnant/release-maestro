@@ -16,7 +16,7 @@
 
     <div class="browse-shell__search | relative flex shrink-0 items-center" role="search">
         <app-icon
-            name="octSearch"
+            name="search"
             size="14"
             color="content.muted"
             class="pointer-events-none absolute left-3"
@@ -39,7 +39,7 @@
                 aria-label="Clear search"
                 (click)="onClearSearch()"
             >
-                <app-icon name="octX" size="14"></app-icon>
+                <app-icon name="close" size="14"></app-icon>
             </button>
         }
     </div>
@@ -60,7 +60,7 @@
                     [attr.aria-label]="'Remove ' + chip.kindLabel + ' filter ' + chip.name"
                     (click)="chipRemove.emit(chip)"
                 >
-                    <app-icon name="octX" size="14"></app-icon>
+                    <app-icon name="close" size="14"></app-icon>
                 </button>
             </span>
         }
@@ -72,7 +72,7 @@
 <div class="browse-shell__body | flex min-h-0 min-w-0 flex-1 flex-col">
     @if (isFailed()) {
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-            <app-icon name="octXCircleFill" size="28" color="content.danger"></app-icon>
+            <app-icon name="error" size="28" color="content.danger"></app-icon>
             <p class="type-body-md text-content-primary">Could not load your {{ state().entityLabel }}</p>
             <p class="type-body-sm max-w-md text-content-secondary">
                 {{ state().error || 'The library did not answer.' }}
