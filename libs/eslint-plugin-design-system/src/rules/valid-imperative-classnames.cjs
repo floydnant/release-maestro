@@ -8,6 +8,7 @@ const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
 const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
 const { CLASS_MESSAGES, describeUnknownClass } = require('../lib/diagnostics.cjs')
 const { stringLiteralsOf } = require('../lib/string-literal-types.cjs')
+const ts = require('typescript')
 
 const CLASS_LIST_MUTATIONS = new Set(['add', 'remove', 'toggle', 'replace'])
 const RENDERER_MUTATIONS = new Set(['addClass', 'removeClass'])
@@ -308,45 +309,10 @@ module.exports = {
          */
         const typedStrings = (node, elements = false) => {
             if (!services?.getTypeAtLocation || !checker) return null
-            /** @type {import('typescript').Type} */
             const type = services.getTypeAtLocation(node)
-            if (process.env.CI && elements) {
-                const tsNode = services.esTreeNodeToTSNodeMap?.get(node)
-                const checkerType = tsNode ? checker.getTypeAtLocation(tsNode) : undefined
-                /** @type {import('typescript').Type[]} */
-                const debugTypeArguments = checker.getTypeArguments(type)
-                console.error(
-                    '[DEBUG-mae108]',
-                    JSON.stringify({
-                        source: sourceCode.getText(node),
-                        serviceType: checker.typeToString(type),
-                        checkerType: checkerType ? checker.typeToString(checkerType) : null,
-                        sameType: checkerType === type,
-                        isArray: checker.isArrayType(type),
-                        isTuple: checker.isTupleType(type),
-                        typeArguments: debugTypeArguments.map(argument => checker.typeToString(argument)),
-                        numberIndex: type.getNumberIndexType()
-                            ? checker.typeToString(type.getNumberIndexType())
-                            : null,
-                        symbol: type.symbol?.name ?? null,
-                        flags: type.flags,
-                    }),
-                )
-            }
-            /** @type {import('typescript').Type[]} */
-            const checkedTypes = elements
-                ? (type.isUnion() ? type.types : [type]).flatMap(part =>
-                      checker.isArrayType(part) || checker.isTupleType(part)
-                          ? checker.getTypeArguments(part)
-                          : (part.getNumberIndexType() ?? []),
-                  )
-                : [type]
-            const literalGroups = checkedTypes.map(stringLiteralsOf)
-            if (checkedTypes.length > 0 && literalGroups.every(literals => literals !== null)) {
-                return { literals: literalGroups.flat() }
-            }
-            const displayedTypes = checkedTypes.length > 0 ? checkedTypes : [type]
-            return { type: displayedTypes.map(checkedType => checker.typeToString(checkedType)).join(' | ') }
+            const checkedType = elements ? checker.getIndexTypeOfType(type, ts.IndexKind.Number) : type
+            const literals = checkedType ? stringLiteralsOf(checkedType) : null
+            return literals ? { literals } : { type: checker.typeToString(checkedType ?? type) }
         }
 
         /**

@@ -17,6 +17,9 @@ const tester = new RuleTester({
     languageOptions: {
         parser: typescriptParser,
         parserOptions: {
+            // RuleTester supplies inline source for an existing fixture filename. Keep CI from
+            // replacing it with the file on disk through single-run program inference.
+            disallowAutomaticSingleRunInference: true,
             project: path.join(FIXTURES, 'tsconfig.json'),
             tsconfigRootDir: FIXTURES,
         },
