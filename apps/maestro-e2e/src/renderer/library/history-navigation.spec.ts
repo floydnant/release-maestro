@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import type { QuerySongsRequest } from '@release-maestro/core'
+import type { QueryAlbumsRequest, QuerySongsRequest } from '@release-maestro/core'
 import {
     createAlbumDetail,
     createRendererScenario,
@@ -30,8 +30,55 @@ const sidebarLink = (page: Page, name: string) => page.getByRole('link', { name,
 const trackGrid = (page: Page) => page.getByRole('grid', { name: 'Tracks' })
 const albumGrid = (page: Page) => page.getByRole('grid', { name: 'Albums' })
 
+const required = <T>(value: T | null, message: string): T => {
+    if (value == null) throw new Error(message)
+    return value
+}
+
 const songWindows = async (controller: RendererScenarioController): Promise<QuerySongsRequest[]> =>
     (await controller.calls('library:query-songs')).map(call => call.payload as QuerySongsRequest)
+
+const albumWindows = async (controller: RendererScenarioController): Promise<QueryAlbumsRequest[]> =>
+    (await controller.calls('library:query-albums')).map(call => call.payload as QueryAlbumsRequest)
+
+const albumTrackWindows = async (
+    controller: RendererScenarioController,
+    albumId: string,
+): Promise<QuerySongsRequest[]> =>
+    (await songWindows(controller)).filter(request => request.query.filter.albumIds?.includes(albumId))
+
+/** A fully visible album link after the virtual window has settled. */
+const settledAlbum = (grid: ReturnType<typeof albumGrid>): Promise<string | null> =>
+    grid.evaluate(
+        element =>
+            new Promise<string | null>(resolve => {
+                let previous: string | null = null
+                let frames = 0
+
+                const sample = () => {
+                    const viewport = element.getBoundingClientRect()
+                    const tiles = [...element.querySelectorAll<HTMLAnchorElement>('a[href^="/albums/"]')]
+                    const href =
+                        tiles
+                            .find(anchor => {
+                                const box = anchor.getBoundingClientRect()
+                                return box.top >= viewport.top && box.bottom <= viewport.bottom
+                            })
+                            ?.getAttribute('href') ?? null
+                    const reading = href == null ? null : `${element.scrollTop}:${href}`
+
+                    if (href != null && reading == previous) {
+                        return resolve(href)
+                    }
+                    if (++frames >= 60) return resolve(null)
+
+                    previous = reading
+                    requestAnimationFrame(sample)
+                }
+
+                requestAnimationFrame(sample)
+            }),
+    )
 
 /** A library big enough to scroll, with an album to open at the end of a trail. */
 const browsableLibrary = (page: Page) =>
@@ -199,27 +246,22 @@ test.describe('where Back lands', () => {
         // A tile that is wholly on screen, so that clicking it does not scroll the grid
         // and quietly change the position under test. Which album that is depends on the
         // measured geometry, so it is read off the DOM rather than named.
-        const tileHref = await grid.evaluate(element => {
-            const viewport = element.getBoundingClientRect()
-            const tiles = [...element.querySelectorAll<HTMLAnchorElement>('a[href^="/albums/"]')]
-            const onScreen = tiles.find(anchor => {
-                const box = anchor.getBoundingClientRect()
-                return box.top >= viewport.top && box.bottom <= viewport.bottom
-            })
-            return onScreen?.getAttribute('href') ?? null
-        })
-        expect(tileHref).not.toBeNull()
+        const departureHref = required(await settledAlbum(grid), 'The album grid did not settle')
 
-        await page.locator(`a[href="${tileHref}"]`).click()
-        await expect(page).toHaveURL(new RegExp(`${tileHref}$`))
+        await page.locator(`a[href="${departureHref}"]`).click()
+        await expect(page).toHaveURL(new RegExp(`${departureHref}$`))
         await expect(trackGrid(page)).toBeVisible()
+        const windowsBeforeBack = (await albumWindows(controller)).length
 
         await backButton(page).click()
 
         await expect(page).toHaveURL(/sort=year/)
         await expect(page).toHaveURL(/dir=desc/)
         await expect(page.getByRole('searchbox', { name: 'Search albums' })).toHaveValue('album 1')
-        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(2_400)
+        await expect(page.locator(`a[href="${departureHref}"]`)).toBeVisible()
+        const windowsAfterBack = (await albumWindows(controller)).slice(windowsBeforeBack)
+        expect(windowsAfterBack.length).toBeGreaterThan(0)
+        for (const request of windowsAfterBack) expect(request.window.offset).toBeGreaterThan(0)
         await expect(forwardButton(page)).toBeEnabled()
     })
 
@@ -239,24 +281,18 @@ test.describe('where Back lands', () => {
             })
             .toBeGreaterThan(1_500)
 
-        const tileHref = await grid.evaluate(element => {
-            const viewport = element.getBoundingClientRect()
-            const tiles = [...element.querySelectorAll<HTMLAnchorElement>('a[href^="/albums/"]')]
-            const onScreen = tiles.find(anchor => {
-                const box = anchor.getBoundingClientRect()
-                return box.top >= viewport.top && box.bottom <= viewport.bottom
-            })
-            return onScreen?.getAttribute('href') ?? null
-        })
-        expect(tileHref).not.toBeNull()
-        await page.locator(`a[href="${tileHref}"]`).click()
+        const departureHref = required(await settledAlbum(grid), 'The album grid did not settle')
+        await page.locator(`a[href="${departureHref}"]`).click()
         await expect(trackGrid(page)).toBeVisible()
+        const windowsBeforeBack = (await albumWindows(controller)).length
 
         await backButton(page).click()
 
         await expect(grid).toBeVisible()
-        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(target)
-        await expect(page.locator('a[href^="/albums/"]').first()).toBeVisible()
+        await expect(page.locator(`a[href="${departureHref}"]`)).toBeVisible()
+        const windowsAfterBack = (await albumWindows(controller)).slice(windowsBeforeBack)
+        expect(windowsAfterBack.length).toBeGreaterThan(0)
+        for (const request of windowsAfterBack) expect(request.window.offset).toBeGreaterThan(1_500)
     })
 
     test('brings the album track table back to where it was', async ({ page }) => {
@@ -271,14 +307,16 @@ test.describe('where Back lands', () => {
 
         await sidebarLink(page, 'Tracks').click()
         await expect(page).toHaveURL(/\/tracks/)
-        const windowsBeforeBack = (await songWindows(controller)).length
+        const windowsBeforeBack = (await albumTrackWindows(controller, 'album-4')).length
 
         await backButton(page).click()
 
         await expect(page).toHaveURL(/\/albums\/album-4/)
         await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(40 * 600)
 
-        const windowsAfterBack = (await songWindows(controller)).slice(windowsBeforeBack)
+        // The tracks page can remeasure and issue one last unfiltered window while
+        // Back is replacing it. Only album-detail requests belong to this restore.
+        const windowsAfterBack = (await albumTrackWindows(controller, 'album-4')).slice(windowsBeforeBack)
         expect(windowsAfterBack.length).toBeGreaterThan(0)
         for (const request of windowsAfterBack) expect(request.window.offset).toBeGreaterThan(500)
     })

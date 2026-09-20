@@ -903,6 +903,7 @@ test.describe('what the window actually renders', () => {
 
             const first = Math.floor(top / 40)
             await expect(rowByTitle(page, `Row ${first}`)).toBeVisible()
+            await expect.poll(async () => (await visibleIndices(page)).length).toBeGreaterThan(5)
             expectContiguousFrom(await visibleIndices(page), first)
         }
     })
@@ -1034,20 +1035,32 @@ test.describe('the grid for keyboard and assistive tech', () => {
         await createRendererScenario(page, scenarioBuilder().songCatalog(page, 5_000).build(), '/tracks')
         await clickRow(page, 'Row 0')
 
-        const grid = page.getByRole('grid', { name: 'Tracks' })
-        for (let press = 0; press < 40; press++) await page.keyboard.press('ArrowDown')
-
-        const clearance = await grid.evaluate(element => {
-            const selected = element.querySelector('[role="row"][aria-selected="true"]')
-            if (!selected) return null
-            const bounds = element.getBoundingClientRect()
-            const row = selected.getBoundingClientRect()
-            return { below: bounds.bottom - row.bottom, above: row.top - bounds.top }
-        })
+        for (let row = 1; row <= 12; row++) {
+            await page.keyboard.press('ArrowDown')
+            const selected = page.getByRole('row', {
+                name: `Row ${row} by Aurora Fields`,
+                exact: true,
+            })
+            await expect(selected).toHaveAttribute('aria-selected', 'true')
+            await expect(selected).toBeInViewport()
+        }
 
         // Four rows of 40px, less a pixel of rounding.
-        expect(clearance?.below).toBeGreaterThan(159)
-        expect(clearance?.above).toBeGreaterThan(0)
+        const cursorRow = page.getByRole('row', {
+            name: 'Row 12 by Aurora Fields',
+            exact: true,
+        })
+        await expect
+            .poll(() =>
+                cursorRow.evaluate(row => {
+                    const element = row.closest('[role="grid"]')
+                    if (!element) return false
+                    const bounds = element.getBoundingClientRect()
+                    const rowBounds = row.getBoundingClientRect()
+                    return bounds.bottom - rowBounds.bottom > 159 && rowBounds.top - bounds.top > 0
+                }),
+            )
+            .toBe(true)
     })
 
     test('is a single tab stop, with the row controls on the arrow keys', async ({ page }) => {

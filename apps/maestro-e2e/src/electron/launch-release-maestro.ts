@@ -92,7 +92,6 @@ export const launchReleaseMaestro = async (
         sources: true,
         title: testInfo.title,
     })
-
     Object.defineProperty(app, 'close', {
         configurable: true,
         value: async (): Promise<void> => {
