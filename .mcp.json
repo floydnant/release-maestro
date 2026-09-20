@@ -1,0 +1,19 @@
+{
+    "mcpServers": {
+        "chrome-devtools": {
+            "command": "pnpm",
+            "args": [
+                "exec",
+                "chrome-devtools-mcp",
+                "--browserUrl",
+                "http://127.0.0.1:9222",
+                "--usageStatistics=false",
+                "--memoryDebugging"
+            ]
+        },
+        "playwright": {
+            "command": "pnpm",
+            "args": ["exec", "playwright-mcp", "--cdp-endpoint", "http://127.0.0.1:9222"]
+        }
+    }
+}

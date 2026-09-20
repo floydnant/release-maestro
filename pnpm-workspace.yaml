@@ -39,8 +39,8 @@ peerDependencyRules:
     ignoreMissing:
         - electron-builder-squirrel-windows
 savePrefix: ''
-# These exact versions predate this policy but were less than three days old when the migration
-# lockfile was created. No later version is exempt.
+# These exact versions were accepted before their three-day quarantine expired. No later version is
+# exempt.
 minimumReleaseAgeExclude:
     - '@es-joy/jsdoccomment@0.98.0'
     - '@jest/console@30.5.2'
@@ -56,6 +56,7 @@ minimumReleaseAgeExclude:
     - '@jest/test-result@30.5.2'
     - '@jest/test-sequencer@30.5.2'
     - '@jest/transform@30.5.2'
+    - '@playwright/mcp@0.0.82'
     - babel-jest@30.5.2
     - dotenv@18.0.0
     - electron@44.4.3
@@ -79,4 +80,6 @@ minimumReleaseAgeExclude:
     - jest@30.5.2
     - jsdoc-type-pratt-parser@9.2.2
     - prettier@3.9.8
+    - playwright@1.64.0-alpha-1789764292000
+    - playwright-core@1.64.0-alpha-1789764292000
 minimumReleaseAgeExcludePrune: true

@@ -51,6 +51,9 @@ If the host binary is missing, rebuild it with the command below; old release or
 
 Use `pnpm exec nx build metadata-engine` to build only the host sidecar.
 
+`make dev` also opens local debug endpoints for agent inspection. See
+[`inspect-running-app`](.agents/skills/inspect-running-app/SKILL.md) for attachment and profiling.
+
 ## Commands
 
 `make` is the repo-wide interface — run `make help` for the full list. It is what CI runs.

@@ -99,6 +99,9 @@ Accessibility is part of the implementation contract, not a later audit. Every U
 Verify relevant behavior with user-visible roles, accessible names, labels, keyboard interactions,
 visible focus, and responsive states. Follow `docs/testing.md` for test conventions.
 
+For an accessibility audit of the running app, follow
+[`inspect-running-app`](../inspect-running-app/SKILL.md#audit-the-current-screen).
+
 ## Before coding
 
 Understand the context before opening an editor:
