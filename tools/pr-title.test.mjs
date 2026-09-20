@@ -3,9 +3,17 @@ import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { afterEach, test } from '@jest/globals'
 import { isValidPrTitle } from './verify-pr-title.mjs'
+
+const temporaryDirectories = []
+
+afterEach(() => {
+    for (const directory of temporaryDirectories.splice(0)) {
+        rmSync(directory, { force: true, recursive: true })
+    }
+})
 
 for (const [title, valid] of [
     ['fix(IPC): preserve channel', true],
@@ -31,9 +39,9 @@ for (const [title, status] of [
     ['fix: preserve channel', 0],
     ['fix: ', 1],
 ]) {
-    test(`CLI exits with ${status} and reports the result`, t => {
+    test(`CLI exits with ${status} and reports the result`, () => {
         const dir = mkdtempSync(join(tmpdir(), 'pr-title-'))
-        t.after(() => rmSync(dir, { recursive: true, force: true }))
+        temporaryDirectories.push(dir)
         const summary = join(dir, 'summary')
         const result = spawnSync(process.execPath, [verifier], {
             encoding: 'utf8',

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import test, { afterEach } from 'node:test'
+import { afterEach, test } from '@jest/globals'
 import {
     isExactDependencySpecifier,
     isExactReleaseAgeExclusion,
@@ -11,6 +11,7 @@ import {
 } from './verify-dependency-policy.mjs'
 
 const temporaryDirectories = []
+const testOnNonWindows = process.platform === 'win32' ? test.skip : test
 
 afterEach(() => {
     for (const directory of temporaryDirectories.splice(0)) {
@@ -207,7 +208,7 @@ test('rejects alternate lockfiles', () => {
     assert.match(verifyDependencyPolicy(workspace).join('\n'), /package-lock.json: unsupported lockfile/)
 })
 
-test('does not follow directory symlinks', { skip: process.platform === 'win32' }, () => {
+testOnNonWindows('does not follow directory symlinks', () => {
     const workspace = createWorkspace()
     symlinkSync(workspace, join(workspace, 'loop'), 'dir')
 

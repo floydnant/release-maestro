@@ -103,7 +103,7 @@ dependency-policy-check: ## Verify exact dependencies and immutable GitHub Actio
 	node tools/verify-dependency-policy.mjs
 
 agents-check: ## Verify the canonical agent skills and their harness adapters
-	node --test tools/*.test.mjs
+	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand
 	node tools/verify-agent-harness.mjs
 
 sure: format ## Format, lint, build, unit test, and development E2E; build is the app type gate

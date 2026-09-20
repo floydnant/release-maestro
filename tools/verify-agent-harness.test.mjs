@@ -3,13 +3,21 @@ import { rmSync, symlinkSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { test } from 'node:test'
+import { afterEach, test } from '@jest/globals'
 import { fixture, skill, sidecar } from './fixtures/agent-harness.mjs'
 
 const verifier = fileURLToPath(new URL('./verify-agent-harness.mjs', import.meta.url))
-function check(t, options, mutate, expected) {
+const temporaryDirectories = []
+
+afterEach(() => {
+    for (const directory of temporaryDirectories.splice(0)) {
+        rmSync(directory, { force: true, recursive: true })
+    }
+})
+
+function check(options, mutate, expected) {
     const f = fixture(options)
-    t.after(() => rmSync(f.root, { recursive: true, force: true }))
+    temporaryDirectories.push(f.root)
     mutate?.(f)
     const result = spawnSync(process.execPath, [verifier, f.root], { encoding: 'utf8' })
     assert.equal(result.status, expected ? 1 : 0, result.stdout + result.stderr)
@@ -17,12 +25,12 @@ function check(t, options, mutate, expected) {
     assert.doesNotMatch(result.stderr, /TypeError|at file:\/\//)
 }
 
-test('canonical symlinks pass at multiple directory depths', t => {
-    for (const skillsDir of ['adapters', '.claude/skills', 'nested/harness/skills']) check(t, { skillsDir })
+test('canonical symlinks pass at multiple directory depths', () => {
+    for (const skillsDir of ['adapters', '.claude/skills', 'nested/harness/skills']) check({ skillsDir })
 })
-test('divergent skills pass without a Codex sidecar', t => check(t, { divergent: true }))
-test('OS metadata files are ignored', t =>
-    check(t, {}, f => {
+test('divergent skills pass without a Codex sidecar', () => check({ divergent: true }))
+test('OS metadata files are ignored', () =>
+    check({}, f => {
         f.write('.claude/skills/.DS_Store', '')
         f.write('.claude/skills/Thumbs.db', '')
     }))
@@ -36,13 +44,8 @@ for (const contents of [
     '{"harnesses":{"claude":{"skillsDir":4}}}',
     '{"harnesses":{"claude":{"skillsDir":".claude/skills","diverge":"example"}}}',
 ]) {
-    test(`malformed manifest fails: ${contents}`, t =>
-        check(
-            t,
-            {},
-            f => f.write('.agents/harness-overrides.json', contents),
-            /not ok.*harness-overrides.json/,
-        ))
+    test(`malformed manifest fails: ${contents}`, () =>
+        check({}, f => f.write('.agents/harness-overrides.json', contents), /not ok.*harness-overrides.json/))
 }
 for (const divergent of [false, true]) {
     const options = { divergent }
@@ -57,12 +60,12 @@ for (const divergent of [false, true]) {
         ['duplicate key', skill.replace('description:', 'name: duplicate\ndescription:'), /invalid YAML/],
         ['broken link', skill + '\n[Missing](references/missing.md)\n', /does not resolve/],
     ])
-        test(`${divergent ? 'divergent' : 'canonical'} ${label} fails`, t =>
-            check(t, options, f => f.write(path, contents), expected))
+        test(`${divergent ? 'divergent' : 'canonical'} ${label} fails`, () =>
+            check(options, f => f.write(path, contents), expected))
 }
 for (const value of ['true', 'True', 'TRUE']) {
-    test(`boolean ${value} agrees with disabled sidecar`, t =>
-        check(t, {}, f => {
+    test(`boolean ${value} agrees with disabled sidecar`, () =>
+        check({}, f => {
             f.write(
                 '.agents/skills/example/SKILL.md',
                 skill.replace('name:', `disable-model-invocation: ${value}\nname:`),
@@ -71,9 +74,8 @@ for (const value of ['true', 'True', 'TRUE']) {
         }))
 }
 for (const value of ['yes', '"true"', '1', 'null']) {
-    test(`ambiguous policy ${value} fails`, t =>
+    test(`ambiguous policy ${value} fails`, () =>
         check(
-            t,
             {},
             f =>
                 f.write(
@@ -83,16 +85,14 @@ for (const value of ['yes', '"true"', '1', 'null']) {
             /must be a YAML boolean/,
         ))
 }
-test('policy mismatch fails', t =>
+test('policy mismatch fails', () =>
     check(
-        t,
         {},
         f => f.write('.agents/skills/example/agents/openai.yaml', sidecar.replace('true', 'false')),
         /invocation/,
     ))
-test('sidecar invalid YAML fails', t =>
+test('sidecar invalid YAML fails', () =>
     check(
-        t,
         {},
         f =>
             f.write(
@@ -101,18 +101,16 @@ test('sidecar invalid YAML fails', t =>
             ),
         /invalid YAML/,
     ))
-test('sidecar string boolean fails', t =>
+test('sidecar string boolean fails', () =>
     check(
-        t,
         {},
         f => f.write('.agents/skills/example/agents/openai.yaml', sidecar.replace('true', 'yes')),
         /set to true or false/,
     ))
-test('stale broken adapter fails', t =>
-    check(t, {}, f => symlinkSync('missing', join(f.root, '.claude/skills/stale')), /stale adapter/))
-test('wrong symlink fails', t =>
+test('stale broken adapter fails', () =>
+    check({}, f => symlinkSync('missing', join(f.root, '.claude/skills/stale')), /stale adapter/))
+test('wrong symlink fails', () =>
     check(
-        t,
         {},
         f => {
             unlinkSync(join(f.root, f.adapter))
@@ -120,9 +118,8 @@ test('wrong symlink fails', t =>
         },
         /must be a symlink/,
     ))
-test('undeclared copied skill fails', t =>
+test('undeclared copied skill fails', () =>
     check(
-        t,
         {},
         f => {
             unlinkSync(join(f.root, f.adapter))
