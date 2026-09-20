@@ -68,12 +68,12 @@ const stop = async (processHandle, cwd) => {
         new Promise(resolve => processHandle.once('exit', resolve)),
         new Promise(resolve => setTimeout(resolve, 5_000)),
     ])
+    spawnSync(process.execPath, [join(cwd, 'tools/dev-instance/cli.mjs'), 'dev-stop'], {
+        cwd,
+        env: environment,
+        stdio: 'inherit',
+    })
     if (processHandle.exitCode === null && processHandle.signalCode === null) {
-        spawnSync(process.execPath, [join(cwd, 'tools/dev-instance/cli.mjs'), 'dev-stop'], {
-            cwd,
-            env: environment,
-            stdio: 'inherit',
-        })
         processHandle.kill('SIGKILL')
     }
 }

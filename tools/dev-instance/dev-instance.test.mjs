@@ -250,6 +250,17 @@ test('malformed registry, manifest, stale lock, and interrupted write repair aut
     assert.equal(existsSync(lock), false)
 })
 
+test('forced release finds its allocation when the worktree manifest is missing', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    await rm(join(fixture.main, '.release-maestro-instance.json'))
+
+    const released = runJson(fixture, fixture.main, ['dev-release', '--force'])
+    assert.equal(released.released, true)
+    const registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.equal(registry.allocations[allocation.worktreeId], undefined)
+})
+
 test('registry recovery keeps live ownership from the last known good copy', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)
@@ -481,6 +492,22 @@ test('Electron E2E coexists with renderer E2E but duplicate mutating workflows f
         'transient allocations were not released',
     )
     assert.deepEqual(registry.transients, {})
+})
+
+test('run-workflow can pass its command separator as a literal child argument', async () => {
+    const fixture = await createFixture()
+    const result = run(fixture, fixture.main, [
+        'run-workflow',
+        'renderer-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        'process.exit(process.argv[1] === "--then" ? 0 : 9)',
+        '--',
+        '--literal',
+        '--then',
+    ])
+    assert.equal(result.status, 0, result.stderr)
 })
 
 test('dev conflicts with Electron E2E and a second dev supervisor reports its owner', async () => {

@@ -50,6 +50,30 @@ const stopChild = async child => {
     await waitForExit(child)
 }
 
+const parseWorkflowCommands = tokens => {
+    const commands = [[]]
+    for (let index = 0; index < tokens.length; index += 1) {
+        const token = tokens[index]
+        if (token === '--literal') {
+            if (index === tokens.length - 1) {
+                throw new InstanceError('--literal must be followed by an argument', 'USAGE')
+            }
+            commands.at(-1).push(tokens[(index += 1)])
+        } else if (token === '--then') {
+            if (commands.length === 2 || commands.at(-1).length === 0) {
+                throw new InstanceError('run-workflow accepts at most two non-empty commands', 'USAGE')
+            }
+            commands.push([])
+        } else {
+            commands.at(-1).push(token)
+        }
+    }
+    if (commands.some(command => command.length === 0)) {
+        throw new InstanceError('Each run-workflow command must name an executable', 'USAGE')
+    }
+    return commands
+}
+
 const runDevelopment = async () => {
     const { allocation, holder: supervisor } = await registerDevelopmentHolder('dev-supervisor')
     const environment = { ...process.env, ...bundleEnvironment(allocation.bundle, allocation.appDataPath) }
@@ -170,14 +194,7 @@ const runWorkflow = async args => {
         )
     }
     const workflow = args[0]
-    const commandTokens = args.slice(separator + 1)
-    const then = commandTokens.indexOf('--then')
-    const commands = (
-        then < 0 ? [commandTokens] : [commandTokens.slice(0, then), commandTokens.slice(then + 1)]
-    ).filter(tokens => tokens.length > 0)
-    if (commands.length === 0 || (then >= 0 && commands.length !== 2)) {
-        throw new InstanceError('Each run-workflow command must name an executable', 'USAGE')
-    }
+    const commands = parseWorkflowCommands(args.slice(separator + 1))
     let child
     let pendingSignal = null
     const signalListeners = new Map()

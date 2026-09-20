@@ -1057,9 +1057,11 @@ export const removeDevelopmentHolder = async holderId => {
 export const releaseDevelopment = async ({ force = false, requestWhenIdle = false } = {}) => {
     const worktree = await resolveWorktree()
     const manifest = await readManifest(worktree)
-    if (!manifest) return { released: false, reason: 'unallocated' }
+    if (!manifest && !force) return { released: false, reason: 'unallocated' }
     return withRegistry(async (registry, paths) => {
-        const allocation = registry.allocations[manifest.worktreeId]
+        const allocation = manifest
+            ? registry.allocations[manifest.worktreeId]
+            : Object.values(registry.allocations).find(candidate => candidate.path === worktree.root)
         if (!allocation) return { released: false, reason: 'unallocated' }
         if (allocation.holders.length > 0) {
             if (requestWhenIdle) {
