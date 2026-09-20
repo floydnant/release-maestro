@@ -23,7 +23,8 @@ A desktop app for your music. Scan your local collection into a searchable libra
 ## Prerequisites
 
 - Node.js (use the version in `.node-version`)
-- pnpm
+- pnpm (if the command is unavailable, enable the Node.js-provided launcher with
+  `corepack enable pnpm`)
 - A Rust toolchain (`cargo` and `rustc`) for the metadata-engine sidecar. Development builds only the
   host architecture; `make dev` does not require `rustup`.
 - `rustup` for macOS packaging, which builds the sidecar for both Apple Silicon and Intel
