@@ -147,7 +147,7 @@ rebuild-electron: ## Rebuild native dependencies (e.g. after Electron version ch
 rebuild-node: ## Rebuild native dependencies for Node.js (e.g. after Node version change)
 	$(PNPM) rebuild better-sqlite3
 nx: ## Run a focused Nx command through pinned pnpm (for example: make nx ARGS='test maestro-core')
-	@test -n "$(ARGS)" || (echo "Usage: make nx ARGS='test maestro-core'" && exit 1)
+	$(if $(strip $(ARGS)),,$(error Usage: make nx ARGS='test maestro-core'))
 	$(PNPM) exec nx $(ARGS)
 
 version: ## Generate changelog and update version
