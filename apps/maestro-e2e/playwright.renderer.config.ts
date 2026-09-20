@@ -40,7 +40,7 @@ export default defineConfig({
     projects: [
         {
             name: 'chromium',
-            use: { ...devices['Desktop Chrome'], reducedMotion: 'reduce' },
+            use: { ...devices['Desktop Chrome'] },
         },
     ],
 })

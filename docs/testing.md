@@ -125,6 +125,47 @@ Use locators in this order:
 Use web-first assertions such as `await expect(locator).toBeVisible()`. Each test must run alone, with
 fresh state arranged in `beforeEach` or the test itself.
 
+### Wait for outcomes, not time
+
+An action finishing does not mean the application has finished reacting to it. A click, key press,
+scroll, route change, IPC response, or resize may schedule more work after Playwright returns. Wait
+for the user-visible or boundary-level outcome that the test cares about.
+
+- Prefer locator assertions such as `toBeVisible`, `toBeFocused`, `toHaveValue`, and `toHaveURL`.
+  They retry until the state is true.
+- Use `expect.poll` for state without a locator, such as IPC calls, requested query windows, scroll
+  geometry, or values read with `evaluate`. A polling callback should return `undefined` or another
+  incomplete value while work is pending. It should not throw merely because the result has not
+  arrived yet.
+- Send input through the locator that owns it when rendering may replace DOM nodes. For example,
+  prefer `await tile.press('ArrowRight')` over focusing a tile and later calling
+  `page.keyboard.press`. The latter can send the key to `body` if virtualization replaces the tile
+  between those calls.
+- For virtualized lists, assert the logical place: the expected row or tile is visible and the data
+  source received the expected window. Assert an exact `scrollTop` only when the pixel offset itself
+  is the product contract. A virtualizer may preserve the same item while reanchoring its local
+  scroll offset.
+- When inspecting recorded calls, wait for the source page to settle before taking a baseline and
+  filter calls to the route or entity under test. Navigation can leave a final request from the page
+  being replaced.
+- Do not use `waitForTimeout`, larger timeouts, retries, or reduced motion to make a race pass. They
+  change how often the race occurs without defining when the application is ready.
+
+The suites use the browser's default `no-preference` motion setting. This keeps transitions and
+animations in the normal execution path. A test for reduced-motion behavior should opt in with
+`page.emulateMedia({ reducedMotion: 'reduce' })` and restore `no-preference` when it finishes. A test
+for animation behavior should wait for the resulting DOM state or event instead of its nominal
+duration.
+
+When a test has failed only in CI, repeat the smallest affected slice locally with retries disabled.
+This does not prove the race is gone, but it catches fixes that only move it into Playwright's retry:
+
+```bash
+pnpm exec nx run maestro-e2e:e2e-renderer -- \
+  apps/maestro-e2e/src/renderer/library/albums.spec.ts \
+  --grep "moves between tiles" --repeat-each=10 --retries=0
+```
+
 Electron E2E must isolate filesystem inputs and app state:
 
 - Copy committed media into a fresh temporary library; never mutate source fixtures.

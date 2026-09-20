@@ -92,8 +92,6 @@ export const launchReleaseMaestro = async (
         sources: true,
         title: testInfo.title,
     })
-    await (await app.firstWindow()).emulateMedia({ reducedMotion: 'reduce' })
-
     Object.defineProperty(app, 'close', {
         configurable: true,
         value: async (): Promise<void> => {
