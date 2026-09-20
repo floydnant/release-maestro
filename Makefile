@@ -134,7 +134,7 @@ install: ## Install pnpm packages, Rust crates, and Playwright Chromium dependen
 	$(PNPM) exec playwright install --with-deps chromium
 i: install ## Alias for install
 rebuild-electron: ## Rebuild native dependencies (e.g. after Electron version change)
-	electron-rebuild -f -w better-sqlite3
+	$(PNPM) exec electron-rebuild -f -w better-sqlite3
 rebuild-node: ## Rebuild native dependencies for Node.js (e.g. after Node version change)
 	$(PNPM) rebuild better-sqlite3
 

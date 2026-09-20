@@ -27,7 +27,7 @@ const createWorkspace = () => {
         JSON.stringify({
             packageManager: `pnpm@1.2.3+sha512.${'a'.repeat(128)}`,
             dependencies: { example: '1.2.3' },
-            engines: { node: '>= 22.22.3 < 25', pnpm: '1.2.3' },
+            engines: { node: '>= 22.22.3 < 23 || >= 24.15.0 < 25', pnpm: '1.2.3' },
         }),
     )
     writeFileSync(
@@ -102,6 +102,19 @@ test('validates effective pnpm settings instead of matching comments', () => {
     )
 
     assert.match(verifyDependencyPolicy(workspace).join('\n'), /minimumReleaseAge must be 4320/)
+})
+
+test('rejects Node ranges that admit unsupported releases', () => {
+    const workspace = createWorkspace()
+    const manifestPath = join(workspace, 'package.json')
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    manifest.engines.node = '>= 22.22.3 < 25'
+    writeFileSync(manifestPath, JSON.stringify(manifest))
+
+    assert.match(
+        verifyDependencyPolicy(workspace).join('\n'),
+        /engines\.node must require Node 22\.22\.3–22\.x or Node 24\.15\.0–24\.x/,
+    )
 })
 
 test('rejects broad security exceptions and unreviewed build-script changes', () => {

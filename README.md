@@ -36,12 +36,12 @@ make install # or make i
 make dev
 ```
 
-Node 22 or 24, pnpm, and Rust are required. If pnpm is not installed yet, Node 22 and 24 include
-Corepack, so `corepack enable pnpm` provides the version and hash pinned in `package.json`. After
-that one-time setup, use `pnpm` directly. `make install` installs the root package from the lockfile,
-fetches the locked Rust crates, and installs Playwright Chromium with its system dependencies.
-Linux system dependencies may require sudo. Chromium requires an OS supported by the installed
-Playwright version.
+Node 22.22.3–22.x or 24.15.0–24.x, pnpm, and Rust are required. If pnpm is not installed yet, these
+Node releases include Corepack, so `corepack enable pnpm` provides the version and hash pinned in
+`package.json`. After that one-time setup, use `pnpm` directly. `make install` installs the root
+package from the lockfile, fetches the locked Rust crates, and installs Playwright Chromium with its
+system dependencies. Linux system dependencies may require sudo. Chromium requires an OS supported
+by the installed Playwright version.
 
 `make dev` builds the host metadata-engine binary and starts the Angular dev server and Electron
 main process with hot reload. The host binary lives in `apps/metadata-engine/target/dev/release`,
