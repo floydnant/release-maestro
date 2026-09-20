@@ -25,7 +25,7 @@ const createWorkspace = () => {
     writeFileSync(
         join(workspace, 'package.json'),
         JSON.stringify({
-            packageManager: `pnpm@1.2.3+sha512.${'a'.repeat(128)}`,
+            packageManager: 'pnpm@1.2.3',
             dependencies: { example: '1.2.3' },
             engines: { node: '>= 22.22.3 < 23 || >= 24.15.0 < 25', pnpm: '1.2.3' },
         }),
@@ -89,6 +89,23 @@ test('accepts only exact-version release-age exclusions', () => {
     assert.equal(isExactReleaseAgeExclusion('@jest/core@30.5.2'), true)
     assert.equal(isExactReleaseAgeExclusion('@jest/*'), false)
     assert.equal(isExactReleaseAgeExclusion('electron'), false)
+})
+
+test('requires one exact pnpm version across package-manager declarations', () => {
+    const workspace = createWorkspace()
+    const manifestPath = join(workspace, 'package.json')
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    manifest.packageManager = 'pnpm@^1.2.3'
+    writeFileSync(manifestPath, JSON.stringify(manifest))
+
+    assert.match(
+        verifyDependencyPolicy(workspace).join('\n'),
+        /packageManager must pin pnpm by exact version/,
+    )
+
+    manifest.packageManager = 'pnpm@1.2.4'
+    writeFileSync(manifestPath, JSON.stringify(manifest))
+    assert.match(verifyDependencyPolicy(workspace).join('\n'), /engines\.pnpm must match packageManager/)
 })
 
 test('validates effective pnpm settings instead of matching comments', () => {

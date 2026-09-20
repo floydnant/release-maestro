@@ -107,11 +107,9 @@ export const verifyDependencyPolicy = workspaceRoot => {
     // installation constraints and must not duplicate versions owned by the root lockfile.
     const rootManifest = JSON.parse(readFileSync(join(workspaceRoot, 'package.json'), 'utf8'))
 
-    const packageManagerMatch = /^pnpm@(\d+\.\d+\.\d+)\+sha512\.[0-9a-f]{128}$/.exec(
-        rootManifest.packageManager ?? '',
-    )
+    const packageManagerMatch = /^pnpm@(\d+\.\d+\.\d+)$/.exec(rootManifest.packageManager ?? '')
     if (!packageManagerMatch) {
-        errors.push('package.json: packageManager must pin pnpm by exact version and SHA-512 hash')
+        errors.push('package.json: packageManager must pin pnpm by exact version')
     } else if (rootManifest.engines?.pnpm !== packageManagerMatch[1]) {
         errors.push(`package.json: engines.pnpm must match packageManager (${packageManagerMatch[1]})`)
     }

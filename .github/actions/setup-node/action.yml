@@ -1,5 +1,5 @@
 name: 'Setup Node dependencies'
-description: 'Set up Node.js and install the pinned pnpm dependencies.'
+description: 'Set up Node.js and install dependencies with the declared pnpm version.'
 
 inputs:
     install-command:

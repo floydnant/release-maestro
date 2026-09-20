@@ -7,7 +7,7 @@ minimumReleaseAgeStrict: true
 
 # Do not accept a package whose publisher provenance is weaker than an earlier release.
 trustPolicy: no-downgrade
-# Apply the provenance downgrade check to releases from the last year. Older packages often predate
+# Check each release for provenance downgrades during its first year. Older packages often predate
 # registry provenance, and the lockfile integrity still pins their contents.
 trustPolicyIgnoreAfter: 525600
 # Revalidate the lockfile against the registry rather than trusting policy decisions made elsewhere.
