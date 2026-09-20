@@ -146,7 +146,7 @@ durations. To reproduce a CI failure, repeat the smallest slice with retries dis
 ```bash
 pnpm exec nx run maestro-e2e:e2e-renderer -- \
   apps/maestro-e2e/src/renderer/library/albums.spec.ts \
-  --grep "moves between tiles" --repeat-each=10 --retries=0
+  --grep "arrows moving between tiles" --repeat-each=10 --retries=0
 ```
 
 Electron E2E must isolate filesystem inputs and app state:
