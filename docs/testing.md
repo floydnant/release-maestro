@@ -127,38 +127,21 @@ fresh state arranged in `beforeEach` or the test itself.
 
 ### Wait for outcomes, not time
 
-An action finishing does not mean the application has finished reacting to it. A click, key press,
-scroll, route change, IPC response, or resize may schedule more work after Playwright returns. Wait
-for the user-visible or boundary-level outcome that the test cares about.
+Playwright returning from an action does not mean the application has settled. Wait for the outcome:
 
-- Prefer locator assertions such as `toBeVisible`, `toBeFocused`, `toHaveValue`, and `toHaveURL`.
-  They retry until the state is true.
-- Use `expect.poll` for state without a locator, such as IPC calls, requested query windows, scroll
-  geometry, or values read with `evaluate`. A polling callback should return `undefined` or another
-  incomplete value while work is pending. It should not throw merely because the result has not
-  arrived yet.
-- Send input through the locator that owns it when rendering may replace DOM nodes. For example,
-  prefer `await tile.press('ArrowRight')` over focusing a tile and later calling
-  `page.keyboard.press`. The latter can send the key to `body` if virtualization replaces the tile
-  between those calls.
-- For virtualized lists, assert the logical place: the expected row or tile is visible and the data
-  source received the expected window. Assert an exact `scrollTop` only when the pixel offset itself
-  is the product contract. A virtualizer may preserve the same item while reanchoring its local
-  scroll offset.
-- When inspecting recorded calls, wait for the source page to settle before taking a baseline and
-  filter calls to the route or entity under test. Navigation can leave a final request from the page
-  being replaced.
-- Do not use `waitForTimeout`, larger timeouts, retries, or reduced motion to make a race pass. They
-  change how often the race occurs without defining when the application is ready.
+- Use retrying locator assertions for DOM state and `expect.poll` for IPC calls, query windows,
+  geometry, or values from `evaluate`. Polling callbacks should return an incomplete value, not
+  throw, while work is pending.
+- Send input through its locator, for example `tile.press('ArrowRight')`, because rendering may
+  replace a focused node before a later `page.keyboard.press`.
+- For virtualized lists, assert the visible item and requested data window. Assert `scrollTop` only
+  when the pixel offset is the contract.
+- Let the source page settle before baselining recorded calls, then filter them to the route or entity
+  under test.
 
-The suites use the browser's default `no-preference` motion setting. This keeps transitions and
-animations in the normal execution path. A test for reduced-motion behavior should opt in with
-`page.emulateMedia({ reducedMotion: 'reduce' })` and restore `no-preference` when it finishes. A test
-for animation behavior should wait for the resulting DOM state or event instead of its nominal
-duration.
-
-When a test has failed only in CI, repeat the smallest affected slice locally with retries disabled.
-This does not prove the race is gone, but it catches fixes that only move it into Playwright's retry:
+Do not hide races with `waitForTimeout`, longer timeouts, retries, or reduced motion. The suites use
+`no-preference`; reduced-motion tests must opt in and restore it. Wait for animation outcomes, not
+durations. To reproduce a CI failure, repeat the smallest slice with retries disabled:
 
 ```bash
 pnpm exec nx run maestro-e2e:e2e-renderer -- \
