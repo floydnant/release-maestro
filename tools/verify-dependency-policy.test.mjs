@@ -98,6 +98,13 @@ test('checks composite actions outside the GitHub directory', () => {
     assert.match(verifyDependencyPolicy(workspace).join('\n'), /ci\/local-action\/action.yml/)
 })
 
+test('rejects alternate lockfiles', () => {
+    const workspace = createWorkspace()
+    writeFileSync(join(workspace, 'package-lock.json'), '{}')
+
+    assert.match(verifyDependencyPolicy(workspace).join('\n'), /package-lock.json: unsupported lockfile/)
+})
+
 test('does not follow directory symlinks', { skip: process.platform === 'win32' }, () => {
     const workspace = createWorkspace()
     symlinkSync(workspace, join(workspace, 'loop'), 'dir')

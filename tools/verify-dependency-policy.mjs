@@ -99,9 +99,7 @@ export const verifyDependencyPolicy = workspaceRoot => {
     }
 
     const unsupportedLockfiles = new Set(['package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock'])
-    for (const path of findFiles(workspaceRoot, path =>
-        unsupportedLockfiles.has(path.slice(path.lastIndexOf('/') + 1)),
-    )) {
+    for (const path of findFiles(workspaceRoot, path => unsupportedLockfiles.has(basename(path)))) {
         errors.push(`${relative(workspaceRoot, path)}: unsupported lockfile`)
     }
 
