@@ -49,8 +49,10 @@ node apps/maestro-electron/tools/profile-main-process.cjs 15
 ```
 
 It connects to `http://127.0.0.1:5858` and prints the hottest sampled leaf frames as bounded JSON.
-`HeapProfiler.enable` and `HeapProfiler.takeHeapSnapshot` over raw CDP answer main-process allocation
-questions.
+The helper uses raw CDP but owns request deadlines, socket cleanup, and output bounds. Reach port
+5858 directly when you need an inspector command it does not expose; raw CDP remains the
+zero-dependency floor. `HeapProfiler.enable` and `HeapProfiler.takeHeapSnapshot` answer main-process
+allocation questions.
 
 ## Heap snapshots and leaks
 

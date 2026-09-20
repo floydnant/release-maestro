@@ -76,15 +76,15 @@ Keep `--usageStatistics=false`. The server reports usage data to Google by defau
 Both clients enable this server for the project, including its extra heap tools. Those tool
 definitions cost context even when the app is not running; browser attachment is lazy.
 
-For interaction-heavy work, attach the repository's pinned `playwright` directly. This adds no MCP
-tool definitions to context, but provides no performance tracing:
+For interaction-heavy work, opt into the repository's pinned Playwright MCP server. It is disabled
+in `.codex/config.toml` so its tools do not consume context by default. Start a Codex session with
+`codex -c mcp_servers.playwright.enabled=true`; other clients can run `node` with these arguments:
 
-```js
-import { chromium } from 'playwright'
-
-const browser = await chromium.connectOverCDP('http://127.0.0.1:9222')
-const page = browser.contexts()[0].pages()[0]
+```text
+./node_modules/@playwright/mcp/cli.js --cdp-endpoint http://127.0.0.1:9222
 ```
+
+Keep Chrome DevTools MCP as the default because Playwright MCP does not provide performance traces.
 
 Prefer exact accessible names for navigation links, such as
 `getByRole('link', { name: 'Tracks', exact: true })`; result cards can include the same word.

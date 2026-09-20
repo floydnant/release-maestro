@@ -7,3 +7,12 @@ args = [
     "--usageStatistics=false",
     "--memoryDebugging",
 ]
+
+[mcp_servers.playwright]
+enabled = false
+command = "node"
+args = [
+    "./node_modules/@playwright/mcp/cli.js",
+    "--cdp-endpoint",
+    "http://127.0.0.1:9222",
+]
