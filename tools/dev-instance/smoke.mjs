@@ -10,16 +10,29 @@ import { fileURLToPath } from 'node:url'
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const temporaryRoot = await mkdtemp(join(tmpdir(), 'release-maestro-two-worktree-'))
 const stateDir = join(temporaryRoot, 'state')
+const shimBin = join(temporaryRoot, 'bin')
 const worktrees = [join(temporaryRoot, 'one'), join(temporaryRoot, 'two')]
 const processes = []
+
+await import('node:fs/promises').then(fs => fs.mkdir(shimBin))
+const pnpmShim = join(shimBin, 'pnpm')
+await writeFile(
+    pnpmShim,
+    `#!/bin/sh
+if [ "$1" = "exec" ]; then shift; fi
+command="$1"
+shift
+exec "${repositoryRoot}/node_modules/.bin/$command" "$@"
+`,
+)
+await chmod(pnpmShim, 0o755)
 
 const environment = {
     ...process.env,
     CI: '1',
+    PATH: `${shimBin}:${process.env.PATH}`,
     RELEASE_MAESTRO_INSTANCE_STATE_DIR: stateDir,
 }
-const pnpmWorks = spawnSync('pnpm', ['--version'], { stdio: 'ignore' }).status === 0
-const makePnpm = pnpmWorks ? [] : ['PNPM=corepack pnpm']
 
 const git = args => {
     const result = spawnSync('git', ['-C', repositoryRoot, ...args], { encoding: 'utf8' })
@@ -74,7 +87,7 @@ try {
     }
 
     for (const worktree of worktrees) {
-        const child = spawn('make', [...makePnpm, 'dev'], {
+        const child = spawn('make', ['dev'], {
             cwd: worktree,
             env: environment,
             stdio: ['ignore', 'pipe', 'pipe'],
