@@ -49,6 +49,29 @@ main process with hot reload. The host binary lives in `apps/metadata-engine/tar
 separate from the packaging binary in `target/release`. Development always uses this host path.
 If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
 
+Each Git worktree gets its own stable renderer, Chrome DevTools, and Node inspector ports. It also
+uses that worktree's `.app-data.dev` directory. Run `make dev-status` to see the current endpoints and
+process holders. `make dev-reallocate` replaces an idle bundle when another program takes one of its
+ports.
+
+The allocator stores an ignored `.release-maestro-instance.json` manifest in each worktree and keeps
+its disposable registry and bounded JSONL log under `~/.release-maestro/dev-instances`. An inactive
+development bundle stays reserved for 20 minutes. Use `make dev-release` to release it sooner,
+`make dev-stop` for an orphaned validated process, and `make dev-log FOLLOW=1` while diagnosing an
+allocation failure. A manual bundle must set all three variables together:
+
+```bash
+RELEASE_MAESTRO_RENDERER_PORT=4300 \
+RELEASE_MAESTRO_CDP_PORT=9300 \
+RELEASE_MAESTRO_INSPECTOR_PORT=5900 \
+make dev-reallocate
+```
+
+Codex and Claude Code use the same advisory session hook. Codex asks you to review the project hook
+in `/hooks` because it records trust against the command hash. Claude Code applies its normal project
+settings approval. Declining either hook does not break allocation or cleanup. The MCP wrappers in
+`.mcp.json` and `.codex/config.toml` resolve the current worktree's CDP endpoint when they start.
+
 Use `pnpm exec nx build metadata-engine` to build only the host sidecar.
 
 `make dev` also opens local debug endpoints for agent inspection. See
@@ -65,9 +88,14 @@ make format-check  # non-mutating formatting check
 make e2e           # full Electron E2E against the development build
 make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
+make dev-status    # show this worktree's ports, resources, and process holders
+make dev-stop      # stop validated development processes from this worktree
+make dev-log       # print orchestration events; FOLLOW=1 follows new events
+make dev-smoke     # run the slower two-worktree concurrency check
 ```
 
-`make sure` mutates formatting.
+`make sure` mutates formatting. Electron E2E and renderer E2E may run together. The instance manager
+rejects Electron E2E while `make dev` owns the same worktree's development build output.
 
 After installation, run `make agents-check` to validate the agent skills and harness adapters and run
 their fixture tests.

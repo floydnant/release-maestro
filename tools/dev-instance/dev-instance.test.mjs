@@ -1,0 +1,592 @@
+import assert from 'node:assert/strict'
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { spawn, spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import net from 'node:net'
+import { afterEach, jest, test } from '@jest/globals'
+
+jest.setTimeout(20_000)
+
+const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
+const cli = join(repositoryRoot, 'tools/dev-instance/cli.mjs')
+const mcpWrapper = join(repositoryRoot, 'tools/dev-instance/mcp-wrapper.mjs')
+const hook = join(repositoryRoot, 'tools/dev-instance/hook.mjs')
+const temporaryDirectories = []
+const liveChildren = []
+const liveServers = []
+
+afterEach(async () => {
+    for (const child of liveChildren.splice(0)) {
+        if (child.exitCode === null && child.signalCode === null) {
+            spawnSync('pkill', ['-TERM', '-P', String(child.pid)])
+            child.kill('SIGKILL')
+        }
+    }
+    for (const server of liveServers.splice(0)) {
+        await new Promise(resolve => server.close(resolve))
+    }
+    for (const directory of temporaryDirectories.splice(0)) {
+        await rm(directory, { recursive: true, force: true })
+    }
+})
+
+const git = (cwd, args) => {
+    const result = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    return result.stdout.trim()
+}
+
+const createFixture = async ({ worktrees = 1 } = {}) => {
+    const base = await mkdtemp(join(tmpdir(), 'release-maestro-instance-test-'))
+    temporaryDirectories.push(base)
+    const main = join(base, 'main')
+    const state = join(base, 'state')
+    await mkdir(main)
+    git(main, ['init', '-q'])
+    git(main, ['config', 'user.email', 'test@example.com'])
+    git(main, ['config', 'user.name', 'Test'])
+    await writeFile(join(main, 'README.md'), 'fixture\n')
+    git(main, ['add', 'README.md'])
+    git(main, ['commit', '-qm', 'fixture'])
+    const roots = [main]
+    for (let index = 1; index < worktrees; index += 1) {
+        const path = join(base, `worktree-${index}`)
+        git(main, ['worktree', 'add', '-q', '-b', `fixture-${index}`, path])
+        roots.push(path)
+    }
+    return { base, main, roots, state }
+}
+
+const environmentFor = (fixture, extra = {}) => ({
+    ...process.env,
+    RELEASE_MAESTRO_INSTANCE_STATE_DIR: fixture.state,
+    ...extra,
+})
+
+const run = (fixture, cwd, args, extra = {}) =>
+    spawnSync(process.execPath, [cli, ...args], {
+        cwd,
+        env: environmentFor(fixture, extra),
+        encoding: 'utf8',
+        timeout: 15_000,
+    })
+
+const runJson = (fixture, cwd, args, extra = {}) => {
+    const result = run(fixture, cwd, args, extra)
+    assert.equal(result.status, 0, result.stderr)
+    return JSON.parse(result.stdout)
+}
+
+const waitFor = async (read, predicate, message) => {
+    const deadline = Date.now() + 10_000
+    let value
+    while (Date.now() < deadline) {
+        try {
+            value = await read()
+        } catch (error) {
+            if (error?.code !== 'ENOENT') throw error
+            await new Promise(resolve => setTimeout(resolve, 50))
+            continue
+        }
+        if (predicate(value)) return value
+        await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    assert.fail(`${message}: ${JSON.stringify(value)}`)
+}
+
+const listen = (host, port) =>
+    new Promise((resolve, reject) => {
+        const server = net.createServer()
+        server.once('error', reject)
+        server.listen({ host, port, ipv6Only: host === '::1' }, () => {
+            liveServers.push(server)
+            resolve(server)
+        })
+    })
+
+const createFakePnpm = async fixture => {
+    const bin = join(fixture.base, 'bin')
+    const executable = join(bin, 'pnpm')
+    await mkdir(bin)
+    await writeFile(
+        executable,
+        `#!/usr/bin/env node
+import { writeFileSync } from 'node:fs'
+import net from 'node:net'
+if (process.env.FAKE_CAPTURE) writeFileSync(process.env.FAKE_CAPTURE, JSON.stringify(process.argv.slice(2)))
+const portIndex = process.argv.indexOf('--port')
+const remoteIndex = process.argv.indexOf('--remoteDebuggingPort')
+const servers = []
+if (process.env.FAKE_OPEN_PORT === '1') {
+  for (const index of [portIndex, remoteIndex]) {
+    if (index < 0) continue
+    const server = net.createServer()
+    server.listen({ host: 'localhost', port: Number(process.argv[index + 1]) })
+    servers.push(server)
+  }
+}
+const finish = signal => {
+  if (process.env.FAKE_SIGNAL_CAPTURE) writeFileSync(process.env.FAKE_SIGNAL_CAPTURE, signal)
+  for (const server of servers) server.close()
+  process.exit(signal ? 0 : Number(process.env.FAKE_EXIT_CODE ?? 0))
+}
+process.on('SIGTERM', () => finish('SIGTERM'))
+process.on('SIGINT', () => finish('SIGINT'))
+const delay = Number(process.env.FAKE_DELAY_MS ?? 60000)
+setTimeout(() => finish(''), delay)
+`,
+    )
+    await chmod(executable, 0o755)
+    return bin
+}
+
+const spawnMcp = (fixture, cwd, bin, server = 'chrome-devtools', extra = {}) => {
+    const child = spawn(process.execPath, [mcpWrapper, server], {
+        cwd,
+        env: environmentFor(fixture, { PATH: `${bin}:${process.env.PATH}`, ...extra }),
+        stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    liveChildren.push(child)
+    return child
+}
+
+const childResult = child =>
+    new Promise(resolve => {
+        let stdout = ''
+        let stderr = ''
+        child.stdout?.on('data', chunk => (stdout += chunk))
+        child.stderr?.on('data', chunk => (stderr += chunk))
+        if (child.exitCode !== null || child.signalCode !== null) {
+            resolve({ code: child.exitCode, signal: child.signalCode, stdout, stderr })
+        } else {
+            child.once('exit', (code, signal) => resolve({ code, signal, stdout, stderr }))
+        }
+    })
+
+test('simultaneous first allocation gives two worktrees distinct stable bundles', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const children = fixture.roots.map(cwd =>
+        spawn(process.execPath, [cli, 'dev-allocate'], {
+            cwd,
+            env: environmentFor(fixture),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        }),
+    )
+    liveChildren.push(...children)
+    const results = await Promise.all(children.map(childResult))
+    results.forEach(result => assert.equal(result.code, 0, result.stderr))
+    const allocations = results.map(result => JSON.parse(result.stdout))
+    assert.notDeepEqual(allocations[0].bundle, allocations[1].bundle)
+    const reused = runJson(fixture, fixture.roots[0], ['dev-allocate'])
+    assert.deepEqual(reused.bundle, allocations[0].bundle)
+    assert.equal(reused.worktreeId, allocations[0].worktreeId)
+})
+
+test('allocator prefers slot zero and skips a slot with one occupied IPv4 port', async () => {
+    const fixture = await createFixture()
+    await listen('127.0.0.1', 4200)
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const slot = allocation.bundle.renderer - 4200
+    assert.ok(slot > 0)
+    assert.equal(allocation.bundle.cdp, 9222 + slot)
+    assert.equal(allocation.bundle.inspector, 5858 + slot)
+})
+
+test('allocator detects an IPv6-only listener', async () => {
+    const fixture = await createFixture()
+    try {
+        await listen('::1', 4200)
+    } catch (error) {
+        if (error?.code === 'EADDRNOTAVAIL') return
+        throw error
+    }
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const slot = allocation.bundle.renderer - 4200
+    assert.ok(slot > 0)
+    assert.equal(allocation.bundle.cdp, 9222 + slot)
+    assert.equal(allocation.bundle.inspector, 5858 + slot)
+})
+
+test('manual bundles must be complete and distinct', async () => {
+    const fixture = await createFixture()
+    const partial = run(fixture, fixture.main, ['dev-allocate'], {
+        RELEASE_MAESTRO_RENDERER_PORT: '4310',
+    })
+    assert.equal(partial.status, 1)
+    assert.match(partial.stderr, /PARTIAL_BUNDLE/)
+
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'], {
+        RELEASE_MAESTRO_RENDERER_PORT: '4310',
+        RELEASE_MAESTRO_CDP_PORT: '9310',
+        RELEASE_MAESTRO_INSPECTOR_PORT: '5910',
+    })
+    assert.deepEqual(allocation.bundle, { renderer: 4310, cdp: 9310, inspector: 5910 })
+})
+
+test('malformed registry, manifest, stale lock, and interrupted write repair automatically', async () => {
+    const fixture = await createFixture()
+    await mkdir(fixture.state, { recursive: true })
+    await writeFile(join(fixture.state, 'registry.json'), '{broken')
+    await writeFile(join(fixture.state, 'registry.json.tmp-interrupted'), '{partial')
+    await writeFile(join(fixture.main, '.release-maestro-instance.json'), '{broken')
+    const lock = join(fixture.state, 'registry.lock')
+    await mkdir(lock)
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({ pid: 999999, startIdentity: 'gone' }))
+
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    assert.ok(allocation.worktreeId)
+    const stateFiles = await import('node:fs/promises').then(fs => fs.readdir(fixture.state))
+    assert.ok(stateFiles.some(name => name.startsWith('registry.json.corrupt-')))
+    const worktreeFiles = await import('node:fs/promises').then(fs => fs.readdir(fixture.main))
+    assert.ok(worktreeFiles.some(name => name.startsWith('.release-maestro-instance.json.corrupt-')))
+    assert.ok(existsSync(join(fixture.state, 'registry.json.tmp-interrupted')))
+    assert.equal(existsSync(lock), false)
+})
+
+test('moving a worktree keeps its identity while a new checkout at the old path gets a new one', async () => {
+    const fixture = await createFixture()
+    const first = runJson(fixture, fixture.main, ['dev-allocate'])
+    git(fixture.main, ['checkout', '-qb', 'renamed-branch'])
+    const afterBranchChange = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(afterBranchChange.worktreeId, first.worktreeId)
+    assert.equal(afterBranchChange.branch, 'renamed-branch')
+    const moved = join(fixture.base, 'moved')
+    await rename(fixture.main, moved)
+    const afterMove = runJson(fixture, moved, ['dev-allocate'])
+    assert.equal(afterMove.worktreeId, first.worktreeId)
+
+    await mkdir(fixture.main)
+    git(fixture.main, ['init', '-q'])
+    const replacement = runJson(fixture, fixture.main, ['dev-allocate'])
+    assert.notEqual(replacement.worktreeId, first.worktreeId)
+})
+
+test('a persisted port taken by an unrelated process fails with owner and reallocation details', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'], {
+        RELEASE_MAESTRO_RENDERER_PORT: '4310',
+        RELEASE_MAESTRO_CDP_PORT: '9310',
+        RELEASE_MAESTRO_INSPECTOR_PORT: '5910',
+    })
+    await listen('127.0.0.1', allocation.bundle.cdp)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const result = await childResult(wrapper)
+    assert.equal(result.code, 1)
+    assert.match(result.stderr, new RegExp(`PID ${process.pid}.*process start.*make dev-reallocate`))
+
+    const reallocated = runJson(fixture, fixture.main, ['dev-reallocate'])
+    assert.notDeepEqual(reallocated.bundle, allocation.bundle)
+})
+
+test('MCP wrapper resolves the worktree endpoint, propagates exit code, and cleans its holder', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const capture = join(fixture.base, 'args.json')
+    const child = spawnMcp(fixture, fixture.main, bin, 'chrome-devtools', {
+        FAKE_CAPTURE: capture,
+        FAKE_DELAY_MS: '20',
+        FAKE_EXIT_CODE: '7',
+    })
+    const result = await childResult(child)
+    assert.equal(result.code, 7, result.stderr)
+    const args = JSON.parse(await readFile(capture, 'utf8'))
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.ok(args.includes(`http://127.0.0.1:${status.bundle.cdp}`))
+    assert.equal(status.state, 'inactive')
+    assert.deepEqual(status.holders, [])
+})
+
+test('MCP wrapper forwards signals and dev-stop leaves unrelated processes alive', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const signalCapture = join(fixture.base, 'signal.txt')
+    const wrapper = spawnMcp(fixture, fixture.main, bin, 'playwright', {
+        FAKE_SIGNAL_CAPTURE: signalCapture,
+    })
+    const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
+    liveChildren.push(unrelated)
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 1,
+        'MCP holder did not register',
+    )
+    const stopped = runJson(fixture, fixture.main, ['dev-stop'])
+    assert.equal(stopped.stopped.length, 1)
+    const result = await childResult(wrapper)
+    assert.equal(result.code, 0)
+    assert.equal((await readFile(signalCapture, 'utf8')).trim(), 'SIGTERM')
+    assert.equal(unrelated.exitCode, null)
+})
+
+test('several MCP sessions share one allocation and release-when-idle waits for the last holder', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const first = spawnMcp(fixture, fixture.main, bin)
+    const second = spawnMcp(fixture, fixture.main, bin)
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 2,
+        'holders did not register',
+    )
+    const hookResult = spawnSync(process.execPath, [hook], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        input: JSON.stringify({ hook_event_name: 'SessionEnd', cwd: fixture.main, reason: 'other' }),
+        encoding: 'utf8',
+    })
+    assert.equal(hookResult.status, 0, hookResult.stderr)
+    first.kill('SIGTERM')
+    await childResult(first)
+    const active = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(active.state, 'active')
+    assert.equal(active.holders.length, 1)
+    const forced = run(fixture, fixture.main, ['dev-release', '--force'])
+    assert.equal(forced.status, 1)
+    assert.match(forced.stderr, /LIVE_HOLDERS/)
+    second.kill('SIGTERM')
+    await childResult(second)
+    const released = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(released.state, 'reclaimable')
+})
+
+test('Claude WorktreeRemove releases only after the directory is gone', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const hookResult = spawnSync(process.execPath, [hook], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        input: JSON.stringify({
+            hook_event_name: 'WorktreeRemove',
+            cwd: fixture.main,
+            worktree_path: fixture.main,
+        }),
+        encoding: 'utf8',
+    })
+    assert.equal(hookResult.status, 0, hookResult.stderr)
+    let registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.ok(registry.allocations[allocation.worktreeId])
+    await rm(fixture.main, { recursive: true, force: true })
+    registry = await waitFor(
+        async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
+        value => !value.allocations[allocation.worktreeId],
+        'removed worktree allocation was not released',
+    )
+    assert.equal(registry.allocations[allocation.worktreeId], undefined)
+})
+
+test('zero grace expires an inactive allocation and permits reassignment', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const bin = await createFakePnpm(fixture)
+    const first = spawnMcp(fixture, fixture.roots[0], bin, 'chrome-devtools', {
+        FAKE_DELAY_MS: '20',
+        RELEASE_MAESTRO_INSTANCE_GRACE_MS: '0',
+    })
+    await childResult(first)
+    const expired = runJson(fixture, fixture.roots[0], ['dev-status', '--json'], {
+        RELEASE_MAESTRO_INSTANCE_GRACE_MS: '0',
+    })
+    assert.equal(expired.state, 'reclaimable')
+    const reassigned = runJson(fixture, fixture.roots[1], ['dev-allocate'], {
+        RELEASE_MAESTRO_INSTANCE_GRACE_MS: '0',
+    })
+    assert.equal(reassigned.bundle.renderer, 4200)
+})
+
+test('Electron E2E coexists with renderer E2E but duplicate mutating workflows fail', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const hold = [process.execPath, '-e', 'setInterval(() => {}, 1000)']
+    const electron = spawn(process.execPath, [cli, 'run-workflow', 'electron-e2e', '--', ...hold], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(electron)
+    await waitFor(
+        async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
+        registry => Object.values(registry.transients).some(item => item.workflow === 'electron-e2e'),
+        'Electron E2E did not allocate',
+    )
+    const renderer = spawn(process.execPath, [cli, 'run-workflow', 'renderer-e2e', '--', ...hold], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(renderer)
+    await waitFor(
+        async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
+        registry => Object.keys(registry.transients).length === 2,
+        'compatible renderer E2E did not allocate',
+    )
+    const otherWorktreeElectron = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'electron-e2e', '--', ...hold],
+        {
+            cwd: fixture.roots[1],
+            env: environmentFor(fixture),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        },
+    )
+    liveChildren.push(otherWorktreeElectron)
+    await waitFor(
+        async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
+        registry => Object.keys(registry.transients).length === 3,
+        'the second worktree Electron E2E did not allocate',
+    )
+    const duplicate = run(fixture, fixture.main, ['run-workflow', 'electron-e2e', '--', ...hold])
+    assert.equal(duplicate.status, 1)
+    assert.match(duplicate.stderr, /RESOURCE_CONFLICT.*held by electron-e2e/)
+    electron.kill('SIGTERM')
+    renderer.kill('SIGTERM')
+    otherWorktreeElectron.kill('SIGTERM')
+    await Promise.all([childResult(electron), childResult(renderer), childResult(otherWorktreeElectron)])
+    const registry = await waitFor(
+        async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
+        value => Object.keys(value.transients).length === 0,
+        'transient allocations were not released',
+    )
+    assert.deepEqual(registry.transients, {})
+})
+
+test('dev conflicts with Electron E2E and a second dev supervisor reports its owner', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const dev = spawn(process.execPath, [cli, 'run-dev'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, { PATH: `${bin}:${process.env.PATH}`, FAKE_OPEN_PORT: '1' }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    let devStderr = ''
+    dev.stderr.on('data', chunk => (devStderr += chunk))
+    const status = await waitFor(
+        () => {
+            if (dev.exitCode !== null || dev.signalCode !== null) assert.fail(devStderr)
+            return Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json']))
+        },
+        value => value.holders?.some(holder => holder.role === 'dev-electron'),
+        'dev stack did not start',
+    )
+    const duplicate = run(fixture, fixture.main, ['run-dev'], {
+        PATH: `${bin}:${process.env.PATH}`,
+        FAKE_OPEN_PORT: '1',
+    })
+    assert.equal(duplicate.status, 1)
+    assert.match(duplicate.stderr, new RegExp(`DUPLICATE_WORKFLOW.*PID ${status.holders[0].pid}`))
+    const e2e = run(fixture, fixture.main, [
+        'run-workflow',
+        'electron-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        'process.exit(0)',
+    ])
+    assert.equal(e2e.status, 1)
+    assert.match(e2e.stderr, /RESOURCE_CONFLICT.*electron-development-bundle/)
+    dev.kill('SIGTERM')
+    await childResult(dev)
+})
+
+test('active worktrees cannot share a canonical app-data directory', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const bin = await createFakePnpm(fixture)
+    const shared = join(fixture.base, 'shared-data')
+    const first = spawnMcp(fixture, fixture.roots[0], bin, 'chrome-devtools', {
+        RELEASE_MAESTRO_APP_DATA_DIR: shared,
+    })
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.roots[0], ['dev-status', '--json'])),
+        status => status.state === 'active',
+        'first worktree did not become active',
+    )
+    const second = spawnMcp(fixture, fixture.roots[1], bin, 'chrome-devtools', {
+        RELEASE_MAESTRO_APP_DATA_DIR: join(shared, '..', 'shared-data'),
+    })
+    const result = await childResult(second)
+    assert.equal(result.code, 1)
+    assert.match(result.stderr, /Resource app-data:.*worktree/)
+    first.kill('SIGTERM')
+    await childResult(first)
+})
+
+test('dead or reused PIDs are reconciled without killing a live unrelated process', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
+    liveChildren.push(unrelated)
+    const registryPath = join(fixture.state, 'registry.json')
+    const registry = JSON.parse(await readFile(registryPath, 'utf8'))
+    registry.allocations[allocation.worktreeId].holders.push({
+        id: 'reused-pid',
+        role: 'dev-electron',
+        pid: unrelated.pid,
+        startIdentity: 'a different process start',
+        heartbeatAt: new Date(0).toISOString(),
+        worktreeId: allocation.worktreeId,
+    })
+    registry.allocations[allocation.worktreeId].wasActive = true
+    await writeFile(registryPath, JSON.stringify(registry))
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.deepEqual(status.holders, [])
+    assert.equal(unrelated.exitCode, null)
+})
+
+test('logs redact sensitive query values, rotate, and render through dev-log', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const bin = await createFakePnpm(fixture)
+    const shared = join(fixture.base, 'shared?token=very-secret')
+    const first = spawnMcp(fixture, fixture.roots[0], bin, 'chrome-devtools', {
+        RELEASE_MAESTRO_APP_DATA_DIR: shared,
+        RELEASE_MAESTRO_INSTANCE_LOG_LIMIT_BYTES: '400',
+    })
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.roots[0], ['dev-status', '--json'])),
+        status => status.state === 'active',
+        'first holder did not register',
+    )
+    const failed = spawnMcp(fixture, fixture.roots[1], bin, 'chrome-devtools', {
+        RELEASE_MAESTRO_APP_DATA_DIR: shared,
+        RELEASE_MAESTRO_INSTANCE_LOG_LIMIT_BYTES: '400',
+    })
+    await childResult(failed)
+    for (let index = 0; index < 8; index += 1) {
+        run(fixture, fixture.roots[0], ['dev-status', '--json'], {
+            RELEASE_MAESTRO_INSTANCE_LOG_LIMIT_BYTES: '400',
+        })
+    }
+    const rendered = run(fixture, fixture.roots[0], ['dev-log'])
+    assert.equal(rendered.status, 0, rendered.stderr)
+    assert.match(rendered.stdout, /holder-registered|command-failed|mcp-wrapper-failed/)
+    const logs = await import('node:fs/promises').then(fs => fs.readdir(fixture.state))
+    assert.ok(logs.some(name => name === 'orchestration.jsonl.1'))
+    for (const name of logs.filter(name => name.startsWith('orchestration.jsonl'))) {
+        assert.doesNotMatch(await readFile(join(fixture.state, name), 'utf8'), /very-secret/)
+    }
+    first.kill('SIGTERM')
+    await childResult(first)
+})
+
+test('hook failures are advisory', async () => {
+    const fixture = await createFixture()
+    const start = spawnSync(process.execPath, [hook], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        input: JSON.stringify({ hook_event_name: 'SessionStart', cwd: fixture.main, source: 'resume' }),
+        encoding: 'utf8',
+    })
+    assert.equal(start.status, 0, start.stderr)
+    assert.match(
+        await readFile(join(fixture.state, 'orchestration.jsonl'), 'utf8'),
+        /session-start-reconciled/,
+    )
+    const result = spawnSync(process.execPath, [hook], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        input: '{not json',
+        encoding: 'utf8',
+    })
+    assert.equal(result.status, 0)
+})

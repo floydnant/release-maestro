@@ -12,14 +12,15 @@ skill covers what to measure once attached.
 
 Guessing wrong here wastes the whole session, because each profiler is blind to the other process.
 
-| Symptom                                           | Profile        | How                       |
-| ------------------------------------------------- | -------------- | ------------------------- |
-| Slow scan or import, slow browse query            | main, 5858     | `Profiler` over raw CDP   |
-| Jank, dropped frames, slow render or route change | renderer, 9222 | `performance_start_trace` |
-| Memory grows over a session                       | either         | heap snapshots, see below |
+| Symptom                                           | Profile         | How                       |
+| ------------------------------------------------- | --------------- | ------------------------- |
+| Slow scan or import, slow browse query            | main, inspector | `Profiler` over raw CDP   |
+| Jank, dropped frames, slow render or route change | renderer, CDP   | `performance_start_trace` |
+| Memory grows over a session                       | either          | heap snapshots, see below |
 
 The main process coordinates scans and runs SQLite queries. A renderer trace cannot attribute
-that work. Start on 5858 for slow scans, but the Rust metadata-engine is a separate child process.
+that work. Start on the inspector port from `make dev-status` for slow scans, but the Rust
+metadata-engine is a separate child process.
 A Node CPU profile shows its caller's work, not time inside Rust; investigate the sidecar separately
 when elapsed time grows while the main process is idle.
 
@@ -36,7 +37,7 @@ The trace returns insight sets split by navigation. Ask for one insight at a tim
 reading the whole trace.
 
 For interaction latency, read the main-thread call tree rather than load-time vitals.
-Development load timings include the server at `localhost:4200`; measure packaged startup
+Development load timings include the worktree's renderer server. Measure packaged startup
 separately when investigating launch speed. Accessibility audits answer a different question
 and remain useful in the running app.
 
@@ -48,9 +49,9 @@ Run the repository helper, then exercise the app during its sampling window:
 node apps/maestro-electron/tools/profile-main-process.cjs 15
 ```
 
-It connects to `http://127.0.0.1:5858` and prints the hottest sampled leaf frames as bounded JSON.
-The helper uses raw CDP but owns request deadlines, socket cleanup, and output bounds. Reach port
-5858 directly when you need an inspector command it does not expose; raw CDP remains the
+It reads the current worktree manifest, connects to its inspector port, and prints the hottest
+sampled leaf frames as bounded JSON. The helper uses raw CDP but owns request deadlines, socket
+cleanup, and output bounds. Reach that port directly when you need an inspector command it does not expose; raw CDP remains the
 zero-dependency floor. `HeapProfiler.enable` and `HeapProfiler.takeHeapSnapshot` answer main-process
 allocation questions.
 

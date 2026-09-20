@@ -1,12 +1,20 @@
 #!/usr/bin/env node
 
+const { existsSync, readFileSync } = require('node:fs')
+const { join } = require('node:path')
+
 const durationSeconds = Number(process.argv[2] ?? 10)
 
 if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
     throw new Error('Usage: node apps/maestro-electron/tools/profile-main-process.cjs [seconds]')
 }
 
-const inspectorUrl = 'http://127.0.0.1:5858/json/list'
+const manifestPath = join(process.cwd(), '.release-maestro-instance.json')
+const manifestPort = existsSync(manifestPath)
+    ? JSON.parse(readFileSync(manifestPath, 'utf8')).bundle?.inspector
+    : undefined
+const inspectorPort = Number(process.env.RELEASE_MAESTRO_INSPECTOR_PORT ?? manifestPort ?? 5858)
+const inspectorUrl = `http://127.0.0.1:${inspectorPort}/json/list`
 const requestTimeoutMs = 5_000
 
 async function main() {

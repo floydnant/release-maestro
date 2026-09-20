@@ -5,50 +5,42 @@ description: Attach Chrome DevTools to the running dev app to inspect the DOM, c
 
 # Inspect the running app
 
-`make dev` opens two debug ports. They speak different protocols and answer different questions,
-and reaching for the wrong one is the usual first mistake.
+`make dev` opens two worktree-specific debug ports. They speak different protocols and answer
+different questions. Run `make dev-status` first and use the ports it prints.
 
-| Port | Protocol                 | Answers                                                              |
-| ---- | ------------------------ | -------------------------------------------------------------------- |
-| 9222 | Chrome DevTools Protocol | renderer DOM, clicks, console, network, renderer traces, screenshots |
-| 5858 | Node inspector           | main-process CPU and heap profiles, Electron APIs, native dialogs    |
+| Status field | Protocol                 | Answers                                                              |
+| ------------ | ------------------------ | -------------------------------------------------------------------- |
+| CDP          | Chrome DevTools Protocol | renderer DOM, clicks, console, network, renderer traces, screenshots |
+| inspector    | Node inspector           | main-process CPU and heap profiles, Electron APIs, native dialogs    |
 
 [`profiling`](../profiling/SKILL.md) covers choosing a process and what to measure once attached.
 
-Both ports listen on 127.0.0.1. `apps/maestro-electron/project.json` sets them on the
+Both ports listen on loopback. The development-instance wrapper passes them to the
 `serve-internal` target, which runs only in development.
 Debugging stays enabled in dev so an agent can attach to an existing session without restarting
 the app and losing the state it needs to inspect. Packaged builds do not use this executor.
 
 ## Start the app and confirm both ports
 
-Before starting, use `lsof -nP -iTCP:9222,5858,4200 -sTCP:LISTEN` to identify existing listeners.
-Port 9222 is also commonly used by Chrome. Reuse an app only after checking its process command
-and checkout path with `ps -p <pid> -o command=`. Do not attach to an unrelated listener.
-
 ```bash
 make dev
-curl -s http://127.0.0.1:9222/json/list   # renderer page target
-curl -s http://127.0.0.1:5858/json/list   # main process
+make dev-status
+curl -s http://127.0.0.1:<CDP>/json/list
+curl -s http://127.0.0.1:<inspector>/json/list
 ```
 
-That uses this checkout's `.app-data.dev`, which suits onboarding and import work. For populated
-browse data, resolve the main worktree instead of hard-coding its path:
+That uses this worktree's `.app-data.dev`. Never point an active worktree at another worktree's
+writable app-data directory. MAE-155 tracks safe seeding for a worktree that needs populated data.
 
-```bash
-main_worktree="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
-RELEASE_MAESTRO_APP_DATA_DIR="$main_worktree/.app-data.dev" make dev
-```
-
-Wait for a renderer page at `http://localhost:4200`. Before evaluating scripts, confirm the
-listener's process command names this checkout's `dist/apps/maestro-electron/main.js`; the Node
-discovery response can report only `file://`, so its URL alone cannot identify the checkout.
+Wait for the renderer URL shown by `make dev-status`. If another program takes a persisted port,
+startup fails and tells you to run `make dev-reallocate`. It does not move an active MCP endpoint.
 
 ## Drive the renderer through the MCP server
 
-`.mcp.json` and `.codex/config.toml` point `chrome-devtools-mcp` at port 9222. Prefer its tools
-over hand-written protocol calls. `take_snapshot` returns an accessibility tree with stable `uid` refs, a steadier handle on
-the UI than a DOM query.
+`.mcp.json` and `.codex/config.toml` launch the repository MCP wrapper. It resolves this worktree's
+CDP port when the server starts, so separate worktrees need no config rewrites. Prefer its tools over
+hand-written protocol calls. `take_snapshot` returns an accessibility tree with stable `uid` refs, a
+steadier handle on the UI than a DOM query.
 
 These constraints cost time when you meet them cold:
 
@@ -67,7 +59,7 @@ Claude Code uses `.mcp.json`; Codex uses `.codex/config.toml` after the project 
 Both configs include the memory tools used by `profiling`. Restart the client after changing
 its server configuration. Codex's `/mcp` shows the active servers.
 
-Run `make install` before starting an agent client from the repository root. Both configs use
+Run `make install` before starting an agent client from the repository root. Both wrappers use
 `pnpm exec` to run the installed MCP package, so the dependency manifest and lockfile control its
 version. Dependency updates take effect after reinstalling and restarting the client.
 If dependencies are missing, startup fails without downloading a fallback package.
@@ -80,10 +72,10 @@ For interaction-heavy work, opt into the repository's pinned Playwright MCP serv
 it in `.codex/config.toml` so its tools do not consume context by default; start a session with
 `codex -c mcp_servers.playwright.enabled=true`. Claude asks each user to approve project servers
 from `.mcp.json`; leave Playwright unapproved until a task needs it. Other clients can run the same
-pinned binary:
+repository wrapper:
 
 ```text
-pnpm exec playwright-mcp --cdp-endpoint http://127.0.0.1:9222
+node tools/dev-instance/mcp-wrapper.mjs playwright
 ```
 
 Keep Chrome DevTools MCP as the default because Playwright MCP does not provide performance traces.
@@ -116,12 +108,12 @@ Node 22 has a global `WebSocket`, so raw protocol access needs nothing installed
 MCP server is available, and for main-process work, which no MCP server drives.
 
 ```js
-const page = (await (await fetch('http://127.0.0.1:9222/json/list')).json()).find(t => t.type === 'page')
+const page = (await (await fetch('http://127.0.0.1:<CDP>/json/list')).json()).find(t => t.type === 'page')
 const ws = new WebSocket(page.webSocketDebuggerUrl)
 // Runtime.enable, then Runtime.evaluate with returnByValue and awaitPromise
 ```
 
-The main process answers the same way at `http://127.0.0.1:5858/json/list`. For CPU profiles, heap
+The main process answers the same way at `http://127.0.0.1:<inspector>/json/list`. For CPU profiles, heap
 snapshots, and performance traces, see [`profiling`](../profiling/SKILL.md).
 
 **`Runtime.evaluate` on the main process needs `includeCommandLineAPI: true`.** Without it
@@ -149,25 +141,24 @@ the app cannot reach on its own. Save direct IPC for reading state, such as
 
 ## Finish the session
 
-Stop `make dev` and check that nothing still holds the ports:
+Stop the `make dev` process normally. If its supervisor exited first, inspect and stop only this
+worktree's validated holders:
 
 ```bash
-lsof -nP -iTCP:9222,5858,4200 -sTCP:LISTEN
+make dev-status
+make dev-stop
 ```
 
 A finding worth keeping belongs in a committed Playwright spec. See `e2e-testing`.
 
 ## Gotchas
 
-- If an Electron-based agent client passes `ELECTRON_RUN_AS_NODE=1` to its shell, Electron
-  rejects `--remote-debugging-port` as a Node option. Launch with
-  `env -u ELECTRON_RUN_AS_NODE make dev` to clear it for that command.
-- Stop `make dev` before `make e2e`. Locally, Playwright can reuse the renderer on port 4200,
-  but the dev watcher and E2E build share `dist/apps/maestro-electron/main.js`; a rebuild can
-  replace the bundle while a test launches it. Playwright launches Electron directly with
-  its own debug port, so the test app is not the target on 9222 or 5858.
-- The renderer dev server binds IPv6 `[::1]:4200`. An IPv4 probe such as `nc -z 127.0.0.1 4200`
-  reports it down while it is up. `wait-on tcp:4200` reads it correctly.
+- The development wrapper clears `ELECTRON_RUN_AS_NODE` before it launches Electron. Database tools
+  may set that variable in their own process without breaking a later `make dev` run.
+- `make e2e` refuses to start while `make dev` owns the Electron development output. Renderer E2E
+  stays compatible with both. The rejection names the conflicting workflow and holder.
+- The renderer dev server may bind IPv6 localhost. The allocator checks both IPv4 and IPv6 before
+  assigning every port in a bundle.
 - The window is frameless. The window controls are custom DOM, not OS chrome.
 - The renderer holds state in Angular signals. After a click, wait for stability before you
   evaluate, or you read the pre-update DOM.

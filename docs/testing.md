@@ -96,7 +96,8 @@ Windows, and Linux, and CI runs the production suite on all three. E2E windows r
 unfocused by default, so a screenshot of a test run never steals focus; set
 `RELEASE_MAESTRO_E2E_BACKGROUND=0` to activate the window while debugging.
 
-To inspect the development app rather than a test run, attach to the debug ports `make dev` opens.
+To inspect the development app rather than a test run, attach to the worktree-specific debug ports
+that `make dev` opens. `make dev-status` prints them.
 The [`inspect-running-app`](../.agents/skills/inspect-running-app/SKILL.md) skill owns that
 workflow. Reach for it before you write a throwaway spec to look at something.
 
@@ -131,6 +132,16 @@ Electron E2E must isolate filesystem inputs and app state:
 - Launch with a fresh `RELEASE_MAESTRO_APP_DATA_DIR` so database, config, cache, logs, and temp files
   cannot leak between tests.
 - Keep full-app tests broad but few.
+
+The Electron and renderer suites obtain transient port bundles from the same instance manager as
+development. They release those bundles as soon as Playwright exits, including in CI. Electron E2E
+and renderer E2E claim different mutable resources and can still run together. Electron E2E conflicts
+with a live development stack because both rebuild the Electron development output. If a run is
+rejected, `make dev-status` names the holder and `make dev-log` shows the orchestration event.
+
+`make dev-smoke` is the slower repository check for two real Git worktrees. It starts both development
+stacks and checks their renderer, CDP, inspector, app-data, MCP resolution, and independent shutdown.
+It stays outside `make sure`.
 
 ## Fixtures
 

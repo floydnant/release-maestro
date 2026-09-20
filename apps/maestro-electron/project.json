@@ -41,8 +41,9 @@
             }
         },
         "serve": {
-            "dependsOn": ["maestro-renderer:serve", "metadata-engine:build"],
-            "command": "wait-on tcp:4200 && nx serve-internal maestro-electron"
+            "dependsOn": ["metadata-engine:build"],
+            "continuous": true,
+            "command": "node tools/dev-instance/cli.mjs run-dev"
         },
         "package": {
             "dependsOn": [

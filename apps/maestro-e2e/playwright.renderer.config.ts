@@ -2,7 +2,7 @@ import { workspaceRoot } from '@nx/devkit'
 import { nxE2EPreset } from '@nx/playwright/preset'
 import { defineConfig, devices } from '@playwright/test'
 
-const rendererE2EPort = 4201
+const rendererE2EPort = Number(process.env['RELEASE_MAESTRO_RENDERER_PORT'] ?? 4201)
 const baseURL = process.env['BASE_URL'] || `http://localhost:${rendererE2EPort}`
 
 /**
@@ -32,7 +32,7 @@ export default defineConfig({
     webServer: process.env['BASE_URL']
         ? undefined
         : {
-              command: 'pnpm exec nx serve maestro-renderer -c e2e',
+              command: `pnpm exec nx serve maestro-renderer -c e2e --host localhost --port ${rendererE2EPort}`,
               url: baseURL,
               reuseExistingServer: !process.env.CI,
               cwd: workspaceRoot,

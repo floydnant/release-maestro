@@ -1,20 +1,8 @@
 [mcp_servers.chrome-devtools]
-command = "pnpm"
-args = [
-    "exec",
-    "chrome-devtools-mcp",
-    "--browserUrl",
-    "http://127.0.0.1:9222",
-    "--usageStatistics=false",
-    "--memoryDebugging",
-]
+command = "node"
+args = ["tools/dev-instance/mcp-wrapper.mjs", "chrome-devtools"]
 
 [mcp_servers.playwright]
 enabled = false
-command = "pnpm"
-args = [
-    "exec",
-    "playwright-mcp",
-    "--cdp-endpoint",
-    "http://127.0.0.1:9222",
-]
+command = "node"
+args = ["tools/dev-instance/mcp-wrapper.mjs", "playwright"]

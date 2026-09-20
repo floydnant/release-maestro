@@ -1,0 +1,1238 @@
+import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { basename, dirname, join, resolve } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { spawn, spawnSync } from 'node:child_process'
+import net from 'node:net'
+
+export const registryVersion = 1
+export const manifestVersion = 1
+export const defaultGraceMs = 20 * 60 * 1000
+const defaultPorts = Object.freeze({ renderer: 4200, cdp: 9222, inspector: 5858 })
+const manifestName = '.release-maestro-instance.json'
+const lockWaitMs = 10_000
+const defaultLogLimitBytes = 5 * 1024 * 1024
+const retainedLogs = 3
+
+/** @typedef {{renderer: number, cdp: number, inspector: number}} PortBundle */
+/**
+ * @typedef {{
+ *   id: string,
+ *   role: string,
+ *   pid: number,
+ *   startIdentity: string,
+ *   heartbeatAt: string,
+ *   worktreeId: string,
+ *   parentHolderId?: string,
+ *   processGroup?: boolean
+ * }} ProcessHolder
+ */
+/**
+ * The state is derived from holders and time, so contradictory stored flags cannot exist.
+ * @typedef {
+ *   | {kind: 'unallocated'}
+ *   | {kind: 'reserved'}
+ *   | {kind: 'active', holders: [ProcessHolder, ...ProcessHolder[]]}
+ *   | {kind: 'inactive', inactiveSince: string, expiresAt: string}
+ *   | {kind: 'expired'}
+ *   | {kind: 'reclaimable'}
+ * } DevelopmentAllocationState
+ */
+
+const sleep = ms => new Promise(done => setTimeout(done, ms))
+const iso = value => new Date(value).toISOString()
+const nowMs = () => Date.now()
+
+export class InstanceError extends Error {
+    constructor(message, code = 'INSTANCE_ERROR') {
+        super(message)
+        this.name = 'InstanceError'
+        this.code = code
+    }
+}
+
+export const getStatePaths = () => {
+    const root = resolve(
+        process.env['RELEASE_MAESTRO_INSTANCE_STATE_DIR'] ??
+            join(homedir(), '.release-maestro', 'dev-instances'),
+    )
+    return {
+        root,
+        registry: join(root, 'registry.json'),
+        lock: join(root, 'registry.lock'),
+        log: join(root, 'orchestration.jsonl'),
+    }
+}
+
+const runGit = (cwd, args) => {
+    const result = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
+    if (result.status !== 0) {
+        throw new InstanceError(`Not a Git worktree: ${cwd}`, 'NOT_A_WORKTREE')
+    }
+    return result.stdout.trim()
+}
+
+export const resolveWorktree = async (cwd = process.cwd()) => {
+    const root = await realpath(runGit(cwd, ['rev-parse', '--show-toplevel']))
+    const branch = runGit(root, ['branch', '--show-current']) || '(detached)'
+    return { root, branch, manifestPath: join(root, manifestName) }
+}
+
+const processStartIdentity = pid => {
+    if (!Number.isSafeInteger(pid) || pid <= 0) return null
+    try {
+        process.kill(pid, 0)
+    } catch {
+        return null
+    }
+    let started = ''
+    if (process.platform === 'linux') {
+        try {
+            const statLine = readFileSync(`/proc/${pid}/stat`, 'utf8')
+            const afterName = statLine
+                .slice(statLine.lastIndexOf(')') + 2)
+                .trim()
+                .split(/\s+/)
+            started = afterName[19] ?? ''
+        } catch {
+            started = ''
+        }
+    } else if (process.platform === 'win32') {
+        const result = spawnSync(
+            'powershell.exe',
+            [
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().Ticks`,
+            ],
+            { encoding: 'utf8', windowsHide: true },
+        )
+        started = result.status === 0 ? result.stdout.trim() : ''
+    } else {
+        const result = spawnSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8' })
+        started = result.status === 0 ? result.stdout.trim() : ''
+    }
+    return started || null
+}
+
+export const currentProcessIdentity = () => {
+    const startIdentity = processStartIdentity(process.pid)
+    if (!startIdentity) throw new InstanceError('Could not determine this process start identity')
+    return { pid: process.pid, startIdentity }
+}
+
+export const holderIsLive = holder => processStartIdentity(holder.pid) === holder.startIdentity
+
+const processTable = () => {
+    if (process.platform === 'win32') {
+        const result = spawnSync(
+            'powershell.exe',
+            [
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress',
+            ],
+            { encoding: 'utf8', windowsHide: true },
+        )
+        if (result.status !== 0) return []
+        const rows = JSON.parse(result.stdout || '[]')
+        return (Array.isArray(rows) ? rows : [rows]).map(row => ({
+            pid: Number(row.ProcessId),
+            parentPid: Number(row.ParentProcessId),
+        }))
+    }
+    const result = spawnSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' })
+    if (result.status !== 0) return []
+    return result.stdout
+        .trim()
+        .split('\n')
+        .map(line => line.trim().split(/\s+/).map(Number))
+        .filter(([pid, parentPid]) => Number.isSafeInteger(pid) && Number.isSafeInteger(parentPid))
+        .map(([pid, parentPid]) => ({ pid, parentPid }))
+}
+
+export const snapshotProcessTree = rootPid => {
+    const rows = processTable()
+    const childrenByParent = new Map()
+    for (const row of rows) {
+        const children = childrenByParent.get(row.parentPid) ?? []
+        children.push(row.pid)
+        childrenByParent.set(row.parentPid, children)
+    }
+    const result = []
+    const visit = (pid, depth) => {
+        const startIdentity = processStartIdentity(pid)
+        if (!startIdentity) return
+        result.push({ pid, startIdentity, depth })
+        for (const childPid of childrenByParent.get(pid) ?? []) visit(childPid, depth + 1)
+    }
+    visit(rootPid, 0)
+    return result.sort((left, right) => right.depth - left.depth)
+}
+
+const signalProcessSnapshot = (snapshot, signal) => {
+    for (const processRecord of snapshot) {
+        if (processStartIdentity(processRecord.pid) !== processRecord.startIdentity) continue
+        try {
+            process.kill(processRecord.pid, signal)
+        } catch (error) {
+            if (error?.code !== 'ESRCH') throw error
+        }
+    }
+}
+
+export const signalProcessTree = (rootPid, signal) => {
+    signalProcessSnapshot(snapshotProcessTree(rootPid), signal)
+}
+
+export const stopProcessTree = async (rootPid, expectedStartIdentity = null) => {
+    const snapshot = snapshotProcessTree(rootPid)
+    if (
+        expectedStartIdentity &&
+        !snapshot.some(
+            processRecord =>
+                processRecord.pid === rootPid && processRecord.startIdentity === expectedStartIdentity,
+        )
+    ) {
+        return
+    }
+    const descendants = snapshot.filter(processRecord => processRecord.pid !== rootPid)
+    signalProcessSnapshot(descendants, 'SIGTERM')
+    if (descendants.length > 0) {
+        const naturalExitDeadline = nowMs() + 500
+        while (processStartIdentity(rootPid) === expectedStartIdentity && nowMs() < naturalExitDeadline) {
+            await sleep(25)
+        }
+    }
+    signalProcessSnapshot(
+        snapshot.filter(processRecord => processRecord.pid === rootPid),
+        'SIGTERM',
+    )
+    const deadline = nowMs() + 2_000
+    while (
+        snapshot.some(
+            processRecord => processStartIdentity(processRecord.pid) === processRecord.startIdentity,
+        ) &&
+        nowMs() < deadline
+    ) {
+        await sleep(50)
+    }
+    signalProcessSnapshot(snapshot, 'SIGKILL')
+}
+
+const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+const isPort = value => Number.isSafeInteger(value) && value >= 1024 && value <= 65535
+const isBundle = value =>
+    isRecord(value) &&
+    isPort(value.renderer) &&
+    isPort(value.cdp) &&
+    isPort(value.inspector) &&
+    new Set([value.renderer, value.cdp, value.inspector]).size === 3
+
+const parseManifest = value => {
+    if (
+        !isRecord(value) ||
+        value.version !== manifestVersion ||
+        typeof value.worktreeId !== 'string' ||
+        !Number.isSafeInteger(value.registryGeneration) ||
+        value.registryGeneration < 0 ||
+        typeof value.path !== 'string' ||
+        typeof value.branch !== 'string' ||
+        !isBundle(value.bundle)
+    ) {
+        throw new InstanceError('Invalid worktree manifest', 'CORRUPT_MANIFEST')
+    }
+    return value
+}
+
+const emptyRegistry = () => ({
+    version: registryVersion,
+    generation: 0,
+    allocations: {},
+    transients: {},
+})
+
+const parseHolder = value => {
+    if (
+        !isRecord(value) ||
+        typeof value.id !== 'string' ||
+        typeof value.role !== 'string' ||
+        !Number.isSafeInteger(value.pid) ||
+        typeof value.startIdentity !== 'string' ||
+        typeof value.heartbeatAt !== 'string' ||
+        typeof value.worktreeId !== 'string'
+    ) {
+        throw new InstanceError('Invalid holder', 'CORRUPT_REGISTRY')
+    }
+    if (value.processGroup !== undefined && typeof value.processGroup !== 'boolean') {
+        throw new InstanceError('Invalid holder process group', 'CORRUPT_REGISTRY')
+    }
+    return value
+}
+
+const parseAllocation = value => {
+    if (
+        !isRecord(value) ||
+        typeof value.worktreeId !== 'string' ||
+        typeof value.path !== 'string' ||
+        typeof value.branch !== 'string' ||
+        typeof value.createdAt !== 'string' ||
+        typeof value.updatedAt !== 'string' ||
+        !Number.isSafeInteger(value.generation) ||
+        value.generation < 0 ||
+        !isBundle(value.bundle) ||
+        typeof value.appDataPath !== 'string' ||
+        !Array.isArray(value.holders) ||
+        !Array.isArray(value.claims) ||
+        !value.claims.every(claim => typeof claim === 'string') ||
+        !(value.inactiveSince === null || typeof value.inactiveSince === 'string') ||
+        typeof value.releaseWhenIdle !== 'boolean' ||
+        typeof value.wasActive !== 'boolean' ||
+        !value.holders.every(holder => {
+            try {
+                parseHolder(holder)
+                return true
+            } catch {
+                return false
+            }
+        })
+    ) {
+        throw new InstanceError('Invalid allocation', 'CORRUPT_REGISTRY')
+    }
+    return value
+}
+
+const parseTransient = value => {
+    if (
+        !isRecord(value) ||
+        typeof value.id !== 'string' ||
+        typeof value.worktreeId !== 'string' ||
+        typeof value.workflow !== 'string' ||
+        typeof value.path !== 'string' ||
+        typeof value.createdAt !== 'string' ||
+        !isBundle(value.bundle) ||
+        !Array.isArray(value.claims) ||
+        !value.claims.every(claim => typeof claim === 'string') ||
+        !isRecord(value.holder)
+    ) {
+        throw new InstanceError('Invalid transient allocation', 'CORRUPT_REGISTRY')
+    }
+    parseHolder(value.holder)
+    return value
+}
+
+const parseRegistry = value => {
+    if (
+        !isRecord(value) ||
+        value.version !== registryVersion ||
+        !Number.isSafeInteger(value.generation) ||
+        value.generation < 0 ||
+        !isRecord(value.allocations) ||
+        !isRecord(value.transients)
+    ) {
+        throw new InstanceError('Invalid instance registry', 'CORRUPT_REGISTRY')
+    }
+    Object.entries(value.allocations).forEach(([id, allocation]) => {
+        parseAllocation(allocation)
+        if (allocation.worktreeId !== id)
+            throw new InstanceError('Allocation key mismatch', 'CORRUPT_REGISTRY')
+    })
+    Object.entries(value.transients).forEach(([id, transient]) => {
+        parseTransient(transient)
+        if (transient.id !== id || transient.holder.worktreeId !== transient.worktreeId) {
+            throw new InstanceError('Transient key mismatch', 'CORRUPT_REGISTRY')
+        }
+    })
+    return value
+}
+
+const readJson = async path => JSON.parse(await readFile(path, 'utf8'))
+
+const quarantine = async path => {
+    if (!existsSync(path)) return null
+    const quarantined = `${path}.corrupt-${Date.now()}-${randomUUID()}`
+    await rename(path, quarantined)
+    return quarantined
+}
+
+const atomicWriteJson = async (path, value) => {
+    await mkdir(dirname(path), { recursive: true })
+    const temporary = `${path}.tmp-${process.pid}-${randomUUID()}`
+    const handle = await open(temporary, 'wx', 0o600)
+    try {
+        await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`)
+        await handle.sync()
+    } finally {
+        await handle.close()
+    }
+    await rename(temporary, path)
+}
+
+const lockOwnerIsLive = async lockPath => {
+    try {
+        const owner = await readJson(join(lockPath, 'owner.json'))
+        return (
+            isRecord(owner) &&
+            Number.isSafeInteger(owner.pid) &&
+            typeof owner.startIdentity === 'string' &&
+            processStartIdentity(owner.pid) === owner.startIdentity
+        )
+    } catch {
+        try {
+            const info = await stat(lockPath)
+            return nowMs() - info.mtimeMs < 5_000
+        } catch {
+            return false
+        }
+    }
+}
+
+const acquireLock = async paths => {
+    await mkdir(paths.root, { recursive: true })
+    const deadline = nowMs() + lockWaitMs
+    for (;;) {
+        try {
+            await mkdir(paths.lock)
+            await atomicWriteJson(join(paths.lock, 'owner.json'), {
+                ...currentProcessIdentity(),
+                acquiredAt: iso(nowMs()),
+            })
+            return async () => rm(paths.lock, { recursive: true, force: true })
+        } catch (error) {
+            if (error?.code !== 'EEXIST') throw error
+            if (!(await lockOwnerIsLive(paths.lock))) {
+                const stale = `${paths.lock}.stale-${Date.now()}-${randomUUID()}`
+                try {
+                    await rename(paths.lock, stale)
+                    await rm(stale, { recursive: true, force: true })
+                    continue
+                } catch (renameError) {
+                    if (renameError?.code !== 'ENOENT') throw renameError
+                }
+            }
+            if (nowMs() >= deadline) {
+                throw new InstanceError(
+                    `Timed out waiting for instance registry lock at ${paths.lock}`,
+                    'LOCK_TIMEOUT',
+                )
+            }
+            await sleep(25 + Math.floor(Math.random() * 50))
+        }
+    }
+}
+
+const readRegistry = async paths => {
+    try {
+        return parseRegistry(await readJson(paths.registry))
+    } catch (error) {
+        if (error?.code === 'ENOENT') return emptyRegistry()
+        await quarantine(paths.registry)
+        return emptyRegistry()
+    }
+}
+
+const rotateLog = async path => {
+    const configuredLimit = Number(
+        process.env['RELEASE_MAESTRO_INSTANCE_LOG_LIMIT_BYTES'] ?? defaultLogLimitBytes,
+    )
+    const logLimitBytes =
+        Number.isSafeInteger(configuredLimit) && configuredLimit > 0 ? configuredLimit : defaultLogLimitBytes
+    try {
+        if ((await stat(path)).size < logLimitBytes) return
+    } catch (error) {
+        if (error?.code === 'ENOENT') return
+        throw error
+    }
+    await rm(`${path}.${retainedLogs}`, { force: true })
+    for (let index = retainedLogs; index >= 1; index -= 1) {
+        const source = index === 1 ? path : `${path}.${index - 1}`
+        const target = `${path}.${index}`
+        try {
+            await rename(source, target)
+        } catch (error) {
+            if (error?.code !== 'ENOENT') throw error
+        }
+    }
+}
+
+const redact = value => {
+    if (typeof value === 'string') {
+        return value
+            .replace(/([?&](?:token|key|secret|password)=)[^&\s]+/gi, '$1[redacted]')
+            .replace(/\b(?:sk|ghp|github_pat)_[A-Za-z0-9_-]+\b/g, '[redacted]')
+    }
+    if (Array.isArray(value)) return value.map(redact)
+    if (!isRecord(value)) return value
+    return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [
+            key,
+            /token|secret|password|environment|arguments|command/i.test(key) ? '[redacted]' : redact(item),
+        ]),
+    )
+}
+
+const appendEvent = async (paths, event, details = {}) => {
+    await mkdir(paths.root, { recursive: true })
+    await rotateLog(paths.log)
+    const entry = redact({ at: iso(nowMs()), event, ...details })
+    await appendFile(paths.log, `${JSON.stringify(entry)}\n`, { mode: 0o600 })
+}
+
+export const logDiagnostic = async (event, details = {}) => {
+    const paths = getStatePaths()
+    const releaseLock = await acquireLock(paths)
+    try {
+        await appendEvent(paths, event, details)
+    } finally {
+        await releaseLock()
+    }
+}
+
+const canonicalizePath = async path => {
+    let cursor = resolve(path)
+    const tail = []
+    for (;;) {
+        try {
+            const existing = await realpath(cursor)
+            return join(existing, ...tail.reverse())
+        } catch (error) {
+            if (error?.code !== 'ENOENT') throw error
+            const parent = dirname(cursor)
+            if (parent === cursor) return resolve(path)
+            tail.push(basename(cursor))
+            cursor = parent
+        }
+    }
+}
+
+const appDataFor = worktree =>
+    canonicalizePath(process.env['RELEASE_MAESTRO_APP_DATA_DIR'] ?? join(worktree.root, '.app-data.dev'))
+
+const allocationState = (allocation, at = nowMs(), graceMs = defaultGraceMs) => {
+    if (allocation.holders.length > 0) return 'active'
+    if (allocation.inactiveSince) {
+        return at - Date.parse(allocation.inactiveSince) >= graceMs ? 'expired' : 'inactive'
+    }
+    return 'reserved'
+}
+
+const activeClaims = registry => {
+    const claims = []
+    for (const allocation of Object.values(registry.allocations)) {
+        if (allocation.holders.length === 0) continue
+        for (const resource of allocation.claims) {
+            claims.push({
+                resource,
+                workflow: 'dev',
+                worktreeId: allocation.worktreeId,
+                path: allocation.path,
+                holders: allocation.holders,
+                startedAt: allocation.createdAt,
+            })
+        }
+    }
+    for (const transient of Object.values(registry.transients)) {
+        for (const resource of transient.claims) {
+            claims.push({
+                resource,
+                workflow: transient.workflow,
+                worktreeId: transient.worktreeId,
+                path: transient.path,
+                holders: [transient.holder],
+                startedAt: transient.createdAt,
+            })
+        }
+    }
+    return claims
+}
+
+const describeConflict = conflict => {
+    const holder = conflict.holders[0]
+    return (
+        `Resource ${conflict.resource} is held by ${conflict.workflow} in ${conflict.path} ` +
+        `(worktree ${conflict.worktreeId}, PID ${holder.pid}, process start ${holder.startIdentity}, since ${conflict.startedAt}).`
+    )
+}
+
+const assertClaimsAvailable = (registry, claims, worktreeId, allowedWorkflow = null) => {
+    const conflict = activeClaims(registry).find(
+        active =>
+            claims.includes(active.resource) &&
+            !(
+                active.worktreeId === worktreeId &&
+                allowedWorkflow !== null &&
+                active.workflow === allowedWorkflow
+            ),
+    )
+    if (conflict) throw new InstanceError(describeConflict(conflict), 'RESOURCE_CONFLICT')
+}
+
+const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()) => {
+    for (const allocation of Object.values(registry.allocations)) {
+        allocation.holders = allocation.holders.filter(holder => holderIsLive(holder))
+        if (!existsSync(allocation.path) && allocation.holders.length === 0) {
+            delete registry.allocations[allocation.worktreeId]
+            continue
+        }
+        if (allocation.holders.length === 0 && allocation.wasActive && !allocation.inactiveSince) {
+            allocation.inactiveSince = iso(at)
+        }
+        if (allocation.holders.length > 0) {
+            allocation.wasActive = true
+            allocation.inactiveSince = null
+        }
+        if (allocation.releaseWhenIdle && allocation.holders.length === 0) {
+            delete registry.allocations[allocation.worktreeId]
+            continue
+        }
+        if (allocationState(allocation, at, graceMs) === 'expired') {
+            delete registry.allocations[allocation.worktreeId]
+        }
+    }
+    for (const [id, transient] of Object.entries(registry.transients)) {
+        if (!holderIsLive(transient.holder)) delete registry.transients[id]
+    }
+    return registry
+}
+
+const configuredGraceMs = () => {
+    const value = process.env['RELEASE_MAESTRO_INSTANCE_GRACE_MS']
+    if (value === undefined) return defaultGraceMs
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed) || parsed < 0) {
+        throw new InstanceError('RELEASE_MAESTRO_INSTANCE_GRACE_MS must be a non-negative integer')
+    }
+    return parsed
+}
+
+const withRegistry = async action => {
+    const paths = getStatePaths()
+    const releaseLock = await acquireLock(paths)
+    try {
+        const registry = reconcileRegistry(await readRegistry(paths))
+        const result = await action(registry, paths)
+        registry.generation += 1
+        await atomicWriteJson(paths.registry, registry)
+        return result
+    } finally {
+        await releaseLock()
+    }
+}
+
+export const reconcileInstances = async source => {
+    const worktree = await resolveWorktree()
+    await withRegistry(async (registry, paths) => {
+        await appendEvent(paths, 'session-start-reconciled', {
+            path: worktree.root,
+            source: typeof source === 'string' ? source : 'unknown',
+            allocations: Object.keys(registry.allocations).length,
+            transients: Object.keys(registry.transients).length,
+        })
+    })
+}
+
+const readManifest = async worktree => {
+    try {
+        return parseManifest(await readJson(worktree.manifestPath))
+    } catch (error) {
+        if (error?.code !== 'ENOENT') await quarantine(worktree.manifestPath)
+        return null
+    }
+}
+
+const writeManifest = async (worktree, allocation, generation) =>
+    atomicWriteJson(worktree.manifestPath, {
+        version: manifestVersion,
+        worktreeId: allocation.worktreeId,
+        registryGeneration: generation,
+        path: worktree.root,
+        branch: worktree.branch,
+        bundle: allocation.bundle,
+    })
+
+const manualBundle = () => {
+    const values = [
+        process.env['RELEASE_MAESTRO_RENDERER_PORT'],
+        process.env['RELEASE_MAESTRO_CDP_PORT'],
+        process.env['RELEASE_MAESTRO_INSPECTOR_PORT'],
+    ]
+    const supplied = values.filter(value => value !== undefined).length
+    if (supplied === 0) return null
+    if (supplied !== values.length) {
+        throw new InstanceError(
+            'Manual port configuration requires RELEASE_MAESTRO_RENDERER_PORT, RELEASE_MAESTRO_CDP_PORT, and RELEASE_MAESTRO_INSPECTOR_PORT together.',
+            'PARTIAL_BUNDLE',
+        )
+    }
+    const bundle = { renderer: Number(values[0]), cdp: Number(values[1]), inspector: Number(values[2]) }
+    if (!isBundle(bundle) || new Set(Object.values(bundle)).size !== 3) {
+        throw new InstanceError(
+            'Manual ports must be three distinct integers from 1024 through 65535.',
+            'INVALID_BUNDLE',
+        )
+    }
+    return bundle
+}
+
+const canBind = (port, host) =>
+    new Promise(resolvePromise => {
+        const server = net.createServer()
+        server.unref()
+        server.once('error', error => resolvePromise(error?.code === 'EADDRNOTAVAIL'))
+        server.listen({ port, host, exclusive: true }, () => server.close(() => resolvePromise(true)))
+    })
+
+export const portIsAvailable = async port =>
+    (await canBind(port, '127.0.0.1')) && (await canBind(port, '::1'))
+
+const bundleIsAvailable = async bundle => {
+    for (const port of Object.values(bundle)) {
+        if (!(await portIsAvailable(port))) return false
+    }
+    return true
+}
+
+const listenerPids = port => {
+    if (process.platform === 'win32') {
+        const result = spawnSync('netstat.exe', ['-ano', '-p', 'tcp'], {
+            encoding: 'utf8',
+            windowsHide: true,
+        })
+        return result.stdout
+            .split('\n')
+            .map(line => line.trim().split(/\s+/))
+            .filter(parts => parts.length >= 5 && parts[1]?.endsWith(`:${port}`) && parts[3] === 'LISTENING')
+            .map(parts => Number(parts[4]))
+            .filter(Number.isSafeInteger)
+    }
+    const result = spawnSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'], {
+        encoding: 'utf8',
+    })
+    if (result.error?.code === 'ENOENT') return []
+    return result.stdout
+        .split('\n')
+        .filter(line => line.startsWith('p'))
+        .map(line => Number(line.slice(1)))
+        .filter(Number.isSafeInteger)
+}
+
+const assertPersistedBundleUsable = async (allocation, registeringHolder) => {
+    const liveHolders = [
+        ...allocation.holders.filter(holderIsLive),
+        ...(registeringHolder ? [registeringHolder] : []),
+    ]
+    for (const [name, port] of Object.entries(allocation.bundle)) {
+        if (await portIsAvailable(port)) continue
+        const listeners = listenerPids(port)
+        const owningRole = name === 'renderer' ? 'dev-renderer' : 'dev-electron'
+        const owned = liveHolders.some(holder => holder.role === owningRole)
+        if (owned) continue
+        const pid = listeners[0]
+        const started = pid ? processStartIdentity(pid) : 'unknown'
+        throw new InstanceError(
+            `Persisted ${name} port ${port} for dev in ${allocation.path} is occupied by an unrelated process` +
+                `${pid ? `, PID ${pid}, process start ${started}` : ''}. Run make dev-reallocate after stopping or identifying it.`,
+            'PORT_CONFLICT',
+        )
+    }
+}
+
+const occupiedPorts = registry => {
+    const ports = new Set()
+    for (const allocation of Object.values(registry.allocations)) {
+        Object.values(allocation.bundle).forEach(port => ports.add(port))
+    }
+    for (const transient of Object.values(registry.transients)) {
+        Object.values(transient.bundle).forEach(port => ports.add(port))
+    }
+    return ports
+}
+
+const allocateBundle = async (registry, requested = null, excludeWorktreeId = null) => {
+    const reserved = occupiedPorts({
+        ...registry,
+        allocations: Object.fromEntries(
+            Object.entries(registry.allocations).filter(([id]) => id !== excludeWorktreeId),
+        ),
+    })
+    if (requested) {
+        if (
+            Object.values(requested).some(port => reserved.has(port)) ||
+            !(await bundleIsAvailable(requested))
+        ) {
+            throw new InstanceError(
+                `Requested port bundle is unavailable: ${JSON.stringify(requested)}`,
+                'PORT_CONFLICT',
+            )
+        }
+        return requested
+    }
+    for (let slot = 0; slot < 60_000; slot += 1) {
+        const bundle = {
+            renderer: defaultPorts.renderer + slot,
+            cdp: defaultPorts.cdp + slot,
+            inspector: defaultPorts.inspector + slot,
+        }
+        if (Object.values(bundle).some(port => port > 65535 || reserved.has(port))) continue
+        if (await bundleIsAvailable(bundle)) return bundle
+    }
+    throw new InstanceError('No complete loopback port bundle is available.', 'PORT_EXHAUSTED')
+}
+
+const newHolder = async (
+    worktreeId,
+    role,
+    pid = process.pid,
+    parentHolderId = null,
+    processGroup = false,
+) => {
+    const startIdentity = processStartIdentity(pid)
+    if (!startIdentity) throw new InstanceError(`PID ${pid} is not running`, 'PROCESS_NOT_FOUND')
+    return {
+        id: randomUUID(),
+        role,
+        pid,
+        startIdentity,
+        heartbeatAt: iso(nowMs()),
+        worktreeId,
+        ...(parentHolderId ? { parentHolderId } : {}),
+        ...(processGroup ? { processGroup: true } : {}),
+    }
+}
+
+export const allocateDevelopment = async ({ reallocate = false } = {}) => {
+    const worktree = await resolveWorktree()
+    const initialManifest = await readManifest(worktree)
+    const appDataPath = await appDataFor(worktree)
+    let result
+    await withRegistry(async (registry, paths) => {
+        const manifest = (await readManifest(worktree)) ?? initialManifest
+        const manifestId = manifest?.worktreeId
+        const existing = manifestId ? registry.allocations[manifestId] : null
+        const worktreeId = existing ? existing.worktreeId : (manifestId ?? randomUUID())
+        const appDataClaim = `app-data:${appDataPath}`
+        assertClaimsAvailable(registry, [appDataClaim], worktreeId, 'dev')
+
+        if (existing && !reallocate) {
+            existing.path = worktree.root
+            existing.branch = worktree.branch
+            existing.appDataPath = appDataPath
+            existing.claims = [`electron-development-bundle:${worktreeId}`, appDataClaim]
+            existing.updatedAt = iso(nowMs())
+            existing.generation = registry.generation + 1
+            result = existing
+            await writeManifest(worktree, existing, registry.generation + 1)
+            await appendEvent(paths, 'dev-allocation-reused', {
+                worktreeId,
+                path: worktree.root,
+                ports: existing.bundle,
+            })
+            return
+        }
+
+        if (existing?.holders.length) {
+            throw new InstanceError(
+                'Cannot reallocate while validated holders remain. Run make dev-stop first.',
+                'LIVE_HOLDERS',
+            )
+        }
+        const bundle = await allocateBundle(registry, manualBundle(), existing?.worktreeId)
+        const allocation = {
+            worktreeId,
+            generation: registry.generation + 1,
+            path: worktree.root,
+            branch: worktree.branch,
+            bundle,
+            appDataPath,
+            claims: [`electron-development-bundle:${worktreeId}`, appDataClaim],
+            holders: [],
+            createdAt: existing?.createdAt ?? iso(nowMs()),
+            updatedAt: iso(nowMs()),
+            inactiveSince: null,
+            releaseWhenIdle: false,
+            wasActive: false,
+        }
+        registry.allocations[worktreeId] = allocation
+        result = allocation
+        await writeManifest(worktree, allocation, registry.generation + 1)
+        await appendEvent(paths, reallocate ? 'dev-allocation-reallocated' : 'dev-allocation-created', {
+            worktreeId,
+            path: worktree.root,
+            ports: bundle,
+        })
+    })
+    return result
+}
+
+export const getDevelopment = async ({ allocate = false } = {}) => {
+    const worktree = await resolveWorktree()
+    const manifest = await readManifest(worktree)
+    if (!manifest) return allocate ? allocateDevelopment() : null
+    let result = null
+    let generation = null
+    await withRegistry(async registry => {
+        const allocation = registry.allocations[manifest.worktreeId]
+        if (!allocation) return
+        allocation.path = worktree.root
+        allocation.branch = worktree.branch
+        allocation.updatedAt = iso(nowMs())
+        allocation.generation = registry.generation + 1
+        result = allocation
+        generation = registry.generation + 1
+    })
+    if (!result && allocate) return allocateDevelopment()
+    if (result && manifest.registryGeneration !== generation)
+        await writeManifest(worktree, result, generation)
+    return result
+}
+
+export const registerDevelopmentHolder = async (
+    role,
+    pid = process.pid,
+    parentHolderId = null,
+    processGroup = false,
+) => {
+    const allocation = await allocateDevelopment()
+    let holder
+    await withRegistry(async (registry, paths) => {
+        const current = registry.allocations[allocation.worktreeId]
+        if (!current) throw new InstanceError('Development allocation disappeared during registration')
+        holder = await newHolder(current.worktreeId, role, pid, parentHolderId, processGroup)
+        if (role === 'dev-supervisor') {
+            const other = current.holders.find(
+                item =>
+                    ['dev-supervisor', 'dev-renderer', 'dev-electron'].includes(item.role) &&
+                    holderIsLive(item),
+            )
+            if (other) {
+                throw new InstanceError(
+                    `The dev workflow already owns ${current.path}: ${other.role}, PID ${other.pid}, process start ${other.startIdentity}, since ${other.heartbeatAt}.`,
+                    'DUPLICATE_WORKFLOW',
+                )
+            }
+            assertClaimsAvailable(registry, current.claims, current.worktreeId, 'dev')
+        }
+        await assertPersistedBundleUsable(current, holder)
+        current.holders.push(holder)
+        current.inactiveSince = null
+        current.wasActive = true
+        current.updatedAt = iso(nowMs())
+        await appendEvent(paths, 'holder-registered', {
+            worktreeId: current.worktreeId,
+            role,
+            holder: { id: holder.id, pid: holder.pid, startIdentity: holder.startIdentity },
+        })
+    })
+    return { allocation, holder }
+}
+
+export const heartbeatDevelopmentHolder = async holderId => {
+    await withRegistry(async registry => {
+        for (const allocation of Object.values(registry.allocations)) {
+            const holder = allocation.holders.find(item => item.id === holderId)
+            if (!holder) continue
+            if (!holderIsLive(holder)) return
+            holder.heartbeatAt = iso(nowMs())
+            allocation.updatedAt = holder.heartbeatAt
+            return
+        }
+    })
+}
+
+export const removeDevelopmentHolder = async holderId => {
+    await withRegistry(async (registry, paths) => {
+        for (const allocation of Object.values(registry.allocations)) {
+            const before = allocation.holders.length
+            allocation.holders = allocation.holders.filter(holder => holder.id !== holderId)
+            if (allocation.holders.length === before) continue
+            allocation.updatedAt = iso(nowMs())
+            if (allocation.holders.length === 0) allocation.inactiveSince = iso(nowMs())
+            await appendEvent(paths, 'holder-removed', { worktreeId: allocation.worktreeId, holderId })
+            if (allocation.releaseWhenIdle && allocation.holders.length === 0) {
+                delete registry.allocations[allocation.worktreeId]
+                await appendEvent(paths, 'dev-allocation-released', {
+                    worktreeId: allocation.worktreeId,
+                    reason: 'release-when-idle',
+                })
+            }
+            return
+        }
+    })
+}
+
+export const releaseDevelopment = async ({ force = false, requestWhenIdle = false } = {}) => {
+    const worktree = await resolveWorktree()
+    const manifest = await readManifest(worktree)
+    if (!manifest) return { released: false, reason: 'unallocated' }
+    return withRegistry(async (registry, paths) => {
+        const allocation = registry.allocations[manifest.worktreeId]
+        if (!allocation) return { released: false, reason: 'unallocated' }
+        if (allocation.holders.length > 0) {
+            if (requestWhenIdle) {
+                allocation.releaseWhenIdle = true
+                await appendEvent(paths, 'release-when-idle-requested', {
+                    worktreeId: allocation.worktreeId,
+                    holders: allocation.holders.map(({ id, role, pid, startIdentity }) => ({
+                        id,
+                        role,
+                        pid,
+                        startIdentity,
+                    })),
+                })
+                return { released: false, reason: 'live-holders', requested: true }
+            }
+            const details = allocation.holders
+                .map(holder => `${holder.role} PID ${holder.pid} started ${holder.startIdentity}`)
+                .join(', ')
+            throw new InstanceError(
+                `Refusing release while validated holders remain: ${details}`,
+                'LIVE_HOLDERS',
+            )
+        }
+        delete registry.allocations[allocation.worktreeId]
+        await appendEvent(paths, 'dev-allocation-released', {
+            worktreeId: allocation.worktreeId,
+            reason: force ? 'forced-corrupt-metadata-release' : 'explicit',
+        })
+        return { released: true }
+    })
+}
+
+export const statusDevelopment = async () => {
+    const worktree = await resolveWorktree()
+    const manifest = await readManifest(worktree)
+    if (!manifest) return { state: 'unallocated', path: worktree.root, branch: worktree.branch }
+    let status
+    await withRegistry(async registry => {
+        const allocation = registry.allocations[manifest.worktreeId]
+        if (!allocation) {
+            status = { state: 'reclaimable', path: worktree.root, branch: worktree.branch, manifest }
+            return
+        }
+        allocation.path = worktree.root
+        allocation.branch = worktree.branch
+        allocation.updatedAt = iso(nowMs())
+        allocation.generation = registry.generation + 1
+        await writeManifest(worktree, allocation, registry.generation + 1)
+        status = {
+            state: allocationState(allocation),
+            health: allocation.holders.every(
+                holder => holderIsLive(holder) && nowMs() - Date.parse(holder.heartbeatAt) < 60_000,
+            )
+                ? 'healthy'
+                : 'degraded',
+            ageMs: nowMs() - Date.parse(allocation.createdAt),
+            ...allocation,
+        }
+    })
+    return status
+}
+
+export const stopDevelopment = async () => {
+    const worktree = await resolveWorktree()
+    const manifest = await readManifest(worktree)
+    if (!manifest) return []
+    const stopped = []
+    let targets = []
+    await withRegistry(async (registry, paths) => {
+        const allocation = registry.allocations[manifest.worktreeId]
+        if (!allocation) return
+        targets = [...allocation.holders]
+            .reverse()
+            .filter(holder => holder.worktreeId === allocation.worktreeId && holderIsLive(holder))
+        await appendEvent(paths, 'dev-stop-requested', {
+            worktreeId: allocation.worktreeId,
+            targets: targets.map(({ role, pid, startIdentity }) => ({ role, pid, startIdentity })),
+        })
+    })
+    for (const holder of targets) {
+        if (!holderIsLive(holder)) continue
+        await stopProcessTree(holder.pid, holder.startIdentity)
+        stopped.push({ role: holder.role, pid: holder.pid, startIdentity: holder.startIdentity })
+    }
+    return stopped
+}
+
+const workflowClaims = (workflow, appDataPath, worktreeId) => {
+    switch (workflow) {
+        case 'electron-e2e':
+            return [
+                `electron-development-bundle:${worktreeId}`,
+                `workflow:electron-e2e:${worktreeId}`,
+                `app-data:${appDataPath}`,
+            ]
+        case 'renderer-e2e':
+            return [`workflow:renderer-e2e:${worktreeId}`]
+        default:
+            throw new InstanceError(`Unknown workflow: ${workflow}`, 'INVALID_WORKFLOW')
+    }
+}
+
+export const allocateTransient = async workflow => {
+    const worktree = await resolveWorktree()
+    const appDataPath = await canonicalizePath(join(worktree.root, '.app-data.e2e', workflow))
+    let manifest = await readManifest(worktree)
+    if (!manifest) {
+        await allocateDevelopment()
+        await releaseDevelopment()
+        manifest = await readManifest(worktree)
+    }
+    if (!manifest) throw new InstanceError('Could not create the worktree identity manifest')
+    const worktreeId = manifest.worktreeId
+    let transient
+    await withRegistry(async (registry, paths) => {
+        const claims = workflowClaims(workflow, appDataPath, worktreeId)
+        assertClaimsAvailable(registry, claims, worktreeId)
+        const id = randomUUID()
+        transient = {
+            id,
+            worktreeId,
+            workflow,
+            path: worktree.root,
+            createdAt: iso(nowMs()),
+            bundle: await allocateBundle(registry),
+            appDataPath,
+            claims,
+            holder: await newHolder(worktreeId, `workflow:${workflow}`),
+        }
+        registry.transients[id] = transient
+        await appendEvent(paths, 'transient-allocation-created', {
+            transientId: id,
+            worktreeId,
+            workflow,
+            ports: transient.bundle,
+        })
+    })
+    return transient
+}
+
+export const heartbeatTransient = async id => {
+    await withRegistry(async registry => {
+        const transient = registry.transients[id]
+        if (transient && holderIsLive(transient.holder)) transient.holder.heartbeatAt = iso(nowMs())
+    })
+}
+
+export const releaseTransient = async id => {
+    await withRegistry(async (registry, paths) => {
+        const transient = registry.transients[id]
+        if (!transient) return
+        delete registry.transients[id]
+        await appendEvent(paths, 'transient-allocation-released', {
+            transientId: id,
+            worktreeId: transient.worktreeId,
+            workflow: transient.workflow,
+        })
+    })
+}
+
+export const bundleEnvironment = (bundle, appDataPath = null) => ({
+    RELEASE_MAESTRO_RENDERER_PORT: String(bundle.renderer),
+    RELEASE_MAESTRO_CDP_PORT: String(bundle.cdp),
+    RELEASE_MAESTRO_INSPECTOR_PORT: String(bundle.inspector),
+    ...(appDataPath ? { RELEASE_MAESTRO_APP_DATA_DIR: appDataPath } : {}),
+})
+
+export const spawnManaged = (command, args, options = {}) =>
+    spawn(command, args, {
+        stdio: 'inherit',
+        detached: process.platform !== 'win32',
+        ...options,
+    })
+
+export const forwardSignals = children => {
+    const listeners = new Map()
+    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+        const listener = () => {
+            for (const child of children()) {
+                if (!child?.pid || child.exitCode !== null || child.signalCode !== null) continue
+                signalProcessTree(child.pid, signal)
+            }
+        }
+        process.on(signal, listener)
+        listeners.set(signal, listener)
+    }
+    return () => listeners.forEach((listener, signal) => process.off(signal, listener))
+}
+
+export const startHeartbeat = callback => {
+    const timer = setInterval(() => void callback().catch(() => {}), 15_000)
+    timer.unref()
+    return () => clearInterval(timer)
+}
+
+export const waitForPort = async (port, timeoutMs = 120_000) => {
+    const deadline = nowMs() + timeoutMs
+    while (nowMs() < deadline) {
+        for (const host of ['::1', '127.0.0.1']) {
+            const connected = await new Promise(resolvePromise => {
+                const socket = net.connect({ host, port })
+                socket.once('connect', () => {
+                    socket.destroy()
+                    resolvePromise(true)
+                })
+                socket.once('error', () => resolvePromise(false))
+                socket.setTimeout(250, () => {
+                    socket.destroy()
+                    resolvePromise(false)
+                })
+            })
+            if (connected) return
+        }
+        await sleep(100)
+    }
+    throw new InstanceError(`Timed out waiting for loopback port ${port}`, 'PORT_TIMEOUT')
+}
+
+export const followLog = async ({ follow = false } = {}) => {
+    const { log } = getStatePaths()
+    let offset = 0
+    const printNew = async () => {
+        let content = ''
+        try {
+            content = await readFile(log, 'utf8')
+        } catch (error) {
+            if (error?.code !== 'ENOENT') throw error
+        }
+        if (content.length < offset) offset = 0
+        const next = content.slice(offset)
+        offset = content.length
+        for (const line of next.split('\n').filter(Boolean)) {
+            try {
+                const event = JSON.parse(line)
+                process.stdout.write(`${event.at} ${event.event} ${JSON.stringify(event)}\n`)
+            } catch {
+                process.stdout.write(`${line}\n`)
+            }
+        }
+    }
+    await printNew()
+    if (!follow) return
+    for (;;) {
+        await sleep(500)
+        await printNew()
+    }
+}
+
+export const releaseRemovedWorktree = async (worktreePath, worktreeId = null) => {
+    const canonical = resolve(worktreePath)
+    if (existsSync(canonical)) return { released: false, reason: 'worktree-still-exists' }
+    return withRegistry(async (registry, paths) => {
+        const match = Object.values(registry.allocations).find(
+            allocation =>
+                (worktreeId && allocation.worktreeId === worktreeId) ||
+                resolve(allocation.path) === canonical,
+        )
+        if (!match) return { released: false, reason: 'unallocated' }
+        if (match.holders.length > 0) return { released: false, reason: 'live-holders' }
+        delete registry.allocations[match.worktreeId]
+        await appendEvent(paths, 'removed-worktree-released', {
+            worktreeId: match.worktreeId,
+            path: canonical,
+        })
+        return { released: true }
+    })
+}
