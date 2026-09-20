@@ -15,6 +15,14 @@ const isSafeExternalUrl = (url: string) => {
     }
 }
 
+const openUrlInNativeBrowser = (url: string) => {
+    if (!isSafeExternalUrl(url)) return
+
+    void shell.openExternal(url).catch(error => {
+        console.error('Failed to open URL in the native browser:', error)
+    })
+}
+
 export default class App {
     // Keep a global reference of the window object, if you don't, the window will
     // be closed automatically when the JavaScript object is garbage collected.
@@ -136,12 +144,12 @@ export default class App {
         })
 
         App.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-            if (isSafeExternalUrl(url)) {
-                void shell.openExternal(url).catch(error => {
-                    console.error('Failed to open URL in the native browser:', error)
-                })
-            }
+            openUrlInNativeBrowser(url)
             return { action: 'deny' }
+        })
+        App.mainWindow.webContents.on('will-navigate', (event, url) => {
+            event.preventDefault()
+            openUrlInNativeBrowser(url)
         })
 
         // Emitted when the window is closed.

@@ -1,5 +1,6 @@
 const openExternal = jest.fn().mockResolvedValue(undefined)
 const setWindowOpenHandler = jest.fn()
+const onWebContents = jest.fn()
 const mainWindow = {
     loadURL: jest.fn(),
     on: jest.fn(),
@@ -7,6 +8,7 @@ const mainWindow = {
     setMenu: jest.fn(),
     webContents: {
         getURL: jest.fn(() => 'http://localhost:4200'),
+        on: onWebContents,
         setWindowOpenHandler,
     },
 }
@@ -54,4 +56,18 @@ describe('App main window', () => {
             expect(openExternal).not.toHaveBeenCalled()
         },
     )
+
+    it('opens links that navigate the primary window in the native browser', () => {
+        App['initMainWindow']()
+
+        expect(onWebContents).toHaveBeenCalledWith('will-navigate', expect.any(Function))
+        const handleNavigation = onWebContents.mock.calls.find(
+            ([eventName]) => eventName === 'will-navigate',
+        )![1]
+        const event = { preventDefault: jest.fn() }
+        handleNavigation(event, 'https://artist.bandcamp.com/album/release')
+
+        expect(event.preventDefault).toHaveBeenCalledTimes(1)
+        expect(openExternal).toHaveBeenCalledWith('https://artist.bandcamp.com/album/release')
+    })
 })
