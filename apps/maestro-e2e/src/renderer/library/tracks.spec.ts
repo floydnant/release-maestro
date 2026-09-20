@@ -903,6 +903,7 @@ test.describe('what the window actually renders', () => {
 
             const first = Math.floor(top / 40)
             await expect(rowByTitle(page, `Row ${first}`)).toBeVisible()
+            await expect.poll(async () => (await visibleIndices(page)).length).toBeGreaterThan(5)
             expectContiguousFrom(await visibleIndices(page), first)
         }
     })

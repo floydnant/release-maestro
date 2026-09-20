@@ -659,7 +659,7 @@ test.describe('keyboard', () => {
         const before = await focusedIndex(page)
         await page.keyboard.press('ArrowRight')
 
-        expect(await focusedIndex(page)).toBe(before + 1)
+        await expect.poll(() => focusedIndex(page)).toBe(before + 1)
     })
 
     test('moves a whole row on the vertical arrows', async ({ page }) => {
@@ -671,7 +671,7 @@ test.describe('keyboard', () => {
         const before = await focusedIndex(page)
         await page.keyboard.press('ArrowDown')
 
-        expect(await focusedIndex(page)).toBe(before + columns)
+        await expect.poll(() => focusedIndex(page)).toBe(before + columns)
     })
 
     test('focuses a long-jump destination after its window renders', async ({ page }) => {

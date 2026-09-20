@@ -30,6 +30,11 @@ const sidebarLink = (page: Page, name: string) => page.getByRole('link', { name,
 const trackGrid = (page: Page) => page.getByRole('grid', { name: 'Tracks' })
 const albumGrid = (page: Page) => page.getByRole('grid', { name: 'Albums' })
 
+const required = <T>(value: T | null, message: string): T => {
+    if (value == null) throw new Error(message)
+    return value
+}
+
 const songWindows = async (controller: RendererScenarioController): Promise<QuerySongsRequest[]> =>
     (await controller.calls('library:query-songs')).map(call => call.payload as QuerySongsRequest)
 
@@ -39,11 +44,13 @@ const albumTrackWindows = async (
 ): Promise<QuerySongsRequest[]> =>
     (await songWindows(controller)).filter(request => request.query.filter.albumIds?.includes(albumId))
 
-/** A fully visible album link after the virtual window has stopped moving. */
-const settledAlbumHref = (grid: ReturnType<typeof albumGrid>): Promise<string | null> =>
+/** A fully visible album link and the position the grid has settled at. */
+const settledAlbum = (
+    grid: ReturnType<typeof albumGrid>,
+): Promise<{ href: string; scrollTop: number } | null> =>
     grid.evaluate(
         element =>
-            new Promise<string | null>(resolve => {
+            new Promise<{ href: string; scrollTop: number } | null>(resolve => {
                 let previous: string | null = null
                 let frames = 0
 
@@ -59,7 +66,9 @@ const settledAlbumHref = (grid: ReturnType<typeof albumGrid>): Promise<string | 
                             ?.getAttribute('href') ?? null
                     const reading = href == null ? null : `${element.scrollTop}:${href}`
 
-                    if (reading != null && reading == previous) return resolve(href)
+                    if (href != null && reading == previous) {
+                        return resolve({ href, scrollTop: element.scrollTop })
+                    }
                     if (++frames >= 60) return resolve(null)
 
                     previous = reading
@@ -236,11 +245,10 @@ test.describe('where Back lands', () => {
         // A tile that is wholly on screen, so that clicking it does not scroll the grid
         // and quietly change the position under test. Which album that is depends on the
         // measured geometry, so it is read off the DOM rather than named.
-        const tileHref = await settledAlbumHref(grid)
-        expect(tileHref).not.toBeNull()
+        const departure = required(await settledAlbum(grid), 'The album grid did not settle')
 
-        await page.locator(`a[href="${tileHref}"]`).click()
-        await expect(page).toHaveURL(new RegExp(`${tileHref}$`))
+        await page.locator(`a[href="${departure.href}"]`).click()
+        await expect(page).toHaveURL(new RegExp(`${departure.href}$`))
         await expect(trackGrid(page)).toBeVisible()
 
         await backButton(page).click()
@@ -248,7 +256,7 @@ test.describe('where Back lands', () => {
         await expect(page).toHaveURL(/sort=year/)
         await expect(page).toHaveURL(/dir=desc/)
         await expect(page.getByRole('searchbox', { name: 'Search albums' })).toHaveValue('album 1')
-        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(2_400)
+        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(departure.scrollTop)
         await expect(forwardButton(page)).toBeEnabled()
     })
 
@@ -268,15 +276,14 @@ test.describe('where Back lands', () => {
             })
             .toBeGreaterThan(1_500)
 
-        const tileHref = await settledAlbumHref(grid)
-        expect(tileHref).not.toBeNull()
-        await page.locator(`a[href="${tileHref}"]`).click()
+        const departure = required(await settledAlbum(grid), 'The album grid did not settle')
+        await page.locator(`a[href="${departure.href}"]`).click()
         await expect(trackGrid(page)).toBeVisible()
 
         await backButton(page).click()
 
         await expect(grid).toBeVisible()
-        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(target)
+        await expect.poll(() => grid.evaluate(element => element.scrollTop)).toBe(departure.scrollTop)
         await expect(page.locator('a[href^="/albums/"]').first()).toBeVisible()
     })
 
