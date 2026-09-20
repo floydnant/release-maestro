@@ -1248,7 +1248,11 @@ export const spawnManaged = (command, args, options = {}) =>
 export const spawnPackageBinary = (binary, args, options = {}) => {
     const configured = process.env['RELEASE_MAESTRO_PNPM_COMMAND']?.trim()
     const [command, ...prefix] = configured ? configured.split(/\s+/) : ['corepack', 'pnpm']
-    return spawnManaged(command, [...prefix, 'exec', binary, ...args], options)
+    return spawnManaged(command, [...prefix, 'exec', binary, ...args], {
+        ...options,
+        // Windows exposes Corepack and pnpm through command shims, not executable files.
+        shell: process.platform === 'win32',
+    })
 }
 
 export const forwardSignals = children => {

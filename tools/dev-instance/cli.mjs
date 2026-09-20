@@ -198,7 +198,9 @@ const runWorkflow = async args => {
             ...bundleEnvironment(transient.bundle, transient.appDataPath),
         }
         for (const [command, ...commandArgs] of commands) {
-            child = spawnManaged(command, commandArgs, { env: environment })
+            child = ['nx', 'playwright'].includes(command)
+                ? spawnPackageBinary(command, commandArgs, { env: environment })
+                : spawnManaged(command, commandArgs, { env: environment })
             await setTransientChildHolder(transient.id, child.pid)
             if (pendingSignal) signalProcessTree(child.pid, pendingSignal)
             stopHeartbeat()
