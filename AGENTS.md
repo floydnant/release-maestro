@@ -26,8 +26,9 @@ specific ADR and conflict; do not implement the change until it is resolved.
 
 Issues and PRDs live in **Linear**, not GitHub Issues — `#123` in a commit subject is a pull
 request; Linear issues are `MAE-123`.
-Open Linear tickets only through the Linear MCP. Never use computer use, a browser, or the
-integrated browser to open them.
+Access and manage Linear tickets only through the Linear MCP. This includes creating, viewing,
+searching, browsing, updating, and triaging tickets. Never use computer use, a browser, or the
+integrated browser for Linear tickets.
 See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) for the workflow and
 the `/triage` skill for the states and labels.
 
