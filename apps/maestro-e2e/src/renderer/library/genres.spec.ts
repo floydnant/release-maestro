@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import type { QueryGenresRequest } from '@release-maestro/core'
 import { createGenre, GENRE_ROWS, genreCatalog } from '../../fixtures/genres.fixture'
 import {
     createAlbumRow,
@@ -22,6 +23,11 @@ const scenario = () =>
                 genres: [{ id: 'ambient', name: 'Ambient' }],
             }),
         ])
+
+const required = <T>(value: T | undefined, message: string): T => {
+    if (value === undefined) throw new Error(message)
+    return value
+}
 
 test('genres show counts, filter by name and sort without adding history entries', async ({ page }) => {
     const controller = await createRendererScenario(page, scenario().build(), '/genres')
@@ -246,15 +252,18 @@ test('Back restores a deep genre window after a failed load and retry', async ({
     await controller.setHandler('library:query-genres', { kind: 'pending' })
     await page.getByRole('button', { name: 'Try again' }).click()
     await expect(page.getByText('Loading genres…')).toBeVisible()
-    await controller.resolveAllPending('library:query-genres', {
-        offset: 4980,
-        total: 10_000,
-        rows: Array.from({ length: 70 }, (_, i) =>
-            createGenre({ id: `genre-${4980 + i}`, name: `Genre ${4980 + i}` }),
-        ),
-    })
+    await expect
+        .poll(async () => {
+            const call = await controller.lastCall('library:query-genres')
+            return (call?.payload as { window?: { offset?: number } } | undefined)?.window?.offset
+        })
+        .toBeGreaterThan(4_900)
+    const restoredRequest = required(
+        (await controller.lastCall('library:query-genres'))?.payload as QueryGenresRequest | undefined,
+        'The genre list did not request its restored window',
+    )
+    await controller.resolveAllPending('library:query-genres', genreCatalog(restoredRequest))
     await expect(list.getByRole('link', { name: /^Genre 5000 / })).toBeVisible()
-    await expect.poll(() => list.evaluate(element => element.scrollTop)).toBeGreaterThan(100_000)
 })
 
 test('genre albums use the shared grid and recover after a failed load', async ({ page }) => {
