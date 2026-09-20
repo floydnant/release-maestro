@@ -334,6 +334,24 @@ test('MCP wrapper resolves the worktree endpoint, propagates exit code, and clea
     assert.deepEqual(status.holders, [])
 })
 
+test('MCP wrapper reports and logs package-manager startup failures', async () => {
+    const fixture = await createFixture()
+    const child = spawn(process.execPath, [mcpWrapper, 'chrome-devtools'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, {
+            RELEASE_MAESTRO_PNPM_COMMAND: join(fixture.base, 'missing-pnpm'),
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(child)
+
+    const result = await childResult(child)
+    assert.equal(result.code, 1)
+    assert.match(result.stderr, /MCP wrapper failed: spawn .*missing-pnpm ENOENT/)
+    const log = await readFile(join(fixture.state, 'orchestration.jsonl'), 'utf8')
+    assert.match(log, /"event":"mcp-wrapper-failed"/)
+})
+
 test('MCP wrapper forwards signals and dev-stop leaves unrelated processes alive', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)

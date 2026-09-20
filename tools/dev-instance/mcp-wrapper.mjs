@@ -54,9 +54,9 @@ try {
     })
     if (pendingSignal) signalProcessTree(child.pid, pendingSignal, child.releaseMaestroStartIdentity)
     stopHeartbeat = startHeartbeat(() => heartbeatDevelopmentHolder(holder.id))
-    const { code, signal } = await new Promise(resolve => {
+    const { code, signal } = await new Promise((resolve, reject) => {
         child.once('exit', (code, signal) => resolve({ code, signal }))
-        child.once('error', error => resolve({ code: 1, signal: null, error }))
+        child.once('error', reject)
     })
     if (signal) {
         const signalNumber = osConstants.signals[signal] ?? 0
