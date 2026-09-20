@@ -45,17 +45,14 @@ describe('App main window', () => {
         expect(result).toEqual({ action: 'deny' })
     })
 
-    it.each(['file:///tmp/private-file', 'not a URL'])(
-        'blocks an unsafe new-window URL: %s',
-        url => {
-            App['initMainWindow']()
+    it.each(['file:///tmp/private-file', 'not a URL'])('blocks an unsafe new-window URL: %s', url => {
+        App['initMainWindow']()
 
-            const handleWindowOpen = setWindowOpenHandler.mock.calls[0]![0]
+        const handleWindowOpen = setWindowOpenHandler.mock.calls[0]![0]
 
-            expect(handleWindowOpen({ url })).toEqual({ action: 'deny' })
-            expect(openExternal).not.toHaveBeenCalled()
-        },
-    )
+        expect(handleWindowOpen({ url })).toEqual({ action: 'deny' })
+        expect(openExternal).not.toHaveBeenCalled()
+    })
 
     it('opens links that navigate the primary window in the native browser', () => {
         App['initMainWindow']()
