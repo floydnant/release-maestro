@@ -141,7 +141,12 @@ writeFileSync(process.env.MCP_CAPTURE, JSON.stringify(process.argv.slice(2)))
         [join(worktrees[1], 'tools/dev-instance/mcp-wrapper.mjs'), 'chrome-devtools'],
         {
             cwd: worktrees[1],
-            env: { ...environment, PATH: `${fakeBin}:${process.env.PATH}`, MCP_CAPTURE: capture },
+            env: {
+                ...environment,
+                PATH: `${fakeBin}:${process.env.PATH}`,
+                RELEASE_MAESTRO_PNPM_COMMAND: fakePnpm,
+                MCP_CAPTURE: capture,
+            },
             encoding: 'utf8',
         },
     )
