@@ -13,7 +13,6 @@ app/**/*.js
 
 # dependencies
 node_modules
-/.corepack
 
 # IDEs and editors
 .idea

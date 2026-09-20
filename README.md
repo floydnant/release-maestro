@@ -36,19 +36,19 @@ make install # or make i
 make dev
 ```
 
-Node 22 or 24 is required because Node 25 no longer bundles Corepack. `make install` creates a
-repository-local Corepack `pnpm` shim, installs the root package from the
-lockfile, fetches the locked Rust crates, and installs Playwright Chromium with its system
-dependencies. The shim reads the exact pnpm version and hash from `package.json`, so Make and CI use
-plain `pnpm` commands without modifying system-wide binaries. Linux system dependencies may require
-sudo. Chromium requires an OS supported by the installed Playwright version.
+Node 22 or 24, pnpm, and Rust are required. If pnpm is not installed yet, Node 22 and 24 include
+Corepack, so `corepack enable pnpm` provides the version and hash pinned in `package.json`. After
+that one-time setup, use `pnpm` directly. `make install` installs the root package from the lockfile,
+fetches the locked Rust crates, and installs Playwright Chromium with its system dependencies.
+Linux system dependencies may require sudo. Chromium requires an OS supported by the installed
+Playwright version.
 
 `make dev` builds the host metadata-engine binary and starts the Angular dev server and Electron
 main process with hot reload. The host binary lives in `apps/metadata-engine/target/dev/release`,
 separate from the packaging binary in `target/release`. Development always uses this host path.
 If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
 
-Use `make nx ARGS='build metadata-engine'` to build only the host sidecar.
+Use `pnpm exec nx build metadata-engine` to build only the host sidecar.
 
 ## Commands
 
@@ -72,9 +72,9 @@ For focused work, use Nx; see the [fast-iteration examples](docs/testing.md#fast
 and test-name filters.
 
 ```bash
-make nx ARGS='test maestro-renderer'
-make nx ARGS='lint maestro-electron'
-make nx ARGS='build maestro-core'
+pnpm exec nx test maestro-renderer
+pnpm exec nx lint maestro-electron
+pnpm exec nx build maestro-core
 ```
 
 There is no repo-wide typecheck target; `build` is the type gate for app code. See
@@ -100,7 +100,7 @@ Five Nx projects, whose names are not self-explanatory:
 
 `apple-scripts/` holds the AppleScript that exports mail out of Apple Mail; `drizzle/` holds
 migrations. A project's `project.json` declares its explicit configuration, but Nx can infer
-additional targets. Use `make nx ARGS='show project <project> --web false'` for the effective project and
+additional targets. Use `pnpm exec nx show project <project> --web false` for the effective project and
 target inventory.
 
 Note that the project layout is not the product layout: both product contexts (music library, release

@@ -54,24 +54,24 @@ may have uncommitted work in it — so `make format-check`, never `make format` 
 
 Repo-wide gates go through `make`; single-project gates go direct to `nx`.
 
-| Diff touches                                        | Run                                                       |
-| --------------------------------------------------- | --------------------------------------------------------- |
-| anything                                            | `make format-check`, `make lint`                          |
-| `apps/maestro-renderer`                             | `make nx ARGS='test maestro-renderer'`                    |
-| `apps/maestro-electron`                             | `make nx ARGS='test maestro-electron'`                    |
-| `libs/maestro-core`                                 | `make nx ARGS='test maestro-core'`                        |
-| `apps/metadata-engine`                              | `make nx ARGS='test metadata-engine'`                     |
-| `apps/maestro-renderer/design-tokens`               | `make nx ARGS='run maestro-renderer:design-tokens-check'` |
-| several projects and full-app coverage is warranted | `make affected`                                           |
-| a user journey (scan/import, feed, playback)        | `make e2e` or `make e2e-renderer`                         |
-| build config, packaging, or deps                    | `make build-prod`                                         |
+| Diff touches                                        | Run                                                     |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| anything                                            | `make format-check`, `make lint`                        |
+| `apps/maestro-renderer`                             | `pnpm exec nx test maestro-renderer`                    |
+| `apps/maestro-electron`                             | `pnpm exec nx test maestro-electron`                    |
+| `libs/maestro-core`                                 | `pnpm exec nx test maestro-core`                        |
+| `apps/metadata-engine`                              | `pnpm exec nx test metadata-engine`                     |
+| `apps/maestro-renderer/design-tokens`               | `pnpm exec nx run maestro-renderer:design-tokens-check` |
+| several projects and full-app coverage is warranted | `make affected`                                         |
+| a user journey (scan/import, feed, playback)        | `make e2e` or `make e2e-renderer`                       |
+| build config, packaging, or deps                    | `make build-prod`                                       |
 
 `make affected` includes both development E2E layers. Do not use it merely as a convenient
 multi-project unit-test command; select the affected Nx project targets directly unless full-app
 coverage is intentional.
 
 There is no repo-wide typecheck target. Type errors in renderer, electron, and core surface through
-`build` — run `make nx ARGS='build <project>'` (or `make build`) when the diff changes types or contracts.
+`build` — run `pnpm exec nx build <project>` (or `make build`) when the diff changes types or contracts.
 The e2e suites type-check themselves as a task dependency.
 
 Report pass/fail with the command that produced it. Never claim green without having run it. If a

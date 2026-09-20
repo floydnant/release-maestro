@@ -1,15 +1,10 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean corepack-enable install rebuild-electron rebuild-node nx version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
 SKIP_NX_CACHE := false
 E2E_REPORT := electron
-COREPACK_DIR := $(CURDIR)/.corepack
-ifeq ($(OS),Windows_NT)
-PNPM := "$(COREPACK_DIR)/pnpm.cmd"
-else
-PNPM := "$(COREPACK_DIR)/pnpm"
-endif
+PNPM := pnpm
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
@@ -133,11 +128,7 @@ clean: ## Clean build outputs and caches
 	rm -rf dist/ release/ .angular/cache/
 	$(PNPM) exec nx reset
 .PHONY: i
-corepack-enable: ## Enable the pnpm shim pinned by package.json (requires Node 22 or 24)
-	mkdir -p "$(COREPACK_DIR)"
-	corepack enable pnpm --install-directory "$(COREPACK_DIR)"
-
-install: corepack-enable ## Install pnpm packages, Rust crates, and Playwright Chromium dependencies
+install: ## Install pnpm packages, Rust crates, and Playwright Chromium dependencies
 	$(PNPM) install --frozen-lockfile
 	cargo fetch --locked --manifest-path apps/metadata-engine/Cargo.toml
 	$(PNPM) exec playwright install --with-deps chromium
@@ -146,9 +137,6 @@ rebuild-electron: ## Rebuild native dependencies (e.g. after Electron version ch
 	electron-rebuild -f -w better-sqlite3
 rebuild-node: ## Rebuild native dependencies for Node.js (e.g. after Node version change)
 	$(PNPM) rebuild better-sqlite3
-nx: ## Run a focused Nx command through pinned pnpm (for example: make nx ARGS='test maestro-core')
-	$(if $(strip $(ARGS)),,$(error Usage: make nx ARGS='test maestro-core'))
-	$(PNPM) exec nx $(ARGS)
 
 version: ## Generate changelog and update version
 	$(PNPM) exec conventional-changelog -i CHANGELOG.md -s -r 0 && $(PNPM) exec prettier --write CHANGELOG.md && git add CHANGELOG.md

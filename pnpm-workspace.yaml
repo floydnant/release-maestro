@@ -10,6 +10,10 @@ trustPolicy: no-downgrade
 # Apply the provenance downgrade check to releases from the last year. Older packages often predate
 # registry provenance, and the lockfile integrity still pins their contents.
 trustPolicyIgnoreAfter: 525600
+# Revalidate the lockfile against the registry rather than trusting policy decisions made elsewhere.
+trustLockfile: false
+# Transitive packages must come from a registry or another source pnpm recognizes as trusted.
+blockExoticSubdeps: true
 
 # Adding a dependency cannot introduce an unreviewed install script. Keep this list narrow.
 strictDepBuilds: true
@@ -19,7 +23,6 @@ allowBuilds:
     '@swc/core': true
     better-sqlite3: true
     electron: true
-    electron-winstaller: true
     esbuild: true
     # These packages have optional native accelerators or browser downloads that this project does
     # not use. Keep their scripts blocked instead of granting unnecessary code execution.
@@ -31,6 +34,10 @@ allowBuilds:
 
 # pnpm may resolve peer ranges for validation, but it must not add undeclared peers automatically.
 autoInstallPeers: false
+peerDependencyRules:
+    # app-builder-lib loads this peer only for its Squirrel target; this app packages Windows with NSIS.
+    ignoreMissing:
+        - electron-builder-squirrel-windows
 savePrefix: ''
 # These exact versions predate this policy but were less than three days old when the migration
 # lockfile was created. No later version is exempt.

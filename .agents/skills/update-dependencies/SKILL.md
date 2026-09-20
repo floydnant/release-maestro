@@ -11,8 +11,10 @@ Preserve existing product behavior.
 
 ## Update and repair
 
-1. Honor the requested scope. By default, update all tracked npm and Cargo packages to compatible
-   stable releases, including majors. Keep prereleases opt-in and existing pinning conventions.
+1. Honor the requested scope. By default, update all tracked npm and Cargo packages and the Node.js
+   runtime to compatible stable releases, including majors. Use a supported Node.js LTS release and
+   keep its engine range, CI version, and documented prerequisites aligned. Keep prereleases opt-in
+   and existing pinning conventions.
 2. Start a dedicated branch or worktree from `origin/main`, record the base commit, and establish a
    verification baseline. Reuse a matching branch and PR when resuming. Keep unrelated changes out.
 3. Check registries and official migration guides for versions, peer dependencies, and runtime

@@ -32,18 +32,17 @@ the `/triage` skill for the states and labels.
 ## Verification
 
 ALWAYS verify after changing code, starting with the narrowest relevant check.
-The `Makefile` is authoritative for repo-wide commands; `make nx ARGS='show project <project> --web false'`
+The `Makefile` is authoritative for repo-wide commands; `pnpm exec nx show project <project> --web false`
 is authoritative for the effective targets of one project. Command examples in docs and skills are
 intentional convenience summaries.
 
 - **`make` for repo-wide checks** — `make sure`, `make affected`, `make test`, `make lint`,
   `make format-check`, `make build-prod`, `db-*`, packaging.
-- **`make install` or `make i` for dependencies** — creates the repository-local pinned pnpm shim,
-  installs the root package, fetches locked Rust crates, and installs Playwright Chromium with its
-  system dependencies. Node and Rust must already be installed.
-- **`nx` for single-project checks** — `make nx ARGS='test maestro-renderer'`,
-  `make nx ARGS='build maestro-core'`.
-  Prefer it over a make wrapper for focused work; file/name-filtered examples are in
+- **`make install` or `make i` for dependencies** — installs the root package, fetches locked Rust
+  crates, and installs Playwright Chromium with its system dependencies. Node, pnpm, and Rust must
+  already be installed.
+- **`nx` for single-project checks** — `pnpm exec nx test maestro-renderer`,
+  `pnpm exec nx build maestro-core`. Prefer it for focused work; file/name-filtered examples are in
   [docs/testing.md](docs/testing.md#fast-iteration).
 - `make sure` formats, lints, builds, unit-tests, and runs development Electron and renderer E2E. It
   mutates formatting. Use `make e2e` or `make e2e-renderer` when only one E2E layer is relevant.

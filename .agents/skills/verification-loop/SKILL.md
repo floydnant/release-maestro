@@ -16,19 +16,18 @@ description: Verification loop using repository make targets.
 - **`make` for overarching checks** — anything that spans the repo: `make sure`, `make affected`,
   `make test`, `make lint`, `make format-check`, `make build-prod`, and the `db-*` and packaging
   targets. These are the public interface and what CI runs.
-- **`nx` for focused, single-project checks** — `make nx ARGS='test maestro-renderer'`,
-  `make nx ARGS='lint maestro-electron'`, `make nx ARGS='build maestro-core'`. Prefer it for a single project and
+- **`nx` for focused, single-project checks** — `pnpm exec nx test maestro-renderer`,
+  `pnpm exec nx lint maestro-electron`, `pnpm exec nx build maestro-core`. Prefer it for a single project and
   filtered iteration; `docs/testing.md#fast-iteration` has the exact Jest and Playwright forms.
 - Never use package scripts directly. `package.json` intentionally has almost none.
 - The `Makefile` is authoritative for repo-wide commands. Use
-  `make nx ARGS='show project <project> --web false'` to inspect the effective targets of one project,
+  `pnpm exec nx show project <project> --web false` to inspect the effective targets of one project,
   including inferred targets.
 
 ## Commands
 
-- `make install` or `make i` — create the repository-local pinned pnpm shim, install the root package from the
-  lockfile, fetch locked Rust crates, and install Playwright Chromium with its system dependencies.
-  Requires Node and Rust.
+- `make install` or `make i` — install the root package from the lockfile, fetch locked Rust crates,
+  and install Playwright Chromium with its system dependencies. Requires Node, pnpm, and Rust.
 
 - `make sure` — format, then lint, build, unit-test, and run development Electron and renderer E2E
   across the repo. **Mutates formatting.**
@@ -42,7 +41,7 @@ description: Verification loop using repository make targets.
   suite. Use it for file-URL routing, lazy chunks, packaging-only, and cross-platform behavior.
 - `make build-prod` — catches production-only build issues.
 - **A project's type gate is its `build`, unless it has no build.** A green unit test is not a type
-  check. Non-buildable projects expose `typecheck`; inspect them with `make nx ARGS='show project <project>'`.
+  check. Non-buildable projects expose `typecheck`; inspect them with `pnpm exec nx show project <project>`.
 - See `docs/testing.md` for the test-layer split and E2E isolation conventions.
 
 ## Reading the results

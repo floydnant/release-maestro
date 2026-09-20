@@ -6,7 +6,6 @@ import { parse } from 'yaml'
 const dependencySections = ['dependencies', 'devDependencies', 'optionalDependencies']
 const ignoredDirectories = new Set([
     '.angular',
-    '.corepack',
     '.git',
     '.nx',
     'coverage',
@@ -21,14 +20,34 @@ const requiredPnpmSettings = new Map([
     ['minimumReleaseAge', 4320],
     ['minimumReleaseAgeIgnoreMissingTime', false],
     ['minimumReleaseAgeStrict', true],
+    ['minimumReleaseAgeExcludePrune', true],
     ['trustPolicy', 'no-downgrade'],
+    ['trustPolicyIgnoreAfter', 525600],
+    ['trustLockfile', false],
+    ['blockExoticSubdeps', true],
     ['strictDepBuilds', true],
     ['autoInstallPeers', false],
     ['savePrefix', ''],
 ])
+const requiredBuildPolicy = new Map([
+    ['@parcel/watcher', true],
+    ['@pnpm/exe', true],
+    ['@swc/core', true],
+    ['better-sqlite3', true],
+    ['electron', true],
+    ['esbuild', true],
+    ['lmdb', false],
+    ['msgpackr-extract', false],
+    ['nx', true],
+    ['puppeteer', false],
+    ['unrs-resolver', false],
+])
 
 export const isExactDependencySpecifier = specifier =>
     /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(specifier)
+
+export const isExactReleaseAgeExclusion = selector =>
+    /^(?:@[^/@]+\/)?[^/@]+@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(selector)
 
 export const isPinnedActionReference = reference => {
     if (reference.startsWith('./')) return true
@@ -88,8 +107,13 @@ export const verifyDependencyPolicy = workspaceRoot => {
     // installation constraints and must not duplicate versions owned by the root lockfile.
     const rootManifest = JSON.parse(readFileSync(join(workspaceRoot, 'package.json'), 'utf8'))
 
-    if (!/^pnpm@\d+\.\d+\.\d+\+sha512\.[0-9a-f]{128}$/.test(rootManifest.packageManager ?? '')) {
+    const packageManagerMatch = /^pnpm@(\d+\.\d+\.\d+)\+sha512\.[0-9a-f]{128}$/.exec(
+        rootManifest.packageManager ?? '',
+    )
+    if (!packageManagerMatch) {
         errors.push('package.json: packageManager must pin pnpm by exact version and SHA-512 hash')
+    } else if (rootManifest.engines?.pnpm !== packageManagerMatch[1]) {
+        errors.push(`package.json: engines.pnpm must match packageManager (${packageManagerMatch[1]})`)
     }
     if (rootManifest.engines?.node !== '>= 22.22.3 < 25') {
         errors.push('package.json: engines.node must require Node 22.22.3 through Node 24')
@@ -101,6 +125,39 @@ export const verifyDependencyPolicy = workspaceRoot => {
         if (pnpmSettings?.[setting] !== requiredValue) {
             errors.push(`pnpm-workspace.yaml: ${setting} must be ${JSON.stringify(requiredValue)}`)
         }
+    }
+    const releaseAgeExclusions = pnpmSettings?.minimumReleaseAgeExclude ?? []
+    if (
+        !Array.isArray(releaseAgeExclusions) ||
+        releaseAgeExclusions.some(selector =>
+            typeof selector === 'string' ? !isExactReleaseAgeExclusion(selector) : true,
+        )
+    ) {
+        errors.push('pnpm-workspace.yaml: minimumReleaseAgeExclude may contain exact versions only')
+    }
+    if ((pnpmSettings?.trustPolicyExclude ?? []).length !== 0) {
+        errors.push('pnpm-workspace.yaml: trustPolicyExclude must be empty')
+    }
+    const ignoredMissingPeers = pnpmSettings?.peerDependencyRules?.ignoreMissing
+    if (
+        !Array.isArray(ignoredMissingPeers) ||
+        ignoredMissingPeers.length !== 1 ||
+        ignoredMissingPeers[0] !== 'electron-builder-squirrel-windows'
+    ) {
+        errors.push(
+            'pnpm-workspace.yaml: peerDependencyRules.ignoreMissing must contain only electron-builder-squirrel-windows',
+        )
+    }
+    const buildPolicy = pnpmSettings?.allowBuilds
+    if (
+        buildPolicy === null ||
+        typeof buildPolicy !== 'object' ||
+        Array.isArray(buildPolicy) ||
+        buildPolicy === undefined ||
+        Object.keys(buildPolicy).length !== requiredBuildPolicy.size ||
+        [...requiredBuildPolicy].some(([name, allowed]) => buildPolicy[name] !== allowed)
+    ) {
+        errors.push('pnpm-workspace.yaml: allowBuilds must match the reviewed install-script policy')
     }
 
     const unsupportedLockfiles = new Set(['package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock'])

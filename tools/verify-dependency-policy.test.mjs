@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test, { afterEach } from 'node:test'
 import {
     isExactDependencySpecifier,
+    isExactReleaseAgeExclusion,
     isPinnedActionReference,
     verifyDependencyPolicy,
 } from './verify-dependency-policy.mjs'
@@ -26,7 +27,7 @@ const createWorkspace = () => {
         JSON.stringify({
             packageManager: `pnpm@1.2.3+sha512.${'a'.repeat(128)}`,
             dependencies: { example: '1.2.3' },
-            engines: { node: '>= 22.22.3 < 25' },
+            engines: { node: '>= 22.22.3 < 25', pnpm: '1.2.3' },
         }),
     )
     writeFileSync(
@@ -35,10 +36,29 @@ const createWorkspace = () => {
             'minimumReleaseAge: 4320',
             'minimumReleaseAgeIgnoreMissingTime: false',
             'minimumReleaseAgeStrict: true',
+            'minimumReleaseAgeExcludePrune: true',
             'trustPolicy: no-downgrade',
+            'trustPolicyIgnoreAfter: 525600',
+            'trustLockfile: false',
+            'blockExoticSubdeps: true',
             'strictDepBuilds: true',
             'autoInstallPeers: false',
             "savePrefix: ''",
+            'allowBuilds:',
+            "  '@parcel/watcher': true",
+            "  '@pnpm/exe': true",
+            "  '@swc/core': true",
+            '  better-sqlite3: true',
+            '  electron: true',
+            '  esbuild: true',
+            '  lmdb: false',
+            '  msgpackr-extract: false',
+            '  nx: true',
+            '  puppeteer: false',
+            '  unrs-resolver: false',
+            'peerDependencyRules:',
+            '  ignoreMissing:',
+            '    - electron-builder-squirrel-windows',
         ].join('\n'),
     )
     writeFileSync(
@@ -64,14 +84,57 @@ test('accepts immutable action references and local actions', () => {
     assert.equal(isPinnedActionReference('docker://registry.example/action:latest'), false)
 })
 
+test('accepts only exact-version release-age exclusions', () => {
+    assert.equal(isExactReleaseAgeExclusion('electron@44.4.3'), true)
+    assert.equal(isExactReleaseAgeExclusion('@jest/core@30.5.2'), true)
+    assert.equal(isExactReleaseAgeExclusion('@jest/*'), false)
+    assert.equal(isExactReleaseAgeExclusion('electron'), false)
+})
+
 test('validates effective pnpm settings instead of matching comments', () => {
     const workspace = createWorkspace()
     writeFileSync(
         join(workspace, 'pnpm-workspace.yaml'),
-        `minimumReleaseAge: 0\n# minimumReleaseAge: 4320\nminimumReleaseAgeIgnoreMissingTime: false\nminimumReleaseAgeStrict: true\ntrustPolicy: no-downgrade\nstrictDepBuilds: true\nautoInstallPeers: false\nsavePrefix: ''\n`,
+        readFileSync(join(workspace, 'pnpm-workspace.yaml'), 'utf8').replace(
+            'minimumReleaseAge: 4320',
+            'minimumReleaseAge: 0\n# minimumReleaseAge: 4320',
+        ),
     )
 
     assert.match(verifyDependencyPolicy(workspace).join('\n'), /minimumReleaseAge must be 4320/)
+})
+
+test('rejects broad security exceptions and unreviewed build-script changes', () => {
+    const workspace = createWorkspace()
+    const settingsPath = join(workspace, 'pnpm-workspace.yaml')
+    writeFileSync(
+        settingsPath,
+        `${readFileSync(settingsPath, 'utf8')}\nminimumReleaseAgeExclude:\n  - '@jest/*'\ntrustPolicyExclude:\n  - example\n`,
+    )
+
+    const errors = verifyDependencyPolicy(workspace).join('\n')
+    assert.match(errors, /minimumReleaseAgeExclude may contain exact versions only/)
+    assert.match(errors, /trustPolicyExclude must be empty/)
+
+    writeFileSync(settingsPath, readFileSync(settingsPath, 'utf8').replace('  nx: true', '  nx: false'))
+    assert.match(
+        verifyDependencyPolicy(workspace).join('\n'),
+        /allowBuilds must match the reviewed install-script policy/,
+    )
+})
+
+test('rejects broad missing-peer exceptions', () => {
+    const workspace = createWorkspace()
+    const settingsPath = join(workspace, 'pnpm-workspace.yaml')
+    writeFileSync(
+        settingsPath,
+        readFileSync(settingsPath, 'utf8').replace('    - electron-builder-squirrel-windows', "    - '*'"),
+    )
+
+    assert.match(
+        verifyDependencyPolicy(workspace).join('\n'),
+        /peerDependencyRules\.ignoreMissing must contain only electron-builder-squirrel-windows/,
+    )
 })
 
 test('parses quoted uses keys while ignoring comments and block-scalar text', () => {
