@@ -36,7 +36,8 @@ make install # or make i
 make dev
 ```
 
-`make install` creates a repository-local Corepack `pnpm` shim, installs the root package from the
+Node 22 or 24 is required because Node 25 no longer bundles Corepack. `make install` creates a
+repository-local Corepack `pnpm` shim, installs the root package from the
 lockfile, fetches the locked Rust crates, and installs Playwright Chromium with its system
 dependencies. The shim reads the exact pnpm version and hash from `package.json`, so Make and CI use
 plain `pnpm` commands without modifying system-wide binaries. Linux system dependencies may require

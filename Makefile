@@ -5,10 +5,11 @@ ICON_SOURCE := $(ICON_DIR)/app-icon.png
 SKIP_NX_CACHE := false
 E2E_REPORT := electron
 COREPACK_DIR := $(CURDIR)/.corepack
-PATH := $(COREPACK_DIR):$(PATH)
-export PATH
-# Force shell PATH lookup so a stale system pnpm cannot bypass the repository-local Corepack shim.
-PNPM := command pnpm
+ifeq ($(OS),Windows_NT)
+PNPM := "$(COREPACK_DIR)/pnpm.cmd"
+else
+PNPM := "$(COREPACK_DIR)/pnpm"
+endif
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
@@ -132,7 +133,7 @@ clean: ## Clean build outputs and caches
 	rm -rf dist/ release/ .angular/cache/
 	$(PNPM) exec nx reset
 .PHONY: i
-corepack-enable: ## Enable the pnpm shim pinned by package.json
+corepack-enable: ## Enable the pnpm shim pinned by package.json (requires Node 22 or 24)
 	mkdir -p "$(COREPACK_DIR)"
 	corepack enable pnpm --install-directory "$(COREPACK_DIR)"
 

@@ -1,24 +1,38 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { readFileSync, readdirSync, lstatSync } from 'node:fs'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'yaml'
 
 const dependencySections = ['dependencies', 'devDependencies', 'optionalDependencies']
-const ignoredDirectories = new Set(['.git', 'dist', 'node_modules', 'release', 'target'])
-const requiredPnpmSettings = [
-    'minimumReleaseAge: 4320',
-    'minimumReleaseAgeIgnoreMissingTime: false',
-    'minimumReleaseAgeStrict: true',
-    'trustPolicy: no-downgrade',
-    'strictDepBuilds: true',
-    'autoInstallPeers: false',
-    "savePrefix: ''",
-]
+const ignoredDirectories = new Set([
+    '.angular',
+    '.corepack',
+    '.git',
+    '.nx',
+    'coverage',
+    'dist',
+    'node_modules',
+    'playwright-report',
+    'release',
+    'target',
+    'test-results',
+])
+const requiredPnpmSettings = new Map([
+    ['minimumReleaseAge', 4320],
+    ['minimumReleaseAgeIgnoreMissingTime', false],
+    ['minimumReleaseAgeStrict', true],
+    ['trustPolicy', 'no-downgrade'],
+    ['strictDepBuilds', true],
+    ['autoInstallPeers', false],
+    ['savePrefix', ''],
+])
 
 export const isExactDependencySpecifier = specifier =>
     /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(specifier)
 
 export const isPinnedActionReference = reference => {
-    if (reference.startsWith('./') || reference.startsWith('docker://')) return true
+    if (reference.startsWith('./')) return true
+    if (/^docker:\/\/.+@sha256:[0-9a-f]{64}$/.test(reference)) return true
     const separator = reference.lastIndexOf('@')
     return separator > 0 && /^[0-9a-f]{40}$/.test(reference.slice(separator + 1))
 }
@@ -28,10 +42,38 @@ const findFiles = (directory, predicate) => {
     for (const entry of readdirSync(directory)) {
         if (ignoredDirectories.has(entry)) continue
         const path = join(directory, entry)
-        if (statSync(path).isDirectory()) files.push(...findFiles(path, predicate))
+        const metadata = lstatSync(path)
+        if (metadata.isSymbolicLink()) {
+            if (predicate(path)) files.push(path)
+            continue
+        }
+        if (metadata.isDirectory()) files.push(...findFiles(path, predicate))
         else if (predicate(path)) files.push(path)
     }
     return files
+}
+
+const collectActionReferences = value => {
+    if (Array.isArray(value)) return value.flatMap(collectActionReferences)
+    if (value === null || typeof value !== 'object') return []
+
+    const references = []
+    for (const [key, nestedValue] of Object.entries(value)) {
+        if (key === 'uses') references.push(nestedValue)
+        else references.push(...collectActionReferences(nestedValue))
+    }
+    return references
+}
+
+const readYaml = (path, workspaceRoot, errors) => {
+    try {
+        return parse(readFileSync(path, 'utf8'))
+    } catch (error) {
+        errors.push(
+            `${relative(workspaceRoot, path)}: invalid YAML (${error instanceof Error ? error.message : String(error)})`,
+        )
+        return undefined
+    }
 }
 
 export const verifyDependencyPolicy = workspaceRoot => {
@@ -44,11 +86,15 @@ export const verifyDependencyPolicy = workspaceRoot => {
     if (!/^pnpm@\d+\.\d+\.\d+\+sha512\.[0-9a-f]{128}$/.test(rootManifest.packageManager ?? '')) {
         errors.push('package.json: packageManager must pin pnpm by exact version and SHA-512 hash')
     }
+    if (rootManifest.engines?.node !== '>= 22.22.3 < 25') {
+        errors.push('package.json: engines.node must require Node 22.22.3 through Node 24')
+    }
 
-    const pnpmSettings = readFileSync(join(workspaceRoot, 'pnpm-workspace.yaml'), 'utf8')
-    for (const setting of requiredPnpmSettings) {
-        if (!pnpmSettings.split('\n').includes(setting)) {
-            errors.push(`pnpm-workspace.yaml: required setting is missing (${setting})`)
+    const pnpmSettingsPath = join(workspaceRoot, 'pnpm-workspace.yaml')
+    const pnpmSettings = readYaml(pnpmSettingsPath, workspaceRoot, errors)
+    for (const [setting, requiredValue] of requiredPnpmSettings) {
+        if (pnpmSettings?.[setting] !== requiredValue) {
+            errors.push(`pnpm-workspace.yaml: ${setting} must be ${JSON.stringify(requiredValue)}`)
         }
     }
 
@@ -67,15 +113,17 @@ export const verifyDependencyPolicy = workspaceRoot => {
         }
     }
 
-    const githubDirectory = join(workspaceRoot, '.github')
-    const workflowFiles = findFiles(githubDirectory, path => /\.ya?ml$/.test(path))
-    for (const path of workflowFiles) {
-        for (const [index, line] of readFileSync(path, 'utf8').split('\n').entries()) {
-            const reference = line.match(/\buses:\s*([^\s#]+)/)?.[1]
-            if (reference && !isPinnedActionReference(reference)) {
-                errors.push(
-                    `${relative(workspaceRoot, path)}:${index + 1}: action is not pinned (${reference})`,
-                )
+    const automationFiles = findFiles(workspaceRoot, path => {
+        const relativePath = relative(workspaceRoot, path)
+        const isWorkflow = relativePath.startsWith(join('.github', 'workflows')) && /\.ya?ml$/.test(path)
+        const isAction = /^action\.ya?ml$/.test(basename(path))
+        return isWorkflow || isAction
+    })
+    for (const path of automationFiles) {
+        const document = readYaml(path, workspaceRoot, errors)
+        for (const reference of collectActionReferences(document)) {
+            if (typeof reference !== 'string' || !isPinnedActionReference(reference)) {
+                errors.push(`${relative(workspaceRoot, path)}: action is not pinned (${String(reference)})`)
             }
         }
     }
