@@ -22,8 +22,8 @@ A desktop app for your music. Scan your local collection into a searchable libra
 
 ## Prerequisites
 
-- Node.js >= 22.22.3 (see `.node-version`)
-- Corepack, which is bundled with the supported Node.js release
+- Node.js (use the version in `.node-version`)
+- Corepack enabled for pnpm
 - A Rust toolchain (`cargo` and `rustc`) for the metadata-engine sidecar. Development builds only the
   host architecture; `make dev` does not require `rustup`.
 - `rustup` for macOS packaging, which builds the sidecar for both Apple Silicon and Intel
@@ -36,12 +36,12 @@ make install # or make i
 make dev
 ```
 
-Node 22.22.3–22.x or 24.15.0–24.x, pnpm, and Rust are required. If pnpm is not installed yet, these
-Node releases include Corepack, so `corepack enable pnpm` provides the version and hash pinned in
-`package.json`. After that one-time setup, use `pnpm` directly. `make install` installs the root
-package from the lockfile, fetches the locked Rust crates, and installs Playwright Chromium with its
-system dependencies. Linux system dependencies may require sudo. Chromium requires an OS supported
-by the installed Playwright version.
+Node.js, pnpm, and Rust are required. `.node-version` selects the development and CI Node.js
+version, while `package.json` declares the supported range and pnpm release. Run
+`corepack enable pnpm` once if pnpm is unavailable, then use `pnpm` directly. `make install` installs
+the root package from the lockfile, fetches the locked Rust crates, and installs Playwright Chromium
+with its system dependencies. Linux system dependencies may require sudo. Chromium requires an OS
+supported by the installed Playwright version.
 
 `make dev` builds the host metadata-engine binary and starts the Angular dev server and Electron
 main process with hot reload. The host binary lives in `apps/metadata-engine/target/dev/release`,
