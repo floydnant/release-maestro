@@ -87,7 +87,7 @@ try {
     }
 
     for (const worktree of worktrees) {
-        const child = spawn('make', ['dev'], {
+        const child = spawn('make', ['PNPM=pnpm', 'dev'], {
             cwd: worktree,
             env: environment,
             stdio: ['ignore', 'pipe', 'pipe'],
