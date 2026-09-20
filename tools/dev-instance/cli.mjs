@@ -21,7 +21,7 @@ import {
     stopDevelopment,
     stopProcessTree,
     waitForPort,
-    heartbeatDevelopmentHolder,
+    heartbeatDevelopmentHolders,
     logDiagnostic,
 } from './core.mjs'
 import { constants as osConstants } from 'node:os'
@@ -55,9 +55,7 @@ const runDevelopment = async () => {
     const children = []
     const childHolders = []
     const stopHeartbeat = startHeartbeat(() =>
-        Promise.all(
-            [supervisor.id, ...childHolders.map(holder => holder.id)].map(heartbeatDevelopmentHolder),
-        ),
+        heartbeatDevelopmentHolders([supervisor.id, ...childHolders.map(holder => holder.id)]),
     )
     const stopForwarding = forwardSignals(() => children)
 

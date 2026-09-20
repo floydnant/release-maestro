@@ -11,7 +11,7 @@ export const manifestVersion = 1
 export const defaultGraceMs = 20 * 60 * 1000
 const defaultPorts = Object.freeze({ renderer: 4200, cdp: 9222, inspector: 5858 })
 const manifestName = '.release-maestro-instance.json'
-const lockWaitMs = 10_000
+const lockWaitMs = 60_000
 const defaultLogLimitBytes = 5 * 1024 * 1024
 const retainedLogs = 3
 
@@ -393,6 +393,7 @@ const lockOwnerIsLive = async lockPath => {
 const acquireLock = async paths => {
     await mkdir(paths.root, { recursive: true })
     const deadline = nowMs() + lockWaitMs
+    let nextOwnerCheckAt = 0
     for (;;) {
         try {
             await mkdir(paths.lock)
@@ -403,7 +404,9 @@ const acquireLock = async paths => {
             return async () => rm(paths.lock, { recursive: true, force: true })
         } catch (error) {
             if (error?.code !== 'EEXIST') throw error
-            if (!(await lockOwnerIsLive(paths.lock))) {
+            const shouldCheckOwner = nowMs() >= nextOwnerCheckAt
+            nextOwnerCheckAt = shouldCheckOwner ? nowMs() + 500 : nextOwnerCheckAt
+            if (shouldCheckOwner && !(await lockOwnerIsLive(paths.lock))) {
                 const stale = `${paths.lock}.stale-${Date.now()}-${randomUUID()}`
                 try {
                     await rename(paths.lock, stale)
@@ -419,7 +422,7 @@ const acquireLock = async paths => {
                     'LOCK_TIMEOUT',
                 )
             }
-            await sleep(25 + Math.floor(Math.random() * 50))
+            await sleep(50 + Math.floor(Math.random() * 50))
         }
     }
 }
@@ -949,14 +952,18 @@ export const registerDevelopmentListenerHolder = async (role, ports, launcherPid
 }
 
 export const heartbeatDevelopmentHolder = async holderId => {
+    await heartbeatDevelopmentHolders([holderId])
+}
+
+export const heartbeatDevelopmentHolders = async holderIds => {
+    const ids = new Set(holderIds)
     await withRegistry(async registry => {
         for (const allocation of Object.values(registry.allocations)) {
-            const holder = allocation.holders.find(item => item.id === holderId)
-            if (!holder) continue
-            if (!holderIsLive(holder)) return
-            holder.heartbeatAt = iso(nowMs())
-            allocation.updatedAt = holder.heartbeatAt
-            return
+            for (const holder of allocation.holders) {
+                if (!ids.has(holder.id) || !holderIsLive(holder)) continue
+                holder.heartbeatAt = iso(nowMs())
+                allocation.updatedAt = holder.heartbeatAt
+            }
         }
     })
 }
