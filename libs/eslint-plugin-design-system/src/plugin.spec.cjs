@@ -9,7 +9,7 @@
  * Every authority is a fixture inside this library — see `fixtures/tailwind.config.cjs` for why the
  * renderer's own config is deliberately not used here.
  *
- * Run with `npx nx test eslint-plugin-design-system`.
+ * Run with `pnpm exec nx test eslint-plugin-design-system`.
  */
 const path = require('node:path')
 const { ESLint, RuleTester } = require('eslint')

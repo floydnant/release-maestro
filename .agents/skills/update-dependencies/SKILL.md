@@ -11,8 +11,10 @@ Preserve existing product behavior.
 
 ## Update and repair
 
-1. Honor the requested scope. By default, update all tracked npm and Cargo packages to compatible
-   stable releases, including majors. Keep prereleases opt-in and existing pinning conventions.
+1. Honor the requested scope. By default, update all tracked npm and Cargo packages and the Node.js
+   runtime to compatible stable releases, including majors. Use a supported Node.js LTS release and
+   keep `.node-version`, the engine range, CI setup, and developer bootstrap documentation aligned.
+   Keep prereleases opt-in and existing pinning conventions.
 2. Start a dedicated branch or worktree from `origin/main`, record the base commit, and establish a
    verification baseline. Reuse a matching branch and PR when resuming. Keep unrelated changes out.
 3. Check registries and official migration guides for versions, peer dependencies, and runtime
@@ -37,7 +39,8 @@ Preserve existing product behavior.
 Follow [verification-loop](../verification-loop/SKILL.md) from focused checks through `make sure`.
 Verify installs from the final lockfiles and inspect generated changes for unrelated churn. Also run:
 
-- `make agents-check` for changes to the `tools/` package.
+- `make agents-check` for changes to agent tooling, its root dependencies, or files under `.agents/`
+  or `tools/`.
 - `make build-prod` for compiler, bundler, or build-tool updates.
 - `make e2e-production` for Electron, native modules, sidecar packaging, or packaged loading changes.
   Use CI for other platforms.

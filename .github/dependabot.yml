@@ -4,6 +4,8 @@ updates:
       directory: '/'
       schedule:
           interval: 'weekly'
+      cooldown:
+          default-days: 3
       groups:
           gh-actions:
               applies-to: version-updates
@@ -20,6 +22,8 @@ updates:
       directory: '/'
       schedule:
           interval: 'weekly'
+      cooldown:
+          default-days: 3
       groups:
           angular:
               applies-to: version-updates
@@ -60,26 +64,12 @@ updates:
                   - 'minor'
                   - 'patch'
 
-    - package-ecosystem: 'npm'
-      directory: '/tools'
-      schedule:
-          interval: 'weekly'
-      groups:
-          tools:
-              applies-to: version-updates
-              update-types:
-                  - 'minor'
-                  - 'patch'
-          tools-security:
-              applies-to: security-updates
-              update-types:
-                  - 'minor'
-                  - 'patch'
-
     - package-ecosystem: 'cargo'
       directory: '/apps/metadata-engine'
       schedule:
           interval: 'weekly'
+      cooldown:
+          default-days: 3
       groups:
           cargo:
               applies-to: version-updates

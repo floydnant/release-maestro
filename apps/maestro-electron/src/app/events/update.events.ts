@@ -1,4 +1,4 @@
-// TODO: Install electron-updater: npm install electron-updater
+// TODO: Install electron-updater: pnpm add electron-updater
 // import { autoUpdater } from 'electron-updater'
 // import { dialog, MessageBoxOptions } from 'electron'
 import App from '../app'
