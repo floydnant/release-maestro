@@ -10,6 +10,7 @@ import {
     heartbeatTransient,
     registerDevelopmentHolder,
     registerDevelopmentListenerHolder,
+    setTransientChildHolder,
     releaseDevelopment,
     releaseTransient,
     removeDevelopmentHolder,
@@ -169,8 +170,14 @@ const runWorkflow = async args => {
         )
     }
     const workflow = args[0]
-    const command = args[separator + 1]
-    const commandArgs = args.slice(separator + 2)
+    const commandTokens = args.slice(separator + 1)
+    const then = commandTokens.indexOf('--then')
+    const commands = (
+        then < 0 ? [commandTokens] : [commandTokens.slice(0, then), commandTokens.slice(then + 1)]
+    ).filter(tokens => tokens.length > 0)
+    if (commands.length === 0 || (then >= 0 && commands.length !== 2)) {
+        throw new InstanceError('Each run-workflow command must name an executable', 'USAGE')
+    }
     let child
     let pendingSignal = null
     const signalListeners = new Map()
@@ -186,16 +193,20 @@ const runWorkflow = async args => {
     let stopHeartbeat = () => {}
     try {
         transient = await allocateTransient(workflow)
-        child = spawnManaged(command, commandArgs, {
-            env: {
-                ...process.env,
-                ...bundleEnvironment(transient.bundle, transient.appDataPath),
-            },
-        })
-        if (pendingSignal) signalProcessTree(child.pid, pendingSignal)
-        stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
-        const result = await waitForExit(child)
-        process.exitCode = exitForChild(result.code, result.signal)
+        const environment = {
+            ...process.env,
+            ...bundleEnvironment(transient.bundle, transient.appDataPath),
+        }
+        for (const [command, ...commandArgs] of commands) {
+            child = spawnManaged(command, commandArgs, { env: environment })
+            await setTransientChildHolder(transient.id, child.pid)
+            if (pendingSignal) signalProcessTree(child.pid, pendingSignal)
+            stopHeartbeat()
+            stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
+            const result = await waitForExit(child)
+            process.exitCode = exitForChild(result.code, result.signal)
+            if (result.code !== 0 || result.signal) break
+        }
     } finally {
         stopHeartbeat()
         signalListeners.forEach((listener, signal) => process.off(signal, listener))

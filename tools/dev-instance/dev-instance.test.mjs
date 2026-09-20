@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -250,6 +250,25 @@ test('malformed registry, manifest, stale lock, and interrupted write repair aut
     assert.equal(existsSync(lock), false)
 })
 
+test('registry recovery keeps live ownership from the last known good copy', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const active = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 1,
+        'MCP holder did not register',
+    )
+    await writeFile(join(fixture.state, 'registry.json'), '{broken')
+
+    const recovered = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(recovered.holders.length, 1)
+    assert.equal(recovered.holders[0].id, active.holders[0].id)
+    assert.equal(recovered.holders[0].pid, wrapper.pid)
+    wrapper.kill('SIGTERM')
+    await childResult(wrapper)
+})
+
 test('moving a worktree keeps its identity while a new checkout at the old path gets a new one', async () => {
     const fixture = await createFixture()
     const first = runJson(fixture, fixture.main, ['dev-allocate'])
@@ -409,11 +428,18 @@ test('Electron E2E coexists with renderer E2E but duplicate mutating workflows f
         stdio: ['ignore', 'pipe', 'pipe'],
     })
     liveChildren.push(electron)
-    await waitFor(
+    const electronRegistry = await waitFor(
         async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
-        registry => Object.values(registry.transients).some(item => item.workflow === 'electron-e2e'),
+        registry =>
+            Object.values(registry.transients).some(
+                item => item.workflow === 'electron-e2e' && item.childHolder?.pid !== undefined,
+            ),
         'Electron E2E did not allocate',
     )
+    const electronTransient = Object.values(electronRegistry.transients).find(
+        item => item.workflow === 'electron-e2e',
+    )
+    assert.notEqual(electronTransient.childHolder.pid, electron.pid)
     const renderer = spawn(process.execPath, [cli, 'run-workflow', 'renderer-e2e', '--', ...hold], {
         cwd: fixture.main,
         env: environmentFor(fixture),
@@ -547,11 +573,17 @@ test('active worktrees cannot share a canonical app-data directory', async () =>
     const first = spawnMcp(fixture, fixture.roots[0], bin, 'chrome-devtools', {
         RELEASE_MAESTRO_APP_DATA_DIR: shared,
     })
-    await waitFor(
+    const firstStatus = await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.roots[0], ['dev-status', '--json'])),
         status => status.state === 'active',
         'first worktree did not become active',
     )
+    assert.equal(firstStatus.appDataPath, join(await realpath(fixture.base), 'shared-data'))
+    const changedOverride = run(fixture, fixture.roots[0], ['dev-allocate'], {
+        RELEASE_MAESTRO_APP_DATA_DIR: join(fixture.base, 'different-data'),
+    })
+    assert.equal(changedOverride.status, 1)
+    assert.match(changedOverride.stderr, /APP_DATA_CONFLICT/)
     const second = spawnMcp(fixture, fixture.roots[1], bin, 'chrome-devtools', {
         RELEASE_MAESTRO_APP_DATA_DIR: join(shared, '..', 'shared-data'),
     })

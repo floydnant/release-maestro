@@ -1,5 +1,5 @@
 import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, readlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -60,6 +60,7 @@ export const getStatePaths = () => {
     return {
         root,
         registry: join(root, 'registry.json'),
+        registryBackup: join(root, 'registry.backup.json'),
         lock: join(root, 'registry.lock'),
         log: join(root, 'orchestration.jsonl'),
     }
@@ -321,6 +322,7 @@ const parseTransient = value => {
         throw new InstanceError('Invalid transient allocation', 'CORRUPT_REGISTRY')
     }
     parseHolder(value.holder)
+    if (value.childHolder !== undefined) parseHolder(value.childHolder)
     return value
 }
 
@@ -342,7 +344,11 @@ const parseRegistry = value => {
     })
     Object.entries(value.transients).forEach(([id, transient]) => {
         parseTransient(transient)
-        if (transient.id !== id || transient.holder.worktreeId !== transient.worktreeId) {
+        if (
+            transient.id !== id ||
+            transient.holder.worktreeId !== transient.worktreeId ||
+            (transient.childHolder && transient.childHolder.worktreeId !== transient.worktreeId)
+        ) {
             throw new InstanceError('Transient key mismatch', 'CORRUPT_REGISTRY')
         }
     })
@@ -431,9 +437,13 @@ const readRegistry = async paths => {
     try {
         return parseRegistry(await readJson(paths.registry))
     } catch (error) {
-        if (error?.code === 'ENOENT') return emptyRegistry()
-        await quarantine(paths.registry)
-        return emptyRegistry()
+        if (error?.code !== 'ENOENT') await quarantine(paths.registry)
+        try {
+            return parseRegistry(await readJson(paths.registryBackup))
+        } catch (backupError) {
+            if (backupError?.code !== 'ENOENT') await quarantine(paths.registryBackup)
+            return emptyRegistry()
+        }
     }
 }
 
@@ -544,7 +554,7 @@ const activeClaims = registry => {
                 workflow: transient.workflow,
                 worktreeId: transient.worktreeId,
                 path: transient.path,
-                holders: [transient.holder],
+                holders: [transient.holder, transient.childHolder].filter(Boolean),
                 startedAt: transient.createdAt,
             })
         }
@@ -596,7 +606,13 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
         }
     }
     for (const [id, transient] of Object.entries(registry.transients)) {
-        if (!holderIsLive(transient.holder)) delete registry.transients[id]
+        const wrapperIsLive = holderIsLive(transient.holder)
+        const childIsLive = transient.childHolder ? holderIsLive(transient.childHolder) : false
+        if (!wrapperIsLive && !childIsLive) {
+            delete registry.transients[id]
+        } else if (!childIsLive) {
+            delete transient.childHolder
+        }
     }
     return registry
 }
@@ -618,6 +634,7 @@ const withRegistry = async action => {
         const registry = reconcileRegistry(await readRegistry(paths))
         const result = await action(registry, paths)
         registry.generation += 1
+        await atomicWriteJson(paths.registryBackup, registry)
         await atomicWriteJson(paths.registry, registry)
         return result
     } finally {
@@ -711,9 +728,42 @@ const listenerPids = port => {
             .map(parts => Number(parts[4]))
             .filter(Number.isSafeInteger)
     }
-    const result = spawnSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'], {
+    const lsof = process.platform === 'darwin' ? '/usr/sbin/lsof' : 'lsof'
+    const result = spawnSync(lsof, ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'], {
         encoding: 'utf8',
     })
+    if (result.error?.code === 'ENOENT' && process.platform === 'linux') {
+        const hexPort = port.toString(16).toUpperCase().padStart(4, '0')
+        const socketInodes = new Set()
+        for (const table of ['/proc/net/tcp', '/proc/net/tcp6']) {
+            try {
+                for (const line of readFileSync(table, 'utf8').trim().split('\n').slice(1)) {
+                    const fields = line.trim().split(/\s+/)
+                    if (fields[1]?.endsWith(`:${hexPort}`) && fields[3] === '0A' && fields[9]) {
+                        socketInodes.add(fields[9])
+                    }
+                }
+            } catch {}
+        }
+        if (socketInodes.size === 0) return []
+        const pids = []
+        for (const entry of readdirSync('/proc', { withFileTypes: true })) {
+            if (!entry.isDirectory() || !/^\d+$/.test(entry.name)) continue
+            try {
+                const ownsSocket = readdirSync(`/proc/${entry.name}/fd`).some(fd => {
+                    try {
+                        const target = readlinkSync(`/proc/${entry.name}/fd/${fd}`)
+                        const match = /^socket:\[(\d+)]$/.exec(target)
+                        return match ? socketInodes.has(match[1]) : false
+                    } catch {
+                        return false
+                    }
+                })
+                if (ownsSocket) pids.push(Number(entry.name))
+            } catch {}
+        }
+        return pids
+    }
     if (result.error?.code === 'ENOENT') return []
     return result.stdout
         .split('\n')
@@ -735,11 +785,18 @@ const assertPersistedBundleUsable = async (allocation, registeringHolder) => {
         ...allocation.holders.filter(holderIsLive),
         ...(registeringHolder ? [registeringHolder] : []),
     ]
+    const ownedListenerPids = new Map()
+    for (const holder of liveHolders) {
+        if (!['dev-renderer', 'dev-electron'].includes(holder.role)) continue
+        const owned = ownedListenerPids.get(holder.role) ?? new Set()
+        snapshotProcessTree(holder.pid).forEach(record => owned.add(record.pid))
+        ownedListenerPids.set(holder.role, owned)
+    }
     for (const [name, port] of Object.entries(allocation.bundle)) {
         if (await portIsAvailable(port)) continue
         const listeners = listenerPids(port)
         const owningRole = name === 'renderer' ? 'dev-renderer' : 'dev-electron'
-        const owned = liveHolders.some(holder => holder.role === owningRole)
+        const owned = listeners.some(listenerPid => ownedListenerPids.get(owningRole)?.has(listenerPid))
         if (owned) continue
         const pid = listeners[0]
         const started = pid ? processStartIdentity(pid) : 'unknown'
@@ -817,14 +874,22 @@ const newHolder = async (
 export const allocateDevelopment = async ({ reallocate = false } = {}) => {
     const worktree = await resolveWorktree()
     const initialManifest = await readManifest(worktree)
-    const appDataPath = await appDataFor(worktree)
+    const requestedAppDataPath = await appDataFor(worktree)
+    const hasAppDataOverride = process.env['RELEASE_MAESTRO_APP_DATA_DIR'] !== undefined
     let result
     await withRegistry(async (registry, paths) => {
         const manifest = (await readManifest(worktree)) ?? initialManifest
         const manifestId = manifest?.worktreeId
         const existing = manifestId ? registry.allocations[manifestId] : null
         const worktreeId = existing ? existing.worktreeId : (manifestId ?? randomUUID())
+        const appDataPath = existing && !hasAppDataOverride ? existing.appDataPath : requestedAppDataPath
         const appDataClaim = `app-data:${appDataPath}`
+        if (existing?.holders.length && hasAppDataOverride && existing.appDataPath !== requestedAppDataPath) {
+            throw new InstanceError(
+                `The active development allocation uses app data ${existing.appDataPath}; refusing to replace it with ${requestedAppDataPath}. Stop the stack before changing RELEASE_MAESTRO_APP_DATA_DIR.`,
+                'APP_DATA_CONFLICT',
+            )
+        }
         assertClaimsAvailable(registry, [appDataClaim], worktreeId, 'dev')
 
         if (existing && !reallocate) {
@@ -1139,6 +1204,17 @@ export const heartbeatTransient = async id => {
     await withRegistry(async registry => {
         const transient = registry.transients[id]
         if (transient && holderIsLive(transient.holder)) transient.holder.heartbeatAt = iso(nowMs())
+        if (transient?.childHolder && holderIsLive(transient.childHolder)) {
+            transient.childHolder.heartbeatAt = iso(nowMs())
+        }
+    })
+}
+
+export const setTransientChildHolder = async (id, pid) => {
+    await withRegistry(async registry => {
+        const transient = registry.transients[id]
+        if (!transient) throw new InstanceError(`Transient allocation ${id} no longer exists`)
+        transient.childHolder = await newHolder(transient.worktreeId, `workflow:${transient.workflow}`, pid)
     })
 }
 

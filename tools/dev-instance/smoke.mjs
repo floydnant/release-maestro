@@ -13,6 +13,7 @@ const stateDir = join(temporaryRoot, 'state')
 const shimBin = join(temporaryRoot, 'bin')
 const worktrees = [join(temporaryRoot, 'one'), join(temporaryRoot, 'two')]
 const processes = []
+const shellQuote = value => `'${value.replaceAll("'", `'"'"'`)}'`
 
 await import('node:fs/promises').then(fs => fs.mkdir(shimBin))
 const pnpmShim = join(shimBin, 'pnpm')
@@ -22,7 +23,7 @@ await writeFile(
 if [ "$1" = "exec" ]; then shift; fi
 command="$1"
 shift
-exec "${repositoryRoot}/node_modules/.bin/$command" "$@"
+exec ${shellQuote(`${repositoryRoot}/node_modules/.bin`)}"/$command" "$@"
 `,
 )
 await chmod(pnpmShim, 0o755)
