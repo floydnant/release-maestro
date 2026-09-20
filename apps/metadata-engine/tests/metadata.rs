@@ -19,6 +19,7 @@ struct Fixture {
     #[serde(default)]
     create_tag: bool,
     alias_field: Option<AliasField>,
+    binary_marker: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Eq, PartialEq, Ord, PartialOrd)]
@@ -127,6 +128,19 @@ fn reads_independently_authored_metadata_across_formats_and_legacy_aliases() {
             name,
         );
         assert_extras(&metadata, &case);
+        if name == "vardae-invocacion-del-cielo.mp3" {
+            let custom_field_count = metadata["extraMetadata"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|entry| {
+                    entry[0]
+                        .as_str()
+                        .is_some_and(|key| key.contains("X-MAESTRO"))
+                })
+                .count();
+            assert_eq!(custom_field_count, 1, "{name}: duplicate custom field");
+        }
         assert_eq!(metadata["path"], path.to_str().unwrap());
         assert_eq!(metadata["fileName"], name);
         assert!(metadata["duration"].as_f64().unwrap() > 0.0, "{name}");
@@ -167,12 +181,23 @@ fn edits_and_clears_tags_without_losing_unrelated_metadata_or_artwork() {
             "musicalKey",
             "catalogNumber",
             "label",
+            "year",
+            "date",
             "duration",
             "coverPath",
         ] {
             assert_eq!(reread[key], original[key], "{name}: preserved {key}");
         }
         assert_extras(&reread, &case);
+        if let Some(marker) = &case.binary_marker {
+            assert!(
+                std::fs::read(&path)
+                    .unwrap()
+                    .windows(marker.len())
+                    .any(|bytes| bytes == marker.as_bytes()),
+                "{name}: opaque payload preserved"
+            );
+        }
         if ["mp3", "wav", "aiff"].iter().any(|ext| name.ends_with(ext)) {
             assert!(
                 std::fs::read(&path)
@@ -262,6 +287,11 @@ fn streams_successes_and_parse_errors_then_accepts_another_request() {
         .collect();
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0]["data"]["code"], "PARSE_FAILED");
+    let message = errors[0]["data"]["error"].as_str().unwrap();
+    assert!(
+        message.starts_with("Failed to read file metadata: failed to parse Flac file: "),
+        "missing parse-error detail: {message}"
+    );
     assert_eq!(
         messages.last().unwrap()["result"],
         json!({"count": 1, "total": 2})
@@ -369,7 +399,7 @@ fn fractional_id3_tempo_keeps_the_standard_integer_frame() {
             native
                 .primary_tag()
                 .unwrap()
-                .get_string(&ItemKey::IntegerBpm),
+                .get_string(ItemKey::IntegerBpm),
             Some("132"),
             "{name}: standard TBPM"
         );
@@ -431,10 +461,72 @@ fn unrelated_mp4_edits_preserve_every_value_in_mixed_native_atoms() {
 }
 
 #[test]
+fn year_edits_preserve_month_and_day_and_clear_recording_dates() {
+    let library = Library::new();
+    let path = library.copy("multiple.flac");
+    let mut params = library.params(&path);
+    params["update"] = json!({"year": 2026});
+    Engine::new().request("write_tags", params.clone());
+    let actual = Engine::new().request("read_file", library.params(&path));
+    assert_eq!(actual["date"], "2026-02-03");
+    params["update"] = json!({"year": null});
+    Engine::new().request("write_tags", params);
+    let actual = Engine::new().request("read_file", library.params(&path));
+    assert!(actual["date"].is_null());
+    assert!(actual["year"].is_null());
+}
+
+#[test]
+fn ape_year_edits_and_clears_preserve_the_year_field() {
+    let library = Library::new();
+    let path = library.copy("year.wv");
+    for year in [json!(2026), Value::Null] {
+        let mut params = library.params(&path);
+        params["update"] = json!({"year": year});
+        Engine::new().request("write_tags", params);
+        let actual = Engine::new().request("read_file", library.params(&path));
+        assert_eq!(actual["year"], year);
+        assert!(actual["date"].is_null());
+    }
+}
+
+#[test]
+fn label_edits_and_clears_replace_the_formats_publisher_mapping() {
+    let library = Library::new();
+    for name in [
+        "vardae-invocacion-del-cielo.mp3",
+        "vardae-invocacion-del-cielo.wv",
+        "vardae-invocacion-del-cielo.flac",
+    ] {
+        let path = library.copy(name);
+        for update in [json!({"label": "Butter Side Up"}), json!({"label": null})] {
+            let mut params = library.params(&path);
+            params["update"] = update.clone();
+            Engine::new().request("write_tags", params);
+            let actual = Engine::new().request("read_file", library.params(&path));
+            assert_fields(&actual, &update, name);
+        }
+    }
+}
+
+#[test]
 fn clearing_riff_aliases_does_not_resurrect_secondary_values() {
+    use lofty::{
+        config::{ParseOptions, WriteOptions},
+        file::AudioFile,
+        iff::wav::WavFile,
+        tag::TagExt,
+    };
+
     let library = Library::new();
     for field in ["bpm", "musicalKey"] {
         let path = library.copy("riff-aliases.wav");
+        let mut source = std::fs::File::open(&path).unwrap();
+        let wav = WavFile::read_from(&mut source, ParseOptions::new()).unwrap();
+        let mut riff = wav.riff_info().cloned().unwrap();
+        riff.insert("INAM".into(), "Original title".into());
+        riff.save_to_path(&path, WriteOptions::new().remove_others(false))
+            .unwrap();
         let mut params = library.params(&path);
         let replacement = if field == "bpm" {
             json!(130.5)
@@ -444,6 +536,11 @@ fn clearing_riff_aliases_does_not_resurrect_secondary_values() {
         for value in [Value::Null, replacement, Value::Null] {
             params["update"] = json!({field: value, "title": "Gökotta", "artist": "SpunOff"});
             Engine::new().request("write_tags", params.clone());
+            let bytes = std::fs::read(&path).unwrap();
+            assert_eq!(
+                u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize + 8,
+                bytes.len()
+            );
             let actual = Engine::new().request("read_file", library.params(&path));
             assert_eq!(actual[field], value, "{field}: {actual}");
             assert_eq!(actual["title"], "Gökotta");
@@ -525,4 +622,76 @@ fn editing_mp4_text_retains_opaque_values_but_clearing_removes_the_atom() {
             }
         }
     }
+}
+
+#[test]
+fn growing_and_shrinking_iff_tags_keeps_container_sizes_valid() {
+    let library = Library::new();
+    for (name, big) in [
+        ("spunoff-el-sueno-untagged.wav", false),
+        ("spunoff-el-sueno-untagged.aiff", true),
+    ] {
+        let path = library.copy(name);
+        for update in [
+            json!({"title": "Gökotta"}),
+            json!({"artist": "SpunOff", "bpm": 130.5, "lyrics": "Words".repeat(10_000)}),
+            json!({"artist": null, "bpm": null, "lyrics": null}),
+        ] {
+            let mut params = library.params(&path);
+            params["update"] = update.clone();
+            Engine::new().request("write_tags", params);
+            let bytes = std::fs::read(&path).unwrap();
+            let size_bytes = bytes[4..8].try_into().unwrap();
+            let size = if big {
+                u32::from_be_bytes(size_bytes)
+            } else {
+                u32::from_le_bytes(size_bytes)
+            };
+            assert_eq!(size as usize + 8, bytes.len(), "{name}: container size");
+            let actual = Engine::new().request("read_file", library.params(&path));
+            assert_fields(&actual, &update, name);
+            assert_eq!(actual["title"], "Gökotta");
+        }
+    }
+}
+
+#[test]
+fn writes_iff_tags_through_a_relative_basename_path() {
+    let temporary = tempfile::Builder::new()
+        .prefix("maestro-relative-")
+        .suffix(".wav")
+        .tempfile_in(".")
+        .unwrap()
+        .into_temp_path();
+    std::fs::copy(fixtures().join("spunoff-el-sueno-untagged.wav"), &temporary).unwrap();
+    let relative = std::path::PathBuf::from(temporary.file_name().unwrap());
+    let cache = tempfile::tempdir().unwrap();
+    let mut params = json!({"path": relative, "coverArtCacheDir": cache.path()});
+    params["update"] = json!({"title": "Gökotta"});
+
+    let actual = Engine::new().request("write_tags", params);
+
+    assert_eq!(actual["title"], "Gökotta");
+}
+
+#[cfg(unix)]
+#[test]
+fn writes_iff_tags_through_a_symlink_without_replacing_it() {
+    use std::os::unix::fs::symlink;
+
+    let library = Library::new();
+    let target = library.copy("spunoff-el-sueno-untagged.wav");
+    let link = library.0.join("linked.wav");
+    symlink(&target, &link).unwrap();
+    let mut params = library.params(&link);
+    params["update"] = json!({"title": "Gökotta"});
+
+    Engine::new().request("write_tags", params);
+
+    assert!(std::fs::symlink_metadata(&link)
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    let actual = Engine::new().request("read_file", library.params(&target));
+    assert_eq!(actual["title"], "Gökotta");
 }

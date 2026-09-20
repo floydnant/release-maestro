@@ -24,8 +24,8 @@ A desktop app for your music. Scan your local collection into a searchable libra
 
 - Node.js >= 22.22.3 (see `.node-version`)
 - npm
-- A Rust toolchain (`cargo` and `rustc`) for the metadata-engine sidecar. Development builds only the
-  host architecture; `make dev` does not require `rustup`.
+- Rust 1.89 or newer (`cargo` and `rustc`) for the metadata-engine sidecar. Development builds only
+  the host architecture; `make dev` does not require `rustup`.
 - `rustup` for macOS packaging, which builds the sidecar for both Apple Silicon and Intel
 - macOS (required for Apple Mail email import; the app itself builds on all platforms)
 

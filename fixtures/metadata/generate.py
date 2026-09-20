@@ -16,7 +16,7 @@ import subprocess
 
 import mutagen
 from mutagen import id3
-from mutagen.apev2 import APEExtValue
+from mutagen.apev2 import APEv2, APEExtValue, APEBinaryValue
 from mutagen.flac import Picture
 from mutagen.mp4 import MP4Cover, MP4FreeForm
 
@@ -315,6 +315,52 @@ content += b"LIST" + len(info).to_bytes(4, "little") + info
 content[4:8] = (len(content) - 8).to_bytes(4, "little")
 path.write_bytes(content)
 case(path.name, {"bpm": 127.5, "musicalKey": "Am"}, extras=[["Custom: XTRA", "keep me"]])
+
+path = ROOT / "secondary-ape.mp3"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.mp3", path)
+ape = APEv2()
+ape["X-URL"] = APEExtValue("https://example.com/secondary")
+ape["X-BLOB"] = APEBinaryValue(b"maestro-opaque-ape-payload")
+ape.save(path)
+case(path.name, FIELDS, extras=[["Custom: X-URL", "https://example.com/secondary"],
+                               ["Custom: X-BLOB", ""]], writable=True,
+     binaryMarker="maestro-opaque-ape-payload")
+
+path = ROOT / "secondary-riff.wav"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wav", path)
+content = bytearray(path.read_bytes())
+value = b"keep the RIFF field\0"
+extra = b"XTRA" + len(value).to_bytes(4, "little") + value
+if len(value) % 2:
+    extra += b"\0"
+offset = 12
+while offset < len(content):
+    size = int.from_bytes(content[offset + 4:offset + 8], "little")
+    if content[offset:offset + 4] == b"LIST" and content[offset + 8:offset + 12] == b"INFO":
+        end = offset + 8 + size
+        content[end:end] = extra
+        content[offset + 4:offset + 8] = (size + len(extra)).to_bytes(4, "little")
+        break
+    offset += 8 + size + size % 2
+else:
+    raise AssertionError("WAV fixture must contain an INFO list")
+content[4:8] = (len(content) - 8).to_bytes(4, "little")
+path.write_bytes(content)
+case(path.name, FIELDS, extras=[["Custom: XTRA", "keep the RIFF field"]], writable=True)
+
+path = ROOT / "year.wv"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wv", path)
+file = mutagen.File(path)
+file["Year"] = "2024"
+file.save()
+case(path.name, {**FIELDS, "year": 2024, "date": None}, writable=True)
+
+path = ROOT / "recording-date.wv"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wv", path)
+file = mutagen.File(path)
+file["Year"] = "2026-02-03"
+file.save()
+case(path.name, {**FIELDS, "year": None, "date": "2026-02-03"}, writable=True)
 
 (ROOT / "cover.png").write_bytes(PNG)
 (ROOT / "cases.json").write_text(json.dumps(CASES, indent=4, ensure_ascii=False) + "\n")

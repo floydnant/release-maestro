@@ -30,13 +30,24 @@ Tests copy inputs into temporary libraries and run the compiled worker over JSON
 in a fresh worker, check unrelated fields and private ID3 payloads, and remove temporary files afterward.
 The fixture directory is an explicit input to the Nx test cache.
 
-Lofty 0.22.4 drops additional values in an MP4 atom when converting it to a generic tag.
-The engine restores text values for reading and retains the native atoms through the write path.
-Unchanged atoms keep all data variants, including opaque binary and numeric values. `namespaced.m4a`
-and `mixed-data.m4a` check repeated and mixed values through edits. `editable-mixed.m4a` checks
-that editing text retains opaque siblings and clearing the field removes the entire atom.
+The engine retains native MP4 atoms through the write path. Unchanged atoms keep all data variants,
+including opaque binary and numeric values. `namespaced.m4a` and `mixed-data.m4a` check repeated and
+mixed values through edits. The suite also checks MusicBrainz UFID values and preserves the secondary
+ID3v1 footer byte for byte. Native Vorbis, APE and RIFF tags are retained separately because generic
+conversion discards their custom fields.
+
+`editable-mixed.m4a`, `editable-alias.m4a`, and `editable-aliases.m4a` check that text edits
+retain opaque siblings across alias canonicalization and that clears remove the entire atom.
 `repeated-ape.wv` checks NUL-separated custom values; `riff-aliases.wav` checks that cleared
-secondary RIFF aliases do not reappear. The suite also checks MusicBrainz UFID values and preserves the ID3v1 footer byte for
-byte when editing a file with an ID3v2 primary tag.
+secondary RIFF aliases do not reappear.
 
 The fixture manifest uses typed fields and rejects unknown keys, invalid flags, and unknown aliases.
+
+`recording-date.wv` checks full APE recording dates alongside the year-only fixture. WAV and AIFF
+edit tests also check their container sizes after tags grow and shrink. Lofty 0.25.2 subtracts tag
+growth from the size of a container with a trailing ID3 chunk, and can panic on large growth in
+debug builds. The engine streams the file into a temporary file in the same directory, rewrites the
+copy, and replaces the original only after the complete write succeeds. Other chunks and trailing
+data are retained. This adds I/O for large WAV/AIFF files, while Lofty's append path still buffers
+the full container in memory. Replacing the file can also discard inode metadata such as ACLs and
+extended attributes.
