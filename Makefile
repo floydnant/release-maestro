@@ -1,24 +1,29 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean corepack-enable install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
 SKIP_NX_CACHE := false
 E2E_REPORT := electron
+COREPACK_DIR := $(CURDIR)/.corepack
+PATH := $(COREPACK_DIR):$(PATH)
+export PATH
+# Force shell PATH lookup so a stale system pnpm cannot bypass the repository-local Corepack shim.
+PNPM := command pnpm
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
-	npx nx serve maestro-electron
+	$(PNPM) exec nx serve maestro-electron
 
 serve-renderer: ## Start only the renderer dev server
-	npx nx serve maestro-renderer
+	$(PNPM) exec nx serve maestro-renderer
 
 # Build
 build: ## Build all projects (development config)
-	npx nx run-many -t build -c development
+	$(PNPM) exec nx run-many -t build -c development
 build-prod: ## Build all projects (production config)
-	npx nx run-many -t build -p maestro-renderer maestro-electron -c production
+	$(PNPM) exec nx run-many -t build -p maestro-renderer maestro-electron -c production
 build-engine: ## Build the Rust metadata-engine worker binary (release)
-	npx nx run metadata-engine:build-package
+	$(PNPM) exec nx run metadata-engine:build-package
 
 # Package & Release
 generate-icons: ## Generate app icon variants from app-icon.png
@@ -40,9 +45,9 @@ generate-icons: ## Generate app icon variants from app-icon.png
 		rm -rf "$$(dirname "$$iconset_dir")"
 
 package: ## Build and package as distributable (DMG/zip)
-	npx nx make maestro-electron
+	$(PNPM) exec nx make maestro-electron
 package-dir: ## Build and package (directory only, no installer)
-	npx nx package maestro-electron
+	$(PNPM) exec nx package maestro-electron
 run-packaged: package-dir ## Run the packaged app (macOS) and keep terminal attached for logs
 	dist/packages/mac-arm64/Release\ Maestro.app/Contents/MacOS/Release\ Maestro
 open-dmg: ## Open the generated DMG file (macOS)
@@ -58,57 +63,60 @@ install-dmg: package ## Install the packaged app (macOS) using the DMG
 
 # Test
 test: ## Run all tests
-	npx nx run-many -t test --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx run-many -t test --skipNxCache=$(SKIP_NX_CACHE)
 test-watch: ## Run all tests in watch mode
-	npx nx run-many -t test -- --watch
+	$(PNPM) exec nx run-many -t test -- --watch
 test-core: ## Run core library tests
-	npx nx test maestro-core
+	$(PNPM) exec nx test maestro-core
 test-electron: ## Run electron backend tests
-	npx nx test maestro-electron
+	$(PNPM) exec nx test maestro-electron
 test-renderer: ## Run renderer tests
-	npx nx test maestro-renderer
+	$(PNPM) exec nx test maestro-renderer
 design-tokens: ## Generate renderer design-token artifacts
-	npx nx run maestro-renderer:design-tokens-generate
+	$(PNPM) exec nx run maestro-renderer:design-tokens-generate
 design-tokens-watch: ## Regenerate renderer design-token artifacts when token files change
-	npx nx run maestro-renderer:design-tokens-watch
+	$(PNPM) exec nx run maestro-renderer:design-tokens-watch
 design-tokens-check: ## Test and verify renderer design-token artifacts
-	npx nx run maestro-renderer:design-tokens-check
+	$(PNPM) exec nx run maestro-renderer:design-tokens-check
 test-engine: ## Run metadata-engine (Rust) tests
-	npx nx test metadata-engine
+	$(PNPM) exec nx test metadata-engine
 
 e2e: ## Run full Electron end-to-end tests
-	npx nx run maestro-e2e:e2e
+	$(PNPM) exec nx run maestro-e2e:e2e
 e2e-production: package-dir ## Package and run Electron end-to-end tests for the current OS
-	npx nx run maestro-e2e:e2e-production
+	$(PNPM) exec nx run maestro-e2e:e2e-production
 e2e-renderer: ## Run renderer only end-to-end tests
-	npx nx run maestro-e2e:e2e-renderer
+	$(PNPM) exec nx run maestro-e2e:e2e-renderer
 e2e-show-report: ## Show an e2e report (E2E_REPORT=electron, renderer, or production)
-	npx playwright show-report playwright-report/$(E2E_REPORT)
+	$(PNPM) exec playwright show-report playwright-report/$(E2E_REPORT)
 
 # Code Quality
 typecheck-e2e: ## Type-check the end-to-end test suite (also runs automatically before e2e)
-	npx nx run maestro-e2e:typecheck
+	$(PNPM) exec nx run maestro-e2e:typecheck
 lint: ## Lint all projects
-	npx nx run-many -t lint --output-style=stream --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx run-many -t lint --output-style=stream --skipNxCache=$(SKIP_NX_CACHE)
 format: ## Format all files
-	npx prettier --write "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md" "./**/*.yaml" "./**/*.yml" "./**/*.mjs"
+	$(PNPM) exec prettier --write "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md" "./**/*.yaml" "./**/*.yml" "./**/*.mjs"
 	@echo ""
 	@git status --short
 f: format
 format-check: ## Check formatting
-	npx prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md" "./**/*.yaml" "./**/*.yml" "./**/*.mjs"
+	$(PNPM) exec prettier --check "./**/*.ts" "./**/*.html" "./**/*.css" "./**/*.json" "./**/*.md" "./**/*.yaml" "./**/*.yml" "./**/*.mjs"
+
+dependency-policy-check: ## Verify exact dependencies and immutable GitHub Action references
+	node tools/verify-dependency-policy.mjs
 
 agents-check: ## Verify the canonical agent skills and their harness adapters
 	node --test tools/*.test.mjs
 	node tools/verify-agent-harness.mjs
 
 sure: format ## Format, lint, build, unit test, and development E2E; build is the app type gate
-	npx nx run-many -t build,lint,test,e2e,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx run-many -t build,lint,test,e2e,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
 affected: ## Run checks only on affected projects based on git changes
-	npx nx affected -t build,lint,test,e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx affected -t build,lint,test,e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
 
 # Database
-drizzleCommand = mkdir -p .app-data.dev/data && DATABASE_URL=file:./.app-data.dev/data/mailbox-tool.db ELECTRON_RUN_AS_NODE=1 npx electron ./node_modules/drizzle-kit/bin.cjs
+drizzleCommand = mkdir -p .app-data.dev/data && DATABASE_URL=file:./.app-data.dev/data/mailbox-tool.db ELECTRON_RUN_AS_NODE=1 $(PNPM) exec electron ./node_modules/drizzle-kit/bin.cjs
 db-generate: ## Generate a new migration with the given NAME (e.g. make db-generate NAME=add_users_table)
 	@test -n "$(NAME)" || (echo "Usage: make db-generate NAME=migration_name" && exit 1)
 	$(drizzleCommand) generate --name=$(NAME)
@@ -117,26 +125,29 @@ db-studio: ## Open drizzle studio
 db-check: ## Check the database
 	$(drizzleCommand) check
 db-truncate-library: ## Truncate library tables (keeps migrations + feed tables) and delete the library scan state
-	ELECTRON_RUN_AS_NODE=1 npx electron apps/maestro-electron/tools/db-truncate-library.cjs
+	ELECTRON_RUN_AS_NODE=1 $(PNPM) exec electron apps/maestro-electron/tools/db-truncate-library.cjs
 
 # Maintenance
 clean: ## Clean build outputs and caches
 	rm -rf dist/ release/ .angular/cache/
-	npx nx reset
+	$(PNPM) exec nx reset
 .PHONY: i
-install: ## Install npm packages, Rust crates, and Playwright Chromium dependencies
-	npm ci
-	npm ci --prefix tools
+corepack-enable: ## Enable the pnpm shim pinned by package.json
+	mkdir -p "$(COREPACK_DIR)"
+	corepack enable pnpm --install-directory "$(COREPACK_DIR)"
+
+install: corepack-enable ## Install pnpm packages, Rust crates, and Playwright Chromium dependencies
+	$(PNPM) install --frozen-lockfile
 	cargo fetch --locked --manifest-path apps/metadata-engine/Cargo.toml
-	npx playwright install --with-deps chromium
+	$(PNPM) exec playwright install --with-deps chromium
 i: install ## Alias for install
 rebuild-electron: ## Rebuild native dependencies (e.g. after Electron version change)
 	electron-rebuild -f -w better-sqlite3
 rebuild-node: ## Rebuild native dependencies for Node.js (e.g. after Node version change)
-	npm rebuild better-sqlite3
+	$(PNPM) rebuild better-sqlite3
 
 version: ## Generate changelog and update version
-	npx conventional-changelog -i CHANGELOG.md -s -r 0 && npx prettier --write CHANGELOG.md && git add CHANGELOG.md
+	$(PNPM) exec conventional-changelog -i CHANGELOG.md -s -r 0 && $(PNPM) exec prettier --write CHANGELOG.md && git add CHANGELOG.md
 
 # Help
 help: ## Show this help

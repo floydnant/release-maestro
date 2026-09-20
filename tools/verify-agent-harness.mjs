@@ -4,7 +4,7 @@
 //
 // Source of truth is .agents/skills/<name>/SKILL.md. Harness directories hold adapters only:
 // a relative symlink per skill, unless the skill is declared divergent in
-// .agents/harness-overrides.json. Install the isolated tools dependencies with npm ci --prefix tools.
+// .agents/harness-overrides.json. Install the workspace dependencies with pnpm install.
 
 import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'

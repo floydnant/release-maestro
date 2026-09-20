@@ -1,0 +1,75 @@
+# New package releases stay quarantined for three days. This matches Dependabot's default cooldown,
+# applies to direct and transitive dependencies, and fails closed when the registry cannot provide
+# publish times.
+minimumReleaseAge: 4320
+minimumReleaseAgeIgnoreMissingTime: false
+minimumReleaseAgeStrict: true
+
+# Do not accept a package whose publisher provenance is weaker than an earlier release.
+trustPolicy: no-downgrade
+# Apply the provenance downgrade check to releases from the last year. Older packages often predate
+# registry provenance, and the lockfile integrity still pins their contents.
+trustPolicyIgnoreAfter: 525600
+
+# Adding a dependency cannot introduce an unreviewed install script. Keep this list narrow.
+strictDepBuilds: true
+allowBuilds:
+    '@parcel/watcher': true
+    '@pnpm/exe': true
+    '@swc/core': true
+    better-sqlite3: true
+    electron: true
+    electron-winstaller: true
+    esbuild: true
+    # These packages have optional native accelerators or browser downloads that this project does
+    # not use. Keep their scripts blocked instead of granting unnecessary code execution.
+    lmdb: false
+    msgpackr-extract: false
+    nx: true
+    puppeteer: false
+    unrs-resolver: false
+
+# pnpm may resolve peer ranges for validation, but it must not add undeclared peers automatically.
+autoInstallPeers: false
+savePrefix: ''
+# These exact versions predate this policy but were less than three days old when the migration
+# lockfile was created. No later version is exempt.
+minimumReleaseAgeExclude:
+    - '@es-joy/jsdoccomment@0.98.0'
+    - '@jest/console@30.5.2'
+    - '@jest/core@30.5.2'
+    - '@jest/environment-jsdom-abstract@30.5.2'
+    - '@jest/environment@30.5.2'
+    - '@jest/expect-utils@30.5.2'
+    - '@jest/expect@30.5.2'
+    - '@jest/fake-timers@30.5.2'
+    - '@jest/globals@30.5.2'
+    - '@jest/reporters@30.5.2'
+    - '@jest/source-map@30.5.2'
+    - '@jest/test-result@30.5.2'
+    - '@jest/test-sequencer@30.5.2'
+    - '@jest/transform@30.5.2'
+    - babel-jest@30.5.2
+    - dotenv@18.0.0
+    - electron@44.4.3
+    - eslint-plugin-jsdoc@64.5.3
+    - eslint@10.11.0
+    - expect@30.5.2
+    - jest-circus@30.5.2
+    - jest-cli@30.5.2
+    - jest-config@30.5.2
+    - jest-diff@30.5.2
+    - jest-each@30.5.2
+    - jest-environment-jsdom@30.5.2
+    - jest-environment-node@30.5.2
+    - jest-matcher-utils@30.5.2
+    - jest-mock@30.5.2
+    - jest-resolve-dependencies@30.5.2
+    - jest-runner@30.5.2
+    - jest-runtime@30.5.2
+    - jest-snapshot@30.5.2
+    - jest-watcher@30.5.2
+    - jest@30.5.2
+    - jsdoc-type-pratt-parser@9.2.2
+    - prettier@3.9.8
+minimumReleaseAgeExcludePrune: true

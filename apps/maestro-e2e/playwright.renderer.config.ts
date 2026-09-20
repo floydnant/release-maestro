@@ -32,7 +32,7 @@ export default defineConfig({
     webServer: process.env['BASE_URL']
         ? undefined
         : {
-              command: 'npx nx serve maestro-renderer -c e2e',
+              command: 'pnpm exec nx serve maestro-renderer -c e2e',
               url: baseURL,
               reuseExistingServer: !process.env.CI,
               cwd: workspaceRoot,

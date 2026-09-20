@@ -17,16 +17,19 @@ jobs:
     format:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@820762786026740c76f36085b0efc47a31fe5020 # v7
             - uses: ./.github/actions/setup-node
 
             - name: Check formatting
               run: make format-check
 
+            - name: Check dependency policy
+              run: make dependency-policy-check
+
     lint:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@820762786026740c76f36085b0efc47a31fe5020 # v7
             - uses: ./.github/actions/setup-node
 
             - name: Check lint
@@ -35,12 +38,10 @@ jobs:
     agents:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
-            - uses: actions/setup-node@v7
+            - uses: actions/checkout@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - uses: ./.github/actions/setup-node
               with:
-                  node-version: '22'
-            - name: Install agent-check dependencies
-              run: npm ci --prefix tools --ignore-scripts --no-audit --no-fund
+                  install-command: pnpm install --frozen-lockfile --ignore-scripts
 
             # Structural only, so it runs on every pull request rather than a path-selected lane:
             # a skill rename must not slip through a docs-only change.
@@ -50,7 +51,7 @@ jobs:
     test:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@820762786026740c76f36085b0efc47a31fe5020 # v7
             - uses: ./.github/actions/setup-node
 
             - name: Run unit tests
@@ -63,15 +64,15 @@ jobs:
                 os: [ubuntu-latest, macos-latest, windows-latest]
         runs-on: ${{ matrix.os }}
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@820762786026740c76f36085b0efc47a31fe5020 # v7
             - uses: ./.github/actions/setup-node
 
             # The e2e targets depend on maestro-e2e:typecheck, so tsc runs before Playwright does.
             - name: Install Playwright browsers
-              run: npx playwright install --with-deps chromium
+              run: pnpm exec playwright install --with-deps chromium
 
             - name: Run production e2e tests
-              uses: GabrielBB/xvfb-action@v1
+              uses: GabrielBB/xvfb-action@86d97bde4a65fe9b290c0b3fb92c2c4ed0e5302d # v1
               with:
                   run: make e2e-production
 
@@ -80,7 +81,7 @@ jobs:
 
             - name: Upload test report
               if: failure()
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
               with:
                   name: e2e-playwright-report-${{ runner.os }}
                   path: playwright-report

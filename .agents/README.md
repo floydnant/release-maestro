@@ -15,7 +15,7 @@ must agree with the SKILL.md `disable-model-invocation` flag. A skill that genui
 per harness is declared in [.agents/harness-overrides.json](harness-overrides.json) and only
 then may be a real directory instead of a link — anything else divergent is a mistake.
 
-Install the check's isolated YAML parser with `npm ci --prefix tools`. Then `make agents-check`
+Install dependencies with `make install`. Then `make agents-check`
 runs offline and validates the manifest, canonical and divergent frontmatter, invocation policies,
 and cross-skill links. It also runs fixture tests for malformed inputs. Run it after adding,
 renaming, or removing a skill; CI installs only the tools package for this check.
