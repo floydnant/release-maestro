@@ -40,14 +40,10 @@ const git = args => {
     if (result.status !== 0) throw new Error(result.stderr || `git ${args.join(' ')} failed`)
 }
 
-const runJson = (cwd, args) => {
-    const result = spawnSync(process.execPath, [join(cwd, 'tools/dev-instance/cli.mjs'), ...args], {
-        cwd,
-        env: environment,
-        encoding: 'utf8',
-    })
-    if (result.status !== 0) throw new Error(result.stderr)
-    return JSON.parse(result.stdout)
+const readAllocation = async worktree => {
+    const manifest = JSON.parse(await readFile(join(worktree, '.release-maestro-instance.json'), 'utf8'))
+    const registry = JSON.parse(await readFile(join(stateDir, 'registry.json'), 'utf8'))
+    return registry.allocations[manifest.worktreeId] ?? null
 }
 
 const waitFor = async (description, read) => {
@@ -101,8 +97,8 @@ try {
     const statuses = await Promise.all(
         worktrees.map(worktree =>
             waitFor(`${worktree} dev stack`, async () => {
-                const status = runJson(worktree, ['dev-status', '--json'])
-                return status.holders?.some(holder => holder.role === 'dev-electron') ? status : null
+                const status = await readAllocation(worktree)
+                return status?.holders.some(holder => holder.role === 'dev-electron') ? status : null
             }),
         ),
     )
