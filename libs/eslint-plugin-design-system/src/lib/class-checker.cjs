@@ -8,7 +8,7 @@
 const path = require('node:path')
 const { classesFromCssFile, componentClassesForTemplate } = require('./css-classes.cjs')
 const { suggestClassName } = require('./suggest.cjs')
-const { isTailwindClass, tailwindClassList, themeVariableExists } = require('./tailwind-authority.cjs')
+const { createTailwindAuthority } = require('./tailwind-authority.cjs')
 
 /**
  * @typedef {object} ClassCheckerOptions
@@ -34,6 +34,7 @@ function resolveFromRoot(target, root) {
  */
 function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
     const tailwindStylesheet = resolveFromRoot(options.tailwindStylesheet, cwd)
+    const tailwind = createTailwindAuthority(tailwindStylesheet)
     const globalStylesheets = (options.globalStylesheets ?? []).map(sheet => resolveFromRoot(sheet, cwd))
     /** @type {Set<string>} */
     const globalClasses = new Set()
@@ -45,9 +46,7 @@ function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
 
     /** @param {string} className */
     const isValid = className =>
-        globalClasses.has(className) ||
-        localClasses.has(className) ||
-        isTailwindClass(tailwindStylesheet, className)
+        globalClasses.has(className) || localClasses.has(className) || tailwind.isClass(className)
 
     /**
      * Suggestions come from the same authorities that decide validity, so a suggested name is always
@@ -57,14 +56,10 @@ function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
      * @returns {import('./suggest.cjs').Suggestion|null}
      */
     const suggest = className =>
-        suggestClassName(className, [
-            ...localClasses,
-            ...globalClasses,
-            ...tailwindClassList(tailwindStylesheet),
-        ])
+        suggestClassName(className, [...localClasses, ...globalClasses, ...tailwind.classList])
 
     /** @param {string} variable */
-    const isThemeVariable = variable => themeVariableExists(tailwindStylesheet, variable)
+    const isThemeVariable = variable => tailwind.themeVariableExists(variable)
 
     return { isThemeVariable, isValid, suggest }
 }

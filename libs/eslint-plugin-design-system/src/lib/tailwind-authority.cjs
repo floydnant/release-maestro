@@ -5,38 +5,69 @@
  * worker owns the async design system and synckit provides the narrow synchronous bridge.
  */
 const { createSyncFn } = require('synckit')
+const { statSync } = require('node:fs')
 
 /** Marker classes Tailwind reads as variant targets; they legitimately emit no CSS of their own. */
 const VARIANT_MARKERS = /^(group|peer)(\/[^\s/]+)?$/
 
 const queryTailwind = createSyncFn(require.resolve('./tailwind-worker.mjs'))
 
-/** @type {Map<string, Set<string>>} */
-const classSetCache = new Map()
+/** @type {Map<string, { classList: string[], classes: Set<string>, dependencies: Map<string, string|null> }>} */
+const authorityCache = new Map()
 
-/**
- * @param {string} stylesheetPath
- * @param {string} className
- * @returns {boolean}
- */
-function isTailwindClass(stylesheetPath, className) {
-    if (VARIANT_MARKERS.test(className)) return true
-    if (getTailwindClassSet(stylesheetPath).has(className)) return true
-    return queryTailwind({ operation: 'isClass', stylesheetPath, value: className })
+/** @param {string} path */
+function fingerprint(path) {
+    try {
+        const metadata = statSync(path, { bigint: true })
+        return `${metadata.mtimeNs}:${metadata.size}`
+    } catch {
+        return null
+    }
 }
 
-/** @type {Map<string, string[]>} */
-const classListCache = new Map()
+/** @param {{ dependencies: Map<string, string|null> }} authority */
+function isCurrent(authority) {
+    for (const [path, previous] of authority.dependencies) {
+        if (fingerprint(path) !== previous) return false
+    }
+    return true
+}
+
+/** @param {string} stylesheetPath */
+function getAuthority(stylesheetPath) {
+    const cached = authorityCache.get(stylesheetPath)
+    if (cached && isCurrent(cached)) return cached
+
+    const loaded = /** @type {{ classList: string[], dependencies: [string, string|null][] }} */ (
+        queryTailwind({ operation: 'authority', stylesheetPath })
+    )
+    const authority = {
+        classList: loaded.classList,
+        classes: new Set(loaded.classList),
+        dependencies: new Map(loaded.dependencies),
+    }
+    authorityCache.set(stylesheetPath, authority)
+    return authority
+}
 
 /**
- * Whether a `var(--color-…)` reference names a design token in Tailwind's v4 theme.
- *
  * @param {string} stylesheetPath
- * @param {string} variable
- * @returns {boolean}
+ * @returns {{ classList: string[], isClass(className: string): boolean, themeVariableExists(variable: string): boolean }}
  */
-function themeVariableExists(stylesheetPath, variable) {
-    return queryTailwind({ operation: 'isThemeVariable', stylesheetPath, value: variable })
+function createTailwindAuthority(stylesheetPath) {
+    const { classes, classList } = getAuthority(stylesheetPath)
+
+    return {
+        classList,
+        isClass(className) {
+            if (VARIANT_MARKERS.test(className)) return true
+            if (classes.has(className)) return true
+            return queryTailwind({ operation: 'isClass', stylesheetPath, value: className })
+        },
+        themeVariableExists(variable) {
+            return queryTailwind({ operation: 'isThemeVariable', stylesheetPath, value: variable })
+        },
+    }
 }
 
 /**
@@ -47,23 +78,15 @@ function themeVariableExists(stylesheetPath, variable) {
  * @returns {string[]}
  */
 function tailwindClassList(stylesheetPath) {
-    let list = classListCache.get(stylesheetPath)
-    if (!list) {
-        const loaded = /** @type {string[]} */ (queryTailwind({ operation: 'classList', stylesheetPath }))
-        classListCache.set(stylesheetPath, loaded)
-        list = loaded
-    }
-    return list
+    return createTailwindAuthority(stylesheetPath).classList
 }
 
-/** @param {string} stylesheetPath */
-function getTailwindClassSet(stylesheetPath) {
-    let classes = classSetCache.get(stylesheetPath)
-    if (!classes) {
-        classes = new Set(tailwindClassList(stylesheetPath))
-        classSetCache.set(stylesheetPath, classes)
-    }
-    return classes
+/**
+ * @param {string} stylesheetPath
+ * @param {string} className
+ */
+function isTailwindClass(stylesheetPath, className) {
+    return createTailwindAuthority(stylesheetPath).isClass(className)
 }
 
-module.exports = { isTailwindClass, tailwindClassList, themeVariableExists }
+module.exports = { createTailwindAuthority, isTailwindClass, tailwindClassList }
