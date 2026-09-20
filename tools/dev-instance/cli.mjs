@@ -15,6 +15,7 @@ import {
     removeDevelopmentHolder,
     signalProcessTree,
     spawnManaged,
+    spawnPackageBinary,
     startHeartbeat,
     statusDevelopment,
     stopDevelopment,
@@ -61,11 +62,9 @@ const runDevelopment = async () => {
     const stopForwarding = forwardSignals(() => children)
 
     try {
-        const renderer = spawnManaged(
-            'pnpm',
+        const renderer = spawnPackageBinary(
+            'nx',
             [
-                'exec',
-                'nx',
                 'serve',
                 'maestro-renderer',
                 '--host',
@@ -103,11 +102,9 @@ const runDevelopment = async () => {
 
         const electronEnvironment = { ...environment }
         delete electronEnvironment.ELECTRON_RUN_AS_NODE
-        const electron = spawnManaged(
-            'pnpm',
+        const electron = spawnPackageBinary(
+            'nx',
             [
-                'exec',
-                'nx',
                 'serve-internal',
                 'maestro-electron',
                 '--remoteDebuggingPort',

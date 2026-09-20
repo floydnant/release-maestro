@@ -5,7 +5,7 @@ import {
     registerDevelopmentHolder,
     removeDevelopmentHolder,
     signalProcessTree,
-    spawnManaged,
+    spawnPackageBinary,
     startHeartbeat,
     heartbeatDevelopmentHolder,
     logDiagnostic,
@@ -48,7 +48,8 @@ try {
                   '--memoryDebugging',
               ]
             : ['exec', 'playwright-mcp', '--cdp-endpoint', endpoint]
-    child = spawnManaged('pnpm', commandArgs, {
+    const [binary, ...binaryArgs] = commandArgs.slice(1)
+    child = spawnPackageBinary(binary, binaryArgs, {
         env: { ...process.env, ...bundleEnvironment(allocation.bundle, allocation.appDataPath) },
     })
     if (pendingSignal) signalProcessTree(child.pid, pendingSignal)

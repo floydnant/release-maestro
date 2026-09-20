@@ -1162,6 +1162,12 @@ export const spawnManaged = (command, args, options = {}) =>
         ...options,
     })
 
+export const spawnPackageBinary = (binary, args, options = {}) => {
+    const configured = process.env['RELEASE_MAESTRO_PNPM_COMMAND']?.trim()
+    const [command, ...prefix] = configured ? configured.split(/\s+/) : ['corepack', 'pnpm']
+    return spawnManaged(command, [...prefix, 'exec', binary, ...args], options)
+}
+
 export const forwardSignals = children => {
     const listeners = new Map()
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {

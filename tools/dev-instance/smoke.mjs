@@ -31,6 +31,7 @@ const environment = {
     ...process.env,
     CI: '1',
     PATH: `${shimBin}:${process.env.PATH}`,
+    RELEASE_MAESTRO_PNPM_COMMAND: pnpmShim,
     RELEASE_MAESTRO_INSTANCE_STATE_DIR: stateDir,
 }
 

@@ -146,7 +146,11 @@ setTimeout(() => finish(''), delay)
 const spawnMcp = (fixture, cwd, bin, server = 'chrome-devtools', extra = {}) => {
     const child = spawn(process.execPath, [mcpWrapper, server], {
         cwd,
-        env: environmentFor(fixture, { PATH: `${bin}:${process.env.PATH}`, ...extra }),
+        env: environmentFor(fixture, {
+            PATH: `${bin}:${process.env.PATH}`,
+            RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+            ...extra,
+        }),
         stdio: ['pipe', 'pipe', 'pipe'],
     })
     liveChildren.push(child)
@@ -458,7 +462,11 @@ test('dev conflicts with Electron E2E and a second dev supervisor reports its ow
     const bin = await createFakePnpm(fixture)
     const dev = spawn(process.execPath, [cli, 'run-dev'], {
         cwd: fixture.main,
-        env: environmentFor(fixture, { PATH: `${bin}:${process.env.PATH}`, FAKE_OPEN_PORT: '1' }),
+        env: environmentFor(fixture, {
+            PATH: `${bin}:${process.env.PATH}`,
+            RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+            FAKE_OPEN_PORT: '1',
+        }),
         stdio: ['ignore', 'pipe', 'pipe'],
     })
     liveChildren.push(dev)
@@ -474,6 +482,7 @@ test('dev conflicts with Electron E2E and a second dev supervisor reports its ow
     )
     const duplicate = run(fixture, fixture.main, ['run-dev'], {
         PATH: `${bin}:${process.env.PATH}`,
+        RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
         FAKE_OPEN_PORT: '1',
     })
     assert.equal(duplicate.status, 1)
@@ -497,7 +506,11 @@ test('an orphaned live listener remains an owner and dev-stop terminates it', as
     const bin = await createFakePnpm(fixture)
     const dev = spawn(process.execPath, [cli, 'run-dev'], {
         cwd: fixture.main,
-        env: environmentFor(fixture, { PATH: `${bin}:${process.env.PATH}`, FAKE_OPEN_PORT: '1' }),
+        env: environmentFor(fixture, {
+            PATH: `${bin}:${process.env.PATH}`,
+            RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+            FAKE_OPEN_PORT: '1',
+        }),
         stdio: ['ignore', 'pipe', 'pipe'],
     })
     liveChildren.push(dev)
