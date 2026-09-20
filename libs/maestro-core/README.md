@@ -9,7 +9,7 @@ Both product contexts run through this lib; see [CONTEXT-MAP.md](../../CONTEXT-M
 schemas belong to which.
 
 ```bash
-npx nx test maestro-core
-npx nx build maestro-core
-npx nx lint maestro-core
+pnpm exec nx test maestro-core
+pnpm exec nx build maestro-core
+pnpm exec nx lint maestro-core
 ```

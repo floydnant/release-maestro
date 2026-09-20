@@ -1,35 +1,33 @@
-name: 'Setup Node Dependencies'
-description: 'Set up Node.js, cache npm downloads, and install project dependencies.'
+name: 'Setup Node dependencies'
+description: 'Set up Node.js and install dependencies with the declared pnpm version.'
 
 inputs:
-    node-version:
-        description: 'Node.js version to install.'
-        required: false
-        default: '22'
     install-command:
         description: 'Command used to install dependencies.'
         required: false
-        default: 'npm i'
+        default: 'pnpm install --frozen-lockfile'
 
 runs:
     using: 'composite'
     steps:
-        - name: Cache node modules
-          uses: actions/cache@v4
-          env:
-              cache-name: cache-node-modules
-          with:
-              path: ~/.npm
-              key: ${{ runner.os }}-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
-              restore-keys: |
-                  ${{ runner.os }}-${{ env.cache-name }}-
-                  ${{ runner.os }}-
-
         - name: Setup node
-          uses: actions/setup-node@v5
+          uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
           with:
-              node-version: ${{ inputs.node-version }}
+              node-version-file: '.node-version'
 
-        - name: Install Dependencies
+        - name: Setup pnpm
+          uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+        # Resolve without executing dependency code, then validate the repository policy before the
+        # requested install is allowed to run lifecycle scripts.
+        - name: Install policy dependencies
+          shell: bash
+          run: pnpm install --frozen-lockfile --ignore-scripts
+
+        - name: Check dependency policy
+          shell: bash
+          run: make dependency-policy-check
+
+        - name: Install dependencies
           shell: bash
           run: ${{ inputs.install-command }}

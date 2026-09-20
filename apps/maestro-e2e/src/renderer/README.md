@@ -55,7 +55,7 @@ harness validates scenario behaviors and recorded calls at the boundary before u
 init script receives that factory's source because it cannot capture module imports. Keep runtime
 imports and module-level dependencies out of the factory.
 
-Jest tests in `*.test.ts` cover the pure helpers with `npx nx test maestro-e2e`, also included in
+Jest tests in `*.test.ts` cover the pure helpers with `pnpm exec nx test maestro-e2e`, also included in
 `make test` and `make sure`. Playwright runs `*.spec.ts` and checks the browser integration.
 
 ## Basic Usage
@@ -242,5 +242,5 @@ make e2e-renderer
 If the change also touches renderer components or services, run:
 
 ```bash
-npx nx test maestro-renderer
+pnpm exec nx test maestro-renderer
 ```

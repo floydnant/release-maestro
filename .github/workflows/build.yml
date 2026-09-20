@@ -17,7 +17,7 @@ jobs:
     build-linux:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
             - uses: ./.github/actions/setup-node
             - name: Install linux dependencies
               run: |
@@ -29,7 +29,7 @@ jobs:
 
             # @TODO: add back in when we have a proper release pipeline
             # - name: Upload artifact
-            #   uses: actions/upload-artifact@v7
+            #   uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
             #   with:
             #       name: linux-build
             #       path: dist/executables/
@@ -37,17 +37,15 @@ jobs:
     build-macos:
         runs-on: macos-latest
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
             - uses: ./.github/actions/setup-node
-              with:
-                  install-command: npm i && npm i -D cli-truncate iconv-corefoundation
 
             - name: Build the app
               run: make package
 
             # @TODO: add back in when we have a proper release pipeline
             # - name: Upload artifact
-            #   uses: actions/upload-artifact@v7
+            #   uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
             #   with:
             #       name: macos-build
             #       path: dist/executables/*.dmg
@@ -55,7 +53,7 @@ jobs:
     build-windows:
         runs-on: windows-latest
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
             - uses: ./.github/actions/setup-node
 
             - name: Build the app
@@ -63,7 +61,7 @@ jobs:
 
             # @TODO: add back in when we have a proper release pipeline
             # - name: Upload artifact
-            #   uses: actions/upload-artifact@v7
+            #   uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
             #   with:
             #       name: windows-build
             #       path: dist/executables/

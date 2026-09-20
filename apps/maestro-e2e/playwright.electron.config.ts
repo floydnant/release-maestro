@@ -16,7 +16,7 @@ export default defineConfig({
         timeout: 20_000,
     },
     webServer: {
-        command: 'npx nx serve maestro-renderer --port 4200',
+        command: 'pnpm exec nx serve maestro-renderer --port 4200',
         url: 'http://localhost:4200',
         reuseExistingServer: !process.env.CI,
         cwd: workspaceRoot,

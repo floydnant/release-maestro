@@ -67,9 +67,9 @@ Claude Code uses `.mcp.json`; Codex uses `.codex/config.toml` after the project 
 Both configs include the memory tools used by `profiling`. Restart the client after changing
 its server configuration. Codex's `/mcp` shows the active servers.
 
-Run `make install` before starting an agent client from the repository root. Both configs run
-the installed MCP package directly with Node, so the dependency manifest and lockfile control
-its version. Dependency updates take effect after reinstalling and restarting the client.
+Run `make install` before starting an agent client from the repository root. Both configs use
+`pnpm exec` to run the installed MCP package, so the dependency manifest and lockfile control its
+version. Dependency updates take effect after reinstalling and restarting the client.
 If dependencies are missing, startup fails without downloading a fallback package.
 
 Keep `--usageStatistics=false`. The server reports usage data to Google by default.
@@ -78,10 +78,10 @@ definitions cost context even when the app is not running; browser attachment is
 
 For interaction-heavy work, opt into the repository's pinned Playwright MCP server. It is disabled
 in `.codex/config.toml` so its tools do not consume context by default. Start a Codex session with
-`codex -c mcp_servers.playwright.enabled=true`; other clients can run `node` with these arguments:
+`codex -c mcp_servers.playwright.enabled=true`; other clients can run the same pinned binary:
 
 ```text
-./node_modules/@playwright/mcp/cli.js --cdp-endpoint http://127.0.0.1:9222
+pnpm exec playwright-mcp --cdp-endpoint http://127.0.0.1:9222
 ```
 
 Keep Chrome DevTools MCP as the default because Playwright MCP does not provide performance traces.

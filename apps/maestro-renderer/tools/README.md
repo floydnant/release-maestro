@@ -18,5 +18,5 @@ Contrast pairs use the project's 3.5:1 minimum. This is not WCAG AA compliance f
 which requires 4.5:1.
 
 ```sh
-npx nx run maestro-renderer:design-tokens-check
+pnpm exec nx run maestro-renderer:design-tokens-check
 ```

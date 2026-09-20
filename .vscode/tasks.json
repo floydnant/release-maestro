@@ -2,9 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build.Main",
+            "label": "make dev",
             "type": "shell",
-            "command": "npm run electron:serve-tsc",
+            "command": "make dev",
             "isBackground": false,
             "group": {
                 "kind": "build",
@@ -20,28 +20,6 @@
                     "activeOnStart": true,
                     "beginsPattern": "^.*",
                     "endsPattern": "^.*Terminal will be reused by tasks, press any key to close it.*"
-                }
-            }
-        },
-        {
-            "label": "Build.Renderer",
-            "type": "shell",
-            "command": "npm run ng:serve",
-            "isBackground": true,
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "problemMatcher": {
-                "owner": "typescript",
-                "source": "ts",
-                "applyTo": "closedDocuments",
-                "fileLocation": ["relative", "${cwd}"],
-                "pattern": "$tsc",
-                "background": {
-                    "activeOnStart": true,
-                    "beginsPattern": "^.*",
-                    "endsPattern": "^.*Compiled successfully.*"
                 }
             }
         }

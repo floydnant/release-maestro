@@ -4,6 +4,7 @@
     "version": "1.0.0",
     "main": "main.js",
     "private": true,
+    "packageManager": "pnpm@12.5.1",
     "scripts": {
         "postinstall": "electron-builder install-app-deps",
         "list-project-dev-scripts": "echo 'ALWAYS USE MAKEFILE SCRIPTS' && make help",
@@ -46,8 +47,10 @@
         "@angular/build": "22.1.8",
         "@angular/cli": "22.1.8",
         "@angular/compiler-cli": "22.1.7",
+        "@electron/rebuild": "4.2.0",
         "@eslint/eslintrc": "3.3.7",
         "@eslint/js": "10.0.1",
+        "@jest/globals": "30.5.2",
         "@ngx-translate/core": "18.0.0",
         "@ngx-translate/http-loader": "18.0.0",
         "@nx/devkit": "22.7.9",
@@ -65,6 +68,7 @@
         "@swc/core": "1.16.2",
         "@swc/helpers": "0.5.23",
         "@types/better-sqlite3": "9.6.0",
+        "@types/estree": "1.0.9",
         "@types/jest": "30.0.0",
         "@types/node": "22.20.3",
         "@typescript-eslint/eslint-plugin": "8.70.0",
@@ -80,13 +84,13 @@
         "electron-debug": "4.1.0",
         "electron-reloader": "1.2.3",
         "eslint": "10.11.0",
-        "eslint-config-prettier": "^10.1.8",
+        "eslint-config-prettier": "10.1.8",
         "eslint-plugin-jsdoc": "64.5.3",
-        "eslint-plugin-playwright": "^2.12.0",
+        "eslint-plugin-playwright": "2.12.0",
         "eslint-plugin-tailwindcss": "3.18.3",
         "jest": "30.5.2",
         "jest-environment-jsdom": "30.5.2",
-        "jest-environment-node": "^30.5.2",
+        "jest-environment-node": "30.5.2",
         "jest-preset-angular": "17.0.0",
         "jest-util": "30.5.1",
         "jsonc-eslint-parser": "3.3.0",
@@ -103,10 +107,12 @@
         "typescript": "6.0.3",
         "typescript-eslint": "8.70.0",
         "wait-on": "9.1.0",
-        "webpack-node-externals": "3.0.0"
+        "webpack-node-externals": "3.0.0",
+        "yaml": "2.9.1"
     },
     "engines": {
-        "node": ">= 22.22.3",
+        "node": ">= 22.22.3 < 23 || >= 24.15.0 < 25",
+        "pnpm": "12.5.1",
         "typescript": ">= 6.0.0 < 6.1.0"
     },
     "browserslist": [

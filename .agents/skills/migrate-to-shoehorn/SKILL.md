@@ -20,7 +20,7 @@ Problems with `as` in tests:
 ## Install
 
 ```bash
-npm i @total-typescript/shoehorn
+pnpm add @total-typescript/shoehorn
 ```
 
 ## Migration patterns
@@ -111,7 +111,7 @@ getUser(fromAny({ body: { id: 123 } }))
     - Do they need to pass intentionally wrong data for error testing?
 
 2. **Install and migrate**:
-    - [ ] Install: `npm i @total-typescript/shoehorn`
+    - [ ] Install: `pnpm add @total-typescript/shoehorn`
     - [ ] Find test files with `as` assertions: `grep -r " as [A-Z]" --include="*.test.ts" --include="*.spec.ts"`
     - [ ] Replace `as Type` with `fromPartial()`
     - [ ] Replace `as unknown as Type` with `fromAny()`

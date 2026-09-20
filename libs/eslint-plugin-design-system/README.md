@@ -188,7 +188,7 @@ corpus case by case (`R*` = reject, `A*` = accept, plus `R7`/`S1` from the compa
 under Jest in the Node environment:
 
 ```bash
-npx nx test eslint-plugin-design-system
+pnpm exec nx test eslint-plugin-design-system
 ```
 
 Every authority the corpus runs against is a fixture in [`src/fixtures/`](src/fixtures) — including
@@ -205,7 +205,7 @@ the template-to-component mapping — are exercised for real rather than through
 The sources are `.cjs` with JSDoc types, checked by `tsc --noEmit`:
 
 ```bash
-npx nx run eslint-plugin-design-system:typecheck
+pnpm exec nx run eslint-plugin-design-system:typecheck
 ```
 
 `lint` depends on it, so type errors fail `make lint`, `make sure`, and CI. There is deliberately no

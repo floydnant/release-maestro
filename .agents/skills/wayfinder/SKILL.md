@@ -22,7 +22,10 @@ The map is a single issue on this repo's issue tracker, labelled `wayfinder:map`
 
 The map is an **index**, not a store. It lists the decisions made and points at the tickets that hold their detail; a decision lives in exactly one place, its ticket, so the map never restates it, only gists it and links.
 
-Maps and tickets live in Linear. Read `docs/agents/issue-tracker.md` before using them. If Linear is unavailable or the team cannot be accessed, ask the maintainer for access or the issue URL. Do not fall back to GitHub Issues or local Markdown.
+Maps and tickets live in Linear. Read `docs/agents/issue-tracker.md` before using them. Access them
+only through the Linear MCP. If the MCP is unavailable or cannot access the team, ask the maintainer
+to restore access. A URL can identify a map or ticket for the MCP, but it does not replace MCP access.
+Do not fall back to GitHub Issues or local Markdown.
 
 ### The map body
 

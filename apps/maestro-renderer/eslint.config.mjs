@@ -8,9 +8,9 @@ import baseConfig from '../../eslint.config.mjs'
 const projectRoot = dirname(fileURLToPath(import.meta.url))
 
 /**
- * `@release-maestro/eslint-plugin-design-system`, by relative path: the workspace does not use npm
- * workspaces, so a library package name is not resolvable from `node_modules` the way it would be
- * for a published consumer. Everything else about the library is publish-ready.
+ * `@release-maestro/eslint-plugin-design-system`, by relative path: the renderer intentionally
+ * loads the plugin's source instead of a built package. Everything else about the library is
+ * publish-ready.
  *
  * Class validation is scoped to this project on purpose. The plugin knows nothing about any design
  * system — the options below are what teach it this one — so registering it at the workspace root
