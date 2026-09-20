@@ -78,12 +78,21 @@ test('parses quoted uses keys while ignoring comments and block-scalar text', ()
     const workspace = createWorkspace()
     writeFileSync(
         join(workspace, '.github', 'workflows', 'ci.yml'),
-        `jobs:\n  test:\n    steps:\n      # uses: owner/commented@v1\n      - run: |\n          echo 'uses: owner/in-a-script@v1'\n      - "uses": owner/action@v1\n`,
+        `env:\n  uses: owner/in-an-env@v1\njobs:\n  test:\n    steps:\n      # uses: owner/commented@v1\n      - run: |\n          echo 'uses: owner/in-a-script@v1'\n      - "uses": owner/action@v1\n`,
     )
 
     const errors = verifyDependencyPolicy(workspace)
     assert.equal(errors.length, 1)
     assert.match(errors[0], /owner\/action@v1/)
+})
+
+test('ignores YAML outside the exact workflows directory', () => {
+    const workspace = createWorkspace()
+    const backupDirectory = join(workspace, '.github', 'workflows-backup')
+    mkdirSync(backupDirectory, { recursive: true })
+    writeFileSync(join(backupDirectory, 'unused.yml'), 'uses: owner/action@v1\n')
+
+    assert.deepEqual(verifyDependencyPolicy(workspace), [])
 })
 
 test('checks composite actions outside the GitHub directory', () => {

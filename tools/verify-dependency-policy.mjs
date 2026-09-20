@@ -53,16 +53,21 @@ const findFiles = (directory, predicate) => {
     return files
 }
 
-const collectActionReferences = value => {
-    if (Array.isArray(value)) return value.flatMap(collectActionReferences)
-    if (value === null || typeof value !== 'object') return []
+const collectStepReferences = steps => {
+    if (!Array.isArray(steps)) return []
+    return steps.flatMap(step =>
+        step !== null && typeof step === 'object' && Object.hasOwn(step, 'uses') ? [step.uses] : [],
+    )
+}
 
-    const references = []
-    for (const [key, nestedValue] of Object.entries(value)) {
-        if (key === 'uses') references.push(nestedValue)
-        else references.push(...collectActionReferences(nestedValue))
-    }
-    return references
+const collectActionReferences = document => {
+    if (document === null || typeof document !== 'object') return []
+
+    const jobReferences = Object.values(document.jobs ?? {}).flatMap(job => {
+        if (job === null || typeof job !== 'object') return []
+        return [...(Object.hasOwn(job, 'uses') ? [job.uses] : []), ...collectStepReferences(job.steps)]
+    })
+    return [...jobReferences, ...collectStepReferences(document.runs?.steps)]
 }
 
 const readYaml = (path, workspaceRoot, errors) => {
@@ -111,12 +116,11 @@ export const verifyDependencyPolicy = workspaceRoot => {
         }
     }
 
-    const automationFiles = findFiles(workspaceRoot, path => {
-        const relativePath = relative(workspaceRoot, path)
-        const isWorkflow = relativePath.startsWith(join('.github', 'workflows')) && /\.ya?ml$/.test(path)
-        const isAction = /^action\.ya?ml$/.test(basename(path))
-        return isWorkflow || isAction
-    })
+    const workflowFiles = findFiles(join(workspaceRoot, '.github', 'workflows'), path =>
+        /\.ya?ml$/.test(path),
+    )
+    const actionFiles = findFiles(workspaceRoot, path => /^action\.ya?ml$/.test(basename(path)))
+    const automationFiles = new Set([...workflowFiles, ...actionFiles])
     for (const path of automationFiles) {
         const document = readYaml(path, workspaceRoot, errors)
         for (const reference of collectActionReferences(document)) {
