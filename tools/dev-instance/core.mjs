@@ -719,6 +719,14 @@ const listenerPids = port => {
         .filter(Number.isSafeInteger)
 }
 
+const ownedListenerPid = (rootPid, ports) => {
+    const processTree = new Set(snapshotProcessTree(rootPid).map(processRecord => processRecord.pid))
+    const candidates = ports
+        .map(port => new Set(listenerPids(port)))
+        .reduce((intersection, pids) => new Set([...intersection].filter(pid => pids.has(pid))))
+    return [...candidates].find(pid => processTree.has(pid)) ?? null
+}
+
 const assertPersistedBundleUsable = async (allocation, registeringHolder) => {
     const liveHolders = [
         ...allocation.holders.filter(holderIsLive),
@@ -927,6 +935,17 @@ export const registerDevelopmentHolder = async (
         })
     })
     return { allocation, holder }
+}
+
+export const registerDevelopmentListenerHolder = async (role, ports, launcherPid, parentHolderId) => {
+    const pid = ownedListenerPid(launcherPid, ports)
+    if (!pid) {
+        throw new InstanceError(
+            `Could not identify the ${role} listener under launcher PID ${launcherPid}.`,
+            'LISTENER_OWNER_NOT_FOUND',
+        )
+    }
+    return registerDevelopmentHolder(role, pid, parentHolderId)
 }
 
 export const heartbeatDevelopmentHolder = async holderId => {

@@ -15,6 +15,7 @@ const processes = []
 
 const environment = {
     ...process.env,
+    CI: '1',
     RELEASE_MAESTRO_INSTANCE_STATE_DIR: stateDir,
 }
 const pnpmWorks = spawnSync('pnpm', ['--version'], { stdio: 'ignore' }).status === 0

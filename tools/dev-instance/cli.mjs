@@ -9,9 +9,11 @@ import {
     forwardSignals,
     heartbeatTransient,
     registerDevelopmentHolder,
+    registerDevelopmentListenerHolder,
     releaseDevelopment,
     releaseTransient,
     removeDevelopmentHolder,
+    signalProcessTree,
     spawnManaged,
     startHeartbeat,
     statusDevelopment,
@@ -91,6 +93,13 @@ const runDevelopment = async () => {
                 )
             }),
         ])
+        const rendererListener = await registerDevelopmentListenerHolder(
+            'dev-renderer',
+            [allocation.bundle.renderer],
+            renderer.pid,
+            supervisor.id,
+        )
+        childHolders.push(rendererListener.holder)
 
         const electronEnvironment = { ...environment }
         delete electronEnvironment.ELECTRON_RUN_AS_NODE
@@ -129,6 +138,13 @@ const runDevelopment = async () => {
                 )
             }),
         ])
+        const electronListener = await registerDevelopmentListenerHolder(
+            'dev-electron',
+            [allocation.bundle.cdp, allocation.bundle.inspector],
+            electron.pid,
+            supervisor.id,
+        )
+        childHolders.push(electronListener.holder)
 
         process.stdout.write(
             `Release Maestro dev instance\n` +
@@ -160,22 +176,35 @@ const runWorkflow = async args => {
     const workflow = args[0]
     const command = args[separator + 1]
     const commandArgs = args.slice(separator + 2)
-    const transient = await allocateTransient(workflow)
-    const child = spawnManaged(command, commandArgs, {
-        env: {
-            ...process.env,
-            ...bundleEnvironment(transient.bundle, transient.appDataPath),
-        },
-    })
-    const stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
-    const stopForwarding = forwardSignals(() => [child])
+    let child
+    let pendingSignal = null
+    const signalListeners = new Map()
+    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+        const listener = () => {
+            if (child?.pid) signalProcessTree(child.pid, signal)
+            else pendingSignal = signal
+        }
+        process.on(signal, listener)
+        signalListeners.set(signal, listener)
+    }
+    let transient
+    let stopHeartbeat = () => {}
     try {
+        transient = await allocateTransient(workflow)
+        child = spawnManaged(command, commandArgs, {
+            env: {
+                ...process.env,
+                ...bundleEnvironment(transient.bundle, transient.appDataPath),
+            },
+        })
+        if (pendingSignal) signalProcessTree(child.pid, pendingSignal)
+        stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
         const result = await waitForExit(child)
         process.exitCode = exitForChild(result.code, result.signal)
     } finally {
         stopHeartbeat()
-        stopForwarding()
-        await releaseTransient(transient.id)
+        signalListeners.forEach((listener, signal) => process.off(signal, listener))
+        if (transient) await releaseTransient(transient.id)
     }
 }
 

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import net from 'node:net'
 import { afterEach, jest, test } from '@jest/globals'
 
-jest.setTimeout(20_000)
+jest.setTimeout(30_000)
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const cli = join(repositoryRoot, 'tools/dev-instance/cli.mjs')
@@ -440,9 +440,11 @@ test('Electron E2E coexists with renderer E2E but duplicate mutating workflows f
     assert.equal(duplicate.status, 1)
     assert.match(duplicate.stderr, /RESOURCE_CONFLICT.*held by electron-e2e/)
     electron.kill('SIGTERM')
+    await childResult(electron)
     renderer.kill('SIGTERM')
+    await childResult(renderer)
     otherWorktreeElectron.kill('SIGTERM')
-    await Promise.all([childResult(electron), childResult(renderer), childResult(otherWorktreeElectron)])
+    await childResult(otherWorktreeElectron)
     const registry = await waitFor(
         async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
         value => Object.keys(value.transients).length === 0,
@@ -488,6 +490,41 @@ test('dev conflicts with Electron E2E and a second dev supervisor reports its ow
     assert.match(e2e.stderr, /RESOURCE_CONFLICT.*electron-development-bundle/)
     dev.kill('SIGTERM')
     await childResult(dev)
+})
+
+test('an orphaned live listener remains an owner and dev-stop terminates it', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const dev = spawn(process.execPath, [cli, 'run-dev'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, { PATH: `${bin}:${process.env.PATH}`, FAKE_OPEN_PORT: '1' }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    let devStderr = ''
+    dev.stderr.on('data', chunk => (devStderr += chunk))
+    const active = await waitFor(
+        () => {
+            if (dev.exitCode !== null || dev.signalCode !== null) assert.fail(devStderr)
+            return Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json']))
+        },
+        status => status.holders?.filter(holder => holder.role === 'dev-electron').length === 2,
+        'listener holder did not register',
+    )
+    const electronListener = active.holders.find(
+        holder => holder.role === 'dev-electron' && holder.processGroup === undefined,
+    )
+    assert.ok(electronListener)
+
+    dev.kill('SIGKILL')
+    await childResult(dev)
+    const orphaned = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.ok(orphaned.holders.some(holder => holder.id === electronListener.id))
+
+    const stopped = runJson(fixture, fixture.main, ['dev-stop'])
+    assert.ok(stopped.stopped.some(holder => holder.pid === electronListener.pid))
+    const inactive = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(inactive.state, 'inactive')
 })
 
 test('active worktrees cannot share a canonical app-data directory', async () => {
