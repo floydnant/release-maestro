@@ -45,8 +45,9 @@ const waitForExit = child =>
     })
 
 const stopChild = async child => {
-    if (!child?.pid) return
-    await stopProcessTree(child.pid)
+    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return
+    if (!child.releaseMaestroStartIdentity) return
+    await stopProcessTree(child.pid, child.releaseMaestroStartIdentity)
     await waitForExit(child)
 }
 
@@ -106,15 +107,20 @@ const runDevelopment = async () => {
         )
         childHolders.push(rendererHolder.holder)
 
-        await Promise.race([
-            waitForPort(allocation.bundle.renderer),
-            waitForExit(renderer).then(result => {
-                throw new InstanceError(
-                    `Renderer exited before it opened port ${allocation.bundle.renderer} with code ${result.code}.`,
-                    'RENDERER_START_FAILED',
-                )
-            }),
-        ])
+        const rendererReadiness = new AbortController()
+        try {
+            await Promise.race([
+                waitForPort(allocation.bundle.renderer, 120_000, rendererReadiness.signal),
+                waitForExit(renderer).then(result => {
+                    throw new InstanceError(
+                        `Renderer exited before it opened port ${allocation.bundle.renderer} with code ${result.code}.`,
+                        'RENDERER_START_FAILED',
+                    )
+                }),
+            ])
+        } finally {
+            rendererReadiness.abort()
+        }
         const rendererListener = await registerDevelopmentListenerHolder(
             'dev-renderer',
             [allocation.bundle.renderer],
@@ -146,18 +152,23 @@ const runDevelopment = async () => {
         )
         childHolders.push(electronHolder.holder)
 
-        await Promise.race([
-            Promise.all([
-                waitForPort(allocation.bundle.cdp, 30_000),
-                waitForPort(allocation.bundle.inspector, 30_000),
-            ]),
-            waitForExit(electron).then(result => {
-                throw new InstanceError(
-                    `Electron exited before it opened its debug ports with code ${result.code}.`,
-                    'ELECTRON_START_FAILED',
-                )
-            }),
-        ])
+        const electronReadiness = new AbortController()
+        try {
+            await Promise.race([
+                Promise.all([
+                    waitForPort(allocation.bundle.cdp, 30_000, electronReadiness.signal),
+                    waitForPort(allocation.bundle.inspector, 30_000, electronReadiness.signal),
+                ]),
+                waitForExit(electron).then(result => {
+                    throw new InstanceError(
+                        `Electron exited before it opened its debug ports with code ${result.code}.`,
+                        'ELECTRON_START_FAILED',
+                    )
+                }),
+            ])
+        } finally {
+            electronReadiness.abort()
+        }
         const electronListener = await registerDevelopmentListenerHolder(
             'dev-electron',
             [allocation.bundle.cdp, allocation.bundle.inspector],
@@ -200,7 +211,7 @@ const runWorkflow = async args => {
     const signalListeners = new Map()
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
         const listener = () => {
-            if (child?.pid) signalProcessTree(child.pid, signal)
+            if (child?.pid) signalProcessTree(child.pid, signal, child.releaseMaestroStartIdentity)
             else pendingSignal = signal
         }
         process.on(signal, listener)
@@ -218,8 +229,8 @@ const runWorkflow = async args => {
             child = ['nx', 'playwright'].includes(command)
                 ? spawnPackageBinary(command, commandArgs, { env: environment })
                 : spawnManaged(command, commandArgs, { env: environment })
-            await setTransientChildHolder(transient.id, child.pid)
-            if (pendingSignal) signalProcessTree(child.pid, pendingSignal)
+            await setTransientChildHolder(transient.id, child.pid, child.releaseMaestroStartIdentity)
+            if (pendingSignal) signalProcessTree(child.pid, pendingSignal, child.releaseMaestroStartIdentity)
             stopHeartbeat()
             stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
             const result = await waitForExit(child)

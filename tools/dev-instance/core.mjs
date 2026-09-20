@@ -185,14 +185,24 @@ const signalProcessSnapshot = (snapshot, signal) => {
     }
 }
 
-export const signalProcessTree = (rootPid, signal) => {
-    signalProcessSnapshot(snapshotProcessTree(rootPid), signal)
-}
-
-export const stopProcessTree = async (rootPid, expectedStartIdentity = null) => {
+export const signalProcessTree = (rootPid, signal, expectedStartIdentity) => {
+    if (!expectedStartIdentity) return
     const snapshot = snapshotProcessTree(rootPid)
     if (
-        expectedStartIdentity &&
+        !snapshot.some(
+            processRecord =>
+                processRecord.pid === rootPid && processRecord.startIdentity === expectedStartIdentity,
+        )
+    ) {
+        return
+    }
+    signalProcessSnapshot(snapshot, signal)
+}
+
+export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
+    if (!expectedStartIdentity) return
+    const snapshot = snapshotProcessTree(rootPid)
+    if (
         !snapshot.some(
             processRecord =>
                 processRecord.pid === rootPid && processRecord.startIdentity === expectedStartIdentity,
@@ -401,15 +411,18 @@ const acquireLock = async paths => {
     const deadline = nowMs() + lockWaitMs
     let nextOwnerCheckAt = 0
     for (;;) {
+        const candidate = `${paths.lock}.candidate-${process.pid}-${randomUUID()}`
         try {
-            await mkdir(paths.lock)
-            await atomicWriteJson(join(paths.lock, 'owner.json'), {
+            await mkdir(candidate)
+            await atomicWriteJson(join(candidate, 'owner.json'), {
                 ...currentProcessIdentity(),
                 acquiredAt: iso(nowMs()),
             })
+            await rename(candidate, paths.lock)
             return async () => rm(paths.lock, { recursive: true, force: true })
         } catch (error) {
-            if (error?.code !== 'EEXIST') throw error
+            await rm(candidate, { recursive: true, force: true })
+            if (!['EEXIST', 'ENOTEMPTY'].includes(error?.code)) throw error
             const shouldCheckOwner = nowMs() >= nextOwnerCheckAt
             nextOwnerCheckAt = shouldCheckOwner ? nowMs() + 500 : nextOwnerCheckAt
             if (shouldCheckOwner && !(await lockOwnerIsLive(paths.lock))) {
@@ -856,8 +869,9 @@ const newHolder = async (
     pid = process.pid,
     parentHolderId = null,
     processGroup = false,
+    knownStartIdentity = null,
 ) => {
-    const startIdentity = processStartIdentity(pid)
+    const startIdentity = knownStartIdentity ?? processStartIdentity(pid)
     if (!startIdentity) throw new InstanceError(`PID ${pid} is not running`, 'PROCESS_NOT_FOUND')
     return {
         id: randomUUID(),
@@ -971,11 +985,12 @@ export const registerDevelopmentHolder = async (
     parentHolderId = null,
     processGroup = false,
 ) => {
-    const allocation = await allocateDevelopment()
+    let allocation = await allocateDevelopment()
     let holder
     await withRegistry(async (registry, paths) => {
         const current = registry.allocations[allocation.worktreeId]
         if (!current) throw new InstanceError('Development allocation disappeared during registration')
+        allocation = current
         holder = await newHolder(current.worktreeId, role, pid, parentHolderId, processGroup)
         if (role === 'dev-supervisor') {
             const other = current.holders.find(
@@ -1212,11 +1227,18 @@ export const heartbeatTransient = async id => {
     })
 }
 
-export const setTransientChildHolder = async (id, pid) => {
+export const setTransientChildHolder = async (id, pid, startIdentity = null) => {
     await withRegistry(async registry => {
         const transient = registry.transients[id]
         if (!transient) throw new InstanceError(`Transient allocation ${id} no longer exists`)
-        transient.childHolder = await newHolder(transient.worktreeId, `workflow:${transient.workflow}`, pid)
+        transient.childHolder = await newHolder(
+            transient.worktreeId,
+            `workflow:${transient.workflow}`,
+            pid,
+            null,
+            false,
+            startIdentity,
+        )
     })
 }
 
@@ -1240,12 +1262,15 @@ export const bundleEnvironment = (bundle, appDataPath = null) => ({
     ...(appDataPath ? { RELEASE_MAESTRO_APP_DATA_DIR: appDataPath } : {}),
 })
 
-export const spawnManaged = (command, args, options = {}) =>
-    spawn(command, args, {
+export const spawnManaged = (command, args, options = {}) => {
+    const child = spawn(command, args, {
         stdio: 'inherit',
         detached: process.platform !== 'win32',
         ...options,
     })
+    child.releaseMaestroStartIdentity = processStartIdentity(child.pid)
+    return child
+}
 
 export const spawnPackageBinary = (binary, args, options = {}) => {
     const configured = process.env['RELEASE_MAESTRO_PNPM_COMMAND']?.trim()
@@ -1263,7 +1288,7 @@ export const forwardSignals = children => {
         const listener = () => {
             for (const child of children()) {
                 if (!child?.pid || child.exitCode !== null || child.signalCode !== null) continue
-                signalProcessTree(child.pid, signal)
+                signalProcessTree(child.pid, signal, child.releaseMaestroStartIdentity)
             }
         }
         process.on(signal, listener)
@@ -1278,26 +1303,43 @@ export const startHeartbeat = callback => {
     return () => clearInterval(timer)
 }
 
-export const waitForPort = async (port, timeoutMs = 120_000) => {
+export const waitForPort = async (port, timeoutMs = 120_000, signal = null) => {
     const deadline = nowMs() + timeoutMs
     while (nowMs() < deadline) {
+        if (signal?.aborted) return
         for (const host of ['::1', '127.0.0.1']) {
             const connected = await new Promise(resolvePromise => {
                 const socket = net.connect({ host, port })
+                let settled = false
+                const finish = connectedValue => {
+                    if (settled) return
+                    settled = true
+                    signal?.removeEventListener('abort', abort)
+                    socket.destroy()
+                    resolvePromise(connectedValue)
+                }
+                const abort = () => finish(false)
                 socket.once('connect', () => {
-                    socket.destroy()
-                    resolvePromise(true)
+                    finish(true)
                 })
-                socket.once('error', () => resolvePromise(false))
-                socket.setTimeout(250, () => {
-                    socket.destroy()
-                    resolvePromise(false)
-                })
+                socket.once('error', () => finish(false))
+                socket.setTimeout(250, () => finish(false))
+                signal?.addEventListener('abort', abort, { once: true })
             })
             if (connected) return
+            if (signal?.aborted) return
         }
-        await sleep(100)
+        await new Promise(resolvePromise => {
+            const finish = () => {
+                clearTimeout(timer)
+                signal?.removeEventListener('abort', finish)
+                resolvePromise()
+            }
+            const timer = setTimeout(finish, 100)
+            signal?.addEventListener('abort', finish, { once: true })
+        })
     }
+    if (signal?.aborted) return
     throw new InstanceError(`Timed out waiting for loopback port ${port}`, 'PORT_TIMEOUT')
 }
 

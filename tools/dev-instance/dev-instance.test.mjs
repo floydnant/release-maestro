@@ -81,7 +81,7 @@ const runJson = (fixture, cwd, args, extra = {}) => {
 }
 
 const waitFor = async (read, predicate, message) => {
-    const deadline = Date.now() + 10_000
+    const deadline = Date.now() + 15_000
     let value
     while (Date.now() < deadline) {
         try {
@@ -552,6 +552,21 @@ test('dev conflicts with Electron E2E and a second dev supervisor reports its ow
     assert.match(e2e.stderr, /RESOURCE_CONFLICT.*electron-development-bundle/)
     dev.kill('SIGTERM')
     await childResult(dev)
+})
+
+test('run-dev exits promptly when the renderer dies before opening its port', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const startedAt = Date.now()
+    const result = run(fixture, fixture.main, ['run-dev'], {
+        PATH: `${bin}:${process.env.PATH}`,
+        RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+        FAKE_DELAY_MS: '3000',
+    })
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /RENDERER_START_FAILED/)
+    assert.ok(Date.now() - startedAt < 10_000, 'startup failure waited for the port timeout')
 })
 
 test('an orphaned live listener remains an owner and dev-stop terminates it', async () => {

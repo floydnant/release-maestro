@@ -25,7 +25,7 @@ let pendingSignal = null
 const signalListeners = new Map()
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     const listener = () => {
-        if (child?.pid) signalProcessTree(child.pid, signal)
+        if (child?.pid) signalProcessTree(child.pid, signal, child.releaseMaestroStartIdentity)
         else pendingSignal = signal
     }
     process.on(signal, listener)
@@ -52,7 +52,7 @@ try {
     child = spawnPackageBinary(binary, binaryArgs, {
         env: { ...process.env, ...bundleEnvironment(allocation.bundle, allocation.appDataPath) },
     })
-    if (pendingSignal) signalProcessTree(child.pid, pendingSignal)
+    if (pendingSignal) signalProcessTree(child.pid, pendingSignal, child.releaseMaestroStartIdentity)
     stopHeartbeat = startHeartbeat(() => heartbeatDevelopmentHolder(holder.id))
     const { code, signal } = await new Promise(resolve => {
         child.once('exit', (code, signal) => resolve({ code, signal }))
