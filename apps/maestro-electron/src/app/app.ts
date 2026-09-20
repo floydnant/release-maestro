@@ -7,6 +7,22 @@ import { rendererAppName, rendererAppPort } from './constants'
 import { nativeWindowBackgroundColor } from './design-tokens.generated'
 import { configurePermissionPolicy } from './permissions'
 
+const isSafeExternalUrl = (url: string) => {
+    try {
+        return ['http:', 'https:'].includes(new URL(url).protocol)
+    } catch {
+        return false
+    }
+}
+
+const openUrlInNativeBrowser = (url: string) => {
+    if (!isSafeExternalUrl(url)) return
+
+    void shell.openExternal(url).catch(error => {
+        console.error('Failed to open URL in the native browser:', error)
+    })
+}
+
 export default class App {
     // Keep a global reference of the window object, if you don't, the window will
     // be closed automatically when the JavaScript object is garbage collected.
@@ -32,14 +48,6 @@ export default class App {
         // in an array if your app supports multi windows, this is the time
         // when you should delete the corresponding element.
         App.mainWindow = null
-    }
-
-    private static onRedirect(event: Electron.Event, url: string) {
-        if (App.mainWindow && url !== App.mainWindow.webContents.getURL()) {
-            // this is a normal external redirect, open it in a new browser window
-            event.preventDefault()
-            shell.openExternal(url)
-        }
     }
 
     private static async onReady() {
@@ -135,11 +143,14 @@ export default class App {
             }
         })
 
-        // handle all external redirects in a new browser window
-        // App.mainWindow.webContents.on('will-navigate', App.onRedirect);
-        // App.mainWindow.webContents.on('new-window', (event, url, frameName, disposition, options) => {
-        //     App.onRedirect(event, url);
-        // });
+        App.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+            openUrlInNativeBrowser(url)
+            return { action: 'deny' }
+        })
+        App.mainWindow.webContents.on('will-navigate', (event, url) => {
+            event.preventDefault()
+            openUrlInNativeBrowser(url)
+        })
 
         // Emitted when the window is closed.
         App.mainWindow.on('closed', () => {
