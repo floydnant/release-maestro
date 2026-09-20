@@ -7,9 +7,9 @@ subject or branch name is a GitHub pull request; Linear issues are referenced by
 - Workspace: `https://linear.app/floyd-haremsa`
 - Team key: `MAE`
 
-Use the Linear MCP tools when they are available. If the MCP is not connected or cannot see the team,
-say so plainly and ask the maintainer for access or for the specific issue URL — do not fall back to
-GitHub Issues.
+Use the Linear MCP tools for every Linear interaction. If the MCP is not connected or cannot see the
+team, say so plainly and ask the maintainer to restore access. A specific issue URL can identify a
+ticket for the MCP, but it does not replace MCP access. Do not fall back to GitHub Issues.
 
 ## Conventions
 
