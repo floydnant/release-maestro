@@ -8,7 +8,7 @@ How to consume this repo's domain documentation. The docs themselves are:
 - [`docs/adr/`](../adr/) — decisions whose reasoning is not visible in the code.
 - [`docs/testing.md`](../testing.md) — test layers, E2E conventions, fixtures.
 - [`README.md`](../../README.md) — project structure and stack. Per-project `project.json` files
-  declare explicit configuration; use `pnpm exec nx show project <project> --web false` for the effective
+  declare explicit configuration; use `make nx ARGS='show project <project> --web false'` for the effective
   target inventory, including inferred targets.
 
 Read the map and the glossary for the context you are working in before exploring the code.

@@ -47,7 +47,7 @@ main process with hot reload. The host binary lives in `apps/metadata-engine/tar
 separate from the packaging binary in `target/release`. Development always uses this host path.
 If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
 
-Use `pnpm exec nx build metadata-engine` to build only the host sidecar.
+Use `make nx ARGS='build metadata-engine'` to build only the host sidecar.
 
 ## Commands
 
@@ -71,9 +71,9 @@ For focused work, use Nx; see the [fast-iteration examples](docs/testing.md#fast
 and test-name filters.
 
 ```bash
-pnpm exec nx test maestro-renderer
-pnpm exec nx lint maestro-electron
-pnpm exec nx build maestro-core
+make nx ARGS='test maestro-renderer'
+make nx ARGS='lint maestro-electron'
+make nx ARGS='build maestro-core'
 ```
 
 There is no repo-wide typecheck target; `build` is the type gate for app code. See
@@ -99,7 +99,7 @@ Five Nx projects, whose names are not self-explanatory:
 
 `apple-scripts/` holds the AppleScript that exports mail out of Apple Mail; `drizzle/` holds
 migrations. A project's `project.json` declares its explicit configuration, but Nx can infer
-additional targets. Use `pnpm exec nx show project <project> --web false` for the effective project and
+additional targets. Use `make nx ARGS='show project <project> --web false'` for the effective project and
 target inventory.
 
 Note that the project layout is not the product layout: both product contexts (music library, release

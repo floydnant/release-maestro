@@ -36,6 +36,9 @@ const findFiles = (directory, predicate) => {
 
 export const verifyDependencyPolicy = workspaceRoot => {
     const errors = []
+    // Nx installs this integrated monorepo from the root manifest only. Library manifests describe
+    // package compatibility, so their wildcard dependencies and peer ranges are intentionally not
+    // installation constraints and must not duplicate versions owned by the root lockfile.
     const rootManifest = JSON.parse(readFileSync(join(workspaceRoot, 'package.json'), 'utf8'))
 
     if (!/^pnpm@\d+\.\d+\.\d+\+sha512\.[0-9a-f]{128}$/.test(rootManifest.packageManager ?? '')) {

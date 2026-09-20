@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean corepack-enable install rebuild-electron rebuild-node version help
+.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean corepack-enable install rebuild-electron rebuild-node nx version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -145,6 +145,9 @@ rebuild-electron: ## Rebuild native dependencies (e.g. after Electron version ch
 	electron-rebuild -f -w better-sqlite3
 rebuild-node: ## Rebuild native dependencies for Node.js (e.g. after Node version change)
 	$(PNPM) rebuild better-sqlite3
+nx: ## Run a focused Nx command through pinned pnpm (for example: make nx ARGS='test maestro-core')
+	@test -n "$(ARGS)" || (echo "Usage: make nx ARGS='test maestro-core'" && exit 1)
+	$(PNPM) exec nx $(ARGS)
 
 version: ## Generate changelog and update version
 	$(PNPM) exec conventional-changelog -i CHANGELOG.md -s -r 0 && $(PNPM) exec prettier --write CHANGELOG.md && git add CHANGELOG.md

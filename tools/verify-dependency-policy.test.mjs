@@ -11,7 +11,7 @@ test('accepts exact dependency versions only', () => {
 })
 
 test('accepts immutable action references and local actions', () => {
-    assert.equal(isPinnedActionReference('actions/checkout@820762786026740c76f36085b0efc47a31fe5020'), true)
+    assert.equal(isPinnedActionReference('actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'), true)
     assert.equal(isPinnedActionReference('./.github/actions/setup-node'), true)
     assert.equal(isPinnedActionReference('actions/checkout@v7'), false)
 })
