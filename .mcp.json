@@ -10,6 +10,10 @@
                 "--usageStatistics=false",
                 "--memoryDebugging"
             ]
+        },
+        "playwright": {
+            "command": "pnpm",
+            "args": ["exec", "playwright-mcp", "--cdp-endpoint", "http://127.0.0.1:9222"]
         }
     }
 }

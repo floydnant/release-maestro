@@ -76,9 +76,11 @@ Keep `--usageStatistics=false`. The server reports usage data to Google by defau
 Both clients enable this server for the project, including its extra heap tools. Those tool
 definitions cost context even when the app is not running; browser attachment is lazy.
 
-For interaction-heavy work, opt into the repository's pinned Playwright MCP server. It is disabled
-in `.codex/config.toml` so its tools do not consume context by default. Start a Codex session with
-`codex -c mcp_servers.playwright.enabled=true`; other clients can run the same pinned binary:
+For interaction-heavy work, opt into the repository's pinned Playwright MCP server. Codex disables
+it in `.codex/config.toml` so its tools do not consume context by default; start a session with
+`codex -c mcp_servers.playwright.enabled=true`. Claude asks each user to approve project servers
+from `.mcp.json`; leave Playwright unapproved until a task needs it. Other clients can run the same
+pinned binary:
 
 ```text
 pnpm exec playwright-mcp --cdp-endpoint http://127.0.0.1:9222
