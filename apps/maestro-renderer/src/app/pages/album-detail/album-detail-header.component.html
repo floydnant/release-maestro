@@ -78,7 +78,7 @@
         >
             @for (genre of album().genres; track genre.id) {
                 <a
-                    class="badge !no-underline transition-colors hover:border-border-default hover:bg-background-elevated"
+                    class="badge no-underline! transition-colors hover:border-border-default hover:bg-background-elevated"
                     [routerLink]="['/genres', genre.id]"
                 >
                     {{ genre.name }}

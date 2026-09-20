@@ -4,7 +4,7 @@
  */
 const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
 const { CLASS_MESSAGES, describeUnknownClass, HOST_MESSAGES } = require('../lib/diagnostics.cjs')
-const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
+const { designTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
 
 const HOST_DECORATORS = new Set(['Component', 'Directive'])
 
@@ -57,7 +57,7 @@ module.exports = {
         const options = context.options[0] ?? {}
         const reportDynamic = options.reportDynamic ?? true
         const sourceCode = context.sourceCode
-        const { isThemePath, isValid, suggest } = createClassChecker(options, {
+        const { isThemeVariable, isValid, suggest } = createClassChecker(options, {
             cwd: context.cwd,
             filePath: context.filename,
         })
@@ -131,19 +131,18 @@ module.exports = {
                 }
 
                 for (const token of tokens) {
-                    for (const bare of bareTokenVariables(token)) {
+                    for (const reference of designTokenVariables(token)) {
+                        if (isThemeVariable(reference.variable)) continue
                         context.report({
-                            messageId: 'bareTokenVariable',
-                            data: { variable: bare.variable },
-                            loc: locFor(bare.start, bare.end),
+                            messageId: 'unknownThemeVariable',
+                            data: { variable: reference.variable },
+                            loc: locFor(reference.start, reference.end),
                         })
                     }
 
                     for (const reference of themeReferences(token)) {
-                        if (isThemePath(reference.path)) continue
                         context.report({
-                            messageId: 'unknownThemePath',
-                            data: { themePath: reference.path },
+                            messageId: 'deprecatedThemeFunction',
                             loc: locFor(reference.start, reference.end),
                         })
                     }

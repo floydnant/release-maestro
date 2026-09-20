@@ -1,7 +1,7 @@
 /* The two rings share keyframes but rotate from different per-ring offsets.
    Keep their SVG stroke and animation rules together around --rotation. */
 .progress-ring {
-    transition: stroke-dashoffset theme('transitionDuration.slow') theme('transitionTimingFunction.standard');
+    transition: stroke-dashoffset var(--duration-slow) var(--ease-standard);
     --rotation: -90deg;
     transform: rotate(var(--rotation));
     transform-origin: 50% 50%;
@@ -11,7 +11,7 @@
     --rotation: -270deg;
 }
 .progress-ring.spin {
-    animation: custom-spin theme('transitionDuration.ambient') linear infinite;
+    animation: custom-spin var(--duration-ambient) linear infinite;
 }
 
 @keyframes custom-spin {

@@ -12,22 +12,40 @@ const tokenPolicy = (css, tailwind) => {
         if (tokenPrefix.test(declaration.prop)) tokens.add(declaration.prop)
     })
     const replacements = new Map()
+    const namespaces = {
+        colors: 'color',
+        spacing: 'spacing',
+        borderRadius: 'radius',
+        opacity: 'opacity',
+        boxShadow: 'shadow',
+        transitionDuration: 'duration',
+        transitionTimingFunction: 'ease',
+    }
     const visit = (value, segments = []) => {
         if (typeof value === 'string') {
             const match = /^var\((--[^)]+)\)$/.exec(value)
             if (match) {
-                const themePath = segments
-                    .map((segment, index) =>
-                        segment.includes('.') ? `[${segment}]` : `${index ? '.' : ''}${segment}`,
-                    )
-                    .join('')
-                replacements.set(match[1], `theme('${themePath}')`)
+                const [group, ...path] = segments
+                const namespace = namespaces[group]
+                if (namespace) replacements.set(match[1], `var(--${namespace}-${path.join('-')})`)
             }
         } else if (value && typeof value === 'object') {
             for (const [key, child] of Object.entries(value)) visit(child, [...segments, key])
         }
     }
     visit(tailwind)
+    for (const [name, value] of Object.entries(tailwind.fontSize ?? {})) {
+        if (!Array.isArray(value)) continue
+        const size = /^var\((--[^)]+)\)$/.exec(value[0])?.[1]
+        if (size) replacements.set(size, `var(--text-${name})`)
+        for (const [property, suffix] of [
+            ['lineHeight', 'line-height'],
+            ['letterSpacing', 'letter-spacing'],
+        ]) {
+            const token = /^var\((--[^)]+)\)$/.exec(value[1]?.[property])?.[1]
+            if (token) replacements.set(token, `var(--text-${name}--${suffix})`)
+        }
+    }
     return { tokens, replacements }
 }
 
@@ -86,14 +104,17 @@ const scanStyleSource = ({ file, source, policy }) => {
                         'unknown-token',
                         `Unknown design token ${name.value}; use a declared token.`,
                     )
-                } else if (!allowsBareTokens(file)) {
+                } else if (
+                    !allowsBareTokens(file) &&
+                    policy.replacements.get(name.value) !== `var(${name.value})`
+                ) {
                     const replacement = policy.replacements.get(name.value)
                     report(
                         position,
                         'bare-design-token',
                         replacement
                             ? `Use ${replacement} instead of var(${name.value}).`
-                            : `Expose ${name.value} in the Tailwind theme, then use theme(...) instead of var(${name.value}).`,
+                            : `Use a semantic token instead of var(${name.value}).`,
                     )
                 }
             })

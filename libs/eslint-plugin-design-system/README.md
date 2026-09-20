@@ -25,13 +25,13 @@ The validators are registered at `error` in the renderer's
 [`eslint.config.mjs`](../../apps/maestro-renderer/eslint.config.mjs), which turns on typed member
 resolution and explains why registration is per-project.
 
-| Option              | Default    | Meaning                                                                                                                      |
-| ------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `tailwindConfig`    | required   | The config whose utilities and theme paths are the authority.                                                                |
-| `globalStylesheets` | `[]`       | Stylesheets whose authored classes count as known everywhere.                                                                |
-| `reportDynamic`     | `true`     | Report class lists that cannot be enumerated. Off silences the whole category.                                               |
-| `resolveTypes`      | `false`    | Resolve an otherwise unenumerable component member through a `TypeChecker`. See [Dynamic class lists](#dynamic-class-lists). |
-| `tsconfig`          | discovered | The project `resolveTypes` builds from.                                                                                      |
+| Option               | Default    | Meaning                                                                                                                      |
+| -------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `tailwindStylesheet` | required   | The Tailwind v4 stylesheet that defines the utility and theme authority.                                                     |
+| `globalStylesheets`  | `[]`       | Stylesheets whose authored classes count as known everywhere.                                                                |
+| `reportDynamic`      | `true`     | Report class lists that cannot be enumerated. Off silences the whole category.                                               |
+| `resolveTypes`       | `false`    | Resolve an otherwise unenumerable component member through a `TypeChecker`. See [Dynamic class lists](#dynamic-class-lists). |
+| `tsconfig`           | discovered | The project `resolveTypes` builds from.                                                                                      |
 
 `resolveTypes` and `tsconfig` affect `valid-template-classnames` only. The imperative rule reads type
 information from the TypeScript parser program already configured for renderer lint.
@@ -64,7 +64,7 @@ and non-class `HostBinding` decorators are ignored.
 
 There is no maintained allowlist. A class is known when **any** of these holds:
 
-1. **Tailwind generates CSS for it.** The rule calls Tailwind's own `generateRules` against
+1. **Tailwind generates CSS for it.** The rule asks Tailwind v4's design system against
    `tailwind.config.js`, so variants, arbitrary values, container queries and the config's plugin
    utilities (`glass`, `wrap-nicely`, `child-focus-ring`) are covered without restating any of them.
    The only literal list in the plugin is `group`/`peer` (+ named forms), variant markers that
@@ -90,14 +90,11 @@ Three further checks ride along on the same tokens:
 
 - **Nearest-name suggestion**, reported and never applied. Candidates come from the same three
   authorities, so a suggested name always passes. See below.
-- **Bare design-token variables inside arbitrary values.** `bg-[color-mix(…var(--color-…)…)]` is a
-  structurally valid utility hiding an unchecked token reference, so `var(--color-*)`,
-  `var(--foundation-*)` and `var(--type-*)` are rejected there in favour of `theme(…)`.
-  Component-local custom properties (`--progress-width`) are not design tokens and are untouched.
-- **Theme paths.** `theme(...)` is the sanctioned replacement, but Tailwind resolves it only when
-  the stylesheet is compiled — a misspelled path is a build error, not an editor diagnostic. The
-  rule resolves the path against the same config, so `theme(colors.status.info.background)` is
-  rejected in favour of `theme(colors.status.info-background)`.
+- **Design-token variables inside arbitrary values.** Tailwind v4 uses CSS variables here. The rule
+  asks the theme whether each `var(--color-*)` name exists. Component-local properties such as
+  `--progress-width` stay valid. Foundation variables stay outside Tailwind's semantic theme.
+- **Deprecated theme calls.** The rule rejects `theme(...)` inside arbitrary values. Use the
+  matching CSS theme variable instead.
 
 ## Diagnostics: two kinds of "nearest", two kinds of wrong
 
@@ -214,22 +211,16 @@ run and to the editor's language server immediately. Publishing later means emit
 from the same JSDoc (`tsc --emitDeclarationOnly`), which is a packaging step rather than a
 development one.
 
-[`src/types.d.ts`](src/types.d.ts) covers the two surfaces that cannot simply be imported, and it is
-worth knowing why each one is there:
-
-- **Tailwind's internals genuinely ship no types.** `tailwindcss` declares a handful of top-level
-  entry points and nothing under `lib/`. `lib/lib/generateRules` and `lib/lib/setupContextUtils` are
-  internal and unavoidable — asking Tailwind's own resolver whether a class emits CSS is the design,
-  and no public API answers that question. Those two are hand-declared.
-- **The Angular AST types exist, and are derived rather than restated.** What cannot be imported is
-  the shape ESLint actually sees: `@angular-eslint/template-parser` rewrites the AST in
-  `preprocessNode` before walking it, stamping `type = node.constructor.name` on every node and
-  displacing Angular's own `type` — `TmplAstBoundAttribute.type` is a numeric `BindingType` — into
-  `__originalType`. The compiler's declarations therefore describe the shape _before_ the rewrite,
-  and the parser's own exported node type is `{ [key: string]: any; type: any }`. So `Stamped<T, N>`
-  expresses exactly that difference and every field still comes from
-  `@angular/compiler`; a rename in Angular fails this build rather than
-  passing silently.
+[`src/types.d.ts`](src/types.d.ts) covers the Angular AST surface that cannot simply be imported.
+The types exist and are derived rather than restated. What cannot be imported is
+the shape ESLint actually sees: `@angular-eslint/template-parser` rewrites the AST in
+`preprocessNode` before walking it, stamping `type = node.constructor.name` on every node and
+displacing Angular's own `type` — `TmplAstBoundAttribute.type` is a numeric `BindingType` — into
+`__originalType`. The compiler's declarations therefore describe the shape _before_ the rewrite,
+and the parser's own exported node type is `{ [key: string]: any; type: any }`. So `Stamped<T, N>`
+expresses exactly that difference and every field still comes from
+`@angular/compiler`; a rename in Angular fails this build rather than
+passing silently.
 
 That derivation is not academic. It is what caught the `[ngClass]` object-spread crash: Angular's
 `LiteralMapKey` is a union and the `spread` member carries no `key`, which a hand-written node shape

@@ -1,6 +1,6 @@
 @for (tab of tabs(); track tab.key) {
     <a
-        class="tab-bar__tab | btn relative gap-1.5 text-content-secondary after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full aria-[current=page]:text-content-primary aria-[current=page]:after:bg-action-primary hover:bg-action-quiet-hover hover:text-content-primary"
+        class="tab-bar__tab | relative btn gap-1.5 text-content-secondary after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full hover:bg-action-quiet-hover hover:text-content-primary aria-[current=page]:text-content-primary aria-[current=page]:after:bg-action-primary"
         [routerLink]="tab.link ?? '.'"
         [queryParams]="tab.queryParams ?? {}"
         [replaceUrl]="replaceUrl()"
@@ -8,7 +8,7 @@
     >
         {{ tab.label }}
         @if (tab.count != null) {
-            <span class="type-body-sm tabular-nums text-content-muted">{{ tab.count | number }}</span>
+            <span class="type-body-sm text-content-muted tabular-nums">{{ tab.count | number }}</span>
         }
     </a>
 }

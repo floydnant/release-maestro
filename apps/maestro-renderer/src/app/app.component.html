@@ -11,7 +11,7 @@
                     aria-label="History"
                 >
                     <button
-                        class="history-back-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard disabled:cursor-default disabled:text-content-muted hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed"
+                        class="history-back-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed disabled:cursor-default disabled:text-content-muted"
                         type="button"
                         title="Back"
                         aria-label="Back"
@@ -21,7 +21,7 @@
                         <app-icon name="navigationBack" size="18"></app-icon>
                     </button>
                     <button
-                        class="history-forward-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard disabled:cursor-default disabled:text-content-muted hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed"
+                        class="history-forward-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed disabled:cursor-default disabled:text-content-muted"
                         type="button"
                         title="Forward"
                         aria-label="Forward"
@@ -91,7 +91,7 @@
                 @if (showLibrarySetupCta()) {
                     <hr />
                     <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
-                    <a class="btn-primary mt-2 block text-center" routerLink="/import">Set up library</a>
+                    <a class="mt-2 btn-primary block text-center" routerLink="/import">Set up library</a>
                 }
 
                 @if (importProgress(); as importStatus) {
@@ -109,10 +109,10 @@
                         >
                             {{ importStatus.message }}
                             <span
-                                class="absolute inset-0 top-10 bg-gradient-to-b from-transparent to-background-surface"
+                                class="absolute inset-0 top-10 bg-linear-to-b from-transparent to-background-surface"
                             ></span>
                         </p>
-                        <button class="btn-nkd-neutral mt-2" (click)="cancelEmailImport()">Cancel</button>
+                        <button class="mt-2 btn-nkd-neutral" (click)="cancelEmailImport()">Cancel</button>
                     } @else if (importStatus.phase == 'completed') {
                         <hr />
                         <p class="type-body-sm text-content-success">
@@ -124,7 +124,7 @@
                             Done! Processed {{ importStatus.totalProcessed }} emails, imported
                             {{ importStatus.newlyImported }} new ones.
                         </p>
-                        <button class="btn-neutral mt-2" (click)="this.importProgress.set({ phase: 'idle' })">
+                        <button class="mt-2 btn-neutral" (click)="this.importProgress.set({ phase: 'idle' })">
                             Cool
                         </button>
                     } @else if (importStatus.phase == 'error') {
@@ -140,7 +140,7 @@
                             ></app-icon>
                             {{ importStatus.errorMessage }}
                         </p>
-                        <button class="btn-primary mt-2" (click)="triggerEmailImport()">Retry</button>
+                        <button class="mt-2 btn-primary" (click)="triggerEmailImport()">Retry</button>
                     }
                 }
 
@@ -160,10 +160,10 @@
 
     <div class="app-shell__content | flex min-w-0 flex-1 flex-col">
         <header
-            class="title-bar | flex h-[2.25rem] flex-none select-none items-stretch text-content-secondary [-webkit-app-region:drag]"
+            class="title-bar | flex h-[2.25rem] flex-none items-stretch text-content-secondary select-none [-webkit-app-region:drag]"
             [class]="
                 isImportRoute()
-                    ? 'title-bar--overlay | absolute inset-x-0 top-0 z-50 border-b-current bg-transparent [border-bottom-style:none]'
+                    ? 'title-bar--overlay | absolute inset-x-0 top-0 z-50 [border-bottom-style:none] border-b-current bg-transparent'
                     : 'border-b border-b-border-subtle bg-background-elevated'
             "
         >

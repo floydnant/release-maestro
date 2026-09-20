@@ -4,7 +4,7 @@
     background-image:
         linear-gradient(
             90deg,
-            color-mix(in srgb, theme('colors.background.surface') 94%, transparent),
+            color-mix(in srgb, var(--color-background-surface) 94%, transparent),
             transparent
         ),
         none;

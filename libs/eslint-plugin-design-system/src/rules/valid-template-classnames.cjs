@@ -6,7 +6,7 @@
  */
 const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
 const { CLASS_MESSAGES, describeUnknownClass, TEMPLATE_MESSAGES } = require('../lib/diagnostics.cjs')
-const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
+const { designTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
 const { componentFileFor } = require('../lib/css-classes.cjs')
 const { collectClassStrings } = require('../lib/expression-classes.cjs')
 const { createMemberResolver } = require('../lib/member-classes.cjs')
@@ -82,7 +82,7 @@ module.exports = {
         const options = context.options[0] ?? {}
         const reportDynamic = options.reportDynamic ?? true
         const sourceCode = context.sourceCode
-        const { isThemePath, isValid, suggest } = createClassChecker(options, {
+        const { isThemeVariable, isValid, suggest } = createClassChecker(options, {
             cwd: context.cwd,
             filePath: context.filename,
         })
@@ -154,19 +154,18 @@ module.exports = {
                 const loc = positioned ? locFor(token.start, token.end) : fallbackLoc
 
                 // A descriptor is not styling, but an arbitrary value hiding in one still is.
-                for (const bare of bareTokenVariables(token)) {
+                for (const reference of designTokenVariables(token)) {
+                    if (isThemeVariable(reference.variable)) continue
                     context.report({
-                        messageId: 'bareTokenVariable',
-                        data: { variable: bare.variable },
-                        loc: positioned ? locFor(bare.start, bare.end) : fallbackLoc,
+                        messageId: 'unknownThemeVariable',
+                        data: { variable: reference.variable },
+                        loc: positioned ? locFor(reference.start, reference.end) : fallbackLoc,
                     })
                 }
 
                 for (const reference of themeReferences(token)) {
-                    if (isThemePath(reference.path)) continue
                     context.report({
-                        messageId: 'unknownThemePath',
-                        data: { themePath: reference.path },
+                        messageId: 'deprecatedThemeFunction',
                         loc: positioned ? locFor(reference.start, reference.end) : fallbackLoc,
                     })
                 }

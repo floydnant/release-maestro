@@ -12,7 +12,7 @@
          a role to hang one on, so assistive tech reads "No track number" where a sighted
          reader sees the dash, and the cell's text stays the one glyph. -->
     <span
-        class="song-table__track-number | shrink-0 truncate py-0.5 pl-4 pr-2 text-right tabular-nums text-content-secondary"
+        class="song-table__track-number | shrink-0 truncate py-0.5 pr-2 pl-4 text-right text-content-secondary tabular-nums"
         role="gridcell"
         [attr.aria-label]="row().trackNumber == null ? 'No track number' : null"
         [style.width.px]="widths.trackNumber"
