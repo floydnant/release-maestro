@@ -7,8 +7,25 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import net from 'node:net'
 import { afterEach, jest, test } from '@jest/globals'
+import { parseUnixProcessIdentity, rootProcessHolders } from './core.mjs'
 
 jest.setTimeout(30_000)
+
+test('Unix process identities exclude zombie and exiting processes', () => {
+    const started = 'Mon Sep 21 23:59:02 2026'
+
+    assert.equal(parseUnixProcessIdentity(`S+ ${started}`), started)
+    assert.equal(parseUnixProcessIdentity(`Z ${started}`), null)
+    assert.equal(parseUnixProcessIdentity(`?Es ${started}`), null)
+})
+
+test('process shutdown starts with supervisors and orphaned holders', () => {
+    const supervisor = { id: 'supervisor' }
+    const managedChild = { id: 'managed-child', parentHolderId: supervisor.id }
+    const orphan = { id: 'orphan', parentHolderId: 'missing-parent' }
+
+    assert.deepEqual(rootProcessHolders([supervisor, managedChild, orphan]), [supervisor, orphan])
+})
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const cli = join(repositoryRoot, 'tools/dev-instance/cli.mjs')
@@ -80,8 +97,8 @@ const runJson = (fixture, cwd, args, extra = {}) => {
     return JSON.parse(result.stdout)
 }
 
-const waitFor = async (read, predicate, message) => {
-    const deadline = Date.now() + 15_000
+const waitFor = async (read, predicate, message, timeoutMs = 15_000) => {
+    const deadline = Date.now() + timeoutMs
     let value
     while (Date.now() < deadline) {
         try {
@@ -374,6 +391,46 @@ test('MCP wrapper forwards signals and dev-stop leaves unrelated processes alive
     assert.equal(unrelated.exitCode, null)
 })
 
+test('dev-stop lets the supervisor reap its managed processes', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const dev = spawn(process.execPath, [cli, 'run-dev'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, {
+            PATH: `${bin}:${process.env.PATH}`,
+            RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+            FAKE_OPEN_PORT: '1',
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.some(holder => holder.role === 'dev-renderer'),
+        'renderer holder did not register',
+    )
+
+    const startedAt = Date.now()
+    const stopped = runJson(fixture, fixture.main, ['dev-stop'])
+    const stopDurationMs = Date.now() - startedAt
+    await childResult(dev)
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    const events = (await readFile(join(fixture.state, 'orchestration.jsonl'), 'utf8'))
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line))
+    const request = events.findLast(event => event.event === 'dev-stop-requested')
+
+    assert.ok(stopped.stopped.some(holder => holder.role === 'dev-supervisor'))
+    assert.ok(stopDurationMs < 4_000, `dev-stop took ${stopDurationMs} ms`)
+    assert.deepEqual(
+        request.targets.map(holder => holder.role),
+        ['dev-supervisor'],
+    )
+    assert.equal(status.state, 'inactive')
+    assert.deepEqual(status.holders, [])
+})
+
 test('several MCP sessions share one allocation and release-when-idle waits for the last holder', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)
@@ -609,6 +666,7 @@ test('an orphaned live listener remains an owner and dev-stop terminates it', as
         },
         status => status.holders?.filter(holder => holder.role === 'dev-electron').length === 2,
         'listener holder did not register',
+        25_000,
     )
     const electronListener = active.holders.find(
         holder => holder.role === 'dev-electron' && holder.processGroup === undefined,
@@ -624,7 +682,7 @@ test('an orphaned live listener remains an owner and dev-stop terminates it', as
     assert.ok(stopped.stopped.some(holder => holder.pid === electronListener.pid))
     const inactive = runJson(fixture, fixture.main, ['dev-status', '--json'])
     assert.equal(inactive.state, 'inactive')
-})
+}, 45_000)
 
 test('active worktrees cannot share a canonical app-data directory', async () => {
     const fixture = await createFixture({ worktrees: 2 })

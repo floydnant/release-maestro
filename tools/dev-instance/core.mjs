@@ -80,6 +80,12 @@ export const resolveWorktree = async (cwd = process.cwd()) => {
     return { root, branch, manifestPath: join(root, manifestName) }
 }
 
+export const parseUnixProcessIdentity = output => {
+    const [state, ...started] = output.trim().split(/\s+/)
+    if (!state || started.length === 0 || /[ZE]/.test(state)) return null
+    return started.join(' ')
+}
+
 const processStartIdentity = pid => {
     if (!Number.isSafeInteger(pid) || pid <= 0) return null
     try {
@@ -95,7 +101,7 @@ const processStartIdentity = pid => {
                 .slice(statLine.lastIndexOf(')') + 2)
                 .trim()
                 .split(/\s+/)
-            started = afterName[19] ?? ''
+            started = /[ZX]/.test(afterName[0] ?? '') ? '' : (afterName[19] ?? '')
         } catch {
             started = ''
         }
@@ -112,8 +118,10 @@ const processStartIdentity = pid => {
         )
         started = result.status === 0 ? result.stdout.trim() : ''
     } else {
-        const result = spawnSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8' })
-        started = result.status === 0 ? result.stdout.trim() : ''
+        const result = spawnSync('ps', ['-p', String(pid), '-o', 'state=', '-o', 'lstart='], {
+            encoding: 'utf8',
+        })
+        started = result.status === 0 ? (parseUnixProcessIdentity(result.stdout) ?? '') : ''
     }
     return started || null
 }
@@ -125,6 +133,11 @@ export const currentProcessIdentity = () => {
 }
 
 export const holderIsLive = holder => processStartIdentity(holder.pid) === holder.startIdentity
+
+export const rootProcessHolders = holders => {
+    const holderIds = new Set(holders.map(holder => holder.id))
+    return holders.filter(holder => !holder.parentHolderId || !holderIds.has(holder.parentHolderId))
+}
 
 const processTable = () => {
     if (process.platform === 'win32') {
@@ -1127,9 +1140,7 @@ export const statusDevelopment = async () => {
         await writeManifest(worktree, allocation, registry.generation + 1)
         status = {
             state: allocationState(allocation),
-            health: allocation.holders.every(
-                holder => holderIsLive(holder) && nowMs() - Date.parse(holder.heartbeatAt) < 60_000,
-            )
+            health: allocation.holders.every(holder => nowMs() - Date.parse(holder.heartbeatAt) < 60_000)
                 ? 'healthy'
                 : 'degraded',
             ageMs: nowMs() - Date.parse(allocation.createdAt),
@@ -1144,23 +1155,44 @@ export const stopDevelopment = async () => {
     const manifest = await readManifest(worktree)
     if (!manifest) return []
     const stopped = []
+    let holders = []
     let targets = []
     await withRegistry(async (registry, paths) => {
         const allocation = registry.allocations[manifest.worktreeId]
         if (!allocation) return
-        targets = [...allocation.holders]
-            .reverse()
-            .filter(holder => holder.worktreeId === allocation.worktreeId && holderIsLive(holder))
+        holders = allocation.holders.filter(holder => holder.worktreeId === allocation.worktreeId)
+        targets = rootProcessHolders(holders)
         await appendEvent(paths, 'dev-stop-requested', {
             worktreeId: allocation.worktreeId,
             targets: targets.map(({ role, pid, startIdentity }) => ({ role, pid, startIdentity })),
         })
     })
-    for (const holder of targets) {
-        if (!holderIsLive(holder)) continue
-        await stopProcessTree(holder.pid, holder.startIdentity)
-        stopped.push({ role: holder.role, pid: holder.pid, startIdentity: holder.startIdentity })
+    await Promise.all(
+        targets.map(holder =>
+            holderIsLive(holder) ? stopProcessTree(holder.pid, holder.startIdentity) : undefined,
+        ),
+    )
+    const survivors = [
+        ...new Map(
+            holders.filter(holderIsLive).map(holder => [`${holder.pid}:${holder.startIdentity}`, holder]),
+        ).values(),
+    ]
+    for (const holder of survivors) {
+        signalProcessTree(holder.pid, 'SIGKILL', holder.startIdentity)
     }
+    const hardStopDeadline = nowMs() + 500
+    while (survivors.some(holderIsLive) && nowMs() < hardStopDeadline) {
+        await sleep(25)
+    }
+    await withRegistry(async () => {})
+    const failed = holders.filter(holderIsLive)
+    if (failed.length > 0) {
+        const details = failed
+            .map(holder => `${holder.role} PID ${holder.pid} started ${holder.startIdentity}`)
+            .join(', ')
+        throw new InstanceError(`Failed to stop validated holders: ${details}`, 'STOP_FAILED')
+    }
+    stopped.push(...holders.map(({ role, pid, startIdentity }) => ({ role, pid, startIdentity })))
     return stopped
 }
 
