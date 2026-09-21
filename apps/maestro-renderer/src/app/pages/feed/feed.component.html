@@ -85,14 +85,30 @@
                                                         isCurrentTrack(track.streamUrl),
                                                 }"
                                                 [attr.aria-label]="
-                                                    isCurrentTrack(track.streamUrl) && audioPlayer.isPlaying()
-                                                        ? 'Pause ' + track.title
-                                                        : 'Play ' + track.title
+                                                    isCurrentTrack(track.streamUrl) && audioPlayer.isLoading()
+                                                        ? 'Loading ' + track.title
+                                                        : isCurrentTrack(track.streamUrl) &&
+                                                            audioPlayer.isPlaying()
+                                                          ? 'Pause ' + track.title
+                                                          : 'Play ' + track.title
+                                                "
+                                                [attr.aria-busy]="
+                                                    isCurrentTrack(track.streamUrl) && audioPlayer.isLoading()
                                                 "
                                                 (mousedown)="$event.preventDefault()"
                                                 (click)="toggleTrackPlayback(track.streamUrl)"
                                             >
-                                                @if (isCurrentTrack(track.streamUrl)) {
+                                                @if (
+                                                    isCurrentTrack(track.streamUrl) && audioPlayer.isLoading()
+                                                ) {
+                                                    <app-progress-ring
+                                                        mode="spinning"
+                                                        [diameter]="20"
+                                                        [strokeWidth]="2"
+                                                        color="content.secondary"
+                                                        bgColor="transparent"
+                                                    ></app-progress-ring>
+                                                } @else if (isCurrentTrack(track.streamUrl)) {
                                                     <app-icon
                                                         [name]="audioPlayer.isPlaying() ? 'pause' : 'play'"
                                                     ></app-icon>
