@@ -67,4 +67,17 @@ describe('App main window', () => {
         expect(event.preventDefault).toHaveBeenCalledTimes(1)
         expect(openExternal).toHaveBeenCalledWith('https://artist.bandcamp.com/album/release')
     })
+
+    it('allows dev renderer reloads to navigate the primary window', () => {
+        App['initMainWindow']()
+
+        const handleNavigation = onWebContents.mock.calls.find(
+            ([eventName]) => eventName === 'will-navigate',
+        )![1]
+        const event = { preventDefault: jest.fn() }
+        handleNavigation(event, 'http://localhost:4200/feed')
+
+        expect(event.preventDefault).not.toHaveBeenCalled()
+        expect(openExternal).not.toHaveBeenCalled()
+    })
 })
