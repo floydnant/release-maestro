@@ -7,6 +7,7 @@ export class WebAudioPlayer {
     private sourceNode: MediaElementAudioSourceNode
     private gainNode: GainNode
     private pendingSeekPercent = 0
+    private playRequestId = 0
 
     private constructor() {
         this.audioElem = new Audio()
@@ -22,7 +23,6 @@ export class WebAudioPlayer {
         this.audioElem.addEventListener('play', () => this.isPlaying.set(true))
         this.audioElem.addEventListener('playing', () => this.isLoading.set(false))
         this.audioElem.addEventListener('waiting', () => this.isLoading.set(true))
-        this.audioElem.addEventListener('stalled', () => this.isLoading.set(true))
         this.audioElem.addEventListener('timeupdate', () => this.playerTime.set(this.audioElem.currentTime))
         this.audioElem.addEventListener('durationchange', () => this.updateDuration())
         this.audioElem.addEventListener('loadedmetadata', () => {
@@ -106,9 +106,10 @@ export class WebAudioPlayer {
     play() {
         if (!this.audioElem.src) return
 
+        const requestId = ++this.playRequestId
         this.isLoading.set(true)
         this.audioElem.play().catch(err => {
-            this.isLoading.set(false)
+            if (requestId == this.playRequestId) this.isLoading.set(false)
             this.logError('Failed to play audio:', err)
         })
 
@@ -117,6 +118,7 @@ export class WebAudioPlayer {
 
     pause() {
         if (this.audioElem) {
+            this.playRequestId++
             this.audioElem.pause()
             this.isLoading.set(false)
         }
