@@ -17,8 +17,8 @@
     }
 }
 @for (entry of content(); track entry.genre.id) {
-    <header class="genre-detail__header | flex flex-col gap-4 px-6 pb-4 pt-5">
-        <h1 class="type-hero-title break-words text-content-primary">{{ entry.genre.name }}</h1>
+    <header class="genre-detail__header | flex flex-col gap-4 px-6 pt-5 pb-4">
+        <h1 class="type-hero-title wrap-break-word text-content-primary">{{ entry.genre.name }}</h1>
 
         <!-- Each tab carries its count, so the header does not repeat one of them as a
              subtitle. -->

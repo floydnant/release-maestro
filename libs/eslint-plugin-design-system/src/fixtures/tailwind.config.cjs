@@ -7,8 +7,6 @@
  * carries a `DEFAULT` key. That is why a bare `rounded` and an off-scale `max-h-72` emit nothing
  * while still looking like perfectly ordinary Tailwind, and it is the case that decided MAE-100.
  */
-const plugin = require('tailwindcss/plugin')
-
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     content: [],
@@ -53,24 +51,14 @@ module.exports = {
         opacity: { 0: '0', 30: '0.3', 50: '0.5', 70: '0.7', 100: '1' },
         extend: {
             colors: {
-                background: { canvas: 'var(--color-background-canvas)', surface: 'var(--color-background-surface)' },
+                background: {
+                    canvas: 'var(--color-background-canvas)',
+                    surface: 'var(--color-background-surface)',
+                },
                 content: { primary: 'var(--color-content-primary)', muted: 'var(--color-content-muted)' },
                 border: { subtle: 'var(--color-border-subtle)', focus: 'var(--color-border-focus)' },
                 status: { 'info-background': 'var(--color-status-info-background)' },
             },
         },
     },
-    plugins: [
-        require('@tailwindcss/container-queries'),
-        plugin(({ addVariant }) => {
-            addVariant('not-hover', '@media (hover: hover) { &:not( :hover, :focus-visible ) }')
-        }),
-        plugin(({ addUtilities }) => {
-            addUtilities({
-                '.glass': { 'backdrop-filter': 'blur(16px)' },
-                '.wrap-nicely': { 'overflow-wrap': 'break-word', hyphens: 'auto' },
-                '.child-focus-ring': { '&:has(:focus-visible)': { outline: '2px solid' } },
-            })
-        }),
-    ],
 }

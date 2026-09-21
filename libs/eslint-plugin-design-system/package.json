@@ -8,10 +8,12 @@
     "peerDependencies": {
         "@angular-eslint/template-parser": ">=19",
         "eslint": ">=9",
-        "tailwindcss": "^3"
+        "tailwindcss": "^4"
     },
     "dependencies": {
+        "@tailwindcss/node": "*",
         "postcss": "*",
+        "synckit": "*",
         "typescript": "*"
     },
     "devDependencies": {

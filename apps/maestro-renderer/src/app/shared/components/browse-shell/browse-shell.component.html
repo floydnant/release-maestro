@@ -5,7 +5,7 @@
          one thing here whose width changes as you type, and at the end it pushed the
          search and everything beside it around on every keystroke. -->
     <p
-        class="type-body-sm shrink-0 tabular-nums text-content-secondary"
+        class="type-body-sm shrink-0 text-content-secondary tabular-nums"
         role="status"
         aria-label="Result count"
     >
@@ -24,7 +24,7 @@
         <input
             #searchInput
             type="search"
-            class="input w-64 pl-[2.25rem] pr-8"
+            class="w-64 input pr-8 pl-[2.25rem]"
             placeholder="Search {{ state().entityLabel }}…"
             [attr.aria-label]="'Search ' + state().entityLabel"
             [value]="searchDraft()"
@@ -35,7 +35,7 @@
                  ignores the token set entirely, so it is suppressed in styles.css. -->
             <button
                 type="button"
-                class="btn absolute inset-y-0 right-0 grid place-items-center text-content-muted hover:text-content-primary"
+                class="absolute inset-y-0 right-0 btn grid place-items-center text-content-muted hover:text-content-primary"
                 aria-label="Clear search"
                 (click)="onClearSearch()"
             >
@@ -51,12 +51,12 @@
 @if (filters().chips.length || filters().hasFilter) {
     <div class="browse-shell__chips | flex shrink-0 flex-wrap items-center gap-2 px-4 py-2">
         @for (chip of filters().chips; track chip.kind + chip.id) {
-            <span class="badge relative gap-1 border-border-subtle bg-background-surface pr-[1.75rem]">
+            <span class="relative badge gap-1 border-border-subtle bg-background-surface pr-[1.75rem]">
                 <span class="text-content-muted">{{ chip.kindLabel }}</span>
                 {{ chip.name }}
                 <button
                     type="button"
-                    class="btn absolute inset-y-0 right-0 flex items-center rounded-full px-1.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
+                    class="absolute inset-y-0 right-0 btn flex items-center rounded-full px-1.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
                     [attr.aria-label]="'Remove ' + chip.kindLabel + ' filter ' + chip.name"
                     (click)="chipRemove.emit(chip)"
                 >

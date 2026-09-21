@@ -5,7 +5,7 @@
  * as in templates and host metadata.
  */
 const { createClassChecker, sharedSchema } = require('../lib/class-checker.cjs')
-const { bareTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
+const { designTokenVariables, themeReferences, tokenizeClassList } = require('../lib/class-list.cjs')
 const { CLASS_MESSAGES, describeUnknownClass } = require('../lib/diagnostics.cjs')
 const { stringLiteralsOf } = require('../lib/string-literal-types.cjs')
 const ts = require('typescript')
@@ -55,7 +55,7 @@ module.exports = {
         const sourceCode = context.sourceCode
         const services = sourceCode.parserServices
         const checker = services?.program?.getTypeChecker()
-        const { isThemePath, isValid, suggest } = createClassChecker(options, {
+        const { isThemeVariable, isValid, suggest } = createClassChecker(options, {
             cwd: context.cwd,
             filePath: context.filename,
         })
@@ -265,17 +265,16 @@ module.exports = {
                 kind: /** @type {const} */ ('styling'),
                 inDescriptorPosition: false,
             }
-            for (const bare of bareTokenVariables(token)) {
-                context.report({ messageId: 'bareTokenVariable', data: { variable: bare.variable }, loc })
+            for (const reference of designTokenVariables(token)) {
+                if (isThemeVariable(reference.variable)) continue
+                context.report({
+                    messageId: 'unknownThemeVariable',
+                    data: { variable: reference.variable },
+                    loc,
+                })
             }
-            for (const reference of themeReferences(token)) {
-                if (!isThemePath(reference.path)) {
-                    context.report({
-                        messageId: 'unknownThemePath',
-                        data: { themePath: reference.path },
-                        loc,
-                    })
-                }
+            if (themeReferences(token).length > 0) {
+                context.report({ messageId: 'deprecatedThemeFunction', loc })
             }
             if (!isValid(className)) {
                 context.report({ ...describeUnknownClass(className, suggest(className)), loc })
@@ -390,10 +389,7 @@ module.exports = {
                     const bindingNode = node.arguments[0]
                     if (!bindingNode || bindingNode.type === 'SpreadElement') return
                     const className = target.slice('class.'.length)
-                    checkClassName(
-                        className,
-                        literalLocFor(bindingNode, 'class.'.length, target.length),
-                    )
+                    checkClassName(className, literalLocFor(bindingNode, 'class.'.length, target.length))
                 } else if ((target === 'class' || target === 'className') && decorated?.key) {
                     // The member name's type describes every value Angular can apply, including
                     // later assignments and getter returns. An initializer alone would be weaker.

@@ -25,6 +25,7 @@ const singleStepOf = prefix => new RegExp(`^${escapeForRegExp(prefix)}-([^-]+)$`
 
 /** Scale steps that a bare utility never means: `rounded` is not `rounded-none`. */
 const EMPTY_STEPS = new Set(['none', '0', 'px'])
+const NAMED_STEP_ORDER = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', 'full']
 
 /** @param {string} value */
 function escapeForRegExp(value) {
@@ -106,19 +107,26 @@ function firstScaleStep(prefix, candidates) {
     const step = singleStepOf(prefix)
 
     let seen = 0
-    /** @type {string|null} */
+    /** @type {{ candidate: string, order: number }|null} */
     let first = null
 
     for (const candidate of candidates) {
         const match = step.exec(candidate)
         if (!match) continue
 
+        const value = match[1]
+        if (EMPTY_STEPS.has(value)) continue
+        const named = NAMED_STEP_ORDER.indexOf(value)
+        const numeric = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : null
+        if (named === -1 && numeric === null) continue
+
         seen += 1
-        if (first === null && !EMPTY_STEPS.has(match[1])) first = candidate
+        const order = named === -1 ? (numeric ?? Infinity) : 10_000 + named
+        if (first === null || order < first.order) first = { candidate, order }
     }
 
     // One lonely match is a coincidence, not a scale.
-    return seen > 1 ? first : null
+    return seen > 1 && first ? first.candidate : null
 }
 
 /**

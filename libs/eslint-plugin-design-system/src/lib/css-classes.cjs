@@ -65,6 +65,10 @@ function classesFromCssText(cssText, into = new Set()) {
     root.walkRules(rule => {
         for (const match of rule.selector.matchAll(CLASS_SELECTOR)) into.add(match[1])
     })
+    root.walkAtRules('utility', rule => {
+        const name = rule.params.trim()
+        if (/^-?[_a-zA-Z][\w-]*$/.test(name)) into.add(name)
+    })
     return into
 }
 

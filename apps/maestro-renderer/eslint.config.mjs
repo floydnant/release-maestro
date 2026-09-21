@@ -20,7 +20,7 @@ const designSystem = createRequire(import.meta.url)('../../libs/eslint-plugin-de
 
 /** @type {ClassCheckerOptions} */
 const classValidationOptions = {
-    tailwindConfig: join(projectRoot, 'tailwind.config.js'),
+    tailwindStylesheet: join(projectRoot, 'src/styles.css'),
     globalStylesheets: [join(projectRoot, 'src/styles.css')],
 }
 

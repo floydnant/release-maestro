@@ -1,7 +1,7 @@
 <div class="bg-background-canvas text-content-primary">
     <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div class="max-w-3xl">
-            <p class="type-label-sm uppercase text-content-success">Developer diagnostics</p>
+            <p class="type-label-sm text-content-success uppercase">Developer diagnostics</p>
             <h2 class="type-hero-title mt-1 text-content-primary">Debug Console</h2>
             <p class="type-body-sm mt-3 text-content-secondary">
                 A home for internal diagnostics across renderer, Electron, and worker boundaries. The current
@@ -31,54 +31,54 @@
 
     <section class="mb-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div class="panel p-4">
-            <p class="type-label-sm uppercase text-content-muted">Status</p>
+            <p class="type-label-sm text-content-muted uppercase">Status</p>
             <p aria-label="Scan status" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanStatus()?.phase ?? 'idle' }}
             </p>
         </div>
         <div class="panel p-4">
-            <p class="type-label-sm uppercase text-content-muted">Progress</p>
+            <p class="type-label-sm text-content-muted uppercase">Progress</p>
             <p class="font-mono text-xl font-semibold text-content-primary">{{ progress() }}%</p>
         </div>
         <div class="panel p-4">
-            <p class="type-label-sm uppercase text-content-muted">Discovered</p>
+            <p class="type-label-sm text-content-muted uppercase">Discovered</p>
             <p aria-label="Discovered files" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanStatus()?.discovered ?? 0 }}
             </p>
         </div>
         <div class="panel p-4">
-            <p class="type-label-sm uppercase text-content-muted">Imported</p>
+            <p class="type-label-sm text-content-muted uppercase">Imported</p>
             <p aria-label="Imported items" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanStatus()?.imported ?? 0 }}
             </p>
         </div>
         <div class="panel p-4">
-            <p class="type-label-sm uppercase text-content-muted">Errors</p>
+            <p class="type-label-sm text-content-muted uppercase">Errors</p>
             <p aria-label="Scan errors" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanStatus()?.failedFiles ?? 0 }}
             </p>
         </div>
         <div class="panel p-4">
-            <p class="type-label-sm uppercase text-content-muted">Duration</p>
+            <p class="type-label-sm text-content-muted uppercase">Duration</p>
             <p class="font-mono text-xl font-semibold text-content-primary">{{ scanDurationText() }}</p>
         </div>
     </section>
 
     <section class="mb-5">
         <div class="panel p-4">
-            <p class="type-label-sm uppercase text-content-muted">Diagnostic module</p>
+            <p class="type-label-sm text-content-muted uppercase">Diagnostic module</p>
             <h3 class="type-section-title mt-1 text-content-primary">Metadata engine</h3>
         </div>
     </section>
 
     <div class="grid gap-5 xl:grid-cols-[minmax(22rem,0.8fr)_minmax(38rem,1.4fr)]">
         <div class="space-y-5">
-            <section class="panel space-y-3 p-4">
-                <p class="type-label-sm uppercase text-content-muted">Direct metadata read</p>
+            <section class="space-y-3 panel p-4">
+                <p class="type-label-sm text-content-muted uppercase">Direct metadata read</p>
                 <h3 class="type-section-title text-content-primary">Inspect file tags</h3>
                 <input
                     aria-label="Read file path"
-                    class="input w-full font-mono text-sm"
+                    class="w-full input font-mono text-sm"
                     [ngModel]="readPath()"
                     (ngModelChange)="readPath.set($event)"
                     placeholder="/absolute/path/to/song.flac"
@@ -108,19 +108,19 @@
                 }
             </section>
 
-            <section class="panel space-y-3 p-4">
-                <p class="type-label-sm uppercase text-content-muted">Write probe</p>
+            <section class="space-y-3 panel p-4">
+                <p class="type-label-sm text-content-muted uppercase">Write probe</p>
                 <h3 class="type-section-title text-content-primary">Apply tag update</h3>
                 <input
                     aria-label="Write file path"
-                    class="input w-full font-mono text-sm"
+                    class="w-full input font-mono text-sm"
                     [ngModel]="writePath()"
                     (ngModelChange)="writePath.set($event)"
                     placeholder="/absolute/path/to/song.flac"
                 />
                 <textarea
                     aria-label="Write tag payload"
-                    class="input w-full font-mono text-sm"
+                    class="w-full input font-mono text-sm"
                     [ngModel]="writePayloadText()"
                     (ngModelChange)="writePayloadText.set($event)"
                 ></textarea>
@@ -149,10 +149,10 @@
         </div>
 
         <div class="space-y-5">
-            <section class="panel space-y-4 p-4">
+            <section class="space-y-4 panel p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="max-w-2xl">
-                        <p class="type-label-sm uppercase text-content-muted">Persisted library scan</p>
+                        <p class="type-label-sm text-content-muted uppercase">Persisted library scan</p>
                         <h3 class="type-section-title mt-1 text-content-primary">Full Library Scan</h3>
                         <p class="type-body-sm mt-2 text-content-secondary">
                             Enter one folder per line, or leave empty to scan the configured library folders.
@@ -171,7 +171,7 @@
 
                 <textarea
                     aria-label="Library scan paths"
-                    class="input min-h-24 w-full font-mono text-sm"
+                    class="min-h-24 w-full input font-mono text-sm"
                     [ngModel]="scanPathsText()"
                     (ngModelChange)="scanPathsText.set($event)"
                     placeholder="/music/library&#10;/other/folder"
@@ -181,7 +181,7 @@
 
                 <div class="grid gap-3 md:grid-cols-5">
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
-                        <p class="type-label-sm uppercase text-content-muted">New</p>
+                        <p class="type-label-sm text-content-muted uppercase">New</p>
                         <p
                             aria-label="New songs"
                             class="font-mono text-xl font-semibold text-content-primary"
@@ -190,7 +190,7 @@
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
-                        <p class="type-label-sm uppercase text-content-muted">Changed</p>
+                        <p class="type-label-sm text-content-muted uppercase">Changed</p>
                         <p
                             aria-label="Changed songs"
                             class="font-mono text-xl font-semibold text-content-primary"
@@ -199,7 +199,7 @@
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
-                        <p class="type-label-sm uppercase text-content-muted">Unchanged</p>
+                        <p class="type-label-sm text-content-muted uppercase">Unchanged</p>
                         <p
                             aria-label="Unchanged songs"
                             class="font-mono text-xl font-semibold text-content-primary"
@@ -208,7 +208,7 @@
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
-                        <p class="type-label-sm uppercase text-content-muted">Missing</p>
+                        <p class="type-label-sm text-content-muted uppercase">Missing</p>
                         <p
                             aria-label="Missing songs"
                             class="font-mono text-xl font-semibold text-content-primary"
@@ -217,7 +217,7 @@
                         </p>
                     </div>
                     <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
-                        <p class="type-label-sm uppercase text-content-muted">Tag issues</p>
+                        <p class="type-label-sm text-content-muted uppercase">Tag issues</p>
                         <p
                             aria-label="Normalization issues"
                             class="font-mono text-xl font-semibold text-content-primary"
@@ -261,10 +261,10 @@
                 }
             </section>
 
-            <section class="panel overflow-hidden p-0">
+            <section class="overflow-hidden panel p-0">
                 <div class="flex items-center justify-between gap-3 border-b border-border-subtle p-4">
                     <div>
-                        <p class="type-label-sm uppercase text-content-muted">Status stream</p>
+                        <p class="type-label-sm text-content-muted uppercase">Status stream</p>
                         <h3 class="type-section-title mt-1 text-content-primary">Scan status snapshots</h3>
                     </div>
                     <button class="btn-nkd-neutral" (click)="clearScanLog()">Clear</button>

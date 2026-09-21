@@ -82,7 +82,6 @@ it('normalizes Windows line endings for generated file checks', () => {
 const fs = require('node:fs')
 const path = require('node:path')
 const postcss = require('postcss')
-const tailwindcss = require('tailwindcss')
 const ts = require('typescript')
 const vm = require('node:vm')
 const { tokenPolicy, scanStyleSource, reportStyleDiagnostics } = require('./design-token-styles.cjs')
@@ -149,8 +148,8 @@ it.each(['VAR', 'VaR', 'vAr'])('checks %s functions without changing custom-prop
     background: ${name}(--color-content-Primary);
     border-color: ${name}(--color-missing);
 }`)
-    expect(findings.map(({ rule }) => rule)).toEqual(['bare-design-token', 'unknown-token', 'unknown-token'])
-    expect(findings[1].message).toContain('--color-content-Primary')
+    expect(findings.map(({ rule }) => rule)).toEqual(['unknown-token', 'unknown-token'])
+    expect(findings[0].message).toContain('--color-content-Primary')
 })
 
 it('reports every nested token reference with exact positions and concrete replacements', () => {
@@ -164,23 +163,21 @@ it('reports every nested token reference with exact positions and concrete repla
             line: 2,
             column: 15,
             rule: 'bare-design-token',
-            message:
-                "Use theme('transitionDuration.fast') instead of var(--foundation-motion-duration-fast).",
+            message: 'Use var(--duration-fast) instead of var(--foundation-motion-duration-fast).',
         },
         {
             file: componentFile,
             line: 2,
             column: 54,
             rule: 'bare-design-token',
-            message:
-                "Use theme('transitionTimingFunction.standard') instead of var(--foundation-motion-easing-standard).",
+            message: 'Use var(--ease-standard) instead of var(--foundation-motion-easing-standard).',
         },
     ])
     expect(
         scan(
             '.x { color: color-mix(in srgb, var(--local, var(--color-content-primary)) 40%, transparent); }',
         ),
-    ).toHaveLength(1)
+    ).toHaveLength(0)
 })
 
 it.each(['--color-nope', '--foundation-nope', '--type-nope'])(
@@ -214,11 +211,11 @@ it('does not broaden exemptions to similarly named product files', () => {
         'src/app/fake.generated.css',
         'src/app/pages/design-system-other/example.css',
     ]) {
-        expect(scan('.x { color: var(--color-content-primary); }', file)).toHaveLength(1)
+        expect(scan('.x { color: var(--foundation-color-neutral-500); }', file)).toHaveLength(1)
     }
 })
 
-it('leaves local variables, comments, strings, and theme access untouched', () => {
+it('leaves local variables, comments, strings, and Tailwind theme variables untouched', () => {
     expect(
         scan(`/* var(--color-missing) */
 .x {
@@ -226,7 +223,7 @@ it('leaves local variables, comments, strings, and theme access untouched', () =
     color: var(--progress-color);
     content: 'var(--foundation-missing)';
     background: url("data:text/plain,var(--type-missing)");
-    transition-duration: theme('transitionDuration.fast');
+    transition-duration: var(--duration-fast);
     /* color: var(--color-missing); */
 }`),
     ).toEqual([])
@@ -241,32 +238,26 @@ it('keeps raw comment offsets and scans at-rule parameters', () => {
     ])
 })
 
-it('does not invent a theme path for tokens that are not exposed in Tailwind', () => {
+it('requires semantic tokens when a foundation token is not exposed in Tailwind', () => {
     expect(scan('.x { color: var(--foundation-color-neutral-500); }')[0].message).toBe(
-        'Expose --foundation-color-neutral-500 in the Tailwind theme, then use theme(...) instead of var(--foundation-color-neutral-500).',
+        'Use a semantic token instead of var(--foundation-color-neutral-500).',
     )
 })
 
-it('suggests theme paths that Tailwind can compile', async () => {
-    const config = require('../tailwind.config.js')
-    const css = [...policy.replacements.values()]
-        .map((replacement, index) => `.token-${index} { --value: ${replacement}; }`)
-        .join('\n')
-    const result = await postcss([tailwindcss({ ...config, content: [{ raw: '<div></div>' }] })]).process(
-        css,
-        { from: undefined },
-    )
-    for (const token of policy.replacements.keys()) expect(result.css).toContain(`var(${token})`)
+it('suggests Tailwind v4 theme variables', () => {
+    expect(policy.replacements.get('--foundation-motion-duration-fast')).toBe('var(--duration-fast)')
+    expect(policy.replacements.get('--foundation-motion-easing-standard')).toBe('var(--ease-standard)')
+    expect(policy.replacements.get('--color-content-primary')).toBe('var(--color-content-primary)')
 })
 
 it('finds scalar, array, aliased, namespace-imported and quoted inline styles', () => {
     const examples = [
-        component('`\n.x { color: var(--color-content-primary); }\n`'),
-        component('[".x { color: var(--color-content-primary); }"]'),
-        component('".x { color: var(--color-content-primary); }"')
+        component('`\n.x { color: var(--foundation-color-neutral-500); }\n`'),
+        component('[".x { color: var(--foundation-color-neutral-500); }"]'),
+        component('".x { color: var(--foundation-color-neutral-500); }"')
             .replace('Component }', 'Component as View }')
             .replace('@Component', '@View'),
-        component('".x { color: var(--color-content-primary); }"')
+        component('".x { color: var(--foundation-color-neutral-500); }"')
             .replace('{ Component }', '* as ng')
             .replace('@Component', '@ng.Component')
             .replace('styles:', "'styles':"),
@@ -284,12 +275,12 @@ it('finds scalar, array, aliased, namespace-imported and quoted inline styles', 
 
 it('maps escaped newlines, quotes, unicode and line continuations back to TypeScript source', () => {
     const source = component(
-        String.raw`".x {\ncontent: '\u{1f680}\x61\u0062';\ncolor: var(--color-content-primary); }"`,
+        String.raw`".x {\ncontent: '\u{1f680}\x61\u0062';\ncolor: var(--foundation-color-neutral-500); }"`,
     )
     expect(scan(source, 'src/app/example.component.ts')).toEqual([
         expect.objectContaining({ line: 2, column: source.split('\n')[1].indexOf('var(') + 1 }),
     ])
-    const continued = component('".x { \\\ncolor: var(--color-content-primary); }"')
+    const continued = component('".x { \\\ncolor: var(--foundation-color-neutral-500); }"')
     expect(scan(continued, 'src/app/example.component.ts')[0]).toMatchObject({ line: 3, column: 8 })
 })
 

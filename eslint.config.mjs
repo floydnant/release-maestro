@@ -6,8 +6,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const workspaceRoot = dirname(fileURLToPath(import.meta.url))
-const tailwindConfig = join(workspaceRoot, 'apps/maestro-renderer/tailwind.config.js')
-const tailwindRules = tailwind.configs['flat/recommended'].find(config => config.rules)?.rules ?? {}
+const tailwindStylesheet = join(workspaceRoot, 'apps/maestro-renderer/src/styles.css')
+const tailwindRules = tailwind.configs.recommended.rules
 
 export default defineConfig([
     ...nx.configs['flat/base'],
@@ -113,7 +113,7 @@ export default defineConfig([
         plugins: { tailwindcss: tailwind },
         settings: {
             tailwindcss: {
-                config: tailwindConfig,
+                cssConfigPath: tailwindStylesheet,
             },
         },
         rules: {
@@ -121,6 +121,8 @@ export default defineConfig([
             // Class ordering is owned by prettier-plugin-tailwindcss to avoid conflicts
             'tailwindcss/classnames-order': 'off',
             'tailwindcss/no-custom-classname': 'off',
+            // The v4 rule suggests dynamic spacing classes that this project's replaced scale rejects.
+            'tailwindcss/no-unnecessary-arbitrary-value': 'off',
         },
     },
 ])

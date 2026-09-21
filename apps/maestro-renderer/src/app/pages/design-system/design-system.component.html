@@ -1,6 +1,6 @@
 <div class="specimen | w-full overflow-y-auto p-8">
     <header class="mx-auto max-w-[65rem]">
-        <p class="type-label-sm uppercase text-content-success">Development specimen</p>
+        <p class="type-label-sm text-content-success uppercase">Development specimen</p>
         <h1 class="type-hero-title mt-2">Release Maestro design system</h1>
         <p class="type-body-md mt-4 max-w-[40rem] text-content-secondary">
             Foundations supply values. Semantic tokens describe intent. Components consume the semantic layer.
@@ -13,7 +13,7 @@
             <div class="foundation-color-grid mt-4">
                 @for (column of foundationColorColumns; track column.family) {
                     <div class="foundation-color-column">
-                        <h3 class="type-label-sm uppercase text-content-muted">{{ column.family }}</h3>
+                        <h3 class="type-label-sm text-content-muted uppercase">{{ column.family }}</h3>
                         <div class="mt-3 grid gap-2">
                             @for (token of column.tokens; track token) {
                                 <div class="swatch">

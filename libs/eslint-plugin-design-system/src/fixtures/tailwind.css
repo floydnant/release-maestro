@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+@config './tailwind.config.cjs';
+
+@custom-variant not-hover {
+    @media (hover: hover) {
+        &:not(:hover, :focus-visible) {
+            @slot;
+        }
+    }
+}
+
+@utility glass {
+    backdrop-filter: blur(16px);
+}
+
+@utility wrap-nicely {
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+@utility child-focus-ring {
+    &:has(:focus-visible) {
+        outline: 2px solid;
+    }
+}

@@ -21,7 +21,7 @@
                         {{ feedState.error }}
                     </p>
 
-                    <button class="btn-nkd-neutral mt-3" (click)="retryNotifier$.next()">Retry</button>
+                    <button class="mt-3 btn-nkd-neutral" (click)="retryNotifier$.next()">Retry</button>
                 </div>
             } @else if (feedState.status === 'caught-up') {
                 <div
@@ -46,8 +46,8 @@
             }
             @for (feedItem of feedState.status === 'feed' ? feedState.items : []; track feedItem.id) {
                 <div
-                    class="feed-entry | my-32 flex max-h-[var(--max-feed-item-height)] min-h-[45vh] snap-center items-center py-[calc(var(--feed-item-padding-y)/2)] transition-all duration-slow ease-standard"
-                    [ngClass]="{ 'opacity-30 blur-sm': currentFeedIndex() != $index }"
+                    class="feed-entry | my-32 flex max-h-(--max-feed-item-height) min-h-[45vh] snap-center items-center py-[calc(var(--feed-item-padding-y)/2)] transition-all duration-slow ease-standard"
+                    [ngClass]="{ 'opacity-30 blur-xs': currentFeedIndex() != $index }"
                     #feedEntry
                     (intersectionChange)="onIntersectionChange($event, feedItem, $index)"
                     [intersectionThreshold]="1"
@@ -150,7 +150,7 @@
                                 }
 
                                 <div
-                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
+                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-linear-to-b from-transparent to-background-canvas"
                                 ></div>
                             </ul>
                         </div>
@@ -180,14 +180,14 @@
                                         [href]="feedItem.data.releaseUrl"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="select-text text-content-primary transition-colors duration-fast hover:text-content-action not-hover:no-underline"
+                                        class="text-content-primary transition-colors duration-fast select-text hover:text-content-action not-hover:no-underline"
                                     >
                                         {{ feedItem.data.releaseName }}
                                     </a>
                                 </h1>
                                 <p class="type-body-sm mt-1">
                                     @if (feedItem.data.artist) {
-                                        <span class="artist | select-text text-content-secondary">
+                                        <span class="artist | text-content-secondary select-text">
                                             by {{ feedItem.data.artist }}
                                         </span>
                                         <span class="text-content-muted">•</span>
@@ -210,7 +210,7 @@
                                 </p>
 
                                 <p
-                                    class="about | type-body-sm mt-6 select-text text-content-secondary"
+                                    class="about | type-body-sm mt-6 text-content-secondary select-text"
                                     [innerHTML]="feedItem.data.about | safe: 'html'"
                                 ></p>
 
@@ -243,7 +243,7 @@
                                     class="feed-controls | sticky inset-x-0 bottom-0 mt-4 flex h-10 justify-end"
                                 >
                                     <div
-                                        class="shadow-overlay | pointer-events-none z-0 size-full bg-gradient-to-b from-transparent to-background-canvas"
+                                        class="shadow-overlay | pointer-events-none z-0 size-full bg-linear-to-b from-transparent to-background-canvas"
                                     ></div>
 
                                     <div class="flex rounded-tl-xl text-xl">
@@ -282,10 +282,10 @@
                                         alt="Label image for {{ feedItem.data.band.name }}"
                                     />
                                 }
-                                <p class="type-label-md mt-2 select-text text-content-primary">
+                                <p class="type-label-md mt-2 text-content-primary select-text">
                                     {{ feedItem.data.band.name }}
                                 </p>
-                                <p class="type-body-sm select-text text-content-muted">
+                                <p class="type-body-sm text-content-muted select-text">
                                     {{ feedItem.data.band.location }}
                                 </p>
                                 @if (feedItem.data.unsubscribeUrl) {
@@ -293,7 +293,7 @@
                                         [href]="feedItem.data.unsubscribeUrl"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="type-label-md btn-muted relative mt-2.5 block text-center not-hover:no-underline [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
+                                        class="type-label-md relative mt-2.5 btn-muted block text-center not-hover:no-underline [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
                                         [title]="feedItem.data.unsubscribeText"
                                     >
                                         <span class="opacity-0">Text</span>
@@ -302,7 +302,7 @@
                                     </a>
                                 }
                                 <p
-                                    class="type-body-sm mt-2.5 select-text leading-snug text-content-secondary"
+                                    class="type-body-sm mt-2.5 leading-snug text-content-secondary select-text"
                                 >
                                     {{ feedItem.data.band.bio }}
                                 </p>
@@ -324,7 +324,7 @@
                                 </ul>
 
                                 <div
-                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-gradient-to-b from-transparent to-background-canvas"
+                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-linear-to-b from-transparent to-background-canvas"
                                 ></div>
                             </div>
                         }
