@@ -53,21 +53,21 @@ describe('resolveMetadataEngineBinaryPath', () => {
     })
 
     it.each([
-        { builds: ['dev/release', 'release', 'debug'] },
-        { builds: ['release', 'debug'] },
-        { builds: ['debug'] },
+        { builds: ['target-dev/release', 'target/release', 'target/debug'] },
+        { builds: ['target/release', 'target/debug'] },
+        { builds: ['target/debug'] },
         { builds: [] },
     ])('resolves the canonical host binary with existing builds $builds', async ({ builds }) => {
         const { resolveMetadataEngineBinaryPath } = await import('./app-env')
-        const target = join(workspace, 'apps', 'metadata-engine', 'target')
+        const engineRoot = join(workspace, 'apps', 'metadata-engine')
         for (const build of builds) {
-            await mkdir(join(target, build), { recursive: true })
-            await writeFile(join(target, build, binaryName), '')
+            await mkdir(join(engineRoot, build), { recursive: true })
+            await writeFile(join(engineRoot, build, binaryName), '')
         }
         jest.spyOn(process, 'cwd').mockReturnValue(workspace)
 
         await expect(resolveMetadataEngineBinaryPath()).resolves.toBe(
-            join(target, 'dev', 'release', binaryName),
+            join(engineRoot, 'target-dev', 'release', binaryName),
         )
     })
 
