@@ -5,9 +5,15 @@
     "projectType": "application",
     "targets": {
         "build": {
+            "executor": "nx:noop",
+            "dependsOn": ["^build", "build-app", "metadata-engine:build"]
+        },
+        "build-app": {
             "executor": "nx-electron:build",
+            "cache": true,
+            "inputs": ["production", "^production"],
             "outputs": ["{options.outputPath}"],
-            "dependsOn": ["^build", "metadata-engine:build"],
+            "dependsOn": ["^build"],
             "options": {
                 "outputPath": "dist/apps/maestro-electron",
                 "main": "apps/maestro-electron/src/main.ts",
@@ -34,7 +40,7 @@
         "serve-internal": {
             "executor": "nx-electron:execute",
             "options": {
-                "buildTarget": "maestro-electron:build",
+                "buildTarget": "maestro-electron:build-app",
                 "remoteDebuggingPort": 9222,
                 "inspect": "inspect",
                 "port": 5858
@@ -48,7 +54,7 @@
             "dependsOn": [
                 "maestro-renderer:build",
                 "prepare-icons",
-                "build",
+                "build-app",
                 "metadata-engine:build-package"
             ],
             "executor": "nx-electron:package",
@@ -72,7 +78,7 @@
             "dependsOn": [
                 "maestro-renderer:build",
                 "prepare-icons",
-                "build",
+                "build-app",
                 "metadata-engine:build-package"
             ],
             "executor": "nx-electron:make",

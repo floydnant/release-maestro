@@ -39,15 +39,7 @@ export const resolveMetadataEngineBinaryPath = async (): Promise<string> => {
         return join(appPaths.resources, 'metadata-engine', metadataEngineBinaryName)
     }
 
-    return join(
-        process.cwd(),
-        'apps',
-        'metadata-engine',
-        'target',
-        'dev',
-        'release',
-        metadataEngineBinaryName,
-    )
+    return join(process.cwd(), 'apps', 'metadata-engine', 'target-dev', 'release', metadataEngineBinaryName)
 }
 
 /** Directory where the engine extracts/caches embedded cover art (mirrors the Tauri cache layout). */
