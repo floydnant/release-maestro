@@ -1,5 +1,5 @@
 import { WritableSignal } from '@angular/core'
-import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing'
+import { ComponentFixture, fakeAsync, TestBed, tick, waitForAsync } from '@angular/core/testing'
 import { provideRouter } from '@angular/router'
 import { provideTranslateService } from '@ngx-translate/core'
 import { EMPTY } from 'rxjs'
@@ -14,6 +14,7 @@ describe(FeedComponent.name, () => {
     let audioPlayer: {
         currentUrl: WritableSignal<string | null>
         duration: WritableSignal<number>
+        isLoading: WritableSignal<boolean>
         playSource: jest.Mock
         playerTime: WritableSignal<number>
         seekTo: jest.Mock
@@ -102,6 +103,23 @@ describe(FeedComponent.name, () => {
         expect(audioPlayer.playSource).toHaveBeenCalledWith('https://example.com/another-preview.mp3')
         expect(scrollCurrentTrackIntoView).toHaveBeenCalledTimes(1)
     })
+
+    it('shows the track loading spinner only after the loading threshold', fakeAsync(() => {
+        audioPlayer.isLoading.set(true)
+        fixture.detectChanges()
+
+        expect(component.showTrackLoadingSpinner()).toBe(false)
+
+        tick(49)
+        expect(component.showTrackLoadingSpinner()).toBe(false)
+
+        tick(1)
+        expect(component.showTrackLoadingSpinner()).toBe(true)
+
+        audioPlayer.isLoading.set(false)
+        fixture.detectChanges()
+        expect(component.showTrackLoadingSpinner()).toBe(false)
+    }))
 
     it('reports the current track progress as a bounded percentage', () => {
         const streamUrl = 'https://example.com/preview.mp3'

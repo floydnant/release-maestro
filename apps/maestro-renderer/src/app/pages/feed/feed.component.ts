@@ -11,7 +11,18 @@ import {
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
 import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
-import { combineLatestWith, fromEvent, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
+import {
+    combineLatestWith,
+    fromEvent,
+    map,
+    mergeScan,
+    mergeWith,
+    of,
+    startWith,
+    Subject,
+    switchMap,
+    timer,
+} from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { FeedService } from '../../core/services/feed.service'
@@ -27,6 +38,7 @@ import {
 
 const NUM_PREFETCH_ITEMS = 5
 const SEEK_BY_SECONDS = 30
+const TRACK_LOADING_INDICATOR_DELAY_MS = 50
 
 const getUserFacingErrorMessage = (error: unknown) => {
     if (typeof error == 'string') return error
@@ -61,6 +73,20 @@ export class FeedComponent {
     electronService = inject(ElectronService)
     feedService = inject(FeedService)
     audioPlayer = inject(WebAudioPlayer)
+
+    showTrackLoadingSpinner = toSignal(
+        toObservable(this.audioPlayer.isLoading).pipe(
+            switchMap(isLoading =>
+                isLoading
+                    ? timer(TRACK_LOADING_INDICATOR_DELAY_MS).pipe(
+                          map(() => true),
+                          startWith(false),
+                      )
+                    : of(false),
+            ),
+        ),
+        { initialValue: false },
+    )
 
     feedEntries = viewChildren<ElementRef<HTMLElement>>('feedEntry')
     currentFeedIndex = signal(0)

@@ -20,6 +20,9 @@ export class WebAudioPlayer {
 
         this.audioElem.addEventListener('pause', () => this.isPlaying.set(false))
         this.audioElem.addEventListener('play', () => this.isPlaying.set(true))
+        this.audioElem.addEventListener('playing', () => this.isLoading.set(false))
+        this.audioElem.addEventListener('waiting', () => this.isLoading.set(true))
+        this.audioElem.addEventListener('stalled', () => this.isLoading.set(true))
         this.audioElem.addEventListener('timeupdate', () => this.playerTime.set(this.audioElem.currentTime))
         this.audioElem.addEventListener('durationchange', () => this.updateDuration())
         this.audioElem.addEventListener('loadedmetadata', () => {
@@ -31,6 +34,7 @@ export class WebAudioPlayer {
             this.ended$.next()
         })
         this.audioElem.addEventListener('error', e => {
+            this.isLoading.set(false)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             switch ((e.target as any)?.error.code) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,6 +62,7 @@ export class WebAudioPlayer {
 
     ended$ = new Subject<void>()
     isPlaying = signal(false)
+    isLoading = signal(false)
     currentUrl = signal<string | null>(null)
     playerTime = signal(0)
     duration = signal(0)
@@ -101,7 +106,9 @@ export class WebAudioPlayer {
     play() {
         if (!this.audioElem.src) return
 
+        this.isLoading.set(true)
         this.audioElem.play().catch(err => {
+            this.isLoading.set(false)
             this.logError('Failed to play audio:', err)
         })
 
@@ -111,6 +118,7 @@ export class WebAudioPlayer {
     pause() {
         if (this.audioElem) {
             this.audioElem.pause()
+            this.isLoading.set(false)
         }
     }
 

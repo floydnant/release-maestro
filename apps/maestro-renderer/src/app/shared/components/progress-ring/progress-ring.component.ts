@@ -1,4 +1,4 @@
-import { Component, input, Input, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core'
+import { ChangeDetectionStrategy, Component, input, Input, ViewEncapsulation } from '@angular/core'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 @Component({
@@ -22,9 +22,12 @@ export class ProgressRingComponent {
     color = input<string | undefined, SemanticColorIdentifier | undefined>(semanticColor('content.action'), {
         transform: value => value && semanticColor(value),
     })
-    bgColor = input<string | undefined, SemanticColorIdentifier | undefined>(semanticColor('border.subtle'), {
-        transform: value => value && semanticColor(value),
-    })
+    bgColor = input<string | undefined, SemanticColorIdentifier | 'transparent' | undefined>(
+        semanticColor('border.subtle'),
+        {
+            transform: value => value && (value == 'transparent' ? 'transparent' : semanticColor(value)),
+        },
+    )
 
     get position() {
         return this.diameter / 2
