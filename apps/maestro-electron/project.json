@@ -39,6 +39,7 @@
         },
         "serve-internal": {
             "executor": "nx-electron:execute",
+            "continuous": true,
             "options": {
                 "buildTarget": "maestro-electron:build-app",
                 "remoteDebuggingPort": 9222,
