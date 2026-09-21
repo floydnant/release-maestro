@@ -99,8 +99,7 @@
                                                 (click)="toggleTrackPlayback(track.streamUrl)"
                                             >
                                                 @if (
-                                                    isCurrentTrack(track.streamUrl) &&
-                                                    showTrackLoadingSpinner()
+                                                    isCurrentTrack(track.streamUrl) && audioPlayer.isLoading()
                                                 ) {
                                                     <app-progress-ring
                                                         mode="spinning"
