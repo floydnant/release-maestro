@@ -15,6 +15,17 @@ const isSafeExternalUrl = (url: string) => {
     }
 }
 
+const isSameWebOrigin = (url: string, currentUrl: string) => {
+    try {
+        const destination = new URL(url)
+        const current = new URL(currentUrl)
+
+        return ['http:', 'https:'].includes(current.protocol) && destination.origin === current.origin
+    } catch {
+        return false
+    }
+}
+
 const openUrlInNativeBrowser = (url: string) => {
     if (!isSafeExternalUrl(url)) return
 
@@ -148,6 +159,8 @@ export default class App {
             return { action: 'deny' }
         })
         App.mainWindow.webContents.on('will-navigate', (event, url) => {
+            if (isSameWebOrigin(url, App.mainWindow?.webContents.getURL() ?? '')) return
+
             event.preventDefault()
             openUrlInNativeBrowser(url)
         })
