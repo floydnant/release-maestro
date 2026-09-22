@@ -59,7 +59,7 @@
         "@nx/js": "22.7.9",
         "@nx/playwright": "22.7.9",
         "@nx/web": "22.7.9",
-        "@nx/workspace": "22.7.9",
+        "@nx/workspace": "22.7.12",
         "@playwright/mcp": "0.0.82",
         "@playwright/test": "1.63.0",
         "@schematics/angular": "22.1.8",
