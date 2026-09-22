@@ -776,9 +776,10 @@ test('logs redact sensitive query values, rotate, and render through dev-log', a
     const rendered = run(fixture, fixture.roots[0], ['dev-log'])
     assert.equal(rendered.status, 0, rendered.stderr)
     assert.match(rendered.stdout, /holder-registered|command-failed|mcp-wrapper-failed/)
-    const pretty = run(fixture, fixture.roots[0], ['dev-log', '--pretty'])
-    assert.equal(pretty.status, 0, pretty.stderr)
-    assert.match(pretty.stdout, /\n  [A-Za-z]+: /)
+    assert.match(rendered.stdout, /\n  [A-Za-z]+: /)
+    const json = run(fixture, fixture.roots[0], ['dev-log', '--json'])
+    assert.equal(json.status, 0, json.stderr)
+    for (const line of json.stdout.trim().split('\n')) assert.ok(JSON.parse(line).event)
     const logs = await import('node:fs/promises').then(fs => fs.readdir(fixture.state))
     assert.ok(logs.some(name => name === 'orchestration.jsonl.1'))
     for (const name of logs.filter(name => name.startsWith('orchestration.jsonl'))) {

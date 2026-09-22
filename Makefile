@@ -1,4 +1,4 @@
-.PHONY: dev dev-allocate dev-release dev-reallocate dev-status dev-list dev-stop dev-log dev-smoke serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: dev dev-allocate dev-release dev-reallocate dev-status dev-list dev-stop dev-log serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -22,10 +22,8 @@ dev-list: ## Show development and verification instances across all worktrees
 	node tools/dev-instance/cli.mjs dev-list $(if $(JSON),--json,)
 dev-stop: ## Stop only validated processes owned by this worktree
 	node tools/dev-instance/cli.mjs dev-stop
-dev-log: ## Print orchestration events (FOLLOW=1 follows, PRETTY=1 formats for humans)
-	node tools/dev-instance/cli.mjs dev-log $(if $(FOLLOW),--follow,) $(if $(PRETTY),--pretty,)
-dev-smoke: ## Run the two-worktree development-instance smoke check
-	node tools/dev-instance/smoke.mjs
+dev-log: ## Print orchestration events (FOLLOW=1 follows, JSON=1 emits JSONL)
+	node tools/dev-instance/cli.mjs dev-log $(if $(FOLLOW),--follow,) $(if $(JSON),--json,)
 
 serve-renderer: ## Start only the renderer dev server
 	$(PNPM) exec nx serve maestro-renderer

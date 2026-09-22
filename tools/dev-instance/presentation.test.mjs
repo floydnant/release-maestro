@@ -33,7 +33,7 @@ test('development app name identifies the allocated slot', () => {
     )
 })
 
-test('pretty log events put details on labeled lines', () => {
+test('human log events put details on labeled lines', () => {
     assert.equal(
         formatLogEvent({
             at: '2026-09-22T01:00:00.000Z',
@@ -49,4 +49,18 @@ test('pretty log events put details on labeled lines', () => {
             '  holder: {"pid":42}',
         ].join('\n'),
     )
+})
+
+test('human output can color event names and field labels', () => {
+    const formatted = formatLogEvent(
+        {
+            at: '2026-09-22T01:00:00.000Z',
+            event: 'holder-registered',
+            role: 'dev-supervisor',
+        },
+        { color: true },
+    )
+
+    assert.match(formatted, /\u001b\[1mholder-registered\u001b\[0m/)
+    assert.match(formatted, /\u001b\[36mrole\u001b\[0m/)
 })

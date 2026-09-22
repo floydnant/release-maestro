@@ -36,6 +36,10 @@ import {
 } from './presentation.mjs'
 
 const print = value => process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)
+const useColor = () => {
+    if ('FORCE_COLOR' in process.env) return process.env['FORCE_COLOR'] !== '0'
+    return Boolean(process.stdout.isTTY && !('NO_COLOR' in process.env))
+}
 
 const exitForChild = (code, signal) => {
     if (signal) return 128 + (osConstants.signals[signal] ?? 0)
@@ -190,7 +194,7 @@ const runDevelopment = async () => {
         )
         childHolders.push(electronListener.holder)
 
-        process.stdout.write(formatDevelopmentSummary(instance))
+        process.stdout.write(formatDevelopmentSummary(instance, { color: useColor() }))
 
         const result = await Promise.race([waitForExit(renderer), waitForExit(electron)])
         await Promise.all(children.filter(child => child !== result.child).map(stopChild))
@@ -268,7 +272,7 @@ const main = async () => {
             process.stdout.write(
                 args.includes('--json')
                     ? `${JSON.stringify(status, null, 2)}\n`
-                    : `${formatDevelopmentStatus(status)}\n`,
+                    : `${formatDevelopmentStatus(status, { color: useColor() })}\n`,
             )
             return
         }
@@ -277,7 +281,7 @@ const main = async () => {
             process.stdout.write(
                 args.includes('--json')
                     ? `${JSON.stringify(listed, null, 2)}\n`
-                    : `${formatInstanceList(listed)}\n`,
+                    : `${formatInstanceList(listed, { color: useColor() })}\n`,
             )
             return
         }
@@ -287,7 +291,8 @@ const main = async () => {
         case 'dev-log':
             await followLog({
                 follow: args.includes('--follow') || args.includes('-f'),
-                pretty: args.includes('--pretty'),
+                json: args.includes('--json'),
+                color: useColor(),
             })
             return
         case 'run-dev':

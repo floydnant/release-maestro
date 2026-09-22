@@ -1415,7 +1415,7 @@ export const waitForPort = async (port, timeoutMs = 120_000, signal = null) => {
     throw new InstanceError(`Timed out waiting for loopback port ${port}`, 'PORT_TIMEOUT')
 }
 
-export const followLog = async ({ follow = false, pretty = false } = {}) => {
+export const followLog = async ({ follow = false, json = false, color = false } = {}) => {
     const { log } = getStatePaths()
     let offset = 0
     const printNew = async () => {
@@ -1432,9 +1432,7 @@ export const followLog = async ({ follow = false, pretty = false } = {}) => {
             try {
                 const event = JSON.parse(line)
                 process.stdout.write(
-                    pretty
-                        ? `${formatLogEvent(event)}\n\n`
-                        : `${event.at} ${event.event} ${JSON.stringify(event)}\n`,
+                    json ? `${JSON.stringify(event)}\n` : `${formatLogEvent(event, { color })}\n\n`,
                 )
             } catch {
                 process.stdout.write(`${line}\n`)

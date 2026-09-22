@@ -1,42 +1,59 @@
 const slotLabel = instance =>
     instance.slot === null ? `renderer ${instance.bundle.renderer}` : `slot ${instance.slot}`
 
-const formatHolders = holders =>
+const ansi = {
+    bold: '\u001b[1m',
+    dim: '\u001b[2m',
+    cyan: '\u001b[36m',
+    green: '\u001b[32m',
+    yellow: '\u001b[33m',
+    reset: '\u001b[0m',
+}
+
+const paint = (value, style, color) => (color ? `${style}${value}${ansi.reset}` : value)
+const label = (value, color) => paint(value, ansi.cyan, color)
+const state = (value, color) => paint(value, value === 'active' ? ansi.green : ansi.yellow, color)
+const health = (value, color) => paint(value, value === 'healthy' ? ansi.green : ansi.yellow, color)
+
+const formatHolders = (holders, color) =>
     holders.length
         ? holders
-              .map(holder => `    ${holder.role}: PID ${holder.pid}, started ${holder.startIdentity}`)
+              .map(
+                  holder =>
+                      `    ${label(holder.role, color)}: PID ${holder.pid}, started ${holder.startIdentity}`,
+              )
               .join('\n')
         : '    none'
 
 export const developmentAppName = instance => `Release Maestro dev [${slotLabel(instance)}]`
 
-export const formatDevelopmentSummary = instance =>
+export const formatDevelopmentSummary = (instance, { color = false } = {}) =>
     [
-        `Release Maestro dev instance [${slotLabel(instance)}]`,
-        `  renderer  http://localhost:${instance.bundle.renderer}`,
-        `  CDP       http://127.0.0.1:${instance.bundle.cdp}`,
-        `  inspector http://127.0.0.1:${instance.bundle.inspector}`,
-        `  app data  ${instance.appDataPath}`,
+        paint(`Release Maestro dev instance [${slotLabel(instance)}]`, ansi.bold, color),
+        `  ${label('renderer ', color)} http://localhost:${instance.bundle.renderer}`,
+        `  ${label('CDP      ', color)} http://127.0.0.1:${instance.bundle.cdp}`,
+        `  ${label('inspector', color)} http://127.0.0.1:${instance.bundle.inspector}`,
+        `  ${label('app data ', color)} ${instance.appDataPath}`,
         '',
     ].join('\r\n')
 
-export const formatDevelopmentStatus = status => {
+export const formatDevelopmentStatus = (status, { color = false } = {}) => {
     if (!status.bundle) return `${status.state}: ${status.path}`
     return [
-        `${status.state} (${status.health}) [${slotLabel(status)}]`,
-        `worktree: ${status.path}`,
-        `identity: ${status.worktreeId}`,
-        `renderer: ${status.bundle.renderer}`,
-        `CDP: ${status.bundle.cdp}`,
-        `inspector: ${status.bundle.inspector}`,
-        `app data: ${status.appDataPath}`,
-        `age: ${Math.round(status.ageMs / 1000)}s`,
-        `resources: ${status.claims.join(', ')}`,
-        `holders:\n${formatHolders(status.holders)}`,
+        `${state(status.state, color)} (${health(status.health, color)}) [${slotLabel(status)}]`,
+        `${label('worktree', color)}: ${status.path}`,
+        `${label('identity', color)}: ${status.worktreeId}`,
+        `${label('renderer', color)}: ${status.bundle.renderer}`,
+        `${label('CDP', color)}: ${status.bundle.cdp}`,
+        `${label('inspector', color)}: ${status.bundle.inspector}`,
+        `${label('app data', color)}: ${status.appDataPath}`,
+        `${label('age', color)}: ${Math.round(status.ageMs / 1000)}s`,
+        `${label('resources', color)}: ${status.claims.join(', ')}`,
+        `${label('holders', color)}:\n${formatHolders(status.holders, color)}`,
     ].join('\n')
 }
 
-export const formatInstanceList = ({ instances }) => {
+export const formatInstanceList = ({ instances }, { color = false } = {}) => {
     if (instances.length === 0) return 'No instances.'
     return instances
         .map(instance => {
@@ -45,13 +62,13 @@ export const formatInstanceList = ({ instances }) => {
                     ? `development [${slotLabel(instance)}]`
                     : `${instance.workflow} [${slotLabel(instance)}]`
             return [
-                `${description}: ${instance.state} (${instance.health})`,
-                `  worktree: ${instance.path}`,
-                `  identity: ${instance.worktreeId}`,
-                `  renderer: ${instance.bundle.renderer}`,
-                `  CDP: ${instance.bundle.cdp}`,
-                `  inspector: ${instance.bundle.inspector}`,
-                `  holders:\n${formatHolders(instance.holders)}`,
+                `${paint(description, ansi.bold, color)}: ${state(instance.state, color)} (${health(instance.health, color)})`,
+                `  ${label('worktree', color)}: ${instance.path}`,
+                `  ${label('identity', color)}: ${instance.worktreeId}`,
+                `  ${label('renderer', color)}: ${instance.bundle.renderer}`,
+                `  ${label('CDP', color)}: ${instance.bundle.cdp}`,
+                `  ${label('inspector', color)}: ${instance.bundle.inspector}`,
+                `  ${label('holders', color)}:\n${formatHolders(instance.holders, color)}`,
             ].join('\n')
         })
         .join('\n\n')
@@ -59,10 +76,10 @@ export const formatInstanceList = ({ instances }) => {
 
 const formatLogValue = value => (typeof value === 'string' ? value : JSON.stringify(value))
 
-export const formatLogEvent = event => {
+export const formatLogEvent = (event, { color = false } = {}) => {
     const { at, event: name, ...details } = event
     return [
-        `${at ?? 'unknown time'} ${name ?? 'unknown event'}`,
-        ...Object.entries(details).map(([key, value]) => `  ${key}: ${formatLogValue(value)}`),
+        `${paint(at ?? 'unknown time', ansi.dim, color)} ${paint(name ?? 'unknown event', ansi.bold, color)}`,
+        ...Object.entries(details).map(([key, value]) => `  ${label(key, color)}: ${formatLogValue(value)}`),
     ].join('\n')
 }
