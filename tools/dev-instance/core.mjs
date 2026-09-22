@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import net from 'node:net'
+import { formatLogEvent } from './presentation.mjs'
 
 export const registryVersion = 1
 export const manifestVersion = 1
@@ -43,6 +44,15 @@ const retainedLogs = 3
 const sleep = ms => new Promise(done => setTimeout(done, ms))
 const iso = value => new Date(value).toISOString()
 const nowMs = () => Date.now()
+
+export const developmentSlot = bundle => {
+    const offsets = [
+        bundle.renderer - defaultPorts.renderer,
+        bundle.cdp - defaultPorts.cdp,
+        bundle.inspector - defaultPorts.inspector,
+    ]
+    return offsets[0] >= 0 && offsets.every(offset => offset === offsets[0]) ? offsets[0] : null
+}
 
 export class InstanceError extends Error {
     constructor(message, code = 'INSTANCE_ERROR') {
@@ -557,6 +567,17 @@ const allocationState = (allocation, at = nowMs(), graceMs = defaultGraceMs) => 
     }
     return 'reserved'
 }
+
+const holdersHealth = holders =>
+    holders.every(holder => nowMs() - Date.parse(holder.heartbeatAt) < 60_000) ? 'healthy' : 'degraded'
+
+const describeDevelopmentAllocation = allocation => ({
+    ...allocation,
+    state: allocationState(allocation),
+    health: holdersHealth(allocation.holders),
+    ageMs: nowMs() - Date.parse(allocation.createdAt),
+    slot: developmentSlot(allocation.bundle),
+})
 
 const activeClaims = registry => {
     const claims = []
@@ -1138,16 +1159,35 @@ export const statusDevelopment = async () => {
         allocation.updatedAt = iso(nowMs())
         allocation.generation = registry.generation + 1
         await writeManifest(worktree, allocation, registry.generation + 1)
-        status = {
-            state: allocationState(allocation),
-            health: allocation.holders.every(holder => nowMs() - Date.parse(holder.heartbeatAt) < 60_000)
-                ? 'healthy'
-                : 'degraded',
-            ageMs: nowMs() - Date.parse(allocation.createdAt),
-            ...allocation,
-        }
+        status = describeDevelopmentAllocation(allocation)
     })
     return status
+}
+
+export const listInstances = async () => {
+    let instances = []
+    await withRegistry(async registry => {
+        const development = Object.values(registry.allocations).map(allocation => ({
+            kind: 'development',
+            ...describeDevelopmentAllocation(allocation),
+        }))
+        const workflows = Object.values(registry.transients).map(transient => {
+            const holders = [transient.holder, transient.childHolder].filter(Boolean)
+            return {
+                ...transient,
+                kind: 'workflow',
+                state: 'active',
+                health: holdersHealth(holders),
+                ageMs: nowMs() - Date.parse(transient.createdAt),
+                slot: developmentSlot(transient.bundle),
+                holders,
+            }
+        })
+        instances = [...development, ...workflows].sort(
+            (left, right) => left.bundle.renderer - right.bundle.renderer,
+        )
+    })
+    return { instances }
 }
 
 export const stopDevelopment = async () => {
@@ -1375,7 +1415,7 @@ export const waitForPort = async (port, timeoutMs = 120_000, signal = null) => {
     throw new InstanceError(`Timed out waiting for loopback port ${port}`, 'PORT_TIMEOUT')
 }
 
-export const followLog = async ({ follow = false } = {}) => {
+export const followLog = async ({ follow = false, pretty = false } = {}) => {
     const { log } = getStatePaths()
     let offset = 0
     const printNew = async () => {
@@ -1391,7 +1431,11 @@ export const followLog = async ({ follow = false } = {}) => {
         for (const line of next.split('\n').filter(Boolean)) {
             try {
                 const event = JSON.parse(line)
-                process.stdout.write(`${event.at} ${event.event} ${JSON.stringify(event)}\n`)
+                process.stdout.write(
+                    pretty
+                        ? `${formatLogEvent(event)}\n\n`
+                        : `${event.at} ${event.event} ${JSON.stringify(event)}\n`,
+                )
             } catch {
                 process.stdout.write(`${line}\n`)
             }

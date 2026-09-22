@@ -138,10 +138,13 @@ development. They release those bundles as soon as Playwright exits, including i
 and renderer E2E claim different mutable resources and can still run together. Electron E2E conflicts
 with a live development stack because both rebuild the Electron development output. If a run is
 rejected, `make dev-status` names the holder and `make dev-log` shows the orchestration event.
+Use `make dev-list` when the conflicting holder may belong to another worktree. Add `PRETTY=1` to
+`make dev-log` for labeled, multi-line entries.
 
-`make dev-smoke` is the slower repository check for two real Git worktrees. It starts both development
-stacks and checks their renderer, CDP, inspector, app-data, MCP resolution, and independent shutdown.
-It stays outside `make sure`.
+`make dev-smoke` is a test-only target, not part of the development interface. It starts two real Git
+worktrees and checks their renderer, CDP, inspector, app-data, MCP resolution, and independent
+shutdown. It stays outside `make sure` because it is slow and creates temporary worktrees and full
+development stacks.
 
 ## Fixtures
 

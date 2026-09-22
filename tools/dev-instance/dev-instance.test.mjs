@@ -206,6 +206,22 @@ test('simultaneous first allocation gives two worktrees distinct stable bundles'
     assert.equal(reused.worktreeId, allocations[0].worktreeId)
 })
 
+test('dev-list reports development allocations across worktrees', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    for (const worktree of fixture.roots) runJson(fixture, worktree, ['dev-allocate'])
+
+    const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
+    const canonicalRoots = await Promise.all(fixture.roots.map(worktree => realpath(worktree)))
+    assert.deepEqual(listed.instances.map(instance => instance.path).sort(), canonicalRoots.sort())
+    const slots = listed.instances.map(instance => instance.slot)
+    assert.ok(slots.every(Number.isSafeInteger))
+    assert.notEqual(slots[0], slots[1])
+
+    const human = run(fixture, fixture.main, ['dev-list'])
+    assert.equal(human.status, 0, human.stderr)
+    for (const worktree of canonicalRoots) assert.match(human.stdout, new RegExp(worktree))
+})
+
 test('allocator prefers slot zero and skips a slot with one occupied IPv4 port', async () => {
     const fixture = await createFixture()
     await listen('127.0.0.1', 4200)
@@ -760,6 +776,9 @@ test('logs redact sensitive query values, rotate, and render through dev-log', a
     const rendered = run(fixture, fixture.roots[0], ['dev-log'])
     assert.equal(rendered.status, 0, rendered.stderr)
     assert.match(rendered.stdout, /holder-registered|command-failed|mcp-wrapper-failed/)
+    const pretty = run(fixture, fixture.roots[0], ['dev-log', '--pretty'])
+    assert.equal(pretty.status, 0, pretty.stderr)
+    assert.match(pretty.stdout, /\n  [A-Za-z]+: /)
     const logs = await import('node:fs/promises').then(fs => fs.readdir(fixture.state))
     assert.ok(logs.some(name => name === 'orchestration.jsonl.1'))
     for (const name of logs.filter(name => name.startsWith('orchestration.jsonl'))) {

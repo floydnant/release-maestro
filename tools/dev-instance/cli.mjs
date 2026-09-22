@@ -5,6 +5,7 @@ import {
     allocateDevelopment,
     allocateTransient,
     bundleEnvironment,
+    developmentSlot,
     followLog,
     forwardSignals,
     heartbeatTransient,
@@ -24,8 +25,15 @@ import {
     waitForPort,
     heartbeatDevelopmentHolders,
     logDiagnostic,
+    listInstances,
 } from './core.mjs'
 import { constants as osConstants } from 'node:os'
+import {
+    developmentAppName,
+    formatDevelopmentStatus,
+    formatDevelopmentSummary,
+    formatInstanceList,
+} from './presentation.mjs'
 
 const print = value => process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)
 
@@ -77,7 +85,12 @@ const parseWorkflowCommands = tokens => {
 
 const runDevelopment = async () => {
     const { allocation, holder: supervisor } = await registerDevelopmentHolder('dev-supervisor')
-    const environment = { ...process.env, ...bundleEnvironment(allocation.bundle, allocation.appDataPath) }
+    const instance = { ...allocation, slot: developmentSlot(allocation.bundle) }
+    const environment = {
+        ...process.env,
+        ...bundleEnvironment(allocation.bundle, allocation.appDataPath),
+        RELEASE_MAESTRO_DEV_APP_NAME: developmentAppName(instance),
+    }
     const children = []
     const childHolders = []
     const stopHeartbeat = startHeartbeat(() =>
@@ -177,13 +190,7 @@ const runDevelopment = async () => {
         )
         childHolders.push(electronListener.holder)
 
-        process.stdout.write(
-            `Release Maestro dev instance\n` +
-                `  renderer  http://localhost:${allocation.bundle.renderer}\n` +
-                `  CDP       http://127.0.0.1:${allocation.bundle.cdp}\n` +
-                `  inspector http://127.0.0.1:${allocation.bundle.inspector}\n` +
-                `  app data  ${allocation.appDataPath}\n`,
-        )
+        process.stdout.write(formatDevelopmentSummary(instance))
 
         const result = await Promise.race([waitForExit(renderer), waitForExit(electron)])
         await Promise.all(children.filter(child => child !== result.child).map(stopChild))
@@ -244,27 +251,6 @@ const runWorkflow = async args => {
     }
 }
 
-const humanStatus = status => {
-    if (!status.bundle) return `${status.state}: ${status.path}`
-    const holders = status.holders.length
-        ? status.holders
-              .map(holder => `  ${holder.role}: PID ${holder.pid}, started ${holder.startIdentity}`)
-              .join('\n')
-        : '  none'
-    return [
-        `${status.state} (${status.health})`,
-        `worktree: ${status.path}`,
-        `identity: ${status.worktreeId}`,
-        `renderer: ${status.bundle.renderer}`,
-        `CDP: ${status.bundle.cdp}`,
-        `inspector: ${status.bundle.inspector}`,
-        `app data: ${status.appDataPath}`,
-        `age: ${Math.round(status.ageMs / 1000)}s`,
-        `resources: ${status.claims.join(', ')}`,
-        `holders:\n${holders}`,
-    ].join('\n')
-}
-
 const main = async () => {
     const [command, ...args] = process.argv.slice(2)
     switch (command) {
@@ -280,7 +266,18 @@ const main = async () => {
         case 'dev-status': {
             const status = await statusDevelopment()
             process.stdout.write(
-                args.includes('--json') ? `${JSON.stringify(status, null, 2)}\n` : `${humanStatus(status)}\n`,
+                args.includes('--json')
+                    ? `${JSON.stringify(status, null, 2)}\n`
+                    : `${formatDevelopmentStatus(status)}\n`,
+            )
+            return
+        }
+        case 'dev-list': {
+            const listed = await listInstances()
+            process.stdout.write(
+                args.includes('--json')
+                    ? `${JSON.stringify(listed, null, 2)}\n`
+                    : `${formatInstanceList(listed)}\n`,
             )
             return
         }
@@ -288,7 +285,10 @@ const main = async () => {
             print({ stopped: await stopDevelopment() })
             return
         case 'dev-log':
-            await followLog({ follow: args.includes('--follow') || args.includes('-f') })
+            await followLog({
+                follow: args.includes('--follow') || args.includes('-f'),
+                pretty: args.includes('--pretty'),
+            })
             return
         case 'run-dev':
             await runDevelopment()
@@ -298,7 +298,7 @@ const main = async () => {
             return
         default:
             throw new InstanceError(
-                'Usage: cli.mjs <dev-allocate|dev-release|dev-reallocate|dev-status|dev-stop|dev-log|run-dev|run-workflow>',
+                'Usage: cli.mjs <dev-allocate|dev-release|dev-reallocate|dev-status|dev-list|dev-stop|dev-log|run-dev|run-workflow>',
                 'USAGE',
             )
     }

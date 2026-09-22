@@ -9,6 +9,7 @@ if (
 }
 
 export const rendererAppPort = configuredRendererPort
+export const developmentAppName = process.env['RELEASE_MAESTRO_DEV_APP_NAME']?.trim() || null
 export const rendererAppName = 'maestro-renderer' // options.name.split('-')[0] + '-web'
 export const electronAppName = 'maestro-electron'
 
