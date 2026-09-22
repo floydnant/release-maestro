@@ -79,7 +79,19 @@ const formatLogValue = value => (typeof value === 'string' ? value : JSON.string
 export const formatLogEvent = (event, { color = false } = {}) => {
     const { at, event: name, ...details } = event
     return [
-        `${paint(at ?? 'unknown time', ansi.dim, color)} ${paint(name ?? 'unknown event', ansi.bold, color)}`,
-        ...Object.entries(details).map(([key, value]) => `  ${label(key, color)}: ${formatLogValue(value)}`),
+        `${paint(name ?? 'unknown event', ansi.bold, color)} ${paint(at ?? 'unknown time', ansi.dim, color)}`,
+        ...Object.entries(details).map(([key, value]) => {
+            const keyFormatted = paint(key + ':', ansi.dim, color)
+            if (key == 'role') return `  ${keyFormatted} ${paint(value, ansi.cyan, color)}`
+            if (key == 'path') return `  ${keyFormatted} ${paint(value, ansi.green, color)}`
+            if (key == 'ports') {
+                return `  ${keyFormatted} ${Object.entries(value)
+                    .map(([holder, port]) => `${holder} ${paint(port, ansi.cyan, color)}`)
+                    .join(' | ')}`
+            }
+            if (key.endsWith('Id')) return `  ${keyFormatted} ${paint(value, ansi.dim, color)}`
+
+            return `  ${keyFormatted} ${formatLogValue(value)}`
+        }),
     ].join('\n')
 }

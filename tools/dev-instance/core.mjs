@@ -1,10 +1,10 @@
-import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
+import { spawn, spawnSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, readlinkSync } from 'node:fs'
+import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
+import net from 'node:net'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
-import { randomUUID } from 'node:crypto'
-import { spawn, spawnSync } from 'node:child_process'
-import net from 'node:net'
 import { formatLogEvent } from './presentation.mjs'
 
 export const registryVersion = 1
@@ -1047,6 +1047,7 @@ export const registerDevelopmentHolder = async (
         current.updatedAt = iso(nowMs())
         await appendEvent(paths, 'holder-registered', {
             worktreeId: current.worktreeId,
+            path: current.path,
             role,
             holder: { id: holder.id, pid: holder.pid, startIdentity: holder.startIdentity },
         })

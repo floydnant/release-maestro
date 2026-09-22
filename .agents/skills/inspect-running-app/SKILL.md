@@ -29,9 +29,6 @@ curl -s http://127.0.0.1:<CDP>/json/list
 curl -s http://127.0.0.1:<inspector>/json/list
 ```
 
-That uses this worktree's `.app-data.dev`. Never point an active worktree at another worktree's
-writable app-data directory. MAE-155 tracks safe seeding for a worktree that needs populated data.
-
 Wait for the renderer URL shown by `make dev-status`. If another program takes a persisted port,
 startup fails and tells you to run `make dev-reallocate`. It does not move an active MCP endpoint.
 

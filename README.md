@@ -83,6 +83,11 @@ make format-check  # non-mutating formatting check
 make e2e           # full Electron E2E against the development build
 make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
+```
+
+Dev stack instance manager
+
+```bash
 make dev-status    # show this worktree's ports, resources, and process holders
 make dev-list      # show instances across every registered worktree
 make dev-stop      # stop validated development processes from this worktree
