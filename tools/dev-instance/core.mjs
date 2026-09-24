@@ -5,6 +5,7 @@ import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'n
 import net from 'node:net'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
+import lockfile from 'proper-lockfile'
 import { formatLogEvent } from './presentation.mjs'
 
 export const registryVersion = 1
@@ -13,6 +14,7 @@ export const defaultGraceMs = 20 * 60 * 1000
 const defaultPorts = Object.freeze({ renderer: 4200, cdp: 9222, inspector: 5858 })
 const manifestName = '.release-maestro-instance.json'
 const lockWaitMs = 60_000
+const lockStaleMs = 10_000
 const defaultLogLimitBytes = 5 * 1024 * 1024
 const retainedLogs = 3
 
@@ -410,77 +412,59 @@ const atomicWriteJson = async (path, value) => {
     await rename(temporary, path)
 }
 
-const lockOwnerIsLive = async lockPath => {
-    try {
-        const owner = await readJson(join(lockPath, 'owner.json'))
-        return (
-            isRecord(owner) &&
-            Number.isSafeInteger(owner.pid) &&
-            typeof owner.startIdentity === 'string' &&
-            processStartIdentity(owner.pid) === owner.startIdentity
-        )
-    } catch {
-        try {
-            const info = await stat(lockPath)
-            return nowMs() - info.mtimeMs < 5_000
-        } catch {
-            return false
-        }
+const configuredLockWaitMs = () => {
+    const value = process.env['RELEASE_MAESTRO_INSTANCE_LOCK_WAIT_MS']
+    if (value === undefined) return lockWaitMs
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed) || parsed < 0) {
+        throw new InstanceError('RELEASE_MAESTRO_INSTANCE_LOCK_WAIT_MS must be a non-negative integer')
     }
+    return parsed
 }
 
 const acquireLock = async paths => {
     await mkdir(paths.root, { recursive: true })
-    const deadline = nowMs() + lockWaitMs
-    let nextOwnerCheckAt = 0
-    for (;;) {
-        const candidate = `${paths.lock}.candidate-${process.pid}-${randomUUID()}`
-        try {
-            await mkdir(candidate)
-            await atomicWriteJson(join(candidate, 'owner.json'), {
-                ...currentProcessIdentity(),
-                acquiredAt: iso(nowMs()),
-            })
-            await rename(candidate, paths.lock)
-            return async () => rm(paths.lock, { recursive: true, force: true })
-        } catch (error) {
-            await rm(candidate, { recursive: true, force: true })
-            if (!['EEXIST', 'ENOTEMPTY'].includes(error?.code)) throw error
-            const shouldCheckOwner = nowMs() >= nextOwnerCheckAt
-            nextOwnerCheckAt = shouldCheckOwner ? nowMs() + 500 : nextOwnerCheckAt
-            if (shouldCheckOwner && !(await lockOwnerIsLive(paths.lock))) {
-                const stale = `${paths.lock}.stale-${Date.now()}-${randomUUID()}`
-                try {
-                    await rename(paths.lock, stale)
-                    await rm(stale, { recursive: true, force: true })
-                    continue
-                } catch (renameError) {
-                    if (renameError?.code !== 'ENOENT') throw renameError
-                }
-            }
-            if (nowMs() >= deadline) {
-                throw new InstanceError(
-                    `Timed out waiting for instance registry lock at ${paths.lock}`,
-                    'LOCK_TIMEOUT',
-                )
-            }
-            await sleep(50 + Math.floor(Math.random() * 50))
-        }
+    const waitMs = configuredLockWaitMs()
+    try {
+        return await lockfile.lock(paths.root, {
+            lockfilePath: paths.lock,
+            realpath: false,
+            stale: lockStaleMs,
+            update: 2_000,
+            retries: {
+                retries: Math.ceil(waitMs / 50),
+                factor: 1,
+                minTimeout: 50,
+                maxTimeout: 50,
+                randomize: true,
+            },
+        })
+    } catch (error) {
+        if (error?.code !== 'ELOCKED') throw error
+        throw new InstanceError(
+            `Timed out waiting for instance registry lock at ${paths.lock}`,
+            'LOCK_TIMEOUT',
+        )
+    }
+}
+
+const readRegistryCopy = async path => {
+    try {
+        return parseRegistry(await readJson(path))
+    } catch (error) {
+        if (error?.code !== 'ENOENT') await quarantine(path)
+        return null
     }
 }
 
 const readRegistry = async paths => {
-    try {
-        return parseRegistry(await readJson(paths.registry))
-    } catch (error) {
-        if (error?.code !== 'ENOENT') await quarantine(paths.registry)
-        try {
-            return parseRegistry(await readJson(paths.registryBackup))
-        } catch (backupError) {
-            if (backupError?.code !== 'ENOENT') await quarantine(paths.registryBackup)
-            return emptyRegistry()
-        }
-    }
+    const [primary, backup] = await Promise.all([
+        readRegistryCopy(paths.registry),
+        readRegistryCopy(paths.registryBackup),
+    ])
+    if (!primary) return backup ?? emptyRegistry()
+    if (!backup) return primary
+    return primary.generation >= backup.generation ? primary : backup
 }
 
 const rotateLog = async path => {

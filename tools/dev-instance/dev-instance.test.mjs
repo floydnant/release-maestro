@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chmod, mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, realpath, rename, rm, utimes, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -263,15 +263,12 @@ test('manual bundles must be complete and distinct', async () => {
     assert.deepEqual(allocation.bundle, { renderer: 4310, cdp: 9310, inspector: 5910 })
 })
 
-test('malformed registry, manifest, stale lock, and interrupted write repair automatically', async () => {
+test('malformed registry, manifest, and interrupted write repair automatically', async () => {
     const fixture = await createFixture()
     await mkdir(fixture.state, { recursive: true })
     await writeFile(join(fixture.state, 'registry.json'), '{broken')
     await writeFile(join(fixture.state, 'registry.json.tmp-interrupted'), '{partial')
     await writeFile(join(fixture.main, '.release-maestro-instance.json'), '{broken')
-    const lock = join(fixture.state, 'registry.lock')
-    await mkdir(lock)
-    await writeFile(join(lock, 'owner.json'), JSON.stringify({ pid: 999999, startIdentity: 'gone' }))
 
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
     assert.ok(allocation.worktreeId)
@@ -280,6 +277,18 @@ test('malformed registry, manifest, stale lock, and interrupted write repair aut
     const worktreeFiles = await import('node:fs/promises').then(fs => fs.readdir(fixture.main))
     assert.ok(worktreeFiles.some(name => name.startsWith('.release-maestro-instance.json.corrupt-')))
     assert.ok(existsSync(join(fixture.state, 'registry.json.tmp-interrupted')))
+})
+
+test('an abandoned registry lock is recovered after its heartbeat becomes stale', async () => {
+    const fixture = await createFixture()
+    const lock = join(fixture.state, 'registry.lock')
+    await mkdir(lock, { recursive: true })
+    const staleAt = new Date(Date.now() - 20_000)
+    await utimes(lock, staleAt, staleAt)
+
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+
+    assert.ok(allocation.worktreeId)
     assert.equal(existsSync(lock), false)
 })
 
@@ -311,6 +320,24 @@ test('registry recovery keeps live ownership from the last known good copy', asy
     assert.equal(recovered.holders[0].pid, wrapper.pid)
     wrapper.kill('SIGTERM')
     await childResult(wrapper)
+})
+
+test('registry recovery selects the valid copy with the highest generation', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const registryPath = join(fixture.state, 'registry.json')
+    const backupPath = join(fixture.state, 'registry.backup.json')
+    const primary = JSON.parse(await readFile(registryPath, 'utf8'))
+    const backup = structuredClone(primary)
+    primary.allocations[allocation.worktreeId].branch = 'older-primary'
+    backup.generation += 1
+    backup.allocations[allocation.worktreeId].branch = 'newer-backup'
+    await writeFile(registryPath, JSON.stringify(primary))
+    await writeFile(backupPath, JSON.stringify(backup))
+
+    const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
+
+    assert.equal(listed.instances[0].branch, 'newer-backup')
 })
 
 test('moving a worktree keeps its identity while a new checkout at the old path gets a new one', async () => {
@@ -601,6 +628,42 @@ test('run-workflow can pass its command separator as a literal child argument', 
     assert.equal(result.status, 0, result.stderr)
 })
 
+test('run-workflow does not launch a chained command after cancellation', async () => {
+    const fixture = await createFixture()
+    const ready = join(fixture.base, 'first-ready')
+    const secondRan = join(fixture.base, 'second-ran')
+    const workflow = spawn(
+        process.execPath,
+        [
+            cli,
+            'run-workflow',
+            'renderer-e2e',
+            '--',
+            process.execPath,
+            '-e',
+            `require('node:fs').writeFileSync(${JSON.stringify(ready)}, ''); process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000)`,
+            '--then',
+            process.execPath,
+            '-e',
+            `require('node:fs').writeFileSync(${JSON.stringify(secondRan)}, '')`,
+        ],
+        {
+            cwd: fixture.main,
+            env: environmentFor(fixture),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        },
+    )
+    liveChildren.push(workflow)
+    await waitFor(() => Promise.resolve(existsSync(ready)), Boolean, 'first command did not start')
+
+    workflow.kill('SIGTERM')
+    const result = await childResult(workflow)
+
+    assert.equal(result.code, 143)
+    assert.equal(result.signal, null)
+    assert.equal(existsSync(secondRan), false)
+})
+
 test('dev conflicts with Electron E2E and a second dev supervisor reports its owner', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)
@@ -658,6 +721,17 @@ test('run-dev exits promptly when the renderer dies before opening its port', as
     assert.equal(result.status, 1)
     assert.match(result.stderr, /RENDERER_START_FAILED/)
     assert.ok(Date.now() - startedAt < 10_000, 'startup failure waited for the port timeout')
+})
+
+test('run-dev reports a missing renderer launcher through its cleanup path', async () => {
+    const fixture = await createFixture()
+    const result = run(fixture, fixture.main, ['run-dev'], {
+        RELEASE_MAESTRO_PNPM_COMMAND: join(fixture.base, 'missing-pnpm'),
+    })
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /RENDERER_START_FAILED/)
+    assert.doesNotMatch(result.stderr, /Unhandled 'error' event/)
 })
 
 test('an orphaned live listener remains an owner and dev-stop terminates it', async () => {

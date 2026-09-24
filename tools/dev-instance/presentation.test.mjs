@@ -43,7 +43,7 @@ test('human log events put details on labeled lines', () => {
             holder: { pid: 42 },
         }),
         [
-            '2026-09-22T01:00:00.000Z holder-registered',
+            'holder-registered 2026-09-22T01:00:00.000Z',
             '  worktreeId: worktree-1',
             '  role: dev-supervisor',
             '  holder: {"pid":42}',
@@ -62,5 +62,5 @@ test('human output can color event names and field labels', () => {
     )
 
     assert.match(formatted, /\u001b\[1mholder-registered\u001b\[0m/)
-    assert.match(formatted, /\u001b\[36mrole\u001b\[0m/)
+    assert.match(formatted, /\u001b\[2mrole:\u001b\[0m \u001b\[36mdev-supervisor\u001b\[0m/)
 })
