@@ -260,7 +260,12 @@ const runWorkflow = async args => {
             child = ['nx', 'playwright'].includes(command)
                 ? spawnPackageBinary(command, commandArgs, { env: environment })
                 : spawnManaged(command, commandArgs, { env: environment })
-            await setTransientChildHolder(transient.id, child.pid, child.releaseMaestroStartIdentity)
+            try {
+                await setTransientChildHolder(transient.id, child.pid, child.releaseMaestroStartIdentity)
+            } catch (error) {
+                await stopChild(child)
+                throw error
+            }
             stopHeartbeat()
             stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
             const result = await waitForExit(child)
