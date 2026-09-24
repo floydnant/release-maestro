@@ -359,6 +359,9 @@ importers:
       conventional-changelog-cli:
         specifier: 5.0.0
         version: 5.0.0(conventional-commits-filter@5.0.0)
+      cross-spawn:
+        specifier: 7.0.6
+        version: 7.0.6
       drizzle-kit:
         specifier: 0.31.10
         version: 0.31.10

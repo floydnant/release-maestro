@@ -1,10 +1,11 @@
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, readlinkSync } from 'node:fs'
 import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
 import net from 'node:net'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
+import crossSpawn from 'cross-spawn'
 import lockfile from 'proper-lockfile'
 import { formatLogEvent } from './presentation.mjs'
 
@@ -1321,7 +1322,7 @@ export const bundleEnvironment = (bundle, appDataPath = null) => ({
 })
 
 export const spawnManaged = (command, args, options = {}) => {
-    const child = spawn(command, args, {
+    const child = crossSpawn(command, args, {
         stdio: 'inherit',
         detached: process.platform !== 'win32',
         ...options,
@@ -1334,11 +1335,7 @@ export const spawnPackageBinary = (binary, args, options = {}) => {
     const configured = process.env['RELEASE_MAESTRO_PNPM_COMMAND']?.trim()
     const command = configured || 'corepack'
     const prefix = configured ? [] : ['pnpm']
-    return spawnManaged(command, [...prefix, 'exec', binary, ...args], {
-        ...options,
-        // Windows exposes Corepack and pnpm through command shims, not executable files.
-        shell: process.platform === 'win32',
-    })
+    return spawnManaged(command, [...prefix, 'exec', binary, ...args], options)
 }
 
 export const forwardSignals = children => {

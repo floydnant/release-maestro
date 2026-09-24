@@ -645,7 +645,7 @@ test('Electron E2E coexists with renderer E2E but duplicate mutating workflows f
     assert.deepEqual(registry.transients, {})
 })
 
-test('run-workflow can pass its command separator as a literal child argument', async () => {
+test('run-workflow passes separators and shell metacharacters as literal child arguments', async () => {
     const fixture = await createFixture()
     const result = run(fixture, fixture.main, [
         'run-workflow',
@@ -653,10 +653,11 @@ test('run-workflow can pass its command separator as a literal child argument', 
         '--',
         process.execPath,
         '-e',
-        'process.exit(process.argv[1] === "--then" ? 0 : 9)',
+        'process.exit(process.argv[1] === "--then" && process.argv[2] === "value with spaces & pipes | literally" ? 0 : 9)',
         '--',
         '--literal',
         '--then',
+        'value with spaces & pipes | literally',
     ])
     assert.equal(result.status, 0, result.stderr)
 })
