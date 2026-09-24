@@ -14,7 +14,7 @@ export const defaultGraceMs = 20 * 60 * 1000
 const defaultPorts = Object.freeze({ renderer: 4200, cdp: 9222, inspector: 5858 })
 const manifestName = '.release-maestro-instance.json'
 const lockWaitMs = 60_000
-const lockStaleMs = 10_000
+const lockStaleMs = 2_000
 const defaultLogLimitBytes = 5 * 1024 * 1024
 const retainedLogs = 3
 
@@ -238,7 +238,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
     const descendants = snapshot.filter(processRecord => processRecord.pid !== rootPid)
     signalProcessSnapshot(descendants, 'SIGTERM')
     if (descendants.length > 0) {
-        const naturalExitDeadline = nowMs() + 500
+        const naturalExitDeadline = nowMs() + 50
         while (processStartIdentity(rootPid) === expectedStartIdentity && nowMs() < naturalExitDeadline) {
             await sleep(25)
         }
@@ -247,7 +247,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
         snapshot.filter(processRecord => processRecord.pid === rootPid),
         'SIGTERM',
     )
-    const deadline = nowMs() + 2_000
+    const deadline = nowMs() + 250
     while (
         snapshot.some(
             processRecord => processStartIdentity(processRecord.pid) === processRecord.startIdentity,
@@ -430,7 +430,7 @@ const acquireLock = async paths => {
             lockfilePath: paths.lock,
             realpath: false,
             stale: lockStaleMs,
-            update: 2_000,
+            update: 1_000,
             retries: {
                 retries: Math.ceil(waitMs / 50),
                 factor: 1,
@@ -1205,7 +1205,7 @@ export const stopDevelopment = async () => {
     for (const holder of survivors) {
         signalProcessTree(holder.pid, 'SIGKILL', holder.startIdentity)
     }
-    const hardStopDeadline = nowMs() + 500
+    const hardStopDeadline = nowMs() + 50
     while (survivors.some(holderIsLive) && nowMs() < hardStopDeadline) {
         await sleep(25)
     }

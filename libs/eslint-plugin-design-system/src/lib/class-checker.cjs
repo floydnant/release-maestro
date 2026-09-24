@@ -8,11 +8,11 @@
 const path = require('node:path')
 const { classesFromCssFile, componentClassesForTemplate } = require('./css-classes.cjs')
 const { suggestClassName } = require('./suggest.cjs')
-const { isTailwindClass, tailwindClassList, themePathExists } = require('./tailwind-authority.cjs')
+const { createTailwindAuthority } = require('./tailwind-authority.cjs')
 
 /**
  * @typedef {object} ClassCheckerOptions
- * @property {string} tailwindConfig path to the Tailwind config that defines the utility surface
+ * @property {string} tailwindStylesheet path to the Tailwind stylesheet that defines the utility surface
  * @property {string[]} [globalStylesheets] stylesheets whose classes are valid everywhere; their
  *   relative `@import`s are followed
  * @property {boolean} [reportDynamic] whether to report class lists that cannot be resolved
@@ -33,7 +33,8 @@ function resolveFromRoot(target, root) {
  * @param {{ cwd?: string, filePath?: string }} context
  */
 function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
-    const tailwindConfig = resolveFromRoot(options.tailwindConfig, cwd)
+    const tailwindStylesheet = resolveFromRoot(options.tailwindStylesheet, cwd)
+    const tailwind = createTailwindAuthority(tailwindStylesheet)
     const globalStylesheets = (options.globalStylesheets ?? []).map(sheet => resolveFromRoot(sheet, cwd))
     /** @type {Set<string>} */
     const globalClasses = new Set()
@@ -45,9 +46,7 @@ function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
 
     /** @param {string} className */
     const isValid = className =>
-        globalClasses.has(className) ||
-        localClasses.has(className) ||
-        isTailwindClass(tailwindConfig, className)
+        globalClasses.has(className) || localClasses.has(className) || tailwind.isClass(className)
 
     /**
      * Suggestions come from the same authorities that decide validity, so a suggested name is always
@@ -57,20 +56,20 @@ function createClassChecker(options, { cwd = process.cwd(), filePath } = {}) {
      * @returns {import('./suggest.cjs').Suggestion|null}
      */
     const suggest = className =>
-        suggestClassName(className, [...localClasses, ...globalClasses, ...tailwindClassList(tailwindConfig)])
+        suggestClassName(className, [...localClasses, ...globalClasses, ...tailwind.classList])
 
-    /** @param {string} themePath */
-    const isThemePath = themePath => themePathExists(tailwindConfig, themePath)
+    /** @param {string} variable */
+    const isThemeVariable = variable => tailwind.themeVariableExists(variable)
 
-    return { isThemePath, isValid, suggest }
+    return { isThemeVariable, isValid, suggest }
 }
 
 const sharedSchema = {
     type: 'object',
     additionalProperties: false,
-    required: ['tailwindConfig'],
+    required: ['tailwindStylesheet'],
     properties: {
-        tailwindConfig: { type: 'string' },
+        tailwindStylesheet: { type: 'string' },
         globalStylesheets: { type: 'array', items: { type: 'string' } },
         reportDynamic: { type: 'boolean' },
 

@@ -449,8 +449,8 @@ test('dev-stop lets the supervisor reap its managed processes', async () => {
     liveChildren.push(dev)
     await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.some(holder => holder.role === 'dev-renderer'),
-        'renderer holder did not register',
+        status => status.holders?.length === 5,
+        'dev stack did not finish registering its holders',
     )
 
     const startedAt = Date.now()
@@ -693,7 +693,8 @@ test('dev conflicts with Electron E2E and a second dev supervisor reports its ow
         FAKE_OPEN_PORT: '1',
     })
     assert.equal(duplicate.status, 1)
-    assert.match(duplicate.stderr, new RegExp(`DUPLICATE_WORKFLOW.*PID ${status.holders[0].pid}`))
+    assert.match(duplicate.stderr, /DUPLICATE_WORKFLOW/)
+    assert.ok(status.holders.some(holder => duplicate.stderr.includes(`PID ${holder.pid}`)))
     const e2e = run(fixture, fixture.main, [
         'run-workflow',
         'electron-e2e',

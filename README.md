@@ -45,7 +45,7 @@ Chromium with its system dependencies. Linux system dependencies may require sud
 requires an OS supported by the installed Playwright version.
 
 `make dev` builds the host metadata-engine binary and starts the Angular dev server and Electron
-main process with hot reload. The host binary lives in `apps/metadata-engine/target/dev/release`,
+main process with hot reload. The host binary lives in `apps/metadata-engine/target-dev/release`,
 separate from the packaging binary in `target/release`. Development always uses this host path.
 If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
 

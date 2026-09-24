@@ -8,8 +8,8 @@
  */
 const DESCRIPTOR_SEPARATOR = '|'
 
-/** A design-token custom property must be reached through Tailwind's theme, not `var()` directly. */
-const BARE_TOKEN_VARIABLE = /var\(\s*(--(?:color|foundation|type)-[\w-]*)/g
+/** Design-token custom properties used inside Tailwind arbitrary values. */
+const DESIGN_TOKEN_VARIABLE = /var\(\s*(--(?:color|foundation|type)-[\w-]*)/g
 
 /** The validated alternative — but only validated if the path is real, hence `themeReferences`. */
 const THEME_PREFIX = 'theme('
@@ -87,15 +87,14 @@ function tokenizeClassList(value, { offset = 0, truncatedStart = false, truncate
 }
 
 /**
- * Finds bare design-token custom properties inside a class token — in practice inside a Tailwind
- * arbitrary value, where a structurally valid outer utility would otherwise hide an unchecked token
- * reference. Component-local custom properties (`--progress-color`) are not design tokens and are
- * intentionally not matched.
+ * Finds design-token custom properties inside a class token. Tailwind v4 makes `var(--color-…)` the
+ * supported form, but a structurally valid arbitrary value still hides a misspelled token. Local
+ * custom properties (`--progress-color`) are not design tokens and are intentionally not matched.
  *
  * @param {ClassToken} token
  */
-function bareTokenVariables(token) {
-    return [...token.name.matchAll(BARE_TOKEN_VARIABLE)].map(match => ({
+function designTokenVariables(token) {
+    return [...token.name.matchAll(DESIGN_TOKEN_VARIABLE)].map(match => ({
         variable: match[1],
         start: token.start + match.index,
         end: token.start + match.index + match[0].length,
@@ -111,7 +110,7 @@ function themeReferences(token) {
     /** @type {{ path: string, start: number, end: number }[]} */
     const references = []
 
-    for (let searchFrom = 0; searchFrom < token.name.length; ) {
+    for (let searchFrom = 0; searchFrom < token.name.length;) {
         const referenceStart = token.name.indexOf(THEME_PREFIX, searchFrom)
         if (referenceStart === -1) break
 
@@ -133,4 +132,4 @@ function themeReferences(token) {
     return references
 }
 
-module.exports = { bareTokenVariables, DESCRIPTOR_SEPARATOR, themeReferences, tokenizeClassList }
+module.exports = { designTokenVariables, DESCRIPTOR_SEPARATOR, themeReferences, tokenizeClassList }

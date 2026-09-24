@@ -20,7 +20,7 @@
                     [attr.aria-posinset]="result().offset + index + 1"
                 >
                     <a
-                        class="catalog-list__link | type-body-sm flex h-full items-center gap-6 px-6 text-content-primary no-underline focus-visible:ring-inset hover:bg-background-surface hover:underline"
+                        class="catalog-list__link | type-body-sm flex h-full items-center gap-6 px-6 text-content-primary no-underline hover:bg-background-surface hover:underline focus-visible:ring-inset"
                         [routerLink]="row.link"
                         [queryParams]="row.queryParams"
                         [attr.data-index]="result().offset + index"
@@ -31,19 +31,19 @@
                             <!-- The unit is spoken but not drawn: the header row above
                                  labels the columns, and repeating "tracks" on every row
                                  buries the numbers it belongs to. -->
-                            <span class="w-24 shrink-0 text-right tabular-nums text-content-secondary"
+                            <span class="w-24 shrink-0 text-right text-content-secondary tabular-nums"
                                 >{{ counts.songCount | number
                                 }}<span class="sr-only">
                                     {{ counts.songCount === 1 ? 'track' : 'tracks' }}</span
                                 ></span
                             >
-                            <span class="w-24 shrink-0 text-right tabular-nums text-content-secondary"
+                            <span class="w-24 shrink-0 text-right text-content-secondary tabular-nums"
                                 >{{ counts.artistCount | number
                                 }}<span class="sr-only">
                                     {{ counts.artistCount === 1 ? 'artist' : 'artists' }}</span
                                 ></span
                             >
-                            <span class="w-24 shrink-0 text-right tabular-nums text-content-secondary"
+                            <span class="w-24 shrink-0 text-right text-content-secondary tabular-nums"
                                 >{{ counts.albumCount | number
                                 }}<span class="sr-only">
                                     {{ counts.albumCount === 1 ? 'album' : 'albums' }}</span

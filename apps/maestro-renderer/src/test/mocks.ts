@@ -12,6 +12,7 @@ export const provideWebAudioPlayerMock = () => ({
         seekTo: jest.fn(),
         seekBy: jest.fn(),
         isPlaying: signal(false),
+        isLoading: signal(false),
         currentUrl: signal(null),
         playerTime: signal(0),
         duration: signal(0),

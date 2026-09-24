@@ -50,6 +50,11 @@
                     "url": "https://tailwindcss.com/docs/functions-and-directives#variants"
                 }
             ]
-        }
+        },
+        { "name": "@custom-variant" },
+        { "name": "@source" },
+        { "name": "@theme" },
+        { "name": "@config" },
+        { "name": "@utility" }
     ]
 }

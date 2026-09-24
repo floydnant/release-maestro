@@ -3,12 +3,12 @@
 .progress-container:is(:hover, .glow) .progress-segment {
     box-shadow: 0 0 12px color-mix(in srgb, var(--color) 55%, transparent);
     transition:
-        box-shadow theme('transitionDuration.fast'),
-        width theme('transitionDuration.ambient') theme('transitionTimingFunction.emphasized'),
-        border-radius theme('transitionDuration.ambient');
+        box-shadow var(--duration-fast),
+        width var(--duration-ambient) var(--ease-emphasized),
+        border-radius var(--duration-ambient);
 }
 .progress-segment {
     transition:
-        box-shadow theme('transitionDuration.slow'),
-        width theme('transitionDuration.ambient') theme('transitionTimingFunction.standard');
+        box-shadow var(--duration-slow),
+        width var(--duration-ambient) var(--ease-standard);
 }

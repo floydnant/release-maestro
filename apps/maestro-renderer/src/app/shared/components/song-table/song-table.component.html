@@ -1,6 +1,6 @@
 <div
     #scroller
-    class="song-table | min-h-0 flex-1 overflow-auto outline-none"
+    class="song-table | min-h-0 flex-1 overflow-auto outline-hidden"
     role="grid"
     tabindex="0"
     aria-label="Tracks"
@@ -156,7 +156,7 @@
          one row in it — the header — and `aria-rowcount`, `aria-rowindex` and
          `aria-activedescendant` describe a shape nothing can navigate. -->
     <div
-        class="song-table__canvas | relative mb-22 mt-2 min-h-full w-max min-w-full"
+        class="song-table__canvas | relative mt-2 mb-22 min-h-full w-max min-w-full"
         role="presentation"
         [style.height.px]="canvasHeight()"
     >
@@ -165,7 +165,7 @@
              would stop a selected row's highlight at the viewport edge whenever the
              table is scrolled sideways. -->
         <div
-            class="song-table__window | absolute left-0 top-0 w-max min-w-full"
+            class="song-table__window | absolute top-0 left-0 w-max min-w-full"
             role="presentation"
             [style.transform]="'translateY(' + windowTop() + 'px)'"
         >

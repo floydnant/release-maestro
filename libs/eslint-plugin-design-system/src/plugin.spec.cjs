@@ -12,6 +12,7 @@
  * Run with `pnpm exec nx test eslint-plugin-design-system`.
  */
 const path = require('node:path')
+const { mkdtempSync, rmSync, writeFileSync } = require('node:fs')
 const { ESLint, RuleTester } = require('eslint')
 const templateParser = require('@angular-eslint/template-parser')
 const typescriptParser = require('@typescript-eslint/parser')
@@ -21,21 +22,21 @@ const templateRule = require('./rules/valid-template-classnames.cjs')
 const hostRule = require('./rules/valid-host-classnames.cjs')
 const { suggestClassName } = require('./lib/suggest.cjs')
 const { readComponentMetadata } = require('./lib/component-metadata.cjs')
-const { tailwindClassList } = require('./lib/tailwind-authority.cjs')
+const { isTailwindClass, tailwindClassList } = require('./lib/tailwind-authority.cjs')
 
 const FIXTURES = path.join(__dirname, 'fixtures')
 
 const FIXTURE_TEMPLATE = path.join(FIXTURES, 'specimen.component.html')
 const FIXTURE_COMPONENT = path.join(FIXTURES, 'specimen.component.ts')
 
-const TAILWIND_CONFIG = path.join(FIXTURES, 'tailwind.config.cjs')
+const TAILWIND_STYLESHEET = path.join(FIXTURES, 'tailwind.css')
 
 /**
  * The authorities are addressed absolutely so the corpus does not depend on the directory Jest
  * happens to be launched from.
  */
 const authorities = {
-    tailwindConfig: TAILWIND_CONFIG,
+    tailwindStylesheet: TAILWIND_STYLESHEET,
     globalStylesheets: [path.join(FIXTURES, 'global.css')],
 }
 
@@ -184,10 +185,10 @@ templateTester.run('valid-template-classnames', templateRule, {
             '<div class="w-[130px] bg-[color-mix(in_srgb,white_40%,transparent)]"></div>',
         ),
         template(
-            'A2 design token reached through the theme',
-            '<div class="bg-[color-mix(in_srgb,theme(colors.background.surface)_40%,transparent)]"></div>',
+            'A2 design token reached through a CSS variable',
+            '<div class="bg-[color-mix(in_srgb,var(--color-background-surface)_40%,transparent)]"></div>',
         ),
-        template('A2 theme path', '<div class="bg-[theme(colors.status.info-background)]"></div>'),
+        template('A2 theme variable', '<div class="bg-[var(--color-status-info-background)]"></div>'),
         template('A3 generated typography classes', '<div class="type-body-sm type-code-sm"></div>'),
         template('A4 global authored classes', '<div class="btn-nkd-neutral badge panel"></div>'),
         template(
@@ -283,11 +284,11 @@ templateTester.run('valid-template-classnames', templateRule, {
             errors: [{ messageId: 'multiplePipes' }],
         }),
         template(
-            'R6 bare design token inside an arbitrary value',
-            '<div class="bg-[color-mix(in_srgb,var(--color-background-surface)_40%,transparent)]"></div>',
+            'R6 unknown design token inside an arbitrary value',
+            '<div class="bg-[color-mix(in_srgb,var(--color-background-surfac)_40%,transparent)]"></div>',
             {
                 errors: [
-                    { messageId: 'bareTokenVariable', data: { variable: '--color-background-surface' } },
+                    { messageId: 'unknownThemeVariable', data: { variable: '--color-background-surfac' } },
                 ],
             },
         ),
@@ -296,19 +297,18 @@ templateTester.run('valid-template-classnames', templateRule, {
             '<div class="text-[var(--foundation-color-neutral-500)]"></div>',
             {
                 errors: [
-                    { messageId: 'bareTokenVariable', data: { variable: '--foundation-color-neutral-500' } },
+                    {
+                        messageId: 'unknownThemeVariable',
+                        data: { variable: '--foundation-color-neutral-500' },
+                    },
                 ],
             },
         ),
         template(
-            // Tailwind resolves theme paths only at compile time, so this would otherwise be a build
-            // error rather than an editor diagnostic.
-            'R6 misspelled theme path',
-            '<div class="bg-[theme(colors.status.info.background)]"></div>',
+            'R6 deprecated theme function',
+            '<div class="bg-[theme(colors.status.info-background)]"></div>',
             {
-                errors: [
-                    { messageId: 'unknownThemePath', data: { themePath: 'colors.status.info.background' } },
-                ],
+                errors: [{ messageId: 'deprecatedThemeFunction' }],
             },
         ),
         // Each of these used to be one undifferentiated `dynamicClassList`. The verdict now names
@@ -552,9 +552,11 @@ typescriptTester.run('valid-host-classnames', hostRule, {
             errors: [{ messageId: 'multipleDescriptors' }],
         }),
         host(
-            'R6 bare design token in host metadata',
-            "@Component({ host: { class: 'text-[var(--color-content-muted)]' } }) class C {}",
-            { errors: [{ messageId: 'bareTokenVariable', data: { variable: '--color-content-muted' } }] },
+            'R6 unknown design token in host metadata',
+            "@Component({ host: { class: 'text-[var(--color-content-mute)]' } }) class C {}",
+            {
+                errors: [{ messageId: 'unknownThemeVariable', data: { variable: '--color-content-mute' } }],
+            },
         ),
         host('R7 bare utility in host metadata', "@Component({ host: { class: 'rounded' } }) class C {}", {
             errors: [bareUtility('rounded', 'rounded-sm')],
@@ -592,7 +594,7 @@ typescriptTester.run('valid-host-classnames', hostRule, {
 // --- suggestion quality, isolated from ESLint ----------------------------------------------------
 
 describe('S1 nearest-value suggestions in the utility’s own scale', () => {
-    const candidates = tailwindClassList(TAILWIND_CONFIG)
+    const candidates = tailwindClassList(TAILWIND_STYLESHEET)
 
     // The values a human reached for when fixing these exact classes in the renderer.
     it.each([
@@ -600,7 +602,6 @@ describe('S1 nearest-value suggestions in the utility’s own scale', () => {
         ['max-h-44', 'max-h-52', 'max-h'],
         ['min-h-36', 'min-h-32', 'min-h'],
         ['py-14', 'py-12', 'py'],
-        ['opacity-80', 'opacity-70', 'opacity'],
     ])('suggests %s → %s, off the %s scale', (unknownClass, expected, scale) => {
         expect(suggestClassName(unknownClass, candidates)).toEqual({
             name: expected,
@@ -780,5 +781,44 @@ describe('the member diagnostics, as rendered', () => {
         expect(await lint('<div [class]="plantedClass()"></div>')).toEqual([
             'Unknown class `fleex` — did you mean `flex`?',
         ])
+    })
+})
+
+describe('Tailwind authority cache', () => {
+    it('reloads the design system when its stylesheet changes', () => {
+        const directory = mkdtempSync(path.join(FIXTURES, '.tailwind-cache-'))
+        const stylesheet = path.join(directory, 'tailwind.css')
+        const importedStylesheet = path.join(directory, 'tokens.css')
+        const config = path.join(directory, 'tailwind.config.cjs')
+
+        /** @param {string} suffix */
+        const writeAuthority = suffix => {
+            writeFileSync(
+                stylesheet,
+                `@import 'tailwindcss';\n@import './tokens.css';\n@config './tailwind.config.cjs';\n@utility cache-root-${suffix} { display: block; }\n`,
+            )
+            writeFileSync(importedStylesheet, `@utility cache-import-${suffix} { display: block; }\n`)
+            writeFileSync(
+                config,
+                `module.exports = { theme: { extend: { colors: { 'cache-config-${suffix}': '#000' } } } }\n`,
+            )
+        }
+
+        try {
+            writeAuthority('first')
+            expect(isTailwindClass(stylesheet, 'cache-root-first')).toBe(true)
+            expect(isTailwindClass(stylesheet, 'cache-import-first')).toBe(true)
+            expect(isTailwindClass(stylesheet, 'bg-cache-config-first')).toBe(true)
+
+            writeAuthority('other')
+            expect(isTailwindClass(stylesheet, 'cache-root-other')).toBe(true)
+            expect(isTailwindClass(stylesheet, 'cache-import-other')).toBe(true)
+            expect(isTailwindClass(stylesheet, 'bg-cache-config-other')).toBe(true)
+            expect(isTailwindClass(stylesheet, 'cache-root-first')).toBe(false)
+            expect(isTailwindClass(stylesheet, 'cache-import-first')).toBe(false)
+            expect(isTailwindClass(stylesheet, 'bg-cache-config-first')).toBe(false)
+        } finally {
+            rmSync(directory, { recursive: true, force: true })
+        }
     })
 })

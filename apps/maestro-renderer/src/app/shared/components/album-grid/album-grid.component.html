@@ -1,6 +1,6 @@
 <div
     #scroller
-    class="album-grid | min-h-0 flex-1 overflow-y-auto overflow-x-hidden outline-none [scrollbar-gutter:stable]"
+    class="album-grid | min-h-0 flex-1 scrollbar-gutter-stable overflow-x-hidden overflow-y-auto outline-hidden"
     role="grid"
     aria-label="Albums"
     [attr.aria-rowcount]="rowCount()"
@@ -72,7 +72,7 @@
                                      the same on all of them. -->
                                 <a
                                     #tile
-                                    class="album-tile | flex size-full cursor-default flex-col gap-2 rounded-md p-2 !no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus hover:bg-background-surface"
+                                    class="album-tile | flex size-full cursor-default flex-col gap-2 rounded-md p-2 no-underline! outline-hidden hover:bg-background-surface focus-visible:ring-2 focus-visible:ring-border-focus"
                                     [id]="tileElementId(index)"
                                     [tabindex]="tabbableIndex() === index ? 0 : -1"
                                     [routerLink]="['/albums', album.id]"
@@ -120,7 +120,7 @@
                                         >
                                             {{ album.albumArtistText || '—' }}
                                         </span>
-                                        <span class="type-label-sm truncate tabular-nums text-content-muted">
+                                        <span class="type-label-sm truncate text-content-muted tabular-nums">
                                             @if (album.year) {
                                                 {{ album.year }} ·
                                             }

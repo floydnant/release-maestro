@@ -1,14 +1,8 @@
 type ClassCheckerOptions = import('./lib/class-checker.cjs').ClassCheckerOptions
 
 /**
- * Types for the two surfaces that cannot simply be imported.
- *
- * **Tailwind.** `tailwindcss` ships declarations for a handful of top-level entry points
- * (`resolveConfig`, `plugin`, …) and none at all under `lib/`. `lib/lib/generateRules` and
- * `lib/lib/setupContextUtils` are internal, untyped, and unavoidable: asking Tailwind's own resolver
- * whether a class emits CSS is the whole design, and there is no public API that answers it.
- *
- * **The Angular AST.** Here the classes *are* importable, so everything below is derived from them
+ * Types for the Angular AST surface, which cannot simply be imported. The classes are importable,
+ * so everything below is derived from them
  * rather than restated — a field renamed in Angular fails this build. What cannot be imported is the
  * shape ESLint sees, because `@angular-eslint/template-parser` rewrites the AST before walking it:
  * `preprocessNode` stamps `type = node.constructor.name` on every node, and where Angular already
@@ -20,22 +14,6 @@ type ClassCheckerOptions = import('./lib/class-checker.cjs').ClassCheckerOptions
  * Angular types are referenced with inline `import(...)` rather than a top-level `import type`,
  * which would turn this file into a module and take the declarations below out of global scope.
  */
-
-declare module 'tailwindcss/lib/lib/setupContextUtils' {
-    export interface TailwindContext {
-        getClassList(): (string | { name: string })[]
-    }
-
-    /** Takes a *resolved* config, which `tailwindcss/resolveConfig` types differently from `Config`. */
-    export function createContext(config: object): TailwindContext
-}
-
-declare module 'tailwindcss/lib/lib/generateRules' {
-    import type { TailwindContext } from 'tailwindcss/lib/lib/setupContextUtils'
-
-    /** Returns one entry per rule Tailwind can build for the candidate; empty means "emits nothing". */
-    export function generateRules(candidates: string[], context: TailwindContext): unknown[]
-}
 
 /**
  * Everything the Angular compiler exports.

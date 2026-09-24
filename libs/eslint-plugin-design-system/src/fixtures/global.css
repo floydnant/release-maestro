@@ -4,7 +4,7 @@
  */
 @import './generated-tokens.css';
 
-.btn-nkd-neutral {
+@utility btn-nkd-neutral {
     background: none;
 }
 

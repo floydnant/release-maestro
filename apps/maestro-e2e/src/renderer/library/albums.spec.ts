@@ -642,10 +642,12 @@ test.describe('keyboard', () => {
         return Number(id?.split('-').at(-1))
     }
 
-    /** Put focus on the grid's single tab stop, the way Tab would. */
+    /** Put focus on the grid's single tab stop, the way Tab would, and return that live locator. */
     const focusFirstTile = async (page: Page) => {
-        await page.locator('[role="gridcell"] a[tabindex="0"]').focus()
+        const tile = page.locator('[role="gridcell"] a[tabindex="0"]')
+        await tile.focus()
         await expect(page.locator('a:focus')).toHaveCount(1)
+        return tile
     }
 
     test('is one tab stop, with the arrows moving between tiles', async ({ page }) => {
@@ -655,11 +657,11 @@ test.describe('keyboard', () => {
         // One tab stop for the whole grid, not one per rendered tile.
         await expect(page.locator('[role="gridcell"] a[tabindex="0"]')).toHaveCount(1)
 
-        await focusFirstTile(page)
+        const firstTile = await focusFirstTile(page)
         const before = await focusedIndex(page)
-        await page.keyboard.press('ArrowRight')
+        await firstTile.press('ArrowRight')
 
-        expect(await focusedIndex(page)).toBe(before + 1)
+        await expect.poll(() => focusedIndex(page)).toBe(before + 1)
     })
 
     test('moves a whole row on the vertical arrows', async ({ page }) => {
@@ -667,11 +669,11 @@ test.describe('keyboard', () => {
         await expect(tile(page, 'Album 0')).toBeVisible()
         const columns = Number(await grid(page).getAttribute('aria-colcount'))
 
-        await focusFirstTile(page)
+        const firstTile = await focusFirstTile(page)
         const before = await focusedIndex(page)
-        await page.keyboard.press('ArrowDown')
+        await firstTile.press('ArrowDown')
 
-        expect(await focusedIndex(page)).toBe(before + columns)
+        await expect.poll(() => focusedIndex(page)).toBe(before + columns)
     })
 
     test('focuses a long-jump destination after its window renders', async ({ page }) => {

@@ -8,7 +8,7 @@ const FIXTURE_COMPONENT = path.join(FIXTURES, 'specimen.component.ts')
 
 const options = [
     {
-        tailwindConfig: path.join(FIXTURES, 'tailwind.config.cjs'),
+        tailwindStylesheet: path.join(FIXTURES, 'tailwind.css'),
         globalStylesheets: [path.join(FIXTURES, 'global.css')],
     },
 ]
@@ -94,9 +94,7 @@ tester.run('valid-imperative-classnames', rule, {
         example("element.classList.toggle('hidden')"),
         example("declare const shouldHide: boolean; element.classList.toggle('hidden', shouldHide)"),
         example("element.classList.replace('hidden', 'flex')"),
-        example(
-            "declare const classes: ('hidden' | 'flex')[]; element.classList.add(...classes)",
-        ),
+        example("declare const classes: ('hidden' | 'flex')[]; element.classList.add(...classes)"),
         example(
             "type Classes = 'hidden' | 'flex'; declare function pick(): Classes; element.classList.add(pick())",
         ),

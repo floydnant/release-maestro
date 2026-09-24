@@ -29,8 +29,8 @@ const CLASS_MESSAGES = {
     multipleDescriptors: 'More than one descriptor before `|`.',
     multiplePipes: 'More than one `|` in a class list.',
 
-    bareTokenVariable: 'Bare design token `{{variable}}` — use `theme(…)`.',
-    unknownThemePath: 'No such theme path: `{{themePath}}`.',
+    unknownThemeVariable: 'No Tailwind theme variable named `{{variable}}`.',
+    deprecatedThemeFunction: '`theme(…)` is deprecated — use the matching CSS variable.',
 }
 
 /**

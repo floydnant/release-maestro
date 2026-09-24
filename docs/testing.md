@@ -126,6 +126,30 @@ Use locators in this order:
 Use web-first assertions such as `await expect(locator).toBeVisible()`. Each test must run alone, with
 fresh state arranged in `beforeEach` or the test itself.
 
+### Wait for outcomes, not time
+
+Playwright returning from an action does not mean the application has settled. Wait for the outcome:
+
+- Use retrying locator assertions for DOM state and `expect.poll` for IPC calls, query windows,
+  geometry, or values from `evaluate`. Polling callbacks should return an incomplete value, not
+  throw, while work is pending.
+- Send input through its locator, for example `tile.press('ArrowRight')`, because rendering may
+  replace a focused node before a later `page.keyboard.press`.
+- For virtualized lists, assert the visible item and requested data window. Assert `scrollTop` only
+  when the pixel offset is the contract.
+- Let the source page settle before baselining recorded calls, then filter them to the route or entity
+  under test.
+
+Do not hide races with `waitForTimeout`, longer timeouts, retries, or reduced motion. The suites use
+`no-preference`; reduced-motion tests must opt in and restore it. Wait for animation outcomes, not
+durations. To reproduce a CI failure, repeat the smallest slice with retries disabled:
+
+```bash
+pnpm exec nx run maestro-e2e:e2e-renderer -- \
+  apps/maestro-e2e/src/renderer/library/albums.spec.ts \
+  --grep "arrows moving between tiles" --repeat-each=10 --retries=0
+```
+
 Electron E2E must isolate filesystem inputs and app state:
 
 - Copy committed media into a fresh temporary library; never mutate source fixtures.

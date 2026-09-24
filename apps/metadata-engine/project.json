@@ -13,9 +13,9 @@
                     "runtime": "rustc -vV"
                 }
             ],
-            "outputs": ["{projectRoot}/target/dev/release"],
+            "outputs": ["{projectRoot}/target-dev/release"],
             "options": {
-                "command": "cargo build --release --target-dir target/dev",
+                "command": "cargo build --release --target-dir target-dev",
                 "cwd": "apps/metadata-engine"
             }
         },

@@ -4,7 +4,7 @@ Closes [MAE-000](https://linear.app/floyd-haremsa/issue/MAE-000) or N/A
 The Closes line above and the "What changed" section below are the two required parts.
 Everything else is your call: add, rename, or drop sections to fit the change.
 
-Replace MAE-000 and the URL with the Linear issue this pull request closes, or n/a if
+Replace MAE-000 and the URL with the Linear issue this pull request closes, or "Closes N/A" if
 there is none associated.
 
 Do not list the checks you ran. CI reports those.

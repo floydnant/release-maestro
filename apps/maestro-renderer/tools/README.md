@@ -3,9 +3,10 @@
 `design-tokens-check` validates generated output, contrast pairs, raw color utilities, and
 stylesheet token references. It prints every finding in red and fails if it finds any.
 
-Product styles must access design tokens through Tailwind's `theme(...)`. The checker rejects
-unknown or bare `--color-*`, `--foundation-*`, and `--type-*` references. It allows bare references
-only in:
+Product styles must access design tokens through Tailwind v4's theme CSS variables. The checker
+allows declared semantic `--color-*` variables and rejects unknown color variables or direct
+`--foundation-*` and `--type-*` references. Direct foundation and type references are allowed only
+in:
 
 - `src/styles/design-tokens.generated.css`
 - `src/styles.css`
