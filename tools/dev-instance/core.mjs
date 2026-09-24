@@ -14,7 +14,7 @@ export const defaultGraceMs = 20 * 60 * 1000
 const defaultPorts = Object.freeze({ renderer: 4200, cdp: 9222, inspector: 5858 })
 const manifestName = '.release-maestro-instance.json'
 const lockWaitMs = 60_000
-const lockStaleMs = 2_000
+const lockStaleMs = 10_000
 const defaultLogLimitBytes = 5 * 1024 * 1024
 const retainedLogs = 3
 
@@ -261,6 +261,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
 
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const isPort = value => Number.isSafeInteger(value) && value >= 1024 && value <= 65535
+const isTimestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value))
 const isBundle = value =>
     isRecord(value) &&
     isPort(value.renderer) &&
@@ -298,7 +299,7 @@ const parseHolder = value => {
         typeof value.role !== 'string' ||
         !Number.isSafeInteger(value.pid) ||
         typeof value.startIdentity !== 'string' ||
-        typeof value.heartbeatAt !== 'string' ||
+        !isTimestamp(value.heartbeatAt) ||
         typeof value.worktreeId !== 'string'
     ) {
         throw new InstanceError('Invalid holder', 'CORRUPT_REGISTRY')
@@ -315,8 +316,8 @@ const parseAllocation = value => {
         typeof value.worktreeId !== 'string' ||
         typeof value.path !== 'string' ||
         typeof value.branch !== 'string' ||
-        typeof value.createdAt !== 'string' ||
-        typeof value.updatedAt !== 'string' ||
+        !isTimestamp(value.createdAt) ||
+        !isTimestamp(value.updatedAt) ||
         !Number.isSafeInteger(value.generation) ||
         value.generation < 0 ||
         !isBundle(value.bundle) ||
@@ -324,7 +325,7 @@ const parseAllocation = value => {
         !Array.isArray(value.holders) ||
         !Array.isArray(value.claims) ||
         !value.claims.every(claim => typeof claim === 'string') ||
-        !(value.inactiveSince === null || typeof value.inactiveSince === 'string') ||
+        !(value.inactiveSince === null || isTimestamp(value.inactiveSince)) ||
         typeof value.releaseWhenIdle !== 'boolean' ||
         typeof value.wasActive !== 'boolean' ||
         !value.holders.every(holder => {
@@ -348,7 +349,7 @@ const parseTransient = value => {
         typeof value.worktreeId !== 'string' ||
         typeof value.workflow !== 'string' ||
         typeof value.path !== 'string' ||
-        typeof value.createdAt !== 'string' ||
+        !isTimestamp(value.createdAt) ||
         !isBundle(value.bundle) ||
         !Array.isArray(value.claims) ||
         !value.claims.every(claim => typeof claim === 'string') ||
@@ -430,7 +431,7 @@ const acquireLock = async paths => {
             lockfilePath: paths.lock,
             realpath: false,
             stale: lockStaleMs,
-            update: 1_000,
+            update: 2_000,
             retries: {
                 retries: Math.ceil(waitMs / 50),
                 factor: 1,
@@ -1331,7 +1332,8 @@ export const spawnManaged = (command, args, options = {}) => {
 
 export const spawnPackageBinary = (binary, args, options = {}) => {
     const configured = process.env['RELEASE_MAESTRO_PNPM_COMMAND']?.trim()
-    const [command, ...prefix] = configured ? configured.split(/\s+/) : ['corepack', 'pnpm']
+    const command = configured || 'corepack'
+    const prefix = configured ? [] : ['pnpm']
     return spawnManaged(command, [...prefix, 'exec', binary, ...args], {
         ...options,
         // Windows exposes Corepack and pnpm through command shims, not executable files.
@@ -1403,12 +1405,24 @@ export const waitForPort = async (port, timeoutMs = 120_000, signal = null) => {
 export const followLog = async ({ follow = false, json = false, color = false } = {}) => {
     const { log } = getStatePaths()
     let offset = 0
+    let fileIdentity = null
     const printNew = async () => {
         let content = ''
         try {
-            content = await readFile(log, 'utf8')
+            const handle = await open(log, 'r')
+            try {
+                const info = await handle.stat()
+                const identity = `${info.dev}:${info.ino}`
+                if (fileIdentity !== null && identity !== fileIdentity) offset = 0
+                fileIdentity = identity
+                content = await handle.readFile('utf8')
+            } finally {
+                await handle.close()
+            }
         } catch (error) {
             if (error?.code !== 'ENOENT') throw error
+            fileIdentity = null
+            offset = 0
         }
         if (content.length < offset) offset = 0
         const next = content.slice(offset)
@@ -1438,8 +1452,8 @@ export const releaseRemovedWorktree = async (worktreePath, worktreeId = null) =>
     return withRegistry(async (registry, paths) => {
         const match = Object.values(registry.allocations).find(
             allocation =>
-                (worktreeId && allocation.worktreeId === worktreeId) ||
-                resolve(allocation.path) === canonical,
+                resolve(allocation.path) === canonical &&
+                (!worktreeId || allocation.worktreeId === worktreeId),
         )
         if (!match) return { released: false, reason: 'unallocated' }
         if (match.holders.length > 0) return { released: false, reason: 'live-holders' }

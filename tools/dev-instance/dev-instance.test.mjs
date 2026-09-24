@@ -124,8 +124,8 @@ const listen = (host, port) =>
         })
     })
 
-const createFakePnpm = async fixture => {
-    const bin = join(fixture.base, 'bin')
+const createFakePnpm = async (fixture, directoryName = 'bin') => {
+    const bin = join(fixture.base, directoryName)
     const executable = join(bin, 'pnpm')
     await mkdir(bin)
     await writeFile(
@@ -290,6 +290,23 @@ test('an abandoned registry lock is recovered after its heartbeat becomes stale'
 
     assert.ok(allocation.worktreeId)
     assert.equal(existsSync(lock), false)
+})
+
+test('an invalid allocation timestamp quarantines both registry copies', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const registryPath = join(fixture.state, 'registry.json')
+    const backupPath = join(fixture.state, 'registry.backup.json')
+    const registry = JSON.parse(await readFile(registryPath, 'utf8'))
+    registry.allocations[allocation.worktreeId].inactiveSince = 'not-a-date'
+    await writeFile(registryPath, JSON.stringify(registry))
+    await writeFile(backupPath, JSON.stringify(registry))
+
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    const stateFiles = await import('node:fs/promises').then(fs => fs.readdir(fixture.state))
+
+    assert.equal(status.state, 'reclaimable')
+    assert.equal(stateFiles.filter(name => name.includes('.corrupt-')).length, 2)
 })
 
 test('forced release finds its allocation when the worktree manifest is missing', async () => {
@@ -530,6 +547,22 @@ test('Claude WorktreeRemove releases only after the directory is gone', async ()
     assert.equal(registry.allocations[allocation.worktreeId], undefined)
 })
 
+test('a delayed removal for an old path keeps the allocation at its current path', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const removedPath = join(fixture.base, 'old-worktree-path')
+
+    const result = spawnSync(process.execPath, [hook, 'verify-remove', removedPath, allocation.worktreeId], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        encoding: 'utf8',
+    })
+    const registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.ok(registry.allocations[allocation.worktreeId])
+})
+
 test('zero grace expires an inactive allocation and permits reassignment', async () => {
     const fixture = await createFixture({ worktrees: 2 })
     const bin = await createFakePnpm(fixture)
@@ -711,16 +744,19 @@ test('dev conflicts with Electron E2E and a second dev supervisor reports its ow
 
 test('run-dev exits promptly when the renderer dies before opening its port', async () => {
     const fixture = await createFixture()
-    const bin = await createFakePnpm(fixture)
+    const bin = await createFakePnpm(fixture, 'bin with spaces')
+    const capture = join(fixture.base, 'pnpm-arguments.json')
     const startedAt = Date.now()
     const result = run(fixture, fixture.main, ['run-dev'], {
         PATH: `${bin}:${process.env.PATH}`,
         RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+        FAKE_CAPTURE: capture,
         FAKE_DELAY_MS: '3000',
     })
 
     assert.equal(result.status, 1)
     assert.match(result.stderr, /RENDERER_START_FAILED/)
+    assert.deepEqual(JSON.parse(await readFile(capture, 'utf8')).slice(0, 3), ['exec', 'nx', 'serve'])
     assert.ok(Date.now() - startedAt < 10_000, 'startup failure waited for the port timeout')
 })
 
@@ -862,6 +898,38 @@ test('logs redact sensitive query values, rotate, and render through dev-log', a
     }
     first.kill('SIGTERM')
     await childResult(first)
+})
+
+test('dev-log follow restarts at the beginning of a rotated log', async () => {
+    const fixture = await createFixture()
+    await mkdir(fixture.state, { recursive: true })
+    const log = join(fixture.state, 'orchestration.jsonl')
+    await writeFile(log, `${JSON.stringify({ event: 'before-rotation', detail: 'x'.repeat(200) })}\n`)
+    const follower = spawn(process.execPath, [cli, 'dev-log', '--follow', '--json'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(follower)
+    const followerResult = childResult(follower)
+    let output = ''
+    follower.stdout.on('data', chunk => (output += chunk))
+    await waitFor(
+        () => Promise.resolve(output),
+        value => value.includes('before-rotation'),
+        'log follower did not read the initial log',
+    )
+
+    await rename(log, `${log}.1`)
+    await writeFile(log, `${JSON.stringify({ event: 'after-rotation', detail: 'y'.repeat(500) })}\n`)
+    await waitFor(
+        () => Promise.resolve(output),
+        value => value.includes('after-rotation'),
+        'log follower skipped the replacement log',
+    )
+
+    follower.kill('SIGTERM')
+    await followerResult
 })
 
 test('hook failures are advisory', async () => {
