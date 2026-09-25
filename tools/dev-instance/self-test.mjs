@@ -59,17 +59,19 @@ const ensureStackRunning = (index, worktree) => {
 }
 
 const stop = async (processHandle, cwd) => {
-    if (processHandle.exitCode === null && processHandle.signalCode === null) processHandle.kill('SIGTERM')
-    await Promise.race([
-        new Promise(resolve => processHandle.once('exit', resolve)),
-        new Promise(resolve => setTimeout(resolve, 5_000)),
-    ])
     if (processHandle.exitCode === null && processHandle.signalCode === null) {
-        spawnSync(process.execPath, [join(cwd, 'tools/dev-instance/cli.mjs'), 'dev-stop'], {
-            cwd,
-            env: environment,
-            stdio: 'inherit',
-        })
+        processHandle.kill('SIGTERM')
+        await Promise.race([
+            new Promise(resolve => processHandle.once('exit', resolve)),
+            new Promise(resolve => setTimeout(resolve, 5_000)),
+        ])
+    }
+    spawnSync(process.execPath, [join(cwd, 'tools/dev-instance/cli.mjs'), 'dev-stop'], {
+        cwd,
+        env: environment,
+        stdio: 'inherit',
+    })
+    if (processHandle.exitCode === null && processHandle.signalCode === null) {
         processHandle.kill('SIGKILL')
     }
 }
