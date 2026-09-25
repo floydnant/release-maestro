@@ -1011,8 +1011,18 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
     await withRegistry(async (registry, paths) => {
         const manifest = (await readManifest(worktree)) ?? initialManifest
         const manifestId = manifest?.worktreeId
-        const existing = manifestId ? registry.allocations[manifestId] : null
-        const worktreeId = existing ? existing.worktreeId : (manifestId ?? randomUUID())
+        const persisted = manifestId ? registry.allocations[manifestId] : null
+        const existing =
+            persisted &&
+            (persisted.path === worktree.root ||
+                (!existsSync(persisted.path) && persisted.holders.length === 0))
+                ? persisted
+                : null
+        const worktreeId = existing
+            ? existing.worktreeId
+            : persisted
+              ? randomUUID()
+              : (manifestId ?? randomUUID())
         const appDataPath = existing && !hasAppDataOverride ? existing.appDataPath : requestedAppDataPath
         const appDataClaim = `app-data:${appDataPath}`
         if (existing?.holders.length && hasAppDataOverride && existing.appDataPath !== requestedAppDataPath) {

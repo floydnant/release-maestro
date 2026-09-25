@@ -412,6 +412,22 @@ test('moving a worktree keeps its identity while a new checkout at the old path 
     assert.notEqual(replacement.worktreeId, first.worktreeId)
 })
 
+test('a copied manifest does not attach another worktree to the original allocation', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const first = runJson(fixture, fixture.roots[0], ['dev-allocate'])
+    await cp(
+        join(fixture.roots[0], '.release-maestro-instance.json'),
+        join(fixture.roots[1], '.release-maestro-instance.json'),
+    )
+
+    const second = runJson(fixture, fixture.roots[1], ['dev-allocate'])
+    const firstAfterCopy = runJson(fixture, fixture.roots[0], ['dev-status', '--json'])
+
+    assert.notEqual(second.worktreeId, first.worktreeId)
+    assert.notDeepEqual(second.bundle, first.bundle)
+    assert.equal(firstAfterCopy.path, await realpath(fixture.roots[0]))
+})
+
 test('a persisted port taken by an unrelated process fails with owner and reallocation details', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)
