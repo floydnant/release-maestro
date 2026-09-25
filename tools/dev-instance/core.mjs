@@ -271,6 +271,30 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
     signalProcessSnapshot(snapshot, 'SIGKILL')
 }
 
+export const stopProcessGroup = async (rootPid, expectedStartIdentity) => {
+    if (process.platform === 'win32') {
+        spawnSync('taskkill.exe', ['/PID', String(rootPid), '/T', '/F'], {
+            encoding: 'utf8',
+            windowsHide: true,
+        })
+        return
+    }
+    const currentStartIdentity = processStartIdentity(rootPid)
+    if (currentStartIdentity && currentStartIdentity !== expectedStartIdentity) return
+    const signalGroup = signal => {
+        try {
+            process.kill(-rootPid, signal)
+            return true
+        } catch (error) {
+            if (error?.code !== 'ESRCH') throw error
+            return false
+        }
+    }
+    if (!signalGroup('SIGTERM')) return
+    await sleep(250)
+    signalGroup('SIGKILL')
+}
+
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const isPort = value => Number.isSafeInteger(value) && value >= 1024 && value <= 65535
 const isTimestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value))
@@ -1111,8 +1135,8 @@ export const registerDevelopmentHolder = async (
                     'DUPLICATE_WORKFLOW',
                 )
             }
-            assertClaimsAvailable(registry, current.claims, current.worktreeId, 'dev')
         }
+        assertClaimsAvailable(registry, current.claims, current.worktreeId, 'dev')
         current.holders.push(holder)
         current.inactiveSince = null
         current.wasActive = true
@@ -1373,6 +1397,8 @@ export const heartbeatTransient = async id => {
 }
 
 export const setTransientChildHolder = async (id, pid, startIdentity = null) => {
+    const childStartIdentity = startIdentity ?? processStartIdentity(pid)
+    if (!childStartIdentity) return false
     await withRegistry(async registry => {
         const transient = registry.transients[id]
         if (!transient) throw new InstanceError(`Transient allocation ${id} no longer exists`)
@@ -1382,9 +1408,10 @@ export const setTransientChildHolder = async (id, pid, startIdentity = null) => 
             pid,
             null,
             false,
-            startIdentity,
+            childStartIdentity,
         )
     })
+    return true
 }
 
 export const releaseTransient = async id => {

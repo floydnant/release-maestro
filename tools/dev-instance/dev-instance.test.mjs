@@ -39,6 +39,7 @@ test('process shutdown starts with supervisors and orphaned holders', () => {
 })
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
+const coreModule = new URL('./core.mjs', import.meta.url).href
 const cli = join(repositoryRoot, 'tools/dev-instance/cli.mjs')
 const mcpWrapper = join(repositoryRoot, 'tools/dev-instance/mcp-wrapper.mjs')
 const hook = join(repositoryRoot, 'tools/dev-instance/hook.mjs')
@@ -705,6 +706,61 @@ test('an MCP-only holder does not block Electron E2E', async () => {
     await childResult(wrapper)
 })
 
+test('a workflow tolerates a child that exits before holder registration', async () => {
+    const fixture = await createFixture()
+    const script = `
+        import { allocateTransient, releaseTransient, setTransientChildHolder } from ${JSON.stringify(coreModule)}
+        const transient = await allocateTransient('renderer-e2e')
+        const registered = await setTransientChildHolder(transient.id, 2147483647)
+        await releaseTransient(transient.id)
+        if (registered) process.exit(2)
+    `
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        encoding: 'utf8',
+    })
+
+    assert.equal(result.status, 0, result.stderr)
+})
+
+test('run-workflow stops descendants left behind by a successful launcher', async () => {
+    const fixture = await createFixture()
+    const descendantPidPath = join(fixture.base, 'descendant.pid')
+    const launcher = `
+        const { writeFileSync } = require('node:fs')
+        const { spawn } = require('node:child_process')
+        const descendant = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+        writeFileSync(${JSON.stringify(descendantPidPath)}, String(descendant.pid))
+        descendant.unref()
+    `
+    const result = run(fixture, fixture.main, [
+        'run-workflow',
+        'renderer-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        launcher,
+    ])
+    const descendantPid = Number(await readFile(descendantPidPath, 'utf8'))
+
+    assert.equal(result.status, 0, result.stderr)
+    await waitFor(
+        () =>
+            Promise.resolve().then(() => {
+                try {
+                    process.kill(descendantPid, 0)
+                    return true
+                } catch (error) {
+                    if (error?.code === 'ESRCH') return false
+                    throw error
+                }
+            }),
+        alive => !alive,
+        'workflow descendant was left running',
+    )
+})
+
 test('run-workflow passes separators and shell metacharacters as literal child arguments', async () => {
     const fixture = await createFixture()
     const result = run(fixture, fixture.main, [
@@ -909,6 +965,12 @@ test('active worktrees cannot share a canonical app-data directory', async () =>
     const fixture = await createFixture({ worktrees: 2 })
     const bin = await createFakePnpm(fixture)
     const shared = join(fixture.base, 'shared-data')
+    runJson(fixture, fixture.roots[0], ['dev-allocate'], {
+        RELEASE_MAESTRO_APP_DATA_DIR: shared,
+    })
+    runJson(fixture, fixture.roots[1], ['dev-allocate'], {
+        RELEASE_MAESTRO_APP_DATA_DIR: join(shared, '..', 'shared-data'),
+    })
     const first = spawnMcp(fixture, fixture.roots[0], bin, 'chrome-devtools', {
         RELEASE_MAESTRO_APP_DATA_DIR: shared,
     })

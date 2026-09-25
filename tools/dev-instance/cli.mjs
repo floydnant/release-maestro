@@ -21,6 +21,7 @@ import {
     startHeartbeat,
     statusDevelopment,
     stopDevelopment,
+    stopProcessGroup,
     stopProcessTree,
     waitForPort,
     heartbeatDevelopmentHolders,
@@ -57,10 +58,14 @@ const waitForExit = child =>
     })
 
 const stopChild = async child => {
-    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return
-    if (!child.releaseMaestroStartIdentity) return
-    await stopProcessTree(child.pid, child.releaseMaestroStartIdentity)
-    await waitForExit(child)
+    if (!child?.pid) return
+    if (child.exitCode === null && child.signalCode === null) {
+        if (!child.releaseMaestroStartIdentity) return
+        await stopProcessTree(child.pid, child.releaseMaestroStartIdentity)
+        await waitForExit(child)
+        return
+    }
+    await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity)
 }
 
 const parseWorkflowCommands = tokens => {
@@ -297,6 +302,7 @@ const runWorkflow = async args => {
             stopHeartbeat()
             stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
             const result = await waitForExit(child)
+            await stopChild(child)
             child = null
             if (cancellationSignal) {
                 process.exitCode = exitForChild(null, cancellationSignal)
