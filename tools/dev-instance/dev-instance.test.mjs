@@ -910,6 +910,37 @@ test('run-dev latches cancellation while waiting for the renderer', async () => 
     assert.ok(JSON.parse(await readFile(capture, 'utf8')).includes('maestro-renderer'))
 })
 
+test('run-dev escalates cancellation after both launchers are ready', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const dev = spawn(process.execPath, [cli, 'run-dev'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, {
+            PATH: `${bin}:${process.env.PATH}`,
+            RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+            FAKE_IGNORE_SIGTERM: '1',
+            FAKE_OPEN_PORT: '1',
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.filter(holder => holder.role === 'dev-electron').length === 2,
+        'Electron listeners did not register',
+    )
+
+    dev.kill('SIGTERM')
+    const result = await Promise.race([
+        childResult(dev),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('run-dev did not escalate cancellation')), 5_000),
+        ),
+    ])
+
+    assert.equal(result.code, 143, result.stderr)
+})
+
 test('run-dev reports a missing renderer launcher through its cleanup path', async () => {
     const fixture = await createFixture()
     const result = run(fixture, fixture.main, ['run-dev'], {

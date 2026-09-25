@@ -106,6 +106,9 @@ const runDevelopment = async () => {
         heartbeatDevelopmentHolders([supervisor.id, ...childHolders.map(holder => holder.id)]),
     )
     const cancellation = new AbortController()
+    const cancelled = new Promise(resolve =>
+        cancellation.signal.addEventListener('abort', () => resolve(null), { once: true }),
+    )
     let cancellationSignal = null
     const stopForwarding = forwardSignals(
         () => children,
@@ -245,7 +248,11 @@ const runDevelopment = async () => {
 
         process.stdout.write(formatDevelopmentSummary(instance, { color: useColor() }))
 
-        const result = await Promise.race([rendererExit, electronExit])
+        const result = await Promise.race([rendererExit, electronExit, cancelled])
+        if (result === null) {
+            process.exitCode = exitForChild(null, cancellationSignal)
+            return
+        }
         await Promise.all(children.filter(child => child !== result.child).map(stopChild))
         process.exitCode = exitForChild(result.code, result.signal)
     } finally {

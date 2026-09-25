@@ -273,6 +273,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
 
 export const stopProcessGroup = async (rootPid, expectedStartIdentity) => {
     if (process.platform === 'win32') {
+        if (processStartIdentity(rootPid) !== expectedStartIdentity) return
         spawnSync('taskkill.exe', ['/PID', String(rootPid), '/T', '/F'], {
             encoding: 'utf8',
             windowsHide: true,
