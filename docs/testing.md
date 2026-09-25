@@ -82,6 +82,7 @@ pnpm exec nx build maestro-electron    # build/type gate for one project
 make e2e-renderer                      # renderer scenario suite
 make e2e                               # full development Electron suite
 make e2e-production                    # cached package + production Electron suite
+make dev-instance-self-test            # two-worktree instance-manager check
 make format-check                      # non-mutating repo formatting check
 make affected                          # affected build/lint/unit/development-Electron/renderer checks
 make sure                              # formats, then lint/build/unit/development Electron/renderer E2E
@@ -90,6 +91,9 @@ make sure                              # formats, then lint/build/unit/developme
 `make sure` mutates formatting. `make e2e-production` remains separate because it packages the app,
 excludes the development-only debug-console spec, and checks file-URL routing, lazy chunks, and
 cross-platform packaging behavior.
+
+CI runs `make dev-instance-self-test` as a separate job. Run it locally after changing
+`tools/dev-instance`; it starts two complete development stacks in temporary worktrees.
 
 Production packaging is cached. The launcher resolves electron-builder's unpacked layout on macOS,
 Windows, and Linux, and CI runs the production suite on all three. E2E windows remain visible but

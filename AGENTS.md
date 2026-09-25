@@ -53,6 +53,8 @@ intentional convenience summaries.
   suite. Use it for file-URL, lazy-loading, packaging, and cross-platform behavior.
 - `make affected` runs build, lint, unit tests, development Electron E2E, and renderer E2E for
   affected projects. It does not check or mutate formatting.
+- `make dev-instance-self-test` starts two temporary worktrees and verifies the development instance
+  manager. CI runs it separately from `make sure`.
 - Never use package scripts directly. Use the Make or Nx commands documented here.
 
 Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verification-loop/SKILL.md).

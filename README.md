@@ -92,6 +92,7 @@ make dev-status    # show this worktree's ports, resources, and process holders
 make dev-list      # show instances across every registered worktree
 make dev-stop      # stop validated development processes from this worktree
 make dev-log       # print colored events; FOLLOW=1 follows, JSON=1 emits JSONL
+make dev-instance-self-test # verify the manager with two live worktrees
 ```
 
 `make sure` mutates formatting. Electron E2E and renderer E2E may run together. The instance manager

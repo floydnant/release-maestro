@@ -54,6 +54,20 @@ jobs:
             - name: Run unit tests
               run: make test
 
+    dev-instance-self-test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+            - uses: ./.github/actions/setup-node
+
+            - name: Install Electron system dependencies
+              run: pnpm exec playwright install-deps chromium
+
+            - name: Verify the development-instance manager
+              uses: GabrielBB/xvfb-action@b706e4e27b14669b486812790492dc50ca16b465 # v1.7
+              with:
+                  run: make dev-instance-self-test
+
     e2e:
         strategy:
             fail-fast: false

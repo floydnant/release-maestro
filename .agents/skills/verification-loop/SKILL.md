@@ -39,6 +39,8 @@ description: Verification loop using repository make targets.
   themselves first.
 - `make e2e-production` — package the app for the host OS and run the production-compatible Electron
   suite. Use it for file-URL routing, lazy chunks, packaging-only, and cross-platform behavior.
+- `make dev-instance-self-test` — verify the instance manager by starting two complete development
+  stacks in temporary worktrees. Run it after changing `tools/dev-instance`; CI runs it separately.
 - `make build-prod` — catches production-only build issues.
 - **A project's type gate is its `build`, unless it has no build.** A green unit test is not a type
   check. Non-buildable projects expose `typecheck`; inspect them with `pnpm exec nx show project <project>`.

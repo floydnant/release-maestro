@@ -1,8 +1,9 @@
 import { workspaceRoot } from '@nx/devkit'
 import { nxE2EPreset } from '@nx/playwright/preset'
 import { defineConfig } from '@playwright/test'
+import { environmentPort } from './src/support/environment-port'
 
-const electronE2EPort = Number(process.env['RELEASE_MAESTRO_RENDERER_PORT'] ?? 4200)
+const electronE2EPort = environmentPort('RELEASE_MAESTRO_RENDERER_PORT', 4200)
 const electronE2EBaseURL = `http://localhost:${electronE2EPort}`
 
 export default defineConfig({

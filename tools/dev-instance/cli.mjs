@@ -100,7 +100,20 @@ const runDevelopment = async () => {
     const stopHeartbeat = startHeartbeat(() =>
         heartbeatDevelopmentHolders([supervisor.id, ...childHolders.map(holder => holder.id)]),
     )
-    const stopForwarding = forwardSignals(() => children)
+    const cancellation = new AbortController()
+    let cancellationSignal = null
+    const stopForwarding = forwardSignals(
+        () => children,
+        signal => {
+            cancellationSignal ??= signal
+            cancellation.abort()
+        },
+    )
+    const stopIfCancelled = () => {
+        if (!cancellationSignal) return false
+        process.exitCode = exitForChild(null, cancellationSignal)
+        return true
+    }
 
     try {
         const renderer = spawnPackageBinary(
@@ -135,7 +148,11 @@ const runDevelopment = async () => {
         const rendererReadiness = new AbortController()
         try {
             await Promise.race([
-                waitForPort(allocation.bundle.renderer, 120_000, rendererReadiness.signal),
+                waitForPort(
+                    allocation.bundle.renderer,
+                    120_000,
+                    AbortSignal.any([rendererReadiness.signal, cancellation.signal]),
+                ),
                 rendererExit.then(result => {
                     throw new InstanceError(
                         `Renderer exited before it opened port ${allocation.bundle.renderer} with code ${result.code}.`,
@@ -146,6 +163,7 @@ const runDevelopment = async () => {
         } finally {
             rendererReadiness.abort()
         }
+        if (stopIfCancelled()) return
         const rendererListener = await registerDevelopmentListenerHolder(
             'dev-renderer',
             [allocation.bundle.renderer],
@@ -153,6 +171,7 @@ const runDevelopment = async () => {
             supervisor.id,
         )
         childHolders.push(rendererListener.holder)
+        if (stopIfCancelled()) return
 
         const electronEnvironment = { ...environment }
         delete electronEnvironment.ELECTRON_RUN_AS_NODE
@@ -189,8 +208,16 @@ const runDevelopment = async () => {
         try {
             await Promise.race([
                 Promise.all([
-                    waitForPort(allocation.bundle.cdp, 30_000, electronReadiness.signal),
-                    waitForPort(allocation.bundle.inspector, 30_000, electronReadiness.signal),
+                    waitForPort(
+                        allocation.bundle.cdp,
+                        30_000,
+                        AbortSignal.any([electronReadiness.signal, cancellation.signal]),
+                    ),
+                    waitForPort(
+                        allocation.bundle.inspector,
+                        30_000,
+                        AbortSignal.any([electronReadiness.signal, cancellation.signal]),
+                    ),
                 ]),
                 electronExit.then(result => {
                     throw new InstanceError(
@@ -202,6 +229,7 @@ const runDevelopment = async () => {
         } finally {
             electronReadiness.abort()
         }
+        if (stopIfCancelled()) return
         const electronListener = await registerDevelopmentListenerHolder(
             'dev-electron',
             [allocation.bundle.cdp, allocation.bundle.inspector],

@@ -1,8 +1,9 @@
 import { workspaceRoot } from '@nx/devkit'
 import { nxE2EPreset } from '@nx/playwright/preset'
 import { defineConfig, devices } from '@playwright/test'
+import { environmentPort } from './src/support/environment-port'
 
-const rendererE2EPort = Number(process.env['RELEASE_MAESTRO_RENDERER_PORT'] ?? 4201)
+const rendererE2EPort = environmentPort('RELEASE_MAESTRO_RENDERER_PORT', 4201)
 const baseURL = process.env['BASE_URL'] || `http://localhost:${rendererE2EPort}`
 
 /**

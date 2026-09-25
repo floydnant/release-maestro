@@ -1,5 +1,16 @@
 import assert from 'node:assert/strict'
-import { chmod, mkdir, mkdtemp, readFile, realpath, rename, rm, utimes, writeFile } from 'node:fs/promises'
+import {
+    chmod,
+    cp,
+    mkdir,
+    mkdtemp,
+    readFile,
+    realpath,
+    rename,
+    rm,
+    utimes,
+    writeFile,
+} from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -150,7 +161,9 @@ const finish = signal => {
   for (const server of servers) server.close()
   process.exit(signal ? 0 : Number(process.env.FAKE_EXIT_CODE ?? 0))
 }
-process.on('SIGTERM', () => finish('SIGTERM'))
+process.on('SIGTERM', () => {
+  if (process.env.FAKE_IGNORE_SIGTERM !== '1') finish('SIGTERM')
+})
 process.on('SIGINT', () => finish('SIGINT'))
 const delay = Number(process.env.FAKE_DELAY_MS ?? 60000)
 setTimeout(() => finish(''), delay)
@@ -204,6 +217,21 @@ test('simultaneous first allocation gives two worktrees distinct stable bundles'
     const reused = runJson(fixture, fixture.roots[0], ['dev-allocate'])
     assert.deepEqual(reused.bundle, allocations[0].bundle)
     assert.equal(reused.worktreeId, allocations[0].worktreeId)
+})
+
+test('the instance manager allocates before dependencies are installed', async () => {
+    const fixture = await createFixture()
+    const copiedTools = join(fixture.main, 'tools', 'dev-instance')
+    await cp(join(repositoryRoot, 'tools', 'dev-instance'), copiedTools, { recursive: true })
+
+    const result = spawnSync(process.execPath, [join(copiedTools, 'cli.mjs'), 'dev-allocate'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        encoding: 'utf8',
+    })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.ok(JSON.parse(result.stdout).worktreeId)
 })
 
 test('dev-list reports development allocations across worktrees', async () => {
@@ -261,6 +289,14 @@ test('manual bundles must be complete and distinct', async () => {
         RELEASE_MAESTRO_INSPECTOR_PORT: '5910',
     })
     assert.deepEqual(allocation.bundle, { renderer: 4310, cdp: 9310, inspector: 5910 })
+})
+
+test('automatic reallocation reserves the previous bundle while choosing its replacement', async () => {
+    const fixture = await createFixture()
+    const first = runJson(fixture, fixture.main, ['dev-allocate'])
+    const second = runJson(fixture, fixture.main, ['dev-reallocate'])
+
+    assert.notDeepEqual(second.bundle, first.bundle)
 })
 
 test('malformed registry, manifest, and interrupted write repair automatically', async () => {
@@ -645,6 +681,30 @@ test('Electron E2E coexists with renderer E2E but duplicate mutating workflows f
     assert.deepEqual(registry.transients, {})
 })
 
+test('an MCP-only holder does not block Electron E2E', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.some(holder => holder.role === 'mcp:chrome-devtools'),
+        'MCP holder did not register',
+    )
+
+    const e2e = run(fixture, fixture.main, [
+        'run-workflow',
+        'electron-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        'process.exit(0)',
+    ])
+
+    assert.equal(e2e.status, 0, e2e.stderr)
+    wrapper.kill('SIGTERM')
+    await childResult(wrapper)
+})
+
 test('run-workflow passes separators and shell metacharacters as literal child arguments', async () => {
     const fixture = await createFixture()
     const result = run(fixture, fixture.main, [
@@ -759,6 +819,39 @@ test('run-dev exits promptly when the renderer dies before opening its port', as
     assert.match(result.stderr, /RENDERER_START_FAILED/)
     assert.deepEqual(JSON.parse(await readFile(capture, 'utf8')).slice(0, 3), ['exec', 'nx', 'serve'])
     assert.ok(Date.now() - startedAt < 10_000, 'startup failure waited for the port timeout')
+})
+
+test('run-dev latches cancellation while waiting for the renderer', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const capture = join(fixture.base, 'pnpm-arguments.json')
+    const dev = spawn(process.execPath, [cli, 'run-dev'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, {
+            PATH: `${bin}:${process.env.PATH}`,
+            RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+            FAKE_CAPTURE: capture,
+            FAKE_IGNORE_SIGTERM: '1',
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.some(holder => holder.role === 'dev-renderer'),
+        'renderer holder did not register',
+    )
+
+    dev.kill('SIGTERM')
+    const result = await Promise.race([
+        childResult(dev),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('run-dev did not honor cancellation')), 5_000),
+        ),
+    ])
+
+    assert.equal(result.code, 143, result.stderr)
+    assert.ok(JSON.parse(await readFile(capture, 'utf8')).includes('maestro-renderer'))
 })
 
 test('run-dev reports a missing renderer launcher through its cleanup path', async () => {

@@ -1,12 +1,10 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, readlinkSync } from 'node:fs'
 import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
 import net from 'node:net'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
-import crossSpawn from 'cross-spawn'
-import lockfile from 'proper-lockfile'
 import { formatLogEvent } from './presentation.mjs'
 
 export const registryVersion = 1
@@ -171,18 +169,30 @@ const processTable = () => {
             parentPid: Number(row.ParentProcessId),
         }))
     }
-    const result = spawnSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' })
+    const columns = process.platform === 'darwin' ? 'pid=,ppid=,state=,lstart=' : 'pid=,ppid='
+    const result = spawnSync('ps', ['-axo', columns], { encoding: 'utf8' })
     if (result.status !== 0) return []
     return result.stdout
         .trim()
         .split('\n')
-        .map(line => line.trim().split(/\s+/).map(Number))
-        .filter(([pid, parentPid]) => Number.isSafeInteger(pid) && Number.isSafeInteger(parentPid))
-        .map(([pid, parentPid]) => ({ pid, parentPid }))
+        .map(line => {
+            const [pidValue, parentPidValue, state, ...started] = line.trim().split(/\s+/)
+            const pid = Number(pidValue)
+            const parentPid = Number(parentPidValue)
+            return {
+                pid,
+                parentPid,
+                ...(process.platform === 'darwin'
+                    ? { startIdentity: parseUnixProcessIdentity(`${state} ${started.join(' ')}`) }
+                    : {}),
+            }
+        })
+        .filter(row => Number.isSafeInteger(row.pid) && Number.isSafeInteger(row.parentPid))
 }
 
 export const snapshotProcessTree = rootPid => {
     const rows = processTable()
+    const rowsByPid = new Map(rows.map(row => [row.pid, row]))
     const childrenByParent = new Map()
     for (const row of rows) {
         const children = childrenByParent.get(row.parentPid) ?? []
@@ -191,7 +201,8 @@ export const snapshotProcessTree = rootPid => {
     }
     const result = []
     const visit = (pid, depth) => {
-        const startIdentity = processStartIdentity(pid)
+        const record = rowsByPid.get(pid)
+        const startIdentity = record?.startIdentity ?? processStartIdentity(pid)
         if (!startIdentity) return
         result.push({ pid, startIdentity, depth })
         for (const childPid of childrenByParent.get(pid) ?? []) visit(childPid, depth + 1)
@@ -239,7 +250,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
     const descendants = snapshot.filter(processRecord => processRecord.pid !== rootPid)
     signalProcessSnapshot(descendants, 'SIGTERM')
     if (descendants.length > 0) {
-        const naturalExitDeadline = nowMs() + 50
+        const naturalExitDeadline = nowMs() + 250
         while (processStartIdentity(rootPid) === expectedStartIdentity && nowMs() < naturalExitDeadline) {
             await sleep(25)
         }
@@ -427,26 +438,75 @@ const configuredLockWaitMs = () => {
 const acquireLock = async paths => {
     await mkdir(paths.root, { recursive: true })
     const waitMs = configuredLockWaitMs()
-    try {
-        return await lockfile.lock(paths.root, {
-            lockfilePath: paths.lock,
-            realpath: false,
-            stale: lockStaleMs,
-            update: 2_000,
-            retries: {
-                retries: Math.ceil(waitMs / 50),
-                factor: 1,
-                minTimeout: 50,
-                maxTimeout: 50,
-                randomize: true,
-            },
-        })
-    } catch (error) {
-        if (error?.code !== 'ELOCKED') throw error
-        throw new InstanceError(
-            `Timed out waiting for instance registry lock at ${paths.lock}`,
-            'LOCK_TIMEOUT',
-        )
+    const deadline = nowMs() + waitMs
+    const owner = { token: randomUUID(), ...currentProcessIdentity(), acquiredAt: iso(nowMs()) }
+    for (;;) {
+        try {
+            await mkdir(paths.lock)
+            await atomicWriteJson(join(paths.lock, 'owner.json'), owner)
+            return async () => {
+                try {
+                    const current = await readJson(join(paths.lock, 'owner.json'))
+                    if (current.token === owner.token) {
+                        await rm(paths.lock, { recursive: true, force: true })
+                    }
+                } catch (error) {
+                    if (error?.code !== 'ENOENT') throw error
+                }
+            }
+        } catch (error) {
+            if (error?.code !== 'EEXIST') throw error
+        }
+
+        let staleOwner = null
+        try {
+            staleOwner = await readJson(join(paths.lock, 'owner.json'))
+        } catch (error) {
+            if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error
+        }
+        let lockStat
+        try {
+            lockStat = await stat(paths.lock)
+        } catch (error) {
+            if (error?.code === 'ENOENT') continue
+            throw error
+        }
+        const ownerIsDead =
+            staleOwner &&
+            typeof staleOwner.token === 'string' &&
+            processStartIdentity(staleOwner.pid) !== staleOwner.startIdentity
+        const corruptAndStale = !staleOwner && nowMs() - lockStat.mtimeMs >= lockStaleMs
+        if (ownerIsDead || corruptAndStale) {
+            const observed = staleOwner?.token ?? `${lockStat.dev}-${lockStat.ino}`
+            const recovery = `${paths.lock}.recover-${observed}`
+            try {
+                await mkdir(recovery)
+                try {
+                    const current = await readJson(join(paths.lock, 'owner.json')).catch(() => null)
+                    const currentStat = await stat(paths.lock).catch(() => null)
+                    const unchanged = staleOwner
+                        ? current?.token === staleOwner.token
+                        : current === null &&
+                          currentStat?.dev === lockStat.dev &&
+                          currentStat?.ino === lockStat.ino
+                    if (unchanged) {
+                        await rename(paths.lock, join(recovery, 'stale-lock'))
+                    }
+                } finally {
+                    await rm(recovery, { recursive: true, force: true })
+                }
+                continue
+            } catch (error) {
+                if (error?.code !== 'EEXIST' && error?.code !== 'ENOENT') throw error
+            }
+        }
+        if (nowMs() >= deadline) {
+            throw new InstanceError(
+                `Timed out waiting for instance registry lock at ${paths.lock}`,
+                'LOCK_TIMEOUT',
+            )
+        }
+        await sleep(50 + Math.floor(Math.random() * 25))
     }
 }
 
@@ -568,14 +628,20 @@ const describeDevelopmentAllocation = allocation => ({
 const activeClaims = registry => {
     const claims = []
     for (const allocation of Object.values(registry.allocations)) {
-        if (allocation.holders.length === 0) continue
+        const developmentHolders = allocation.holders.filter(holder =>
+            ['dev-supervisor', 'dev-renderer', 'dev-electron'].includes(holder.role),
+        )
         for (const resource of allocation.claims) {
+            const holders = resource.startsWith('electron-development-bundle:')
+                ? developmentHolders
+                : allocation.holders
+            if (holders.length === 0) continue
             claims.push({
                 resource,
                 workflow: 'dev',
                 worktreeId: allocation.worktreeId,
                 path: allocation.path,
-                holders: allocation.holders,
+                holders,
                 startedAt: allocation.createdAt,
             })
         }
@@ -617,8 +683,14 @@ const assertClaimsAvailable = (registry, claims, worktreeId, allowedWorkflow = n
 }
 
 const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()) => {
+    const processIdentities =
+        process.platform === 'darwin'
+            ? new Map(processTable().map(row => [row.pid, row.startIdentity]))
+            : null
+    const isLive = holder =>
+        processIdentities ? processIdentities.get(holder.pid) === holder.startIdentity : holderIsLive(holder)
     for (const allocation of Object.values(registry.allocations)) {
-        allocation.holders = allocation.holders.filter(holder => holderIsLive(holder))
+        allocation.holders = allocation.holders.filter(isLive)
         if (!existsSync(allocation.path) && allocation.holders.length === 0) {
             delete registry.allocations[allocation.worktreeId]
             continue
@@ -639,8 +711,8 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
         }
     }
     for (const [id, transient] of Object.entries(registry.transients)) {
-        const wrapperIsLive = holderIsLive(transient.holder)
-        const childIsLive = transient.childHolder ? holderIsLive(transient.childHolder) : false
+        const wrapperIsLive = isLive(transient.holder)
+        const childIsLive = transient.childHolder ? isLive(transient.childHolder) : false
         if (!wrapperIsLive && !childIsLive) {
             delete registry.transients[id]
         } else if (!childIsLive) {
@@ -949,7 +1021,12 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
                 'LIVE_HOLDERS',
             )
         }
-        const bundle = await allocateBundle(registry, manualBundle(), existing?.worktreeId)
+        const requestedBundle = manualBundle()
+        const bundle = await allocateBundle(
+            registry,
+            requestedBundle,
+            requestedBundle ? existing?.worktreeId : null,
+        )
         const allocation = {
             worktreeId,
             generation: registry.generation + 1,
@@ -1006,12 +1083,22 @@ export const registerDevelopmentHolder = async (
     processGroup = false,
 ) => {
     let allocation = await allocateDevelopment()
-    let holder
+    const holder = await newHolder(allocation.worktreeId, role, pid, parentHolderId, processGroup)
+    await assertPersistedBundleUsable(allocation, holder)
     await withRegistry(async (registry, paths) => {
         const current = registry.allocations[allocation.worktreeId]
         if (!current) throw new InstanceError('Development allocation disappeared during registration')
+        if (
+            current.bundle.renderer !== allocation.bundle.renderer ||
+            current.bundle.cdp !== allocation.bundle.cdp ||
+            current.bundle.inspector !== allocation.bundle.inspector
+        ) {
+            throw new InstanceError(
+                'Development allocation changed during holder registration. Retry the command.',
+                'ALLOCATION_CHANGED',
+            )
+        }
         allocation = current
-        holder = await newHolder(current.worktreeId, role, pid, parentHolderId, processGroup)
         if (role === 'dev-supervisor') {
             const other = current.holders.find(
                 item =>
@@ -1026,7 +1113,6 @@ export const registerDevelopmentHolder = async (
             }
             assertClaimsAvailable(registry, current.claims, current.worktreeId, 'dev')
         }
-        await assertPersistedBundleUsable(current, holder)
         current.holders.push(holder)
         current.inactiveSince = null
         current.wasActive = true
@@ -1321,8 +1407,54 @@ export const bundleEnvironment = (bundle, appDataPath = null) => ({
     ...(appDataPath ? { RELEASE_MAESTRO_APP_DATA_DIR: appDataPath } : {}),
 })
 
+const windowsMetaCharacters = /([()\][%!^"`<>&|;, *?])/g
+const escapeWindowsCommand = command => command.replace(windowsMetaCharacters, '^$1')
+const escapeWindowsArgument = (argument, doubleEscape) => {
+    let value = String(argument)
+    value = value.replace(/(?=(\\+?)?)\1"/g, '$1$1\\"')
+    value = value.replace(/(?=(\\+?)?)\1$/g, '$1$1')
+    value = `"${value}"`.replace(windowsMetaCharacters, '^$1')
+    if (doubleEscape) value = value.replace(windowsMetaCharacters, '^$1')
+    return value
+}
+
+const resolveWindowsCommand = command => {
+    if (command.includes('/') || command.includes('\\')) return command
+    const extensions = (process.env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD').split(';')
+    for (const directory of (process.env['PATH'] ?? '').split(';')) {
+        for (const extension of ['', ...extensions]) {
+            const candidate = join(directory, `${command}${extension}`)
+            if (existsSync(candidate)) return candidate
+        }
+    }
+    return command
+}
+
+const spawnPortable = (command, args, options) => {
+    if (process.platform !== 'win32') return spawn(command, args, options)
+    const resolved = resolveWindowsCommand(command)
+    if (!/\.(?:cmd|bat)$/i.test(resolved)) {
+        if (!/\.(?:com|exe)$/i.test(resolved) && existsSync(resolved)) {
+            const shebang = readFileSync(resolved, 'utf8').match(/^#!\s*(?:\/usr\/bin\/env\s+)?([^\s]+)/)
+            if (shebang && basename(shebang[1]).toLowerCase() === 'node') {
+                return spawn(process.execPath, [resolved, ...args], options)
+            }
+        }
+        return spawn(resolved, args, options)
+    }
+    const doubleEscape = basename(dirname(resolved)).toLowerCase() === '.bin'
+    const commandLine = [
+        escapeWindowsCommand(resolved),
+        ...args.map(argument => escapeWindowsArgument(argument, doubleEscape)),
+    ].join(' ')
+    return spawn(process.env['COMSPEC'] ?? 'cmd.exe', ['/d', '/s', '/c', `"${commandLine}"`], {
+        ...options,
+        windowsVerbatimArguments: true,
+    })
+}
+
 export const spawnManaged = (command, args, options = {}) => {
-    const child = crossSpawn(command, args, {
+    const child = spawnPortable(command, args, {
         stdio: 'inherit',
         detached: process.platform !== 'win32',
         ...options,
@@ -1338,10 +1470,11 @@ export const spawnPackageBinary = (binary, args, options = {}) => {
     return spawnManaged(command, [...prefix, 'exec', binary, ...args], options)
 }
 
-export const forwardSignals = children => {
+export const forwardSignals = (children, onSignal = () => {}) => {
     const listeners = new Map()
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
         const listener = () => {
+            onSignal(signal)
             for (const child of children()) {
                 if (!child?.pid || child.exitCode !== null || child.signalCode !== null) continue
                 signalProcessTree(child.pid, signal, child.releaseMaestroStartIdentity)
