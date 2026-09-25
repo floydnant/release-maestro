@@ -35,8 +35,8 @@ const runJson = (cwd, args) => {
     return JSON.parse(result.stdout)
 }
 
-const waitFor = async (description, read) => {
-    const deadline = Date.now() + 180_000
+const waitFor = async (description, read, timeoutMs = 180_000) => {
+    const deadline = Date.now() + timeoutMs
     let lastError
     while (Date.now() < deadline) {
         try {
@@ -98,7 +98,11 @@ try {
                 ensureStackRunning(index, worktree)
                 const registry = JSON.parse(await readFile(join(stateDir, 'registry.json'), 'utf8'))
                 const allocation = Object.values(registry.allocations).find(item => item.path === worktree)
-                return allocation?.holders.some(holder => holder.role === 'dev-electron')
+                const roles = allocation?.holders.map(holder => holder.role) ?? []
+                return (
+                    roles.filter(role => role === 'dev-renderer').length >= 2 &&
+                    roles.filter(role => role === 'dev-electron').length >= 2
+                )
             }),
         ),
     )
@@ -110,20 +114,34 @@ try {
         throw new Error('The worktrees received the same app-data path')
     }
 
-    for (const [index, status] of statuses.entries()) {
-        await waitFor(`renderer ${status.bundle.renderer}`, async () => {
-            ensureStackRunning(index, canonicalWorktrees[index])
-            return (await fetch(`http://localhost:${status.bundle.renderer}`)).ok
-        })
-        await waitFor(`CDP ${status.bundle.cdp}`, async () => {
-            ensureStackRunning(index, canonicalWorktrees[index])
-            return (await fetch(`http://127.0.0.1:${status.bundle.cdp}/json/list`)).ok
-        })
-        await waitFor(`inspector ${status.bundle.inspector}`, async () => {
-            ensureStackRunning(index, canonicalWorktrees[index])
-            return (await fetch(`http://127.0.0.1:${status.bundle.inspector}/json/list`)).ok
-        })
-    }
+    await Promise.all(
+        statuses.flatMap((status, index) => [
+            waitFor(
+                `renderer ${status.bundle.renderer}`,
+                async () => {
+                    ensureStackRunning(index, canonicalWorktrees[index])
+                    return (await fetch(`http://localhost:${status.bundle.renderer}`)).ok
+                },
+                30_000,
+            ),
+            waitFor(
+                `CDP ${status.bundle.cdp}`,
+                async () => {
+                    ensureStackRunning(index, canonicalWorktrees[index])
+                    return (await fetch(`http://127.0.0.1:${status.bundle.cdp}/json/list`)).ok
+                },
+                30_000,
+            ),
+            waitFor(
+                `inspector ${status.bundle.inspector}`,
+                async () => {
+                    ensureStackRunning(index, canonicalWorktrees[index])
+                    return (await fetch(`http://127.0.0.1:${status.bundle.inspector}/json/list`)).ok
+                },
+                30_000,
+            ),
+        ]),
+    )
 
     const fakeBin = join(temporaryRoot, 'fake-bin')
     const capture = join(temporaryRoot, 'mcp-args.json')
