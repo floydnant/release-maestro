@@ -51,6 +51,13 @@ const waitFor = async (description, read) => {
     throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ''}`)
 }
 
+const ensureStackRunning = (index, worktree) => {
+    if (processes[index].exitCode === null && processes[index].signalCode === null) return
+    const error = new Error(`Development stack exited before it became ready: ${worktree}`)
+    error.selfTestFatal = true
+    throw error
+}
+
 const stop = async (processHandle, cwd) => {
     if (processHandle.exitCode === null && processHandle.signalCode === null) processHandle.kill('SIGTERM')
     await Promise.race([
@@ -88,11 +95,7 @@ try {
     await Promise.all(
         canonicalWorktrees.map((worktree, index) =>
             waitFor(`${worktree} dev stack`, async () => {
-                if (processes[index].exitCode !== null || processes[index].signalCode !== null) {
-                    const error = new Error(`Development stack exited before it became ready: ${worktree}`)
-                    error.selfTestFatal = true
-                    throw error
-                }
+                ensureStackRunning(index, worktree)
                 const registry = JSON.parse(await readFile(join(stateDir, 'registry.json'), 'utf8'))
                 const allocation = Object.values(registry.allocations).find(item => item.path === worktree)
                 return allocation?.holders.some(holder => holder.role === 'dev-electron')
@@ -107,19 +110,19 @@ try {
         throw new Error('The worktrees received the same app-data path')
     }
 
-    for (const status of statuses) {
-        await waitFor(
-            `renderer ${status.bundle.renderer}`,
-            async () => (await fetch(`http://localhost:${status.bundle.renderer}`)).ok,
-        )
-        await waitFor(
-            `CDP ${status.bundle.cdp}`,
-            async () => (await fetch(`http://127.0.0.1:${status.bundle.cdp}/json/list`)).ok,
-        )
-        await waitFor(
-            `inspector ${status.bundle.inspector}`,
-            async () => (await fetch(`http://127.0.0.1:${status.bundle.inspector}/json/list`)).ok,
-        )
+    for (const [index, status] of statuses.entries()) {
+        await waitFor(`renderer ${status.bundle.renderer}`, async () => {
+            ensureStackRunning(index, canonicalWorktrees[index])
+            return (await fetch(`http://localhost:${status.bundle.renderer}`)).ok
+        })
+        await waitFor(`CDP ${status.bundle.cdp}`, async () => {
+            ensureStackRunning(index, canonicalWorktrees[index])
+            return (await fetch(`http://127.0.0.1:${status.bundle.cdp}/json/list`)).ok
+        })
+        await waitFor(`inspector ${status.bundle.inspector}`, async () => {
+            ensureStackRunning(index, canonicalWorktrees[index])
+            return (await fetch(`http://127.0.0.1:${status.bundle.inspector}/json/list`)).ok
+        })
     }
 
     const fakeBin = join(temporaryRoot, 'fake-bin')

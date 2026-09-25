@@ -63,6 +63,11 @@ jobs:
             - name: Install Electron system dependencies
               run: pnpm exec playwright install-deps chromium
 
+            - name: Configure the Electron sandbox
+              run: |
+                  sudo chown root:root node_modules/electron/dist/chrome-sandbox
+                  sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
             - name: Verify the development-instance manager
               uses: GabrielBB/xvfb-action@b706e4e27b14669b486812790492dc50ca16b465 # v1.7
               with:
