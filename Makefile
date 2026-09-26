@@ -124,9 +124,11 @@ agents-check: ## Verify the canonical agent skills and their harness adapters
 	node tools/verify-agent-harness.mjs
 
 sure: format ## Format, lint, build, unit test, and development E2E; build is the app type gate
-	$(PNPM) exec nx run-many -t build,lint,test,e2e,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx run-many -t build,lint,test -c development --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx run-many -t e2e,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
 affected: ## Run checks only on affected projects based on git changes
-	$(PNPM) exec nx affected -t build,lint,test,e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx affected -t build,lint,test --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx affected -t e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
 
 # Database
 drizzleCommand = mkdir -p .app-data.dev/data && DATABASE_URL=file:./.app-data.dev/data/mailbox-tool.db ELECTRON_RUN_AS_NODE=1 $(PNPM) exec electron ./node_modules/drizzle-kit/bin.cjs

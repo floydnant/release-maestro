@@ -8,7 +8,7 @@
     "targets": {
         "e2e": {
             "dependsOn": ["typecheck"],
-            "command": "node tools/dev-instance/cli.mjs run-workflow electron-e2e -- nx run maestro-electron:build --then playwright test -c apps/maestro-e2e/playwright.electron.config.ts"
+            "command": "node tools/dev-instance/cli.mjs run-workflow electron-e2e -- nx run maestro-electron:build -c development --then playwright test -c apps/maestro-e2e/playwright.electron.config.ts"
         },
         "e2e-production": {
             "dependsOn": ["typecheck", "maestro-electron:package"],
