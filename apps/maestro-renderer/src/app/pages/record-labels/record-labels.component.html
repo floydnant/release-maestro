@@ -5,9 +5,15 @@
     (clearFilters)="onClear()"
     (retry)="onRetry()"
 >
-    <!-- Match the widths of the values in the virtual list. -->
-    <div class="overflow-x-auto border-b border-border-subtle">
-        <div class="record-label-sort | flex min-w-[43rem] items-center gap-6 px-6">
+    <!-- Scroll the headings and rows together when the window is narrow. -->
+    <div
+        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-auto"
+        role="region"
+        aria-label="Record label columns"
+    >
+        <div
+            class="record-label-sort | flex min-w-[43rem] items-center gap-6 border-b border-border-subtle px-6"
+        >
             <button
                 type="button"
                 class="type-label-sm flex min-w-0 flex-1 items-center gap-1 py-2 text-content-primary"
@@ -38,14 +44,15 @@
                 >Years active</span
             >
         </div>
+        <app-catalog-list
+            label="Record labels"
+            [result]="result()"
+            [query]="query()"
+            [minContentWidth]="688"
+            [style.min-width.px]="688"
+            [restoreScrollTop]="restoreScrollTop()"
+            (viewportChange)="viewport.set($event)"
+            (scrollRestored)="onScrollRestored()"
+        ></app-catalog-list>
     </div>
-    <app-catalog-list
-        label="Record labels"
-        [result]="result()"
-        [query]="query()"
-        [minContentWidth]="688"
-        [restoreScrollTop]="restoreScrollTop()"
-        (viewportChange)="viewport.set($event)"
-        (scrollRestored)="onScrollRestored()"
-    ></app-catalog-list>
 </app-browse-shell>

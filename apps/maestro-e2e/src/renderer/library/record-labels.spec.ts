@@ -12,7 +12,7 @@ const recordLabel: RecordLabelDetail = {
     lastYear: 2019,
     externalRefs: {
         MUSICBRAINZ_LABEL_ID: ['b00b4a1d-0000-0000-0000-000000000001'],
-        BANDCAMP_LABEL_URL: ['https://kosmische.bandcamp.com'],
+        BANDCAMP_LABEL_URL: ['https://kosmische.bandcamp.com', 'https://unrelated.example/label'],
         DISCOGS_LABEL_LINK: ['http://www.discogs.com/label/1'],
     },
 }
@@ -55,6 +55,27 @@ test('record labels list shows stats, search and sort', async ({ page }) => {
         .toMatchObject({ query: { search: 'Salt' } })
 })
 
+test('record label headings scroll with their rows on a narrow window', async ({ page }) => {
+    await page.setViewportSize({ width: 600, height: 700 })
+    await createRendererScenario(page, scenario().build(), '/record-labels')
+    const columns = page.getByRole('region', { name: 'Record label columns' })
+    const heading = page.getByRole('button', { name: 'Sort record labels Z to A' })
+    const row = page.getByRole('region', { name: 'Record labels', exact: true }).getByRole('link', {
+        name: /^Kosmische/,
+    })
+    await expect(row).toBeVisible()
+    const headingBefore = await heading.evaluate(element => element.getBoundingClientRect().x)
+    const rowBefore = await row.evaluate(element => element.getBoundingClientRect().x)
+    await columns.evaluate(element => {
+        element.scrollLeft = 100
+    })
+    await expect.poll(() => columns.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    const headingAfter = await heading.evaluate(element => element.getBoundingClientRect().x)
+    const rowAfter = await row.evaluate(element => element.getBoundingClientRect().x)
+    expect(headingBefore - headingAfter).toBeGreaterThan(0)
+    expect(headingBefore - headingAfter).toBeCloseTo(rowBefore - rowAfter, 0)
+})
+
 test('record label detail shows tracks, albums, artists and external links', async ({ page }) => {
     const controller = await createRendererScenario(page, scenario().build(), '/record-labels/kosmische')
     await expect(page.getByRole('heading', { name: 'Kosmische' })).toBeVisible()
@@ -66,6 +87,7 @@ test('record label detail shows tracks, albums, artists and external links', asy
         'href',
         'https://kosmische.bandcamp.com',
     )
+    await expect(page.getByRole('link', { name: 'Bandcamp' })).toHaveCount(1)
     await expect(page.getByRole('link', { name: 'Discogs' })).toHaveAttribute(
         'href',
         'http://www.discogs.com/label/1',
