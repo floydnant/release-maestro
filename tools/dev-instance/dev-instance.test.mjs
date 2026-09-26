@@ -652,8 +652,10 @@ test('a replacement checkout cannot adopt a live legacy allocation at the same p
     const wrapper = spawnMcp(fixture, fixture.main, bin)
     const active = await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.some(holder => holder.pid === wrapper.pid),
-        'MCP holder did not register',
+        status =>
+            status.holders?.some(holder => holder.pid === wrapper.pid) &&
+            status.holders?.some(holder => holder.role === 'mcp-child:chrome-devtools'),
+        'MCP wrapper and child holders did not register',
     )
     for (const path of [join(fixture.state, 'registry.json'), join(fixture.state, 'registry.backup.json')]) {
         const registry = JSON.parse(await readFile(path, 'utf8'))
@@ -673,6 +675,40 @@ test('a replacement checkout cannot adopt a live legacy allocation at the same p
     const replacement = run(fixture, fixture.main, ['dev-allocate'])
     assert.equal(replacement.status, 1)
     assert.match(replacement.stderr, /RESOURCE_CONFLICT/)
+})
+
+test('child registration stays with its parent allocation after checkout replacement', async () => {
+    const fixture = await createFixture()
+    const ready = join(fixture.base, 'parent-ready.json')
+    const proceed = join(fixture.base, 'continue-registration')
+    const script = `
+        import { existsSync, writeFileSync } from 'node:fs'
+        import { registerDevelopmentHolder } from ${JSON.stringify(coreModule)}
+        const parent = await registerDevelopmentHolder('mcp:fixture')
+        writeFileSync(${JSON.stringify(ready)}, JSON.stringify(parent.allocation.worktreeId))
+        while (!existsSync(${JSON.stringify(proceed)})) await new Promise(resolve => setTimeout(resolve, 20))
+        const child = await registerDevelopmentHolder('mcp-child:fixture', process.pid, parent.holder.id, false, null, parent.allocation)
+        process.stdout.write(JSON.stringify(child.allocation.worktreeId))
+    `
+    const wrapper = spawn(process.execPath, ['--input-type=module', '-e', script], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(wrapper)
+    const resultPromise = childResult(wrapper)
+    const parentId = JSON.parse(
+        await waitFor(() => readFile(ready, 'utf8'), Boolean, 'parent holder did not register'),
+    )
+    await rename(join(fixture.main, '.git'), join(fixture.base, 'old-git'))
+    git(fixture.main, ['init', '-q'])
+    await writeFile(proceed, '')
+    const result = await resultPromise
+    assert.equal(result.code, 0, result.stderr)
+    assert.equal(JSON.parse(result.stdout), parentId)
+    const status = run(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(status.status, 1)
+    assert.match(status.stderr, /MANIFEST_OWNERSHIP_CONFLICT/)
 })
 
 test('a corrupt manifest does not hide a live holder from dev-stop', async () => {
@@ -1398,6 +1434,36 @@ test('a workflow tolerates a child that exits before holder registration', async
     })
 
     assert.equal(result.status, 0, result.stderr)
+})
+
+test('a live workflow child keeps its claim after its wrapper exits', async () => {
+    const fixture = await createFixture()
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+        stdio: 'ignore',
+    })
+    liveChildren.push(child)
+    const script = `
+        import { allocateTransient, releaseTransient, setTransientChildHolder } from ${JSON.stringify(coreModule)}
+        const transient = await allocateTransient('renderer-e2e')
+        await setTransientChildHolder(transient.id, Number(process.env.FIXTURE_CHILD_PID))
+        await releaseTransient(transient.id)
+        process.stdout.write(transient.id)
+    `
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, { FIXTURE_CHILD_PID: String(child.pid) }),
+        encoding: 'utf8',
+    })
+    assert.equal(result.status, 0, result.stderr)
+    const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
+    assert.ok(listed.instances.some(instance => instance.id === result.stdout))
+    child.kill('SIGKILL')
+    await childResult(child)
+    const released = runJson(fixture, fixture.main, ['dev-list', '--json'])
+    assert.equal(
+        released.instances.some(instance => instance.id === result.stdout),
+        false,
+    )
 })
 
 test('run-workflow stops descendants left behind by a successful launcher', async () => {

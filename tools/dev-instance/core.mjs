@@ -1364,8 +1364,20 @@ export const registerDevelopmentHolder = async (
     parentHolderId = null,
     processGroup = false,
     knownStartIdentity = null,
+    parentAllocation = null,
 ) => {
-    let allocation = await allocateDevelopment()
+    let allocation = parentAllocation
+        ? await withRegistry(async registry => {
+              const current = registry.allocations[parentAllocation.worktreeId]
+              if (!current || current.worktreeIdentity !== parentAllocation.worktreeIdentity) {
+                  throw new InstanceError(
+                      'Development allocation changed during holder registration. Retry the command.',
+                      'ALLOCATION_CHANGED',
+                  )
+              }
+              return current
+          })
+        : await allocateDevelopment()
     const holder = await newHolder(
         allocation.worktreeId,
         role,
@@ -1381,7 +1393,8 @@ export const registerDevelopmentHolder = async (
         if (
             current.bundle.renderer !== allocation.bundle.renderer ||
             current.bundle.cdp !== allocation.bundle.cdp ||
-            current.bundle.inspector !== allocation.bundle.inspector
+            current.bundle.inspector !== allocation.bundle.inspector ||
+            current.worktreeIdentity !== allocation.worktreeIdentity
         ) {
             throw new InstanceError(
                 'Development allocation changed during holder registration. Retry the command.',
@@ -1425,20 +1438,28 @@ export const registerDevelopmentListenerHolder = async (
     parentHolderId,
     signal = null,
     timeoutMs = 5_000,
+    parentAllocation = null,
 ) => {
     const deadline = nowMs() + timeoutMs
     do {
         if (signal?.aborted) return null
-        let pid = null
+        let listener = null
         try {
             if (processStartIdentity(launcherPid) !== launcherStartIdentity) break
-            pid = ownedListenerProcess(launcherPid, launcherStartIdentity, ports)?.pid ?? null
+            listener = ownedListenerProcess(launcherPid, launcherStartIdentity, ports)
         } catch (error) {
             if (error?.code !== 'PROCESS_IDENTITY_UNKNOWN') throw error
         }
-        if (pid) {
+        if (listener) {
             if (signal?.aborted) return null
-            return registerDevelopmentHolder(role, pid, parentHolderId)
+            return registerDevelopmentHolder(
+                role,
+                listener.pid,
+                parentHolderId,
+                false,
+                listener.startIdentity,
+                parentAllocation,
+            )
         }
         await sleep(100)
     } while (nowMs() < deadline)
@@ -1778,6 +1799,7 @@ export const releaseTransient = async id => {
     await withRegistry(async (registry, paths) => {
         const transient = registry.transients[id]
         if (!transient) return
+        if (transient.childHolder && holderIsLive(transient.childHolder)) return
         if (transient.listenerHolder && holderIsLive(transient.listenerHolder)) return
         if (listenerPids(transient.bundle.renderer).length > 0) return
         delete registry.transients[id]

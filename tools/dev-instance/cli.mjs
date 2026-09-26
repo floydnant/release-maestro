@@ -168,6 +168,8 @@ const runDevelopment = async () => {
             renderer.pid,
             supervisor.id,
             process.platform !== 'win32',
+            null,
+            allocation,
         )
         childHolders.push(rendererHolder.holder)
 
@@ -198,6 +200,7 @@ const runDevelopment = async () => {
             supervisor.id,
             cancellation.signal,
             startupRemaining(rendererDeadline),
+            allocation,
         )
         if (rendererListener) childHolders.push(rendererListener.holder)
         if (stopIfCancelled()) return
@@ -232,6 +235,8 @@ const runDevelopment = async () => {
             electron.pid,
             supervisor.id,
             process.platform !== 'win32',
+            null,
+            allocation,
         )
         childHolders.push(electronHolder.holder)
 
@@ -269,6 +274,7 @@ const runDevelopment = async () => {
             supervisor.id,
             cancellation.signal,
             startupRemaining(electronDeadline),
+            allocation,
         )
         if (electronListener) childHolders.push(electronListener.holder)
         if (stopIfCancelled()) return

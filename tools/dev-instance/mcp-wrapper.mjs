@@ -9,6 +9,7 @@ import {
     spawnPackageBinary,
     startHeartbeat,
     heartbeatDevelopmentHolders,
+    holderIsLive,
     logDiagnostic,
 } from './core.mjs'
 import { constants as osConstants } from 'node:os'
@@ -77,6 +78,7 @@ try {
                 holder.id,
                 process.platform !== 'win32',
                 child.releaseMaestroStartIdentity,
+                allocation,
             )
         ).holder
     }
@@ -105,17 +107,30 @@ try {
     clearTimeout(startupShutdownTimer)
     stopHeartbeat()
     signalListeners.forEach((listener, signal) => process.off(signal, listener))
+    let stopError = null
     if (
         child?.pid &&
         child.exitCode === null &&
         child.signalCode === null &&
         child.releaseMaestroStartIdentity
     ) {
-        await stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+        await stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(error => {
+            stopError = error
+        })
     }
     if (child?.pid && child.releaseMaestroStartIdentity) {
-        await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+        await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity).catch(error => {
+            stopError ??= error
+        })
     }
-    if (childHolder) await removeDevelopmentHolder(childHolder.id).catch(() => {})
+    if (stopError) {
+        const message = stopError instanceof Error ? stopError.message : String(stopError)
+        process.stderr.write(`MCP child cleanup failed: ${message}\n`)
+        await logDiagnostic('mcp-child-cleanup-failed', { server, reason: message }).catch(() => {})
+        process.exitCode = 1
+    }
+    if (childHolder && !holderIsLive(childHolder)) {
+        await removeDevelopmentHolder(childHolder.id).catch(() => {})
+    }
     if (holder) await removeDevelopmentHolder(holder.id).catch(() => {})
 }
