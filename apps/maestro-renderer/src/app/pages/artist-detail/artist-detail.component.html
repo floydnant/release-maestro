@@ -25,7 +25,9 @@
             @if (entry.artist.firstYear != null) {
                 {{
                     entry.artist.firstYear +
-                        (entry.artist.lastYear !== entry.artist.firstYear ? '–' + entry.artist.lastYear : '')
+                        (entry.artist.lastYear !== entry.artist.firstYear
+                            ? ' - ' + entry.artist.lastYear
+                            : '')
                 }}
             } @else {
                 Years unknown
