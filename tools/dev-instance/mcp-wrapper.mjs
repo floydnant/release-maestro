@@ -4,6 +4,7 @@ import {
     bundleEnvironment,
     registerDevelopmentHolder,
     removeDevelopmentHolder,
+    stopProcessGroup,
     stopProcessTree,
     spawnPackageBinary,
     startHeartbeat,
@@ -111,6 +112,9 @@ try {
         child.releaseMaestroStartIdentity
     ) {
         await stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+    }
+    if (child?.pid && child.releaseMaestroStartIdentity) {
+        await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
     }
     if (childHolder) await removeDevelopmentHolder(childHolder.id).catch(() => {})
     if (holder) await removeDevelopmentHolder(holder.id).catch(() => {})

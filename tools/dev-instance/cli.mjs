@@ -17,6 +17,7 @@ import {
     releaseDevelopment,
     releaseTransient,
     removeDevelopmentHolder,
+    recoverRegistry,
     signalProcessTree,
     spawnManaged,
     spawnPackageBinary,
@@ -150,7 +151,7 @@ const runDevelopment = async () => {
                 '--port',
                 String(allocation.bundle.renderer),
             ],
-            { env: environment },
+            { env: environment, waitForTree: true },
         )
         children.push(renderer)
         const rendererExit = waitForExit(renderer)
@@ -214,7 +215,7 @@ const runDevelopment = async () => {
                 '--port',
                 String(allocation.bundle.inspector),
             ],
-            { env: electronEnvironment },
+            { env: electronEnvironment, waitForTree: true },
         )
         children.push(electron)
         const electronExit = waitForExit(electron)
@@ -447,6 +448,9 @@ const main = async () => {
         case 'dev-stop':
             print({ stopped: await stopDevelopment() })
             return
+        case 'dev-recover':
+            print(await recoverRegistry())
+            return
         case 'dev-log':
             await followLog({
                 follow: args.includes('--follow') || args.includes('-f'),
@@ -462,7 +466,7 @@ const main = async () => {
             return
         default:
             throw new InstanceError(
-                'Usage: cli.mjs <dev-allocate|dev-release|dev-reallocate|dev-status|dev-list|dev-stop|dev-log|run-dev|run-workflow>',
+                'Usage: cli.mjs <dev-allocate|dev-release|dev-reallocate|dev-status|dev-list|dev-stop|dev-recover|dev-log|run-dev|run-workflow>',
                 'USAGE',
             )
     }

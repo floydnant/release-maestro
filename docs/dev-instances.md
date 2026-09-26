@@ -24,6 +24,7 @@ Run these from the worktree whose instance you want to manage.
 | `make dev-release`            | Release an idle allocation now. Refuses while holders are live.                            |
 | `make dev-reallocate`         | Give an idle instance a new bundle after a port conflict or a manual override.             |
 | `make dev-stop`               | Stop validated dev processes and orphaned E2E processes owned by this worktree.            |
+| `make dev-recover`            | Reset a blocked registry after stopping live processes and inspecting quarantined copies.  |
 | `make dev-log`                | Read lifecycle events. `FOLLOW=1` follows; `JSON=1` prints JSON Lines.                     |
 | `make dev-instance-self-test` | Start two temporary worktrees and verify independent stacks and shutdown.                  |
 
@@ -62,7 +63,8 @@ Electron development build, so the manager rejects that overlap in one worktree.
 renderer E2E can run together. Two copies of the same mutating E2E target cannot. E2E workflows
 get transient bundles, which are released when their commands exit. MCP wrappers share their
 worktree's stable development bundle and may run before `make dev`.
-On Windows, a workflow waits for its command's descendants before releasing its transient bundle.
+On Windows, development, MCP, and E2E launchers use process jobs so descendants stop with the
+launcher or keep its allocation active until they exit.
 On macOS and Linux, the manager records a verified E2E renderer listener so its claim survives an
 abrupt test-runner exit until the listener stops. If a runner exits before the listener can be
 verified, an occupied transient renderer port keeps the claim until the port is free.
@@ -82,6 +84,8 @@ ownership metadata, but still refuses live holders and cannot bypass a registry 
 The registry and manifest are versioned. The manager repairs missing registries, stale locks, and
 dead holders while preserving live processes. If neither registry copy is valid, it quarantines corrupt
 copies and stops rather than discarding possible live ownership. After stopping the processes and
-inspecting the quarantined files, remove `registry.recovery-required.json` in the state directory to
-permit a fresh registry. Its central JSONL log rotates at about 5 MiB with three retained files. It records lifecycle events, ports,
+inspecting the quarantined files, run `make dev-recover` to clear the recovery marker and permit a
+fresh registry. Older registry entries without checkout identity cannot be assigned to a replacement
+checkout by path alone. Their live holders must exit before a new allocation can claim the same
+resources. The central JSONL log rotates at about 5 MiB with three retained files. It records lifecycle events, ports,
 holder identity, and conflict reasons, without application output or full command arguments.

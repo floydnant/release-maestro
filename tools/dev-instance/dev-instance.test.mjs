@@ -493,7 +493,8 @@ test('loss of both registry copies cannot silently discard a live holder', async
     assert.equal(wrapper.exitCode, null)
     wrapper.kill('SIGTERM')
     await childResult(wrapper)
-    await rm(join(fixture.state, 'registry.recovery-required.json'))
+    assert.deepEqual(runJson(fixture, fixture.roots[1], ['dev-recover']), { recovered: true })
+    assert.deepEqual(runJson(fixture, fixture.roots[1], ['dev-recover']), { recovered: false })
     assert.ok(runJson(fixture, fixture.roots[1], ['dev-allocate']).worktreeId)
 })
 
@@ -643,6 +644,35 @@ test('a legacy manifest without checkout identity is only a hint after release',
 
     assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).state, 'reclaimable')
     assert.notEqual(runJson(fixture, fixture.main, ['dev-allocate']).worktreeId, first.worktreeId)
+})
+
+test('a replacement checkout cannot adopt a live legacy allocation at the same path', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const active = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.some(holder => holder.pid === wrapper.pid),
+        'MCP holder did not register',
+    )
+    for (const path of [join(fixture.state, 'registry.json'), join(fixture.state, 'registry.backup.json')]) {
+        const registry = JSON.parse(await readFile(path, 'utf8'))
+        delete registry.allocations[active.worktreeId].worktreeIdentity
+        await writeFile(path, JSON.stringify(registry))
+    }
+    const manifestPath = join(fixture.main, '.release-maestro-instance.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    delete manifest.worktreeIdentity
+    await writeFile(manifestPath, JSON.stringify(manifest))
+    await rename(join(fixture.main, '.git'), join(fixture.base, 'old-git'))
+    git(fixture.main, ['init', '-q'])
+
+    assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).state, 'reclaimable')
+    assert.deepEqual(runJson(fixture, fixture.main, ['dev-stop']).stopped, [])
+    assert.equal(wrapper.exitCode, null)
+    const replacement = run(fixture, fixture.main, ['dev-allocate'])
+    assert.equal(replacement.status, 1)
+    assert.match(replacement.stderr, /RESOURCE_CONFLICT/)
 })
 
 test('a corrupt manifest does not hide a live holder from dev-stop', async () => {
@@ -994,6 +1024,56 @@ test('MCP wrapper reports and logs package-manager startup failures', async () =
     assert.match(result.stderr, /MCP wrapper failed: spawn .*missing-pnpm ENOENT/)
     const log = await readFile(join(fixture.state, 'orchestration.jsonl'), 'utf8')
     assert.match(log, /"event":"mcp-wrapper-failed"/)
+})
+
+test('MCP wrapper stops a server descendant when its package-manager exits', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture()
+    const bin = join(fixture.base, 'bin')
+    const ready = join(fixture.base, 'mcp-server-ready')
+    const serverPidPath = join(fixture.base, 'mcp-server.pid')
+    const server = join(fixture.base, 'mcp-server.cjs')
+    await mkdir(bin)
+    await writeFile(
+        server,
+        `const { writeFileSync } = require('node:fs')
+writeFileSync(${JSON.stringify(serverPidPath)}, String(process.pid))
+require('node:net').createServer(() => {}).listen(Number(process.env.RELEASE_MAESTRO_CDP_PORT), '127.0.0.1', () => writeFileSync(${JSON.stringify(ready)}, 'ready'))
+`,
+    )
+    await writeFile(
+        join(bin, 'pnpm'),
+        `#!/usr/bin/env node
+import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+const child = spawn(process.execPath, [${JSON.stringify(server)}], { stdio: 'ignore' })
+child.unref()
+const timer = setInterval(() => { if (existsSync(${JSON.stringify(ready)})) { clearInterval(timer); process.exit(0) } }, 10)
+`,
+    )
+    await chmod(join(bin, 'pnpm'), 0o755)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    try {
+        const result = await childResult(wrapper)
+        assert.equal(result.code, 0, result.stderr)
+        assert.equal(existsSync(ready), true)
+        const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+        await waitFor(
+            () => portIsAvailable(status.bundle.cdp),
+            available => available,
+            'MCP server descendant survived wrapper cleanup',
+        )
+        assert.deepEqual(status.holders, [])
+    } finally {
+        if (existsSync(serverPidPath)) {
+            const pid = Number(await readFile(serverPidPath, 'utf8'))
+            try {
+                process.kill(pid, 'SIGKILL')
+            } catch (error) {
+                if (error?.code !== 'ESRCH') throw error
+            }
+        }
+    }
 })
 
 test('MCP wrapper forwards signals and dev-stop leaves unrelated processes alive', async () => {
@@ -1600,22 +1680,33 @@ test('Windows MCP wrapper death closes its managed child job', async () => {
     const wrapper = spawnMcp(fixture, fixture.main, bin, 'chrome-devtools', {
         FAKE_CHILD_PID_PATH: childPidPath,
     })
+    let wrapperStderr = ''
+    wrapper.stderr.on('data', chunk => (wrapperStderr += chunk))
+    const wrapperExit = childResult(wrapper)
     let childPid
     try {
-        await waitFor(
-            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-            status => status.holders?.some(holder => holder.role === 'mcp-child:chrome-devtools'),
-            'MCP child job did not register',
-        )
         childPid = Number(
             await waitFor(
-                () => readFile(childPidPath, 'utf8'),
+                () => {
+                    assert.equal(wrapper.exitCode, null, wrapperStderr)
+                    return readFile(childPidPath, 'utf8')
+                },
                 value => Number.isSafeInteger(Number(value)),
                 'MCP child process did not start',
+                60_000,
             ),
         )
+        await waitFor(
+            () => {
+                assert.equal(wrapper.exitCode, null, wrapperStderr)
+                return Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json']))
+            },
+            status => status.holders?.some(holder => holder.role === 'mcp-child:chrome-devtools'),
+            'MCP child job did not register',
+            60_000,
+        )
         wrapper.kill('SIGKILL')
-        await childResult(wrapper)
+        await wrapperExit
         await waitFor(
             () => {
                 try {
@@ -1632,6 +1723,7 @@ test('Windows MCP wrapper death closes its managed child job', async () => {
         assert.deepEqual(runJson(fixture, fixture.main, ['dev-status', '--json']).holders, [])
     } finally {
         if (wrapper.exitCode === null && wrapper.signalCode === null) wrapper.kill('SIGKILL')
+        await wrapperExit
         if (childPid) {
             try {
                 process.kill(childPid, 'SIGKILL')
@@ -1640,7 +1732,7 @@ test('Windows MCP wrapper death closes its managed child job', async () => {
             }
         }
     }
-})
+}, 120_000)
 
 test('run-workflow records a replacement detached listener before its wrapper exits', async () => {
     if (process.platform === 'win32') return

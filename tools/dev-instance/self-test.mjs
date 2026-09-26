@@ -179,8 +179,14 @@ writeFileSync(process.env.MCP_CAPTURE, JSON.stringify(process.argv.slice(2)))
     }
 
     await stop(processes[0], worktrees[0])
-    const secondStillRunning = await fetch(`http://localhost:${statuses[1].bundle.renderer}`)
-    if (!secondStillRunning.ok) throw new Error('Stopping the first worktree stopped the second renderer')
+    await waitFor(
+        `second renderer after stopping the first worktree`,
+        async () => {
+            ensureStackRunning(1, canonicalWorktrees[1])
+            return (await fetch(`http://localhost:${statuses[1].bundle.renderer}`)).ok
+        },
+        15_000,
+    )
     await stop(processes[1], worktrees[1])
 
     process.stdout.write(

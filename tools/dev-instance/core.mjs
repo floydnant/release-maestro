@@ -624,7 +624,7 @@ const readRegistryCopy = async path => {
 const readRegistry = async paths => {
     if (existsSync(paths.registryFailure)) {
         throw new InstanceError(
-            `No valid instance registry copy remains. Stop live processes, inspect the quarantined state, then remove ${paths.registryFailure} to reset it.`,
+            `No valid instance registry copy remains. Stop live processes, inspect the quarantined state, then run make dev-recover to reset it. Recovery marker: ${paths.registryFailure}.`,
             'REGISTRY_UNRECOVERABLE',
         )
     }
@@ -637,7 +637,7 @@ const readRegistry = async paths => {
         if (hadRegistryCopy) {
             await atomicWriteJson(paths.registryFailure, { detectedAt: iso(nowMs()) })
             throw new InstanceError(
-                `No valid instance registry copy remains. Stop live processes, inspect the quarantined state, then remove ${paths.registryFailure} to reset it.`,
+                `No valid instance registry copy remains. Stop live processes, inspect the quarantined state, then run make dev-recover to reset it. Recovery marker: ${paths.registryFailure}.`,
                 'REGISTRY_UNRECOVERABLE',
             )
         }
@@ -646,6 +646,19 @@ const readRegistry = async paths => {
     if (!primary) return backup
     if (!backup) return primary
     return primary.generation >= backup.generation ? primary : backup
+}
+
+export const recoverRegistry = async () => {
+    const paths = getStatePaths()
+    const releaseLock = await acquireLock(paths)
+    try {
+        if (!existsSync(paths.registryFailure)) return { recovered: false }
+        await appendEvent(paths, 'registry-recovery-confirmed', { marker: paths.registryFailure })
+        await rm(paths.registryFailure)
+        return { recovered: true }
+    } finally {
+        await releaseLock()
+    }
 }
 
 const rotateLog = async path => {
@@ -1170,7 +1183,10 @@ const allocationForManifest = (registry, manifest, worktree, rejectCopied = true
         }
         return null
     }
-    if (allocation.worktreeIdentity && allocation.worktreeIdentity !== worktree.identity) {
+    // A path is not proof that an older allocation belongs to the current checkout.
+    // A replacement checkout can inherit both the path and the legacy manifest.
+    if (!allocation.worktreeIdentity) return null
+    if (allocation.worktreeIdentity !== worktree.identity) {
         if (rejectCopied) {
             throw new InstanceError(
                 `Manifest belongs to another checkout, not ${worktree.root}. Allocate a new instance in this worktree.`,
