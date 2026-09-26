@@ -80,7 +80,7 @@ test: test-tools ## Run all tests
 test-tools: ## Run repository tools tests
 	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand
 test-tools-windows: ## Verify Windows workflow descendants and argument passing
-	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand --testNamePattern='Windows workflow keeps its claim|run-workflow passes separators'
+	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand --testNamePattern='Windows workflow|run-workflow passes separators'
 test-watch: ## Run all tests in watch mode
 	$(PNPM) exec nx run-many -t test -- --watch
 test-core: ## Run core library tests

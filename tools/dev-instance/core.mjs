@@ -1080,6 +1080,7 @@ const allocationForManifest = (registry, manifest, worktree, rejectCopied = true
         return null
     }
     if (
+        allocation.worktreeIdentity === worktree.identity ||
         sameCanonicalPath(allocation.path, worktree.root) ||
         (!existsSync(allocation.path) && allocation.holders.length === 0)
     ) {
@@ -1100,9 +1101,7 @@ const allocationForWorktree = (registry, manifest, worktree, rejectCopied = true
         if (ownedByManifest) return ownedByManifest
     }
     const matches = Object.values(registry.allocations).filter(
-        allocation =>
-            allocation.worktreeIdentity === worktree.identity &&
-            sameCanonicalPath(allocation.path, worktree.root),
+        allocation => allocation.worktreeIdentity === worktree.identity,
     )
     if (matches.length > 1) {
         throw new InstanceError('Multiple allocations match this worktree', 'REGISTRY_CONFLICT')
@@ -1508,10 +1507,13 @@ export const allocateTransient = async workflow => {
         manifest = await readManifest(worktree)
     }
     if (!manifest) throw new InstanceError('Could not create the worktree identity manifest')
-    const worktreeId = manifest.worktreeId
     let transient
     await withRegistry(async (registry, paths) => {
-        allocationForManifest(registry, manifest, worktree)
+        const allocation = allocationForWorktree(registry, manifest, worktree)
+        const worktreeId = allocation?.worktreeId ?? manifest.worktreeId
+        if (allocation && manifest.worktreeId !== worktreeId) {
+            await writeManifest(worktree, allocation, registry.generation + 1)
+        }
         const claims = workflowClaims(workflow, appDataPath, worktreeId)
         assertClaimsAvailable(registry, claims, worktreeId)
         const id = randomUUID()
@@ -1633,9 +1635,17 @@ const spawnPortable = (command, args, options) => {
 
 const windowsTreeCommand = `
 $ErrorActionPreference = 'Stop'
+Add-Type -Path $env:RELEASE_MAESTRO_TREE_JOB_HELPER
+$job = [ReleaseMaestro.Job]::CreateAndAssignCurrentProcess()
+try {
 $arguments = '"' + $env:RELEASE_MAESTRO_TREE_SCRIPT + '"'
-$child = Start-Process -FilePath $env:RELEASE_MAESTRO_TREE_NODE -ArgumentList $arguments -NoNewWindow -PassThru -Wait
+$child = Start-Process -FilePath $env:RELEASE_MAESTRO_TREE_NODE -ArgumentList $arguments -NoNewWindow -PassThru
+while ([ReleaseMaestro.Job]::ActiveProcessCount($job) -gt 1) { Start-Sleep -Milliseconds 100 }
+$child.Refresh()
 exit $child.ExitCode
+} finally {
+    [ReleaseMaestro.Job]::Close($job)
+}
 `
 
 export const spawnManaged = (command, args, options = {}) => {
@@ -1661,6 +1671,10 @@ export const spawnManaged = (command, args, options = {}) => {
                           RELEASE_MAESTRO_TREE_SCRIPT: join(
                               dirname(fileURLToPath(import.meta.url)),
                               'windows-tree.mjs',
+                          ),
+                          RELEASE_MAESTRO_TREE_JOB_HELPER: join(
+                              dirname(fileURLToPath(import.meta.url)),
+                              'windows-job.cs',
                           ),
                           RELEASE_MAESTRO_TREE_COMMAND: JSON.stringify({ command, args }),
                       },

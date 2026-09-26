@@ -644,6 +644,34 @@ test('a moved worktree keeps its identity after releasing its allocation', async
     assert.equal(allocation.worktreeId, first.worktreeId)
 })
 
+test('a moved worktree recovers a live allocation with or without its manifest', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const active = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 1,
+        'MCP holder did not register',
+    )
+
+    const moved = join(fixture.base, 'moved')
+    await rename(fixture.main, moved)
+    const withManifest = runJson(fixture, moved, ['dev-status', '--json'])
+    assert.equal(withManifest.worktreeId, active.worktreeId)
+    assert.equal(withManifest.holders[0].pid, wrapper.pid)
+
+    const movedAgain = join(fixture.base, 'moved-again')
+    await rename(moved, movedAgain)
+    await rm(join(movedAgain, '.release-maestro-instance.json'))
+    const withoutManifest = runJson(fixture, movedAgain, ['dev-status', '--json'])
+    assert.equal(withoutManifest.worktreeId, active.worktreeId)
+    assert.equal(withoutManifest.holders[0].pid, wrapper.pid)
+    assert.equal(runJson(fixture, movedAgain, ['dev-allocate']).worktreeId, active.worktreeId)
+
+    wrapper.kill('SIGTERM')
+    await childResult(wrapper)
+})
+
 test('a copied manifest cannot inspect, release, or stop another worktree allocation', async () => {
     const fixture = await createFixture({ worktrees: 2 })
     const first = runJson(fixture, fixture.roots[0], ['dev-allocate'])
@@ -1165,9 +1193,16 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
         { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
     )
     liveChildren.push(workflow)
+    let workflowStderr = ''
+    workflow.stderr.on('data', chunk => (workflowStderr += chunk))
     const grandchildPid = Number(
         await waitFor(
-            () => readFile(grandchildPidPath, 'utf8'),
+            () => {
+                if (workflow.exitCode !== null || workflow.signalCode !== null) {
+                    assert.fail(`workflow exited before grandchild started: ${workflowStderr}`)
+                }
+                return readFile(grandchildPidPath, 'utf8')
+            },
             value => Number.isSafeInteger(Number(value)),
             'grandchild did not start',
         ),
@@ -1187,6 +1222,74 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
         ),
         false,
     )
+})
+
+test('Windows workflow cancellation kills an orphaned grandchild before releasing its claim', async () => {
+    if (process.platform !== 'win32') return
+    const fixture = await createFixture()
+    const grandchildPidPath = join(fixture.base, 'grandchild.pid')
+    const intermediary = `
+        const { writeFileSync } = require('node:fs')
+        const { spawn } = require('node:child_process')
+        const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+        writeFileSync(${JSON.stringify(grandchildPidPath)}, String(grandchild.pid))
+        grandchild.unref()
+    `
+    const launcher = `
+        const { spawn } = require('node:child_process')
+        spawn(process.execPath, ['-e', ${JSON.stringify(intermediary)}], { stdio: 'ignore' }).unref()
+    `
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', launcher],
+        { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    liveChildren.push(workflow)
+    let workflowStderr = ''
+    workflow.stderr.on('data', chunk => (workflowStderr += chunk))
+    const grandchildPid = Number(
+        await waitFor(
+            () => {
+                if (workflow.exitCode !== null || workflow.signalCode !== null) {
+                    assert.fail(`workflow exited before grandchild started: ${workflowStderr}`)
+                }
+                return readFile(grandchildPidPath, 'utf8')
+            },
+            value => Number.isSafeInteger(Number(value)),
+            'grandchild did not start',
+        ),
+    )
+    try {
+        workflow.kill('SIGTERM')
+        const result = await childResult(workflow)
+        assert.equal(result.code, 143, result.stderr)
+        await waitFor(
+            () => {
+                try {
+                    process.kill(grandchildPid, 0)
+                    return false
+                } catch (error) {
+                    if (error.code === 'ESRCH') return true
+                    throw error
+                }
+            },
+            dead => dead,
+            'grandchild survived workflow cancellation',
+        )
+        assert.equal(
+            runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
+                instance => instance.workflow === 'renderer-e2e',
+            ),
+            false,
+        )
+    } finally {
+        if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGTERM')
+        try {
+            process.kill(grandchildPid, 'SIGTERM')
+        } catch (error) {
+            if (error.code !== 'ESRCH') throw error
+        }
+    }
 })
 
 test('run-workflow passes separators and shell metacharacters as literal child arguments', async () => {
@@ -1373,6 +1476,10 @@ test('dev conflicts with Electron E2E and a second dev supervisor reports its ow
     assert.equal(duplicate.status, 1)
     assert.match(duplicate.stderr, /DUPLICATE_WORKFLOW/)
     assert.ok(status.holders.some(holder => duplicate.stderr.includes(`PID ${holder.pid}`)))
+    const manifestPath = join(fixture.main, '.release-maestro-instance.json')
+    const staleManifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    staleManifest.worktreeId = 'stale-worktree-id'
+    await writeFile(manifestPath, JSON.stringify(staleManifest))
     const e2e = run(fixture, fixture.main, [
         'run-workflow',
         'electron-e2e',
@@ -1383,6 +1490,7 @@ test('dev conflicts with Electron E2E and a second dev supervisor reports its ow
     ])
     assert.equal(e2e.status, 1)
     assert.match(e2e.stderr, /RESOURCE_CONFLICT.*electron-development-bundle/)
+    assert.equal(JSON.parse(await readFile(manifestPath, 'utf8')).worktreeId, status.worktreeId)
     dev.kill('SIGTERM')
     await childResult(dev)
 })
