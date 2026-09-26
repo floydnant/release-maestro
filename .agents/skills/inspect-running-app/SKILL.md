@@ -22,11 +22,20 @@ the app and losing the state it needs to inspect. Packaged builds do not use thi
 
 ## Start the app and confirm both ports
 
+Start the app in one terminal:
+
 ```bash
 make dev
-make dev-status
-curl -s http://127.0.0.1:<CDP>/json/list
-curl -s http://127.0.0.1:<inspector>/json/list
+```
+
+After it prints its startup summary, check the ports in another terminal:
+
+```bash
+status="$(make --silent dev-status JSON=1)"
+cdp_port="$(node -p 'JSON.parse(process.argv[1]).bundle.cdp' "$status")"
+inspector_port="$(node -p 'JSON.parse(process.argv[1]).bundle.inspector' "$status")"
+curl -s "http://127.0.0.1:${cdp_port}/json/list"
+curl -s "http://127.0.0.1:${inspector_port}/json/list"
 ```
 
 Open `http://localhost:<renderer port>` using the port from `make dev-status`. If another program takes a persisted port,
