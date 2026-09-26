@@ -1372,8 +1372,13 @@ export const registerDevelopmentListenerHolder = async (
     const deadline = nowMs() + 5_000
     do {
         if (signal?.aborted) return null
-        if (processStartIdentity(launcherPid) !== launcherStartIdentity) break
-        const pid = ownedListenerPid(launcherPid, launcherStartIdentity, ports)
+        let pid = null
+        try {
+            if (processStartIdentity(launcherPid) !== launcherStartIdentity) break
+            pid = ownedListenerPid(launcherPid, launcherStartIdentity, ports)
+        } catch (error) {
+            if (error?.code !== 'PROCESS_IDENTITY_UNKNOWN') throw error
+        }
         if (pid) {
             if (signal?.aborted) return null
             return registerDevelopmentHolder(role, pid, parentHolderId)
@@ -1546,7 +1551,7 @@ export const stopDevelopment = async () => {
     for (const holder of survivors) {
         signalProcessTree(holder.pid, 'SIGKILL', holder.startIdentity)
     }
-    const hardStopDeadline = nowMs() + 50
+    const hardStopDeadline = nowMs() + 2_000
     while (survivors.some(holderIsLive) && nowMs() < hardStopDeadline) {
         await sleep(25)
     }
