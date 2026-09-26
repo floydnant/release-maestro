@@ -17,8 +17,9 @@ const environment = {
     RELEASE_MAESTRO_INSTANCE_STATE_DIR: stateDir,
     PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: 'false',
 }
-const makePnpm =
-    spawnSync('pnpm', ['--version'], { stdio: 'ignore' }).status === 0 ? [] : ['PNPM=corepack pnpm']
+if (spawnSync('pnpm', ['--version'], { stdio: 'ignore' }).status !== 0) {
+    throw new Error('pnpm is required for the two-worktree self-test')
+}
 
 const git = args => {
     const result = spawnSync('git', ['-C', repositoryRoot, ...args], { encoding: 'utf8' })
@@ -83,7 +84,7 @@ try {
     }
 
     for (const worktree of worktrees) {
-        const child = spawn('make', [...makePnpm, 'dev'], {
+        const child = spawn('make', ['dev'], {
             cwd: worktree,
             env: environment,
             stdio: ['ignore', 'pipe', 'pipe'],

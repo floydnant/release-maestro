@@ -96,7 +96,10 @@ const runDevelopment = async () => {
     const configuredTimeout = process.env['RELEASE_MAESTRO_STARTUP_TIMEOUT_MS']
     const startupTimeoutMs = configuredTimeout === undefined ? 600_000 : Number(configuredTimeout)
     if (!Number.isSafeInteger(startupTimeoutMs) || startupTimeoutMs <= 0) {
-        throw new InstanceError('RELEASE_MAESTRO_STARTUP_TIMEOUT_MS must be a positive integer', 'INVALID_CONFIG')
+        throw new InstanceError(
+            'RELEASE_MAESTRO_STARTUP_TIMEOUT_MS must be a positive integer',
+            'INVALID_CONFIG',
+        )
     }
     const { allocation, holder: supervisor } = await registerDevelopmentHolder('dev-supervisor')
     const instance = { ...allocation, slot: developmentSlot(allocation.bundle) }
