@@ -367,10 +367,8 @@ const runWorkflow = async args => {
                     transient.bundle.renderer,
                 )
                     .then(holder => {
-                        if (holder) {
-                            listenerHolder = holder
-                            listenerCaptureError = null
-                        }
+                        if (holder) listenerHolder = holder
+                        listenerCaptureError = null
                     })
                     .catch(error => {
                         if (error?.code !== 'PROCESS_IDENTITY_UNKNOWN') listenerCaptureError = error

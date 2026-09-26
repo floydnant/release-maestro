@@ -1319,7 +1319,7 @@ setInterval(() => {}, 1000)
 
 test('a detached workflow listener retains its claim after the wrapper and launcher die', async () => {
     if (process.platform === 'win32') return
-    const fixture = await createFixture()
+    const fixture = await createFixture({ worktrees: 2 })
     const { launcherPath, listenerPidPath } = await createDetachedListenerLauncher(fixture)
     const workflow = spawn(
         process.execPath,
@@ -1384,11 +1384,18 @@ test('a detached workflow listener retains its claim after the wrapper and launc
         assert.equal(duplicate.status, 1)
         assert.match(duplicate.stderr, /RESOURCE_CONFLICT/)
 
-        process.kill(listenerPid, 'SIGKILL')
+        assert.deepEqual(runJson(fixture, fixture.roots[1], ['dev-stop']).stopped, [])
+        assert.ok(
+            runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
+                instance => instance.listenerHolder?.pid === listenerPid,
+            ),
+        )
+        const stopped = runJson(fixture, fixture.main, ['dev-stop'])
+        assert.ok(stopped.stopped.some(holder => holder.pid === listenerPid))
         await waitFor(
             () => Promise.resolve(runJson(fixture, fixture.main, ['dev-list', '--json'])),
             listed => !listed.instances.some(instance => instance.workflow === 'renderer-e2e'),
-            'claim remained after the detached listener exited',
+            'claim remained after dev-stop stopped the detached listener',
         )
     } finally {
         if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGKILL')

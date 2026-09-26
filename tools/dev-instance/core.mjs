@@ -452,6 +452,7 @@ const parseTransient = value => {
         !isRecord(value) ||
         typeof value.id !== 'string' ||
         typeof value.worktreeId !== 'string' ||
+        (value.worktreeIdentity !== undefined && typeof value.worktreeIdentity !== 'string') ||
         typeof value.workflow !== 'string' ||
         typeof value.path !== 'string' ||
         !isTimestamp(value.createdAt) ||
@@ -1025,13 +1026,14 @@ const listenerPids = port => {
 }
 
 const ownedListenerProcess = (rootPid, rootStartIdentity, ports) => {
+    const candidates = ports
+        .map(port => new Set(listenerPids(port)))
+        .reduce((intersection, pids) => new Set([...intersection].filter(pid => pids.has(pid))))
+    if (candidates.size === 0) return null
     const snapshot = snapshotProcessTree(rootPid)
     if (!snapshot.some(record => record.pid === rootPid && record.startIdentity === rootStartIdentity)) {
         return null
     }
-    const candidates = ports
-        .map(port => new Set(listenerPids(port)))
-        .reduce((intersection, pids) => new Set([...intersection].filter(pid => pids.has(pid))))
     return snapshot.find(record => candidates.has(record.pid)) ?? null
 }
 
@@ -1535,11 +1537,23 @@ export const stopDevelopment = async () => {
     let targets = []
     await withRegistry(async (registry, paths) => {
         const allocation = allocationForWorktree(registry, manifest, worktree)
-        if (!allocation) return
-        holders = allocation.holders.filter(holder => holder.worktreeId === allocation.worktreeId)
+        const developmentHolders = allocation
+            ? allocation.holders.filter(holder => holder.worktreeId === allocation.worktreeId)
+            : []
+        const orphanedListeners = Object.values(registry.transients)
+            .filter(
+                transient =>
+                    transient.worktreeIdentity === worktree.identity &&
+                    !holderIsLive(transient.holder) &&
+                    !transient.childHolder &&
+                    transient.listenerHolder,
+            )
+            .map(transient => transient.listenerHolder)
+        holders = [...developmentHolders, ...orphanedListeners]
+        if (holders.length === 0) return
         targets = rootProcessHolders(holders)
         await appendEvent(paths, 'dev-stop-requested', {
-            worktreeId: allocation.worktreeId,
+            worktreeId: holders[0].worktreeId,
             targets: targets.map(({ role, pid, startIdentity }) => ({ role, pid, startIdentity })),
         })
     })
@@ -1632,6 +1646,7 @@ export const allocateTransient = async workflow => {
         transient = {
             id,
             worktreeId,
+            worktreeIdentity: worktree.identity,
             workflow,
             path: worktree.root,
             createdAt: iso(nowMs()),
@@ -1683,7 +1698,6 @@ export const setTransientChildHolder = async (id, pid, startIdentity = null) => 
 }
 
 export const registerTransientListenerHolder = async (id, launcherPid, launcherStartIdentity, port) => {
-    if (await portIsAvailable(port)) return null
     const listener = ownedListenerProcess(launcherPid, launcherStartIdentity, [port])
     if (!listener) return null
     let holder = null
