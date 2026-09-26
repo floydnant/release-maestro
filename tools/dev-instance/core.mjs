@@ -223,6 +223,14 @@ const signalProcessSnapshot = (snapshot, signal) => {
     }
 }
 
+const snapshotHasLiveProcess = snapshot => {
+    if (process.platform === 'darwin') {
+        const identities = new Map(processTable().map(record => [record.pid, record.startIdentity]))
+        return snapshot.some(record => identities.get(record.pid) === record.startIdentity)
+    }
+    return snapshot.some(record => processStartIdentity(record.pid) === record.startIdentity)
+}
+
 export const signalProcessTree = (rootPid, signal, expectedStartIdentity) => {
     if (!expectedStartIdentity) return
     const snapshot = snapshotProcessTree(rootPid)
@@ -253,7 +261,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
     if (descendants.length > 0) {
         const naturalExitDeadline = nowMs() + 500
         while (processStartIdentity(rootPid) === expectedStartIdentity && nowMs() < naturalExitDeadline) {
-            await sleep(25)
+            await sleep(100)
         }
     }
     signalProcessSnapshot(
@@ -261,13 +269,8 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
         'SIGTERM',
     )
     const deadline = nowMs() + 5_000
-    while (
-        snapshot.some(
-            processRecord => processStartIdentity(processRecord.pid) === processRecord.startIdentity,
-        ) &&
-        nowMs() < deadline
-    ) {
-        await sleep(50)
+    while (snapshotHasLiveProcess(snapshot) && nowMs() < deadline) {
+        await sleep(process.platform === 'win32' ? 500 : 200)
     }
     signalProcessSnapshot(snapshot, 'SIGKILL')
 }
@@ -641,6 +644,9 @@ const canonicalizePath = async path => {
         }
     }
 }
+
+const sameCanonicalPath = (left, right) =>
+    process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right
 
 const appDataFor = worktree =>
     canonicalizePath(process.env['RELEASE_MAESTRO_APP_DATA_DIR'] ?? join(worktree.root, '.app-data.dev'))
@@ -1048,7 +1054,7 @@ const allocationForManifest = (registry, manifest, worktree, rejectCopied = true
     const allocation = manifest ? registry.allocations[manifest.worktreeId] : null
     if (!allocation) return null
     if (
-        allocation.path === worktree.root ||
+        sameCanonicalPath(allocation.path, worktree.root) ||
         (!existsSync(allocation.path) && allocation.holders.length === 0)
     ) {
         return allocation
@@ -1281,9 +1287,14 @@ export const releaseDevelopment = async ({ force = false, requestWhenIdle = fals
     const manifest = await readManifest(worktree)
     if (!manifest && !force) return { released: false, reason: 'unallocated' }
     return withRegistry(async (registry, paths) => {
-        const allocation = manifest
-            ? allocationForManifest(registry, manifest, worktree)
-            : Object.values(registry.allocations).find(candidate => candidate.path === worktree.root)
+        const ownedByManifest = manifest ? allocationForManifest(registry, manifest, worktree, !force) : null
+        const allocation =
+            ownedByManifest ??
+            (force
+                ? Object.values(registry.allocations).find(candidate =>
+                      sameCanonicalPath(candidate.path, worktree.root),
+                  )
+                : null)
         if (!allocation) return { released: false, reason: 'unallocated' }
         if (allocation.holders.length > 0) {
             if (requestWhenIdle) {
@@ -1428,7 +1439,15 @@ export const allocateTransient = async workflow => {
     const worktree = await resolveWorktree()
     const appDataPath = await canonicalizePath(join(worktree.root, '.app-data.e2e', workflow))
     let manifest = await readManifest(worktree)
-    if (!manifest) {
+    const copiedManifest = manifest
+        ? await withRegistry(async registry =>
+              Boolean(
+                  registry.allocations[manifest.worktreeId] &&
+                  !allocationForManifest(registry, manifest, worktree, false),
+              ),
+          )
+        : false
+    if (!manifest || copiedManifest) {
         await allocateDevelopment()
         await releaseDevelopment()
         manifest = await readManifest(worktree)
@@ -1437,6 +1456,7 @@ export const allocateTransient = async workflow => {
     const worktreeId = manifest.worktreeId
     let transient
     await withRegistry(async (registry, paths) => {
+        allocationForManifest(registry, manifest, worktree)
         const claims = workflowClaims(workflow, appDataPath, worktreeId)
         assertClaimsAvailable(registry, claims, worktreeId)
         const id = randomUUID()
@@ -1696,11 +1716,16 @@ export const releaseRemovedWorktree = async (worktreePath, worktreeId = null) =>
     const canonical = await canonicalizePath(worktreePath)
     if (existsSync(canonical)) return { released: false, reason: 'worktree-still-exists' }
     return withRegistry(async (registry, paths) => {
-        const match = Object.values(registry.allocations).find(
-            allocation =>
-                resolve(allocation.path) === canonical &&
-                (!worktreeId || allocation.worktreeId === worktreeId),
-        )
+        let match
+        for (const allocation of Object.values(registry.allocations)) {
+            if (
+                sameCanonicalPath(await canonicalizePath(allocation.path), canonical) &&
+                (!worktreeId || allocation.worktreeId === worktreeId)
+            ) {
+                match = allocation
+                break
+            }
+        }
         if (!match) return { released: false, reason: 'unallocated' }
         if (match.holders.length > 0) return { released: false, reason: 'live-holders' }
         delete registry.allocations[match.worktreeId]

@@ -504,6 +504,49 @@ test('a copied manifest cannot inspect, release, or stop another worktree alloca
     }
 })
 
+test('a copied manifest cannot lend another worktree identity to a workflow', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const original = runJson(fixture, fixture.roots[0], ['dev-allocate'])
+    await cp(
+        join(fixture.roots[0], '.release-maestro-instance.json'),
+        join(fixture.roots[1], '.release-maestro-instance.json'),
+    )
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', 'setInterval(() => {}, 1000)'],
+        { cwd: fixture.roots[1], env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    liveChildren.push(workflow)
+    const listed = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.roots[0], ['dev-list', '--json'])),
+        value => value.instances.some(instance => instance.workflow === 'renderer-e2e'),
+        'workflow did not register',
+    )
+    const transient = listed.instances.find(instance => instance.workflow === 'renderer-e2e')
+    assert.notEqual(transient.worktreeId, original.worktreeId)
+    assert.equal(transient.path, await realpath(fixture.roots[1]))
+    workflow.kill('SIGTERM')
+    await childResult(workflow)
+})
+
+test('forced release with a copied manifest only releases the current worktree', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const first = runJson(fixture, fixture.roots[0], ['dev-allocate'])
+    const second = runJson(fixture, fixture.roots[1], ['dev-allocate'])
+    await cp(
+        join(fixture.roots[0], '.release-maestro-instance.json'),
+        join(fixture.roots[1], '.release-maestro-instance.json'),
+    )
+    const released = runJson(fixture, fixture.roots[1], ['dev-release', '--force'])
+    assert.equal(released.released, true)
+    const listed = runJson(fixture, fixture.roots[0], ['dev-list', '--json'])
+    assert.ok(listed.instances.some(instance => instance.worktreeId === first.worktreeId))
+    assert.equal(
+        listed.instances.some(instance => instance.worktreeId === second.worktreeId),
+        false,
+    )
+})
+
 test('a persisted port taken by an unrelated process fails with owner and reallocation details', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)
@@ -1036,6 +1079,27 @@ test('workflow releases its claim when a child ignores termination', async () =>
     assert.equal(
         instances.instances.some(instance => instance.workflow === 'renderer-e2e'),
         false,
+    )
+})
+
+test('wrappers exit after a signal while waiting for the registry lock', async () => {
+    const fixture = await createFixture()
+    await mkdir(join(fixture.state, 'registry.lock'), { recursive: true })
+    const bin = await createFakePnpm(fixture)
+    const mcp = spawnMcp(fixture, fixture.main, bin)
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', 'setInterval(() => {}, 1000)'],
+        { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    liveChildren.push(workflow)
+    await new Promise(resolve => setTimeout(resolve, 250))
+    mcp.kill('SIGTERM')
+    workflow.kill('SIGTERM')
+    const results = await Promise.all([childResult(mcp), childResult(workflow)])
+    assert.deepEqual(
+        results.map(result => result.code),
+        [143, 143],
     )
 })
 

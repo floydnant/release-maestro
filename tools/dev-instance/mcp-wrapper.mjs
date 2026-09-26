@@ -22,11 +22,20 @@ let holder
 let child
 let stopHeartbeat = () => {}
 let pendingSignal = null
+let startupShutdownTimer = null
 const signalListeners = new Map()
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     const listener = () => {
         pendingSignal ??= signal
-        if (child?.pid) void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+        if (child?.pid) {
+            void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+        } else if (!startupShutdownTimer) {
+            startupShutdownTimer = setTimeout(
+                () => process.exit(128 + (osConstants.signals[pendingSignal] ?? 0)),
+                5_000,
+            )
+            startupShutdownTimer.unref()
+        }
     }
     process.on(signal, listener)
     signalListeners.set(signal, listener)
@@ -52,7 +61,10 @@ try {
     child = spawnPackageBinary(binary, binaryArgs, {
         env: { ...process.env, ...bundleEnvironment(allocation.bundle, allocation.appDataPath) },
     })
-    if (pendingSignal) void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+    if (pendingSignal) {
+        clearTimeout(startupShutdownTimer)
+        void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+    }
     stopHeartbeat = startHeartbeat(() => heartbeatDevelopmentHolder(holder.id))
     const { code, signal } = await new Promise((resolve, reject) => {
         child.once('exit', (code, signal) => resolve({ code, signal }))
@@ -70,6 +82,7 @@ try {
     await logDiagnostic('mcp-wrapper-failed', { server, reason: message }).catch(() => {})
     process.exitCode = 1
 } finally {
+    clearTimeout(startupShutdownTimer)
     stopHeartbeat()
     signalListeners.forEach((listener, signal) => process.off(signal, listener))
     if (holder) await removeDevelopmentHolder(holder.id).catch(() => {})

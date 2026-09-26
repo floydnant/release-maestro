@@ -283,11 +283,20 @@ const runWorkflow = async args => {
     const commands = parseWorkflowCommands(args.slice(separator + 1))
     let child
     let cancellationSignal = null
+    let startupShutdownTimer = null
     const signalListeners = new Map()
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
         const listener = () => {
             cancellationSignal ??= signal
-            if (child?.pid) void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+            if (child?.pid) {
+                void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+            } else if (!startupShutdownTimer) {
+                startupShutdownTimer = setTimeout(
+                    () => process.exit(exitForChild(null, cancellationSignal)),
+                    5_000,
+                )
+                startupShutdownTimer.unref()
+            }
         }
         process.on(signal, listener)
         signalListeners.set(signal, listener)
@@ -308,6 +317,7 @@ const runWorkflow = async args => {
             child = ['nx', 'playwright'].includes(command)
                 ? spawnPackageBinary(command, commandArgs, { env: environment })
                 : spawnManaged(command, commandArgs, { env: environment })
+            clearTimeout(startupShutdownTimer)
             try {
                 await setTransientChildHolder(transient.id, child.pid, child.releaseMaestroStartIdentity)
             } catch (error) {
@@ -327,6 +337,7 @@ const runWorkflow = async args => {
             if (result.code !== 0 || result.signal) break
         }
     } finally {
+        clearTimeout(startupShutdownTimer)
         stopHeartbeat()
         signalListeners.forEach((listener, signal) => process.off(signal, listener))
         if (transient) await releaseTransient(transient.id)
