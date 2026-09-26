@@ -21,35 +21,43 @@ const APPEARS = { section: 'appearsOn' }
 
 const externalLinks = (artist: ArtistDetail): { label: string; url: string }[] => {
     const refs = artist.externalRefs
-    const links = [
+    const links: { label: string; values?: string[]; base?: string; hosts?: string[] }[] = [
         {
             label: 'MusicBrainz',
-            value: refs[ExternalRefKeys.MusicBrainzArtistId]?.[0],
+            values: refs[ExternalRefKeys.MusicBrainzArtistId],
             base: 'https://musicbrainz.org/artist/',
         },
         {
             label: 'Discogs',
-            value: refs[ExternalRefKeys.DiscogsArtistLink]?.[0],
+            values: refs[ExternalRefKeys.DiscogsArtistLink],
             hosts: ['discogs.com', 'www.discogs.com'],
         },
         {
             label: 'Beatport',
-            value: refs[ExternalRefKeys.BeatportArtistUrl]?.[0],
+            values: refs[ExternalRefKeys.BeatportArtistUrl],
             hosts: ['beatport.com', 'www.beatport.com'],
         },
     ]
     const direct = links.flatMap(link => {
-        if (!link.value) return []
-        const url = link.base ? link.base + encodeURIComponent(link.value) : link.value
-        try {
-            const parsed = new URL(url)
-            if (parsed.protocol !== 'https:' || (link.hosts && !link.hosts.includes(parsed.hostname))) {
+        const validUrls = (link.values ?? []).flatMap(value => {
+            const normalized = value.trim()
+            if (!normalized) return []
+            const url = link.base ? link.base + encodeURIComponent(normalized) : normalized
+            try {
+                const parsed = new URL(url)
+                if (parsed.protocol !== 'https:' || (link.hosts && !link.hosts.includes(parsed.hostname))) {
+                    return []
+                }
+            } catch {
                 return []
             }
-        } catch {
-            return []
-        }
-        return [{ label: link.label, url }]
+            return [url]
+        })
+        const urls = [...new Set(validUrls)].sort()
+        return urls.map((url, index) => ({
+            label: urls.length > 1 ? `${link.label} ${index + 1}` : link.label,
+            url,
+        }))
     })
     if (refs[ExternalRefKeys.BandcampArtistId]?.[0]) {
         direct.push({

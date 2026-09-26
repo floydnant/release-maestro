@@ -231,6 +231,34 @@ describe('LibraryBackendRepository', () => {
         expect(repository.countSongsNeedingMetadata()).toBe(0)
     })
 
+    it('attributes artist references to the credit named by the tag', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        repository.processPrescanBatch([fact], scannedAt)
+        repository.ingestMetadata(
+            newSongFixture({
+                artist: 'Track Artist',
+                albumArtist: 'Album Artist',
+                albumTitle: 'Shared record',
+                extraMetadata: [
+                    ['MUSICBRAINZ_ARTIST_ID', 'track-id'],
+                    ['MUSICBRAINZ_ALBUM_ARTIST_ID', 'album-id'],
+                    ['DISCOGS_ARTIST_LINK', 'https://www.discogs.com/artist/123'],
+                ],
+            }),
+            fact,
+            scannedAt,
+        )
+
+        const artists = db.select().from(artistsTable).all()
+        expect(artists.find(artist => artist.name === 'Track Artist')?.externalRefs).toEqual({
+            MUSICBRAINZ_ARTIST_ID: ['track-id'],
+            DISCOGS_ARTIST_LINK: ['https://www.discogs.com/artist/123'],
+        })
+        expect(artists.find(artist => artist.name === 'Album Artist')?.externalRefs).toEqual({
+            MUSICBRAINZ_ARTIST_ID: ['album-id'],
+        })
+    })
+
     it('reapplies a user-confirmed raw-name resolution in order', () => {
         const scannedAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], scannedAt)

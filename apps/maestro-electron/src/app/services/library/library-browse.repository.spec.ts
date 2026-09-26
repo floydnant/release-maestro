@@ -9,6 +9,7 @@ import {
     type SongQuery,
 } from '@release-maestro/core'
 import Database from 'better-sqlite3'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { existsSync } from 'fs'
@@ -201,6 +202,13 @@ describe('LibraryBrowseRepository', () => {
         })
 
         it('separates own albums from appearances and uses only own albums for record labels', () => {
+            db.update(songsTable)
+                .set({
+                    artistText: 'Aurora Fields',
+                    externalRefs: { MUSICBRAINZ_ARTIST_ID: ['mb-1'] },
+                })
+                .where(eq(songsTable.id, 's1'))
+                .run()
             const detail = repository.getArtistDetail('a1')
             expect(detail).toMatchObject({
                 albumCount: 1,
@@ -228,6 +236,32 @@ describe('LibraryBrowseRepository', () => {
             seedSong({ id: 'albumless', title: 'Loose track' })
             db.insert(songArtistsTable).values({ songId: 'albumless', artistId: 'a1', position: 0 }).run()
             expect(repository.getArtistDetail('a1')?.appearanceCount).toBe(1)
+        })
+
+        it('does not expose stored track-artist refs on a different album artist', () => {
+            db.update(albumsTable)
+                .set({ artistText: 'Night Cartel' })
+                .where(eq(albumsTable.id, 'guest'))
+                .run()
+            db.update(songsTable)
+                .set({
+                    artistText: 'Aurora Fields',
+                    externalRefs: {
+                        MUSICBRAINZ_ARTIST_ID: ['track-id'],
+                        MUSICBRAINZ_ALBUM_ARTIST_ID: ['album-id'],
+                        DISCOGS_ARTIST_LINK: ['https://www.discogs.com/artist/123'],
+                    },
+                })
+                .where(eq(songsTable.id, 's3'))
+                .run()
+            db.update(artistsTable)
+                .set({ externalRefs: { MUSICBRAINZ_ARTIST_ID: ['stale-track-id'] } })
+                .where(eq(artistsTable.id, 'a2'))
+                .run()
+
+            expect(repository.getArtistDetail('a2')?.externalRefs).toEqual({
+                MUSICBRAINZ_ARTIST_ID: ['album-id'],
+            })
         })
     })
 

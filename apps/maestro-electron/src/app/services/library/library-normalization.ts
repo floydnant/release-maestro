@@ -196,6 +196,12 @@ export const relevantExternalRefsMap = {
     tracks: Object.values(ExternalRefKeys),
 } satisfies Record<string, ExternalRefKeys[]>
 
+export const artistExternalRefs = (refs: ExternalRefs, credit: 'song' | 'album'): ExternalRefs => {
+    if (credit === 'song') return filterExternalRefs(refs, relevantExternalRefsMap.artists)
+    const albumArtistIds = refs[ExternalRefKeys.MusicBrainzAlbumArtistId]
+    return albumArtistIds?.length ? { [ExternalRefKeys.MusicBrainzArtistId]: albumArtistIds } : {}
+}
+
 export const filterExternalRefs = (refs: ExternalRefs, keys: ExternalRefKeys[]): ExternalRefs => {
     const filtered: ExternalRefs = {}
     for (const key of keys) {

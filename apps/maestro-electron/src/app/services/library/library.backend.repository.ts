@@ -1,4 +1,4 @@
-import { PrescanFileFact, SongMetadata } from '@release-maestro/core'
+import { PrescanFileFact, SongMetadata, type ExternalRefs } from '@release-maestro/core'
 import { randomUUID } from 'crypto'
 import { and, asc, count, eq, gt, inArray, isNull, lt, max, ne, or } from 'drizzle-orm'
 import { DatabaseClient } from '../../database/database.client'
@@ -21,6 +21,7 @@ import {
 } from '../../database/drizzle.schema'
 import {
     albumIdentityKey,
+    artistExternalRefs,
     detectNormalizationIssues,
     extractExternalRefs,
     fileFingerprint,
@@ -194,7 +195,7 @@ export class LibraryBackendRepository {
         const externalRefs = extractExternalRefs(metadata.extraMetadata, metadata.comment)
 
         return db.transaction(tx => {
-            const getOrCreateArtist = (name: string): string => {
+            const getOrCreateArtist = (name: string, artistRefs: ExternalRefs): string => {
                 const existing = tx
                     .select({ id: artistsTable.id, externalRefs: artistsTable.externalRefs })
                     .from(artistsTable)
@@ -205,7 +206,7 @@ export class LibraryBackendRepository {
                         .set({
                             externalRefs: mergeExternalRefs([
                                 existing.externalRefs,
-                                filterExternalRefs(externalRefs, relevantExternalRefsMap.artists),
+                                artistRefs,
                             ]),
                         })
                         .where(eq(artistsTable.id, existing.id))
@@ -218,7 +219,7 @@ export class LibraryBackendRepository {
                     .values({
                         id,
                         name,
-                        externalRefs: filterExternalRefs(externalRefs, relevantExternalRefsMap.artists),
+                        externalRefs: artistRefs,
                     })
                     .onConflictDoNothing()
                     .run()
@@ -231,7 +232,11 @@ export class LibraryBackendRepository {
                 )
             }
 
-            const resolveArtists = (rawText: string | null, displayText: string | null): string[] => {
+            const resolveArtists = (
+                rawText: string | null,
+                displayText: string | null,
+                artistRefs: ExternalRefs,
+            ): string[] => {
                 if (!rawText || !displayText) return []
 
                 const now = scannedAt
@@ -272,7 +277,7 @@ export class LibraryBackendRepository {
                     if (resolvedArtists.length > 0) return resolvedArtists
                 }
 
-                const artistId = getOrCreateArtist(displayText)
+                const artistId = getOrCreateArtist(displayText, artistRefs)
                 tx.delete(artistRawNameArtistsTable)
                     .where(eq(artistRawNameArtistsTable.artistRawNameId, rawNameId))
                     .run()
@@ -391,8 +396,12 @@ export class LibraryBackendRepository {
                 return [genreId]
             }
 
-            const songArtists = resolveArtists(rawArtist, artistText)
-            const albumArtists = resolveArtists(rawAlbumArtist, albumArtistText)
+            const songArtists = resolveArtists(rawArtist, artistText, artistExternalRefs(externalRefs, 'song'))
+            const albumArtists = resolveArtists(
+                rawAlbumArtist,
+                albumArtistText,
+                artistExternalRefs(externalRefs, 'album'),
+            )
             const songGenres = resolveGenres(rawGenre, genreText)
             const recordLabelId = getOrCreateRecordLabel(recordLabelText)
             let albumId: string | null = null

@@ -74,6 +74,29 @@ test('artist list filters, sorts and shows derived stats', async ({ page }) => {
         .toMatchObject({ query: { search: 'Aurora' } })
 })
 
+test('an empty artist list explains what is missing', async ({ page }) => {
+    await createRendererScenario(
+        page,
+        scenario()
+            .handler('library:query-artists', {
+                kind: 'resolve',
+                value: { rows: [], offset: 0, total: 0 },
+            })
+            .build(),
+        '/artists',
+    )
+    await expect(page.getByText('No artists yet')).toBeVisible()
+})
+
+test('artist detail shows loading while the artist is requested', async ({ page }) => {
+    await createRendererScenario(
+        page,
+        scenario().handler('library:get-artist-detail', { kind: 'pending' }).build(),
+        '/artists/aurora',
+    )
+    await expect(page.getByRole('status').getByText('Loading artist…')).toBeVisible()
+})
+
 test('artist detail has four distinct sections', async ({ page }) => {
     const controller = await createRendererScenario(page, scenario().build(), '/artists/aurora')
     await expect(page.getByRole('heading', { name: 'Aurora Fields' })).toBeVisible()
@@ -84,7 +107,7 @@ test('artist detail has four distinct sections', async ({ page }) => {
     const musicBrainz = page.getByRole('link', { name: /MusicBrainz.*opens in new tab/ })
     await expect(musicBrainz).toHaveAttribute('target', '_blank')
     await expect(musicBrainz.locator('app-icon')).toHaveAttribute('name', 'externalLink')
-    await expect(page.locator('.artist-detail__stats')).toContainText('2019–2021')
+    await expect(page.locator('.artist-detail__stats')).toContainText('2019 - 2021')
     await expect(
         page.getByRole('grid', { name: 'Albums' }).getByRole('link', { name: /^Daybreak/ }),
     ).toBeVisible()
@@ -152,6 +175,62 @@ test('named service links only open the matching service host', async ({ page })
         'href',
         'https://www.beatport.com/artist/aurora/123',
     )
+})
+
+test('artist detail shows every valid external reference', async ({ page }) => {
+    await createRendererScenario(
+        page,
+        scenario()
+            .handler('library:get-artist-detail', {
+                kind: 'resolve',
+                value: {
+                    ...artist,
+                    externalRefs: {
+                        MUSICBRAINZ_ARTIST_ID: ['second-id', 'first-id'],
+                        DISCOGS_ARTIST_LINK: [
+                            'https://example.com/artist/wrong-host',
+                            'https://www.discogs.com/artist/456',
+                            'https://www.discogs.com/artist/123',
+                        ],
+                    },
+                },
+            })
+            .build(),
+        '/artists/aurora',
+    )
+    await expect(page.getByRole('link', { name: /^MusicBrainz 1/ })).toHaveAttribute(
+        'href',
+        'https://musicbrainz.org/artist/first-id',
+    )
+    await expect(page.getByRole('link', { name: /^MusicBrainz 2/ })).toHaveAttribute(
+        'href',
+        'https://musicbrainz.org/artist/second-id',
+    )
+    await expect(page.getByRole('link', { name: /^Discogs 1/ })).toHaveAttribute(
+        'href',
+        'https://www.discogs.com/artist/123',
+    )
+    await expect(page.getByRole('link', { name: /^Discogs 2/ })).toHaveAttribute(
+        'href',
+        'https://www.discogs.com/artist/456',
+    )
+    await expect(page.getByRole('navigation', { name: 'Artist external links' }).getByRole('link')).toHaveCount(
+        4,
+    )
+})
+
+test('missing and failed artists offer a way back', async ({ page }) => {
+    const controller = await createRendererScenario(
+        page,
+        scenario().handler('library:get-artist-detail', { kind: 'reject', message: 'Offline' }).build(),
+        '/artists/aurora',
+    )
+    await expect(page.getByRole('alert').getByText('Could not load this artist')).toBeVisible()
+    await controller.setHandler('library:get-artist-detail', { kind: 'resolve', value: null })
+    await page.getByRole('button', { name: 'Try again' }).click()
+    await expect(page.getByRole('heading', { name: 'Artist not found' })).toBeVisible()
+    await page.getByRole('link', { name: 'Back to artists' }).click()
+    await expect(page).toHaveURL(/\/artists$/)
 })
 
 test('an artist with tracks but no own albums opens on All tracks', async ({ page }) => {

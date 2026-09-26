@@ -62,6 +62,7 @@ import {
     genreSearchCondition,
     songSearchCondition,
 } from './catalog-search'
+import { artistExternalRefs, mergeExternalRefs } from './library-normalization'
 
 /**
  * The library read side: windowed catalog queries (ADR 0004).
@@ -108,11 +109,30 @@ export class LibraryBrowseRepository {
 
     getArtistDetail(artistId: string): ArtistDetailResult {
         const artist = this.database.db
-            .select({ id: artistsTable.id, name: artistsTable.name, externalRefs: artistsTable.externalRefs })
+            .select({ id: artistsTable.id, name: artistsTable.name })
             .from(artistsTable)
             .where(eq(artistsTable.id, artistId))
             .get()
         if (!artist) return null
+        // Stored artist refs can contain links copied from a different album artist by older scans.
+        // The song tags retain the source, so build the detail links from the matching credits.
+        const songRefs = this.database.db
+            .select({ externalRefs: songsTable.externalRefs })
+            .from(songArtistsTable)
+            .innerJoin(songsTable, eq(songArtistsTable.songId, songsTable.id))
+            .where(and(eq(songArtistsTable.artistId, artistId), eq(songsTable.artistText, artist.name)))
+            .all()
+        const albumRefs = this.database.db
+            .select({ externalRefs: songsTable.externalRefs })
+            .from(albumArtistsTable)
+            .innerJoin(albumsTable, eq(albumArtistsTable.albumId, albumsTable.id))
+            .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
+            .where(and(eq(albumArtistsTable.artistId, artistId), eq(albumsTable.artistText, artist.name)))
+            .all()
+        const externalRefs = mergeExternalRefs([
+            ...songRefs.map(row => artistExternalRefs(row.externalRefs, 'song')),
+            ...albumRefs.map(row => artistExternalRefs(row.externalRefs, 'album')),
+        ])
         const stats = this.artistStats([artistId]).get(artistId)!
         const ownAlbums = this.database.db
             .selectDistinct({ albumId: albumArtistsTable.albumId })
@@ -133,7 +153,7 @@ export class LibraryBrowseRepository {
             this.database.db.select({ value: count() }).from(appearances.as('appearances')).get()?.value ?? 0
         const labels = this.artistRecordLabelIds(artistId).as('artist_labels')
         const recordLabelCount = this.database.db.select({ value: count() }).from(labels).get()?.value ?? 0
-        return { ...artist, ...stats, appearanceCount, recordLabelCount }
+        return { ...artist, ...stats, externalRefs, appearanceCount, recordLabelCount }
     }
 
     private artistStats(ids: string[]) {
