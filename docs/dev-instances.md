@@ -53,7 +53,7 @@ SessionEnd hook requests release when idle; `/clear` keeps the session's allocat
 advisory, so normal commands also reconcile dead holders and expired allocations.
 [Claude Code removes Git worktrees itself](https://code.claude.com/docs/en/hooks#worktreeremove) and
 fires `WorktreeRemove` alongside that cleanup. The hook releases the allocation after the directory
-disappears.
+disappears and its holders and unverified listeners exit.
 
 Set `graceMs` in `~/.release-maestro/dev-instances/settings.json` to change the grace period for
 all worktrees, for example `{ "graceMs": 600000 }`. `RELEASE_MAESTRO_INSTANCE_GRACE_MS` overrides

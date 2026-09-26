@@ -1309,6 +1309,87 @@ test('removed worktree release resolves a symlinked parent path', async () => {
     assert.equal(registry.allocations[allocation.worktreeId], undefined)
 })
 
+test('removed worktree waits for live holders and unverified listeners', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const server = await listen('127.0.0.1', allocation.bundle.renderer)
+    for (const file of ['registry.json', 'registry.backup.json']) {
+        const path = join(fixture.state, file)
+        const registry = JSON.parse(await readFile(path, 'utf8'))
+        const entry = registry.allocations[allocation.worktreeId]
+        entry.wasActive = true
+        entry.holders = [
+            {
+                id: 'exited-dev-launcher',
+                role: 'dev-supervisor',
+                pid: process.pid,
+                startIdentity: 'stale',
+                heartbeatAt: new Date().toISOString(),
+                worktreeId: allocation.worktreeId,
+            },
+            {
+                id: 'live-mcp',
+                role: 'mcp:fixture',
+                pid: process.pid,
+                startIdentity: currentProcessIdentity().startIdentity,
+                heartbeatAt: new Date().toISOString(),
+                worktreeId: allocation.worktreeId,
+            },
+        ]
+        await writeFile(path, JSON.stringify(registry))
+    }
+    await rm(fixture.main, { recursive: true, force: true })
+    const removed = spawnSync(
+        process.execPath,
+        [hook, 'verify-remove', fixture.main, allocation.worktreeId],
+        {
+            cwd: fixture.base,
+            env: environmentFor(fixture),
+            encoding: 'utf8',
+        },
+    )
+    assert.equal(removed.status, 0, removed.stderr)
+    let registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.equal(registry.allocations[allocation.worktreeId].releaseWhenIdle, true)
+    assert.deepEqual(registry.allocations[allocation.worktreeId].unverifiedPorts, [
+        allocation.bundle.renderer,
+    ])
+
+    const removeMcp = spawnSync(
+        process.execPath,
+        [
+            '--input-type=module',
+            '-e',
+            `
+        import { removeDevelopmentHolder } from ${JSON.stringify(coreModule)}
+        await removeDevelopmentHolder('live-mcp')
+    `,
+        ],
+        { cwd: fixture.base, env: environmentFor(fixture), encoding: 'utf8' },
+    )
+    assert.equal(removeMcp.status, 0, removeMcp.stderr)
+    registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.ok(registry.allocations[allocation.worktreeId])
+
+    await new Promise(resolve => server.close(resolve))
+    liveServers.splice(liveServers.indexOf(server), 1)
+    const reconcile = spawnSync(
+        process.execPath,
+        [
+            '--input-type=module',
+            '-e',
+            `
+        import { listInstances } from ${JSON.stringify(coreModule)}
+        await listInstances()
+    `,
+        ],
+        { cwd: fixture.base, env: environmentFor(fixture), encoding: 'utf8' },
+    )
+    assert.equal(reconcile.status, 0, reconcile.stderr)
+    registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.equal(registry.allocations[allocation.worktreeId], undefined)
+})
+
 test('zero grace expires an inactive allocation and permits reassignment', async () => {
     const fixture = await createFixture({ worktrees: 2 })
     const bin = await createFakePnpm(fixture)

@@ -903,7 +903,7 @@ const reconcileRegistry = async (registry, at = nowMs(), graceMs = configuredGra
             !wrapperIsLive &&
             !childIsLive &&
             !listenerIsLive &&
-            listenerPids(transient.bundle.renderer).length === 0
+            !(await portIsOccupied(transient.bundle.renderer))
         ) {
             delete registry.transients[id]
         } else {
@@ -1099,6 +1099,9 @@ const listenerPids = port => {
         .filter(Number.isSafeInteger)
 }
 
+const portIsOccupied = async (port, listenersFor = listenerPids, portAvailable = portIsAvailable) =>
+    listenersFor(port).length > 0 || !(await portAvailable(port))
+
 export const unverifiedDevelopmentPorts = async (
     allocation,
     lostDevelopmentHolder,
@@ -1109,9 +1112,7 @@ export const unverifiedDevelopmentPorts = async (
     const ports = lostDevelopmentHolder
         ? Object.values(allocation.bundle)
         : (allocation.unverifiedPorts ?? [])
-    const occupied = await Promise.all(
-        ports.map(async port => listenersFor(port).length > 0 || !(await portAvailable(port))),
-    )
+    const occupied = await Promise.all(ports.map(port => portIsOccupied(port, listenersFor, portAvailable)))
     return ports.filter((_, index) => occupied[index])
 }
 
@@ -1887,7 +1888,7 @@ export const releaseTransient = async id => {
         if (!transient) return
         if (transient.childHolder && holderIsLive(transient.childHolder)) return
         if (transient.listenerHolder && holderIsLive(transient.listenerHolder)) return
-        if (listenerPids(transient.bundle.renderer).length > 0) return
+        if (await portIsOccupied(transient.bundle.renderer)) return
         delete registry.transients[id]
         await appendEvent(paths, 'transient-allocation-released', {
             transientId: id,
@@ -2198,7 +2199,14 @@ export const releaseRemovedWorktree = async (worktreePath, worktreeId = null) =>
             }
         }
         if (!match) return { released: false, reason: 'unallocated' }
-        if (match.holders.length > 0) return { released: false, reason: 'live-holders' }
+        if (match.holders.length > 0 || match.unverifiedPorts?.length) {
+            match.releaseWhenIdle = true
+            return {
+                released: false,
+                reason: match.holders.length > 0 ? 'live-holders' : 'unverified-listener',
+                requested: true,
+            }
+        }
         delete registry.allocations[match.worktreeId]
         await appendEvent(paths, 'removed-worktree-released', {
             worktreeId: match.worktreeId,
