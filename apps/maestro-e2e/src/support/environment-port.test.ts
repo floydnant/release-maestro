@@ -17,7 +17,7 @@ describe('environmentPort', () => {
         expect(environmentPort(name, 4200)).toBe(4310)
     })
 
-    it.each(['abc', '1023', '65536', '4200.5'])('rejects %s', value => {
+    it.each(['abc', '1023', '65536', '4200.5', '', ' 4300', '0x10CC'])('rejects %s', value => {
         process.env[name] = value
         expect(() => environmentPort(name, 4200)).toThrow(`${name} must be an integer from 1024 to 65535`)
     })
