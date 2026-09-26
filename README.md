@@ -50,17 +50,8 @@ separate from the packaging binary in `target/release`. Development always uses 
 If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
 
 Each Git worktree gets stable debug ports, its own `.app-data.dev`, and a slot number in the Electron
-window title. Use `make dev-status` for this worktree, `make dev-list` for all worktrees, and
-`make dev-log` for orchestration events. Allocations remain reserved for 20 minutes after use.
-
-To replace an idle allocation with a manual bundle, set all three ports:
-
-```bash
-RELEASE_MAESTRO_RENDERER_PORT=4300 \
-RELEASE_MAESTRO_CDP_PORT=9300 \
-RELEASE_MAESTRO_INSPECTOR_PORT=5900 \
-make dev-reallocate
-```
+window title. Use `make dev-status` to inspect this worktree. The [development instance guide](docs/dev-instances.md)
+covers the full command list, lifecycle, concurrency rules, and recovery.
 
 Codex and Claude Code use the same advisory session hook. Codex asks you to review the project hook
 in `/hooks` because it records trust against the command hash. Claude Code applies its normal project
@@ -85,21 +76,11 @@ make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
 ```
 
-Dev stack instance manager
-
-```bash
-make dev-status    # show this worktree's ports, resources, and process holders
-make dev-list      # show instances across every registered worktree
-make dev-stop      # stop validated development processes from this worktree
-make dev-log       # print colored events; FOLLOW=1 follows, JSON=1 emits JSONL
-make dev-instance-self-test # verify the manager with two live worktrees
-```
-
 `make sure` mutates formatting. Electron E2E and renderer E2E may run together. The instance manager
 rejects Electron E2E while `make dev` owns the same worktree's development build output.
 
-After installation, run `make agents-check` to validate the agent skills and harness adapters and run
-their fixture tests.
+After installation, run `make agents-check` to validate the agent skills and harness adapters.
+`make test-tools` runs the repository tools tests and is part of `make test` and `make sure`.
 
 For focused work, use Nx; see the [fast-iteration examples](docs/testing.md#fast-iteration) for file
 and test-name filters.

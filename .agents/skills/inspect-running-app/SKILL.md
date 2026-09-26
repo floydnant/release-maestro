@@ -150,12 +150,8 @@ A finding worth keeping belongs in a committed Playwright spec. See `e2e-testing
 
 ## Gotchas
 
-- The development wrapper clears `ELECTRON_RUN_AS_NODE` before it launches Electron. Database tools
-  may set that variable in their own process without breaking a later `make dev` run.
 - `make e2e` refuses to start while `make dev` owns the Electron development output. Renderer E2E
   stays compatible with both. The rejection names the conflicting workflow and holder.
-- The renderer dev server may bind IPv6 localhost. The allocator checks both IPv4 and IPv6 before
-  assigning every port in a bundle.
 - The window is frameless. The window controls are custom DOM, not OS chrome.
 - The renderer holds state in Angular signals. After a click, wait for stability before you
   evaluate, or you read the pre-update DOM.

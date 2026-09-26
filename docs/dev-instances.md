@@ -1,0 +1,76 @@
+# Development instances
+
+Each Git worktree has one development instance. The instance manager gives it a stable endpoint
+bundle with a renderer port, Electron CDP port, and Node inspector port. Slot zero uses 4200, 9222,
+and 5858. Later slots offset all three ports together. If any port in a slot is busy, the manager
+tries the next complete slot. Debug endpoints listen on loopback.
+
+The manager stores a manifest at `.release-maestro-instance.json` in the worktree and a locked,
+user-scoped registry under the home directory. The manifest holds a generated worktree ID and a
+copy of its bundle. The registry owns the allocation. A branch change keeps the ID. A new worktree
+at an old path gets a new ID. The manager uses only the Node standard library, so allocation,
+status, recovery, and hooks work before `make install`.
+
+## Commands
+
+Run these from the worktree whose instance you want to manage.
+
+| Command                       | Action                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------ |
+| `make dev`                    | Build the host sidecar and start the renderer and Electron under one supervisor.           |
+| `make dev-allocate`           | Reserve a stable bundle without starting the app. Reuses an existing allocation.           |
+| `make dev-status`             | Show this worktree's bundle, slot, holders, claims, age, and health. `JSON=1` prints JSON. |
+| `make dev-list`               | Show all registered development and verification instances. `JSON=1` prints JSON.          |
+| `make dev-release`            | Release an idle allocation now. Refuses while holders are live.                            |
+| `make dev-reallocate`         | Give an idle instance a new bundle after a port conflict or a manual override.             |
+| `make dev-stop`               | Stop validated processes owned by this worktree, including stuck MCP wrappers.             |
+| `make dev-log`                | Read lifecycle events. `FOLLOW=1` follows; `JSON=1` prints JSON Lines.                     |
+| `make dev-instance-self-test` | Start two temporary worktrees and verify independent stacks and shutdown.                  |
+
+Set all three ports together for a manual bundle:
+
+```bash
+RELEASE_MAESTRO_RENDERER_PORT=4300 \
+RELEASE_MAESTRO_CDP_PORT=9300 \
+RELEASE_MAESTRO_INSPECTOR_PORT=5900 \
+make dev-reallocate
+```
+
+`RELEASE_MAESTRO_APP_DATA_DIR` selects a different writable app-data directory. Active worktrees
+cannot claim the same canonical directory. Use a distinct directory for each worktree.
+
+## Lifecycle and claims
+
+An allocation starts **reserved**. A holder is a concrete process using it, such as the dev
+supervisor or an MCP wrapper. The allocation is **active** while at least one holder remains. After
+the last holder leaves, it is **inactive** for a 20-minute grace period, then **expired** and
+available for reclamation. An absent registry allocation with a local manifest is **reclaimable**.
+The manager checks process start identity as well as PID before accepting a holder. A clean
+SessionEnd hook requests release when idle; `/clear` keeps the session's allocation. Hooks are
+advisory, so normal commands also reconcile dead holders and expired allocations.
+
+Set `RELEASE_MAESTRO_INSTANCE_GRACE_MS` in the environment of instance-manager commands to change
+the grace period in milliseconds. `0` releases an inactive allocation at the next reconciliation.
+`RELEASE_MAESTRO_STARTUP_TIMEOUT_MS` sets the renderer and Electron startup deadline. The default
+is ten minutes; a child exit fails startup immediately.
+
+A claim names a mutable resource held by a workflow. `make dev` and Electron E2E both use the
+Electron development build, so the manager rejects that overlap in one worktree. Electron E2E and
+renderer E2E can run together. Two copies of the same mutating E2E target cannot. E2E workflows
+get transient bundles, which are released when their commands exit. MCP wrappers share their
+worktree's stable development bundle and may run before `make dev`.
+
+## Recovery
+
+Use `make dev-status` to find the holder and port, then `make dev-log` for the event that caused a
+failure. `make dev-list` helps when another worktree owns the resource. If an unrelated process
+took a persisted port, stop your dev stack and MCP clients, then run `make dev-reallocate`.
+`make dev-stop` is the manual resort for stuck processes in agent terminals. It checks both
+worktree ownership and process start identity before signaling them. `make dev-release` only
+changes allocation state and never kills a process. `FORCE=1 make dev-release` can discard corrupt
+ownership metadata, but still refuses live holders.
+
+The registry and manifest are versioned. The manager quarantines malformed state and repairs
+missing registries, stale locks, and dead holders while preserving live processes. Its central
+JSONL log rotates at about 5 MiB with three retained files. It records lifecycle events, ports,
+holder identity, and conflict reasons, without application output or full command arguments.

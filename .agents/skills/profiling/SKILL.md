@@ -49,7 +49,8 @@ Run the repository helper, then exercise the app during its sampling window:
 node apps/maestro-electron/tools/profile-main-process.cjs 15
 ```
 
-It reads the current worktree manifest, connects to its inspector port, and prints the hottest
+Run it from the repository root. It calls `cli.mjs dev-status --json` from the current directory,
+connects to that worktree's inspector port, and prints the hottest
 sampled leaf frames as bounded JSON. The helper uses raw CDP but owns request deadlines, socket
 cleanup, and output bounds. Reach that port directly when you need an inspector command it does not expose; raw CDP remains the
 zero-dependency floor. `HeapProfiler.enable` and `HeapProfiler.takeHeapSnapshot` answer main-process
