@@ -1311,6 +1311,30 @@ test('a later registry command completes a delayed worktree removal', async () =
     assert.equal(registry.allocations[allocation.worktreeId], undefined)
 })
 
+test('pending removal releases a checkout replaced at the same path', async () => {
+    const fixture = await createFixture()
+    const original = runJson(fixture, fixture.main, ['dev-allocate'])
+    const request = spawnSync(
+        process.execPath,
+        [
+            '--input-type=module',
+            '-e',
+            `import { requestRemovedWorktreeRelease } from ${JSON.stringify(coreModule)}
+             await requestRemovedWorktreeRelease(${JSON.stringify(fixture.main)}, ${JSON.stringify(original.worktreeId)})`,
+        ],
+        { cwd: fixture.main, env: environmentFor(fixture), encoding: 'utf8' },
+    )
+    assert.equal(request.status, 0, request.stderr)
+    await rename(join(fixture.main, '.git'), join(fixture.base, 'old-git'))
+    git(fixture.main, ['init', '-q'])
+
+    const replacement = runJson(fixture, fixture.main, ['dev-allocate'])
+    assert.notEqual(replacement.worktreeId, original.worktreeId)
+    assert.deepEqual(replacement.bundle, original.bundle)
+    const registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.equal(registry.allocations[original.worktreeId], undefined)
+})
+
 test('a delayed removal for an old path keeps the allocation at its current path', async () => {
     const fixture = await createFixture()
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])

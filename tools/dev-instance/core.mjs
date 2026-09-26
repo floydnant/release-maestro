@@ -31,18 +31,6 @@ const retainedLogs = 3
  *   processGroup?: boolean
  * }} ProcessHolder
  */
-/**
- * The state is derived from holders and time, so contradictory stored flags cannot exist.
- * @typedef {
- *   | {kind: 'unallocated'}
- *   | {kind: 'reserved'}
- *   | {kind: 'active', holders: [ProcessHolder, ...ProcessHolder[]]}
- *   | {kind: 'inactive', inactiveSince: string, expiresAt: string}
- *   | {kind: 'expired'}
- *   | {kind: 'reclaimable'}
- * } DevelopmentAllocationState
- */
-
 const sleep = ms => new Promise(done => setTimeout(done, ms))
 const iso = value => new Date(value).toISOString()
 const nowMs = () => Date.now()
@@ -88,11 +76,15 @@ const runGit = (cwd, args) => {
     return result.stdout.trim()
 }
 
+const worktreeIdentityAt = async root => {
+    const gitEntry = await stat(join(root, '.git'))
+    return `${gitEntry.dev}:${gitEntry.ino}:${gitEntry.birthtimeMs}`
+}
+
 export const resolveWorktree = async (cwd = process.cwd()) => {
     const root = await realpath(runGit(cwd, ['rev-parse', '--show-toplevel']))
     const branch = runGit(root, ['branch', '--show-current']) || '(detached)'
-    const gitEntry = await stat(join(root, '.git'))
-    const identity = `${gitEntry.dev}:${gitEntry.ino}:${gitEntry.birthtimeMs}`
+    const identity = await worktreeIdentityAt(root)
     return { root, branch, identity, manifestPath: join(root, manifestName) }
 }
 
@@ -844,6 +836,18 @@ const assertClaimsAvailable = (registry, claims, worktreeId, allowedWorkflow = n
     if (conflict) throw new InstanceError(describeConflict(conflict), 'RESOURCE_CONFLICT')
 }
 
+const pendingRemovalFinished = async allocation => {
+    if (!allocation.releaseWhenRemoved) return false
+    if (!existsSync(allocation.path)) return true
+    if (!allocation.worktreeIdentity) return false
+    try {
+        return (await worktreeIdentityAt(allocation.path)) !== allocation.worktreeIdentity
+    } catch (error) {
+        if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') return true
+        throw error
+    }
+}
+
 const reconcileRegistry = async (registry, at = nowMs(), graceMs = configuredGraceMs()) => {
     const processIdentities =
         process.platform === 'darwin'
@@ -854,7 +858,7 @@ const reconcileRegistry = async (registry, at = nowMs(), graceMs = configuredGra
             ? processIdentities.get(holder.pid) === holder.startIdentity
             : holderIsLive(holder)
     for (const allocation of Object.values(registry.allocations)) {
-        if (allocation.releaseWhenRemoved && !existsSync(allocation.path)) {
+        if (await pendingRemovalFinished(allocation)) {
             allocation.releaseWhenIdle = true
         }
         const hadDevelopmentHolder = allocation.holders.some(isDevelopmentHolder)
