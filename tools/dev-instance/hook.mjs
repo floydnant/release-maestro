@@ -31,6 +31,7 @@ const handleHook = async () => {
             await reconcileInstances(payload.source)
             return
         case 'SessionEnd':
+            if (payload.reason === 'clear') return
             await releaseDevelopment({ requestWhenIdle: true })
             return
         case 'WorktreeRemove': {

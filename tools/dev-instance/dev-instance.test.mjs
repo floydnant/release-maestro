@@ -593,6 +593,26 @@ test('several MCP sessions share one allocation and release-when-idle waits for 
     assert.equal(released.state, 'reclaimable')
 })
 
+test('Claude clear keeps an idle allocation for the continuing session', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    for (const payload of [
+        { hook_event_name: 'SessionEnd', reason: 'clear' },
+        { hook_event_name: 'SessionStart', source: 'clear' },
+    ]) {
+        const result = spawnSync(process.execPath, [hook], {
+            cwd: fixture.main,
+            env: environmentFor(fixture),
+            input: JSON.stringify({ ...payload, cwd: fixture.main }),
+            encoding: 'utf8',
+        })
+        assert.equal(result.status, 0, result.stderr)
+    }
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(status.worktreeId, allocation.worktreeId)
+    assert.equal(status.state, 'reserved')
+})
+
 test('Claude WorktreeRemove releases only after the directory is gone', async () => {
     const fixture = await createFixture()
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
