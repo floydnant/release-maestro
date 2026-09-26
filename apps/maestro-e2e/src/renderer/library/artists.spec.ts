@@ -81,6 +81,10 @@ test('artist detail has four distinct sections', async ({ page }) => {
         'href',
         'https://musicbrainz.org/artist/some-id',
     )
+    const musicBrainz = page.getByRole('link', { name: /MusicBrainz.*opens in new tab/ })
+    await expect(musicBrainz).toHaveAttribute('target', '_blank')
+    await expect(musicBrainz.locator('app-icon')).toHaveAttribute('name', 'externalLink')
+    await expect(page.locator('.artist-detail__stats')).toContainText('2019–2021')
     await expect(
         page.getByRole('grid', { name: 'Albums' }).getByRole('link', { name: /^Daybreak/ }),
     ).toBeVisible()
@@ -168,12 +172,22 @@ test('an artist with tracks but no own albums opens on All tracks', async ({ pag
                     recordLabelCount: 0,
                 },
             })
+            .handler('library:query-albums', {
+                kind: 'resolve',
+                value: { rows: [], offset: 0, total: 0 },
+            })
             .build(),
         '/artists/compound',
     )
     await expect(page.getByRole('heading', { name: 'Night Cartel & Aurora Fields' })).toBeVisible()
     await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'All tracks 1' })).toHaveAttribute('aria-current', 'page')
+    await page.getByRole('link', { name: 'Albums 0' }).click()
+    await expect(page).toHaveURL(/\/artists\/compound\?section=albums$/)
+    await expect(page.getByRole('link', { name: 'Albums 0' })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByText('No albums linked to this artist')).toBeVisible()
+    await page.getByRole('link', { name: 'All tracks 1' }).click()
+    await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()
 })
 
 test('record-label navigation keeps the artist filter', async ({ page }) => {

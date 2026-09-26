@@ -6,6 +6,7 @@ import { catchError, defer, map, merge, of, startWith, Subject, switchMap } from
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
 import { TabBarComponent, type Tab } from '../../shared/components/tab-bar/tab-bar.component'
+import { IconComponent } from '../../shared/components/icon/icon.component'
 import { ArtistAlbumsComponent } from './artist-albums.component'
 import { ArtistSongsComponent } from './artist-songs.component'
 import { ArtistRecordLabelsComponent } from './artist-record-labels.component'
@@ -13,6 +14,7 @@ import { ArtistRecordLabelsComponent } from './artist-record-labels.component'
 type ArtistSection = 'albums' | 'songs' | 'recordLabels' | 'appearsOn'
 type DetailState = { status: 'ready'; artist: ArtistDetail } | { status: 'loading' | 'missing' | 'error' }
 const LOADING: DetailState = { status: 'loading' }
+const ALBUMS = { section: 'albums' }
 const SONGS = { section: 'songs' }
 const LABELS = { section: 'recordLabels' }
 const APPEARS = { section: 'appearsOn' }
@@ -64,6 +66,7 @@ const externalLinks = (artist: ArtistDetail): { label: string; url: string }[] =
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         RouterLink,
+        IconComponent,
         TabBarComponent,
         ArtistAlbumsComponent,
         ArtistSongsComponent,
@@ -101,7 +104,14 @@ export class ArtistDetailComponent {
     )
     protected section = computed<ArtistSection>(() => {
         const section = this.params()?.get('section')
-        if (section == 'songs' || section == 'recordLabels' || section == 'appearsOn') return section
+        if (
+            section == 'albums' ||
+            section == 'songs' ||
+            section == 'recordLabels' ||
+            section == 'appearsOn'
+        ) {
+            return section
+        }
         const state = this.detail()
         return state.status == 'ready' && state.artist.albumCount == 0 && state.artist.songCount > 0
             ? 'songs'
@@ -122,7 +132,7 @@ export class ArtistDetailComponent {
         if (state.status != 'ready') return []
         const artist = state.artist
         return [
-            { key: 'albums', label: 'Albums', count: artist.albumCount },
+            { key: 'albums', label: 'Albums', count: artist.albumCount, queryParams: ALBUMS },
             { key: 'songs', label: 'All tracks', count: artist.songCount, queryParams: SONGS },
             {
                 key: 'recordLabels',
