@@ -49,8 +49,9 @@ The manager checks process start identity as well as PID before accepting a hold
 SessionEnd hook requests release when idle; `/clear` keeps the session's allocation. Hooks are
 advisory, so normal commands also reconcile dead holders and expired allocations.
 
-Set `RELEASE_MAESTRO_INSTANCE_GRACE_MS` in the environment of instance-manager commands to change
-the grace period in milliseconds. `0` releases an inactive allocation at the next reconciliation.
+Set `graceMs` in `~/.release-maestro/dev-instances/settings.json` to change the grace period for
+all worktrees, for example `{ "graceMs": 600000 }`. `RELEASE_MAESTRO_INSTANCE_GRACE_MS` overrides
+the setting for one command. `0` releases an inactive allocation at the next reconciliation.
 `RELEASE_MAESTRO_STARTUP_TIMEOUT_MS` sets the renderer and Electron startup deadline. The default
 is ten minutes; a child exit fails startup immediately.
 

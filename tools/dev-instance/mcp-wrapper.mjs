@@ -4,7 +4,6 @@ import {
     bundleEnvironment,
     registerDevelopmentHolder,
     removeDevelopmentHolder,
-    signalProcessTree,
     stopProcessTree,
     spawnPackageBinary,
     startHeartbeat,
@@ -53,7 +52,7 @@ try {
     child = spawnPackageBinary(binary, binaryArgs, {
         env: { ...process.env, ...bundleEnvironment(allocation.bundle, allocation.appDataPath) },
     })
-    if (pendingSignal) signalProcessTree(child.pid, pendingSignal, child.releaseMaestroStartIdentity)
+    if (pendingSignal) void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
     stopHeartbeat = startHeartbeat(() => heartbeatDevelopmentHolder(holder.id))
     const { code, signal } = await new Promise((resolve, reject) => {
         child.once('exit', (code, signal) => resolve({ code, signal }))

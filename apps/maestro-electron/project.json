@@ -43,6 +43,7 @@
             "options": {
                 "buildTarget": "maestro-electron:build-app",
                 "remoteDebuggingPort": 9222,
+                "args": ["--remote-debugging-address=127.0.0.1"],
                 "inspect": "inspect",
                 "port": 5858
             }

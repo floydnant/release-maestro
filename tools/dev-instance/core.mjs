@@ -74,6 +74,7 @@ export const getStatePaths = () => {
         registryBackup: join(root, 'registry.backup.json'),
         lock: join(root, 'registry.lock'),
         log: join(root, 'orchestration.jsonl'),
+        settings: join(root, 'settings.json'),
     }
 }
 
@@ -292,7 +293,7 @@ export const stopProcessGroup = async (rootPid, expectedStartIdentity) => {
         }
     }
     if (!signalGroup('SIGTERM')) return
-    const deadline = nowMs() + 5_000
+    const deadline = nowMs() + 250
     while (nowMs() < deadline) {
         try {
             process.kill(-rootPid, 0)
@@ -626,11 +627,15 @@ const canonicalizePath = async path => {
     for (;;) {
         try {
             const existing = await realpath(cursor)
-            return join(existing, ...tail.reverse())
+            const canonical = join(existing, ...tail.reverse())
+            return process.platform === 'win32' ? canonical.toLowerCase() : canonical
         } catch (error) {
             if (error?.code !== 'ENOENT') throw error
             const parent = dirname(cursor)
-            if (parent === cursor) return resolve(path)
+            if (parent === cursor) {
+                const canonical = resolve(path)
+                return process.platform === 'win32' ? canonical.toLowerCase() : canonical
+            }
             tail.push(basename(cursor))
             cursor = parent
         }
@@ -653,7 +658,10 @@ const holdersHealth = holders =>
 
 const describeDevelopmentAllocation = allocation => ({
     ...allocation,
-    state: allocationState(allocation),
+    state: allocationState(allocation, nowMs(), configuredGraceMs()),
+    ...(allocation.inactiveSince
+        ? { expiresAt: iso(Date.parse(allocation.inactiveSince) + configuredGraceMs()) }
+        : {}),
     health: holdersHealth(allocation.holders),
     ageMs: nowMs() - Date.parse(allocation.createdAt),
     slot: developmentSlot(allocation.bundle),
@@ -757,11 +765,31 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
 }
 
 const configuredGraceMs = () => {
-    const value = process.env['RELEASE_MAESTRO_INSTANCE_GRACE_MS']
+    let value = process.env['RELEASE_MAESTRO_INSTANCE_GRACE_MS']
+    if (value === undefined) {
+        const settingsPath = getStatePaths().settings
+        if (existsSync(settingsPath)) {
+            let settings
+            try {
+                settings = JSON.parse(readFileSync(settingsPath, 'utf8'))
+            } catch {
+                throw new InstanceError(`${settingsPath} must contain valid JSON`, 'INVALID_CONFIG')
+            }
+            if (!isRecord(settings) || Object.keys(settings).some(key => key !== 'graceMs')) {
+                throw new InstanceError(`${settingsPath} must contain only graceMs`, 'INVALID_CONFIG')
+            }
+            value = settings.graceMs
+        }
+    }
     if (value === undefined) return defaultGraceMs
     const parsed = Number(value)
-    if (!Number.isSafeInteger(parsed) || parsed < 0) {
-        throw new InstanceError('RELEASE_MAESTRO_INSTANCE_GRACE_MS must be a non-negative integer')
+    if (
+        !['string', 'number'].includes(typeof value) ||
+        (typeof value === 'string' && !/^\d+$/.test(value)) ||
+        !Number.isSafeInteger(parsed) ||
+        parsed < 0
+    ) {
+        throw new InstanceError('graceMs must be a non-negative integer', 'INVALID_CONFIG')
     }
     return parsed
 }
@@ -841,11 +869,16 @@ const canBind = (port, host) =>
         const server = net.createServer()
         server.unref()
         server.once('error', error => resolvePromise(error?.code === 'EADDRNOTAVAIL'))
-        server.listen({ port, host, exclusive: true }, () => server.close(() => resolvePromise(true)))
+        server.listen({ port, host, exclusive: true, ipv6Only: host.includes(':') }, () =>
+            server.close(() => resolvePromise(true)),
+        )
     })
 
 export const portIsAvailable = async port =>
-    (await canBind(port, '127.0.0.1')) && (await canBind(port, '::1'))
+    (await canBind(port, '127.0.0.1')) &&
+    (await canBind(port, '::1')) &&
+    (await canBind(port, '0.0.0.0')) &&
+    (await canBind(port, '::'))
 
 const bundleIsAvailable = async bundle => {
     for (const port of Object.values(bundle)) {
@@ -1014,7 +1047,10 @@ const newHolder = async (
 const allocationForManifest = (registry, manifest, worktree, rejectCopied = true) => {
     const allocation = manifest ? registry.allocations[manifest.worktreeId] : null
     if (!allocation) return null
-    if (allocation.path === worktree.root || (!existsSync(allocation.path) && allocation.holders.length === 0)) {
+    if (
+        allocation.path === worktree.root ||
+        (!existsSync(allocation.path) && allocation.holders.length === 0)
+    ) {
         return allocation
     }
     if (rejectCopied) {
@@ -1042,7 +1078,13 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
             : persisted
               ? randomUUID()
               : (manifestId ?? randomUUID())
-        const appDataPath = existing && !hasAppDataOverride ? existing.appDataPath : requestedAppDataPath
+        const oldDefaultAppDataPath = existing
+            ? await canonicalizePath(join(existing.path, '.app-data.dev'))
+            : null
+        const appDataPath =
+            existing && !hasAppDataOverride && existing.appDataPath !== oldDefaultAppDataPath
+                ? existing.appDataPath
+                : requestedAppDataPath
         const appDataClaim = `app-data:${appDataPath}`
         if (existing?.holders.length && hasAppDataOverride && existing.appDataPath !== requestedAppDataPath) {
             throw new InstanceError(
@@ -1052,7 +1094,12 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
         }
         assertClaimsAvailable(registry, [appDataClaim], worktreeId, 'dev')
 
-        if (existing && !reallocate) {
+        const requestedBundle = manualBundle()
+        const bundleChanged =
+            requestedBundle &&
+            existing &&
+            Object.keys(requestedBundle).some(key => requestedBundle[key] !== existing.bundle[key])
+        if (existing && !reallocate && !bundleChanged) {
             existing.path = worktree.root
             existing.branch = worktree.branch
             existing.appDataPath = appDataPath
@@ -1075,7 +1122,6 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
                 'LIVE_HOLDERS',
             )
         }
-        const requestedBundle = manualBundle()
         const bundle = await allocateBundle(
             registry,
             requestedBundle,
@@ -1532,7 +1578,10 @@ export const spawnPackageBinary = (binary, args, options = {}) => {
         .split(delimiter)
         .some(directory => executableNames.some(name => existsSync(join(directory, name))))
     if (!available) {
-        throw new InstanceError('pnpm is unavailable. Install pnpm or set RELEASE_MAESTRO_PNPM_COMMAND.', 'PNPM_NOT_FOUND')
+        throw new InstanceError(
+            'pnpm is unavailable. Install pnpm or set RELEASE_MAESTRO_PNPM_COMMAND.',
+            'PNPM_NOT_FOUND',
+        )
     }
     return spawnManaged('pnpm', ['exec', binary, ...args], options)
 }
@@ -1644,7 +1693,7 @@ export const followLog = async ({ follow = false, json = false, color = false } 
 }
 
 export const releaseRemovedWorktree = async (worktreePath, worktreeId = null) => {
-    const canonical = resolve(worktreePath)
+    const canonical = await canonicalizePath(worktreePath)
     if (existsSync(canonical)) return { released: false, reason: 'worktree-still-exists' }
     return withRegistry(async (registry, paths) => {
         const match = Object.values(registry.allocations).find(

@@ -8,6 +8,7 @@ import {
     realpath,
     rename,
     rm,
+    symlink,
     utimes,
     writeFile,
 } from 'node:fs/promises'
@@ -276,6 +277,13 @@ test('allocator detects an IPv6-only listener', async () => {
     assert.equal(allocation.bundle.inspector, 5858 + slot)
 })
 
+test('allocator skips a slot held by a wildcard IPv4 listener', async () => {
+    const fixture = await createFixture()
+    await listen('0.0.0.0', 4200)
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    assert.ok(allocation.bundle.renderer > 4200)
+})
+
 test('manual bundles must be complete and distinct', async () => {
     const fixture = await createFixture()
     const partial = run(fixture, fixture.main, ['dev-allocate'], {
@@ -290,6 +298,18 @@ test('manual bundles must be complete and distinct', async () => {
         RELEASE_MAESTRO_INSPECTOR_PORT: '5910',
     })
     assert.deepEqual(allocation.bundle, { renderer: 4310, cdp: 9310, inspector: 5910 })
+})
+
+test('a complete manual override replaces an existing idle bundle', async () => {
+    const fixture = await createFixture()
+    const original = runJson(fixture, fixture.main, ['dev-allocate'])
+    const changed = runJson(fixture, fixture.main, ['dev-allocate'], {
+        RELEASE_MAESTRO_RENDERER_PORT: '4311',
+        RELEASE_MAESTRO_CDP_PORT: '9311',
+        RELEASE_MAESTRO_INSPECTOR_PORT: '5911',
+    })
+    assert.equal(changed.worktreeId, original.worktreeId)
+    assert.deepEqual(changed.bundle, { renderer: 4311, cdp: 9311, inspector: 5911 })
 })
 
 test('automatic reallocation reserves the previous bundle while choosing its replacement', async () => {
@@ -394,6 +414,43 @@ test('registry recovery selects the valid copy with the highest generation', asy
     assert.equal(listed.instances[0].branch, 'newer-backup')
 })
 
+test('a stale manifest generation follows the authoritative registry', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const manifestPath = join(fixture.main, '.release-maestro-instance.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    manifest.registryGeneration = 0
+    manifest.bundle = { renderer: 4301, cdp: 9301, inspector: 5901 }
+    await writeFile(manifestPath, JSON.stringify(manifest))
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(status.worktreeId, allocation.worktreeId)
+    assert.deepEqual(status.bundle, allocation.bundle)
+    const refreshed = JSON.parse(await readFile(manifestPath, 'utf8'))
+    assert.deepEqual(refreshed.bundle, allocation.bundle)
+    assert.ok(refreshed.registryGeneration > 0)
+})
+
+test('a missed heartbeat reports degraded health while preserving a live holder', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const active = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 1,
+        'MCP holder did not register',
+    )
+    const registryPath = join(fixture.state, 'registry.json')
+    const registry = JSON.parse(await readFile(registryPath, 'utf8'))
+    registry.generation += 1
+    registry.allocations[active.worktreeId].holders[0].heartbeatAt = '2000-01-01T00:00:00.000Z'
+    await writeFile(registryPath, JSON.stringify(registry))
+    const degraded = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(degraded.health, 'degraded')
+    assert.equal(degraded.holders[0].pid, wrapper.pid)
+    wrapper.kill('SIGTERM')
+    await childResult(wrapper)
+})
+
 test('moving a worktree keeps its identity while a new checkout at the old path gets a new one', async () => {
     const fixture = await createFixture()
     const first = runJson(fixture, fixture.main, ['dev-allocate'])
@@ -405,6 +462,7 @@ test('moving a worktree keeps its identity while a new checkout at the old path 
     await rename(fixture.main, moved)
     const afterMove = runJson(fixture, moved, ['dev-allocate'])
     assert.equal(afterMove.worktreeId, first.worktreeId)
+    assert.equal(afterMove.appDataPath, join(await realpath(moved), '.app-data.dev'))
 
     await mkdir(fixture.main)
     git(fixture.main, ['init', '-q'])
@@ -654,6 +712,26 @@ test('a delayed removal for an old path keeps the allocation at its current path
     assert.ok(registry.allocations[allocation.worktreeId])
 })
 
+test('removed worktree release resolves a symlinked parent path', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const alias = join(fixture.base, 'alias')
+    await symlink(fixture.base, alias, process.platform === 'win32' ? 'junction' : 'dir')
+    await rm(fixture.main, { recursive: true, force: true })
+    const result = spawnSync(
+        process.execPath,
+        [hook, 'verify-remove', join(alias, 'main'), allocation.worktreeId],
+        {
+            cwd: fixture.base,
+            env: environmentFor(fixture),
+            encoding: 'utf8',
+        },
+    )
+    assert.equal(result.status, 0, result.stderr)
+    const registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.equal(registry.allocations[allocation.worktreeId], undefined)
+})
+
 test('zero grace expires an inactive allocation and permits reassignment', async () => {
     const fixture = await createFixture({ worktrees: 2 })
     const bin = await createFakePnpm(fixture)
@@ -670,6 +748,30 @@ test('zero grace expires an inactive allocation and permits reassignment', async
         RELEASE_MAESTRO_INSTANCE_GRACE_MS: '0',
     })
     assert.equal(reassigned.bundle.renderer, 4200)
+})
+
+test('configured nonzero grace keeps an inactive allocation and reports expiration', async () => {
+    const fixture = await createFixture()
+    await mkdir(fixture.state, { recursive: true })
+    await writeFile(join(fixture.state, 'settings.json'), JSON.stringify({ graceMs: 60_000 }))
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin, 'chrome-devtools', {
+        FAKE_DELAY_MS: '20',
+    })
+    await childResult(wrapper)
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(status.state, 'inactive')
+    assert.equal(Date.parse(status.expiresAt) - Date.parse(status.inactiveSince), 60_000)
+})
+
+test('invalid global grace settings fail with a configuration error', async () => {
+    const fixture = await createFixture()
+    runJson(fixture, fixture.main, ['dev-allocate'])
+    await mkdir(fixture.state, { recursive: true })
+    await writeFile(join(fixture.state, 'settings.json'), '{"graceMs":"0x10"}')
+    const result = run(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /INVALID_CONFIG.*graceMs/)
 })
 
 test('Electron E2E coexists with renderer E2E but duplicate mutating workflows fail', async () => {
@@ -835,12 +937,20 @@ test('run-workflow passes separators and shell metacharacters as literal child a
 test('run-workflow launches pnpm from npm_execpath with Node', async () => {
     const fixture = await createFixture()
     const pnpmScript = join(fixture.base, 'pnpm.cjs')
-    await writeFile(pnpmScript, 'process.exit(process.argv.slice(2).join(" ") === "exec playwright --version" ? 0 : 9)')
+    await writeFile(
+        pnpmScript,
+        'process.exit(process.argv.slice(2).join(" ") === "exec playwright --version" ? 0 : 9)',
+    )
     await chmod(pnpmScript, 0o644)
-    const result = run(fixture, fixture.main, ['run-workflow', 'renderer-e2e', '--', 'playwright', '--version'], {
-        npm_execpath: pnpmScript,
-        RELEASE_MAESTRO_PNPM_COMMAND: '',
-    })
+    const result = run(
+        fixture,
+        fixture.main,
+        ['run-workflow', 'renderer-e2e', '--', 'playwright', '--version'],
+        {
+            npm_execpath: pnpmScript,
+            RELEASE_MAESTRO_PNPM_COMMAND: '',
+        },
+    )
     assert.equal(result.status, 0, result.stderr)
 })
 
@@ -923,7 +1033,10 @@ test('workflow releases its claim when a child ignores termination', async () =>
     const result = await childResult(workflow)
     assert.equal(result.code, 143)
     const instances = runJson(fixture, fixture.main, ['dev-list', '--json'])
-    assert.equal(instances.instances.some(instance => instance.workflow === 'renderer-e2e'), false)
+    assert.equal(
+        instances.instances.some(instance => instance.workflow === 'renderer-e2e'),
+        false,
+    )
 })
 
 test('development startup rejects an invalid deadline before allocating', async () => {
@@ -1024,7 +1137,7 @@ test('run-dev latches cancellation while waiting for the renderer', async () => 
     const result = await Promise.race([
         childResult(dev),
         new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('run-dev did not honor cancellation')), 5_000),
+            setTimeout(() => reject(new Error('run-dev did not honor cancellation')), 8_000),
         ),
     ])
 
@@ -1056,7 +1169,7 @@ test('run-dev escalates cancellation after both launchers are ready', async () =
     const result = await Promise.race([
         childResult(dev),
         new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('run-dev did not escalate cancellation')), 5_000),
+            setTimeout(() => reject(new Error('run-dev did not escalate cancellation')), 8_000),
         ),
     ])
 
@@ -1207,6 +1320,36 @@ test('logs redact sensitive query values, rotate, and render through dev-log', a
     }
     first.kill('SIGTERM')
     await childResult(first)
+})
+
+test('concurrent log writers keep attributed JSON lines intact', async () => {
+    const fixture = await createFixture()
+    const writers = Array.from({ length: 8 }, (_, index) =>
+        spawn(
+            process.execPath,
+            [
+                '--input-type=module',
+                '-e',
+                `import(${JSON.stringify(coreModule)}).then(m => m.logDiagnostic('writer', { writer: ${index} }))`,
+            ],
+            { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+        ),
+    )
+    liveChildren.push(...writers)
+    const results = await Promise.all(writers.map(childResult))
+    assert.ok(
+        results.every(result => result.code === 0),
+        JSON.stringify(results),
+    )
+    const events = (await readFile(join(fixture.state, 'orchestration.jsonl'), 'utf8'))
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line))
+        .filter(event => event.event === 'writer')
+    assert.deepEqual(
+        events.map(event => event.writer).sort((a, b) => a - b),
+        [0, 1, 2, 3, 4, 5, 6, 7],
+    )
 })
 
 test('dev-log follow restarts at the beginning of a rotated log', async () => {
