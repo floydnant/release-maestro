@@ -92,7 +92,7 @@ test.describe('startup scan summary', () => {
         const controller = await createRendererScenario(page, scenario, '/home')
 
         await expect(page.locator('.scan-indicator')).toContainText('Reading')
-        await expect(page.getByRole('status')).toHaveCount(0)
+        await expect(page.getByRole('status')).toBeEmpty()
         await controller.emit('library:scan-status', { status: completed, newAlbums: [] })
         await expect(page.getByRole('status')).toHaveText('Added 1 track')
     })

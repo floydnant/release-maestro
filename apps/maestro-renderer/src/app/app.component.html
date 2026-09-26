@@ -169,72 +169,80 @@
         >
             <div class="title-bar__drag-region | flex min-w-0 flex-1 items-center justify-start">
                 @if (scanIndicator(); as scan) {
-                    <p
-                        class="scan-indicator | type-body-sm flex items-center gap-1 px-2"
-                        [class.text-content-success]="
-                            scan.phase === 'completed' &&
-                            scan.failedFiles === 0 &&
-                            (scan.newSongs > 0 || scan.changedSongs > 0)
-                        "
-                        [class.text-content-secondary]="
-                            scan.phase !== 'completed' ||
-                            (scan.failedFiles === 0 && scan.newSongs === 0 && scan.changedSongs === 0)
-                        "
-                        [class.text-content-danger]="scan.phase === 'completed' && scan.failedFiles > 0"
-                        [attr.role]="scan.phase === 'completed' ? 'status' : null"
-                    >
-                        @if (scan.phase === 'reading') {
-                            <app-progress-ring
-                                mode="progress"
-                                [diameter]="25"
-                                [strokeWidth]="2.5"
-                                color="content.success"
-                                bgColor="background.surface"
-                                [progress]="libraryScanPercent()"
-                            ></app-progress-ring>
-                        } @else if (scan.phase === 'discovering') {
-                            <app-progress-ring
-                                mode="spinning"
-                                [diameter]="25"
-                                [strokeWidth]="2.5"
-                                color="content.secondary"
-                                bgColor="background.surface"
-                            ></app-progress-ring>
-                        }
-
-                        @if (scan.phase === 'discovering') {
-                            Scanning library…
-                        } @else if (scan.phase === 'reading') {
-                            Reading
-                            <span class="font-mono">{{ scan.readDone }}/{{ scan.readTotal }}</span> tracks
-                            @if (scan.failedFiles > 0) {
-                                <span class="text-content-danger"
-                                    >· <span class="font-mono">{{ scan.failedFiles }}</span> Failed</span
-                                >
-                            }
-                        } @else if (scan.phase === 'completed') {
-                            @if (scan.failedFiles > 0) {
-                                <app-icon name="error" color="content.danger" size="16"></app-icon>
-                                Scan finished · {{ scan.failedFiles }}
-                                {{ scan.failedFiles === 1 ? 'track' : 'tracks' }} failed
-                            } @else if (scan.newSongs === 0 && scan.changedSongs === 0) {
-                                Nothing new
+                    @if (scan.phase !== 'completed') {
+                        <p
+                            class="scan-indicator | type-body-sm flex items-center gap-1 px-2 text-content-secondary"
+                        >
+                            @if (scan.phase === 'reading') {
+                                <app-progress-ring
+                                    mode="progress"
+                                    [diameter]="25"
+                                    [strokeWidth]="2.5"
+                                    color="content.success"
+                                    bgColor="background.surface"
+                                    [progress]="libraryScanPercent()"
+                                ></app-progress-ring>
                             } @else {
-                                <app-icon name="success" color="content.success" size="16"></app-icon>
-                                @if (scan.newSongs > 0) {
-                                    Added {{ scan.newSongs }} {{ scan.newSongs === 1 ? 'track' : 'tracks' }}
-                                }
-                                @if (scan.changedSongs > 0) {
-                                    @if (scan.newSongs > 0) {
-                                        ·
-                                    }
-                                    Updated {{ scan.changedSongs }}
-                                    {{ scan.changedSongs === 1 ? 'track' : 'tracks' }}
+                                <app-progress-ring
+                                    mode="spinning"
+                                    [diameter]="25"
+                                    [strokeWidth]="2.5"
+                                    color="content.secondary"
+                                    bgColor="background.surface"
+                                ></app-progress-ring>
+                            }
+
+                            @if (scan.phase === 'discovering') {
+                                Scanning library…
+                            } @else {
+                                Reading
+                                <span class="font-mono">{{ scan.readDone }}/{{ scan.readTotal }}</span> tracks
+                                @if (scan.failedFiles > 0) {
+                                    <span class="text-content-danger"
+                                        >· <span class="font-mono">{{ scan.failedFiles }}</span> Failed</span
+                                    >
                                 }
                             }
-                        }
-                    </p>
+                        </p>
+                    }
                 }
+                <p class="scan-summary | type-body-sm" role="status" aria-live="polite">
+                    @if (scanIndicator(); as scan) {
+                        @if (scan.phase === 'completed') {
+                            <span
+                                class="flex items-center gap-1 px-2"
+                                [class.text-content-success]="
+                                    scan.failedFiles === 0 && (scan.newSongs > 0 || scan.changedSongs > 0)
+                                "
+                                [class.text-content-secondary]="
+                                    scan.failedFiles === 0 && scan.newSongs === 0 && scan.changedSongs === 0
+                                "
+                                [class.text-content-danger]="scan.failedFiles > 0"
+                            >
+                                @if (scan.failedFiles > 0) {
+                                    <app-icon name="error" color="content.danger" size="16"></app-icon>
+                                    Scan finished · {{ scan.failedFiles }}
+                                    {{ scan.failedFiles === 1 ? 'track' : 'tracks' }} failed
+                                } @else if (scan.newSongs === 0 && scan.changedSongs === 0) {
+                                    Nothing new
+                                } @else {
+                                    <app-icon name="success" color="content.success" size="16"></app-icon>
+                                    @if (scan.newSongs > 0) {
+                                        Added {{ scan.newSongs }}
+                                        {{ scan.newSongs === 1 ? 'track' : 'tracks' }}
+                                    }
+                                    @if (scan.changedSongs > 0) {
+                                        @if (scan.newSongs > 0) {
+                                            ·
+                                        }
+                                        Updated {{ scan.changedSongs }}
+                                        {{ scan.changedSongs === 1 ? 'track' : 'tracks' }}
+                                    }
+                                }
+                            </span>
+                        }
+                    }
+                </p>
             </div>
 
             @if (isElectron && !isMacos) {
