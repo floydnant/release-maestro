@@ -1675,7 +1675,7 @@ $job = [ReleaseMaestro.Job]::CreateAndAssignCurrentProcess()
 $arguments = '"' + $env:RELEASE_MAESTRO_TREE_SCRIPT + '"'
 $child = Start-Process -FilePath $env:RELEASE_MAESTRO_TREE_NODE -ArgumentList $arguments -NoNewWindow -PassThru
 $child.WaitForExit()
-$exitCode = $child.ExitCode
+$exitCode = [ReleaseMaestro.Job]::ProcessExitCode($child.Handle)
 if ($env:RELEASE_MAESTRO_TREE_DEBUG -eq '1') {
     [Console]::Error.WriteLine("workflow tree: child exit=$exitCode active=$([ReleaseMaestro.Job]::ActiveProcessCount($job))")
 }

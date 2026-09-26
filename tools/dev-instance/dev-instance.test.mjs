@@ -90,6 +90,34 @@ const createFixture = async ({ worktrees = 1 } = {}) => {
     return { base, main, roots, state }
 }
 
+const createWindowsOrphanLauncher = async fixture => {
+    const grandchildPidPath = join(fixture.base, 'grandchild.pid')
+    const grandchildPath = join(fixture.base, 'grandchild.cjs')
+    const intermediaryPath = join(fixture.base, 'intermediary.cjs')
+    const launcherPath = join(fixture.base, 'launcher.cjs')
+    await writeFile(
+        grandchildPath,
+        `require('node:fs').writeFileSync(${JSON.stringify(grandchildPidPath)}, String(process.pid))
+setInterval(() => {}, 1000)
+`,
+    )
+    await writeFile(
+        intermediaryPath,
+        `const { spawn } = require('node:child_process')
+spawn(process.execPath, [${JSON.stringify(grandchildPath)}], { stdio: 'ignore' }).unref()
+`,
+    )
+    await writeFile(
+        launcherPath,
+        `const { spawn } = require('node:child_process')
+spawn(process.execPath, [${JSON.stringify(intermediaryPath)}], {
+    stdio: ['ignore', 'ignore', 'inherit'],
+})
+`,
+    )
+    return { launcherPath, grandchildPidPath }
+}
+
 const environmentFor = (fixture, extra = {}) => ({
     ...process.env,
     RELEASE_MAESTRO_INSTANCE_STATE_DIR: fixture.state,
@@ -1201,23 +1229,10 @@ test('run-workflow stops descendants left behind by a successful launcher', asyn
 test('Windows workflow keeps its claim until an orphaned grandchild exits', async () => {
     if (process.platform !== 'win32') return
     const fixture = await createFixture()
-    const grandchildPidPath = join(fixture.base, 'grandchild.pid')
-    const intermediary = `
-        const { writeFileSync } = require('node:fs')
-        const { spawn } = require('node:child_process')
-        const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
-        writeFileSync(${JSON.stringify(grandchildPidPath)}, String(grandchild.pid))
-        grandchild.unref()
-    `
-    const launcher = `
-        const { spawn } = require('node:child_process')
-        spawn(process.execPath, ['-e', ${JSON.stringify(intermediary)}], {
-            stdio: ['ignore', 'ignore', 'inherit'],
-        })
-    `
+    const { launcherPath, grandchildPidPath } = await createWindowsOrphanLauncher(fixture)
     const workflow = spawn(
         process.execPath,
-        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', launcher],
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, launcherPath],
         {
             cwd: fixture.main,
             env: environmentFor(fixture, { RELEASE_MAESTRO_TREE_DEBUG: '1' }),
@@ -1281,23 +1296,10 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
 test('Windows workflow cancellation kills an orphaned grandchild before releasing its claim', async () => {
     if (process.platform !== 'win32') return
     const fixture = await createFixture()
-    const grandchildPidPath = join(fixture.base, 'grandchild.pid')
-    const intermediary = `
-        const { writeFileSync } = require('node:fs')
-        const { spawn } = require('node:child_process')
-        const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
-        writeFileSync(${JSON.stringify(grandchildPidPath)}, String(grandchild.pid))
-        grandchild.unref()
-    `
-    const launcher = `
-        const { spawn } = require('node:child_process')
-        spawn(process.execPath, ['-e', ${JSON.stringify(intermediary)}], {
-            stdio: ['ignore', 'ignore', 'inherit'],
-        })
-    `
+    const { launcherPath, grandchildPidPath } = await createWindowsOrphanLauncher(fixture)
     const workflow = spawn(
         process.execPath,
-        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', launcher],
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, launcherPath],
         {
             cwd: fixture.main,
             env: environmentFor(fixture, { RELEASE_MAESTRO_TREE_DEBUG: '1' }),

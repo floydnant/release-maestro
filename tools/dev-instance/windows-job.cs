@@ -86,6 +86,9 @@ namespace ReleaseMaestro
         private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
 
         [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetExitCodeProcess(IntPtr process, out uint exitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr handle);
 
         public static IntPtr CreateAndAssignCurrentProcess()
@@ -136,6 +139,16 @@ namespace ReleaseMaestro
             if (state == 0) return true;
             if (state == 0x102) return false;
             throw new Win32Exception(Marshal.GetLastWin32Error(), "WaitForSingleObject failed");
+        }
+
+        public static uint ProcessExitCode(IntPtr process)
+        {
+            uint exitCode;
+            if (!GetExitCodeProcess(process, out exitCode))
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "GetExitCodeProcess failed");
+            if (exitCode == 259)
+                throw new InvalidOperationException("Workflow command is still running");
+            return exitCode;
         }
 
     }
