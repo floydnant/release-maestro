@@ -1,4 +1,4 @@
-.PHONY: dev serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: dev dev-allocate dev-release dev-reallocate dev-status dev-list dev-stop dev-recover dev-log dev-instance-self-test serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-tools test-tools-windows test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -8,7 +8,26 @@ PNPM := pnpm
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
-	$(PNPM) exec nx serve maestro-electron
+	RELEASE_MAESTRO_PNPM_COMMAND='$(PNPM)' $(PNPM) exec nx serve maestro-electron
+
+dev-allocate: ## Reserve this worktree's stable development ports
+	node tools/dev-instance/cli.mjs dev-allocate
+dev-release: ## Release this worktree's idle development allocation (FORCE=1 discards corrupt ownership metadata)
+	node tools/dev-instance/cli.mjs dev-release $(if $(FORCE),--force,)
+dev-reallocate: ## Replace this worktree's idle development port bundle
+	node tools/dev-instance/cli.mjs dev-reallocate
+dev-status: ## Show this worktree's development allocation and holders
+	node tools/dev-instance/cli.mjs dev-status $(if $(JSON),--json,)
+dev-list: ## Show development and verification instances across all worktrees
+	node tools/dev-instance/cli.mjs dev-list $(if $(JSON),--json,)
+dev-stop: ## Stop only validated processes owned by this worktree
+	node tools/dev-instance/cli.mjs dev-stop
+dev-recover: ## Clear the registry recovery marker after stopping live processes
+	node tools/dev-instance/cli.mjs dev-recover
+dev-log: ## Print orchestration events (FOLLOW=1 follows, JSON=1 emits JSONL)
+	node tools/dev-instance/cli.mjs dev-log $(if $(FOLLOW),--follow,) $(if $(JSON),--json,)
+dev-instance-self-test: ## Verify the instance manager with two live worktrees
+	node tools/dev-instance/self-test.mjs
 
 serve-renderer: ## Start only the renderer dev server
 	$(PNPM) exec nx serve maestro-renderer
@@ -58,8 +77,12 @@ install-dmg: package ## Install the packaged app (macOS) using the DMG
 	hdiutil detach "$$volumeName"
 
 # Test
-test: ## Run all tests
+test: test-tools ## Run all tests
 	$(PNPM) exec nx run-many -t test --skipNxCache=$(SKIP_NX_CACHE)
+test-tools: ## Run repository tools tests
+	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand
+test-tools-windows: ## Verify Windows workflow descendants and argument passing
+	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' node tools/dev-instance/windows-test-gate.mjs
 test-watch: ## Run all tests in watch mode
 	$(PNPM) exec nx run-many -t test -- --watch
 test-core: ## Run core library tests
@@ -103,13 +126,16 @@ dependency-policy-check: ## Verify exact dependencies and immutable GitHub Actio
 	node tools/verify-dependency-policy.mjs
 
 agents-check: ## Verify the canonical agent skills and their harness adapters
-	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand
 	node tools/verify-agent-harness.mjs
 
-sure: format ## Format, lint, build, unit test, and development E2E; build is the app type gate
-	$(PNPM) exec nx run-many -t build,lint,test,e2e,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
+sure: format test-tools ## Format, lint, build, unit test, and development E2E; build is the app type gate
+	$(PNPM) exec nx run-many -t build -c development --exclude=maestro-electron --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx run-many -t lint,test -c development --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx run-many -t e2e,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
 affected: ## Run checks only on affected projects based on git changes
-	$(PNPM) exec nx affected -t build,lint,test,e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx affected -t build --exclude=maestro-electron --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx affected -t lint,test --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx affected -t e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
 
 # Database
 drizzleCommand = mkdir -p .app-data.dev/data && DATABASE_URL=file:./.app-data.dev/data/mailbox-tool.db ELECTRON_RUN_AS_NODE=1 $(PNPM) exec electron ./node_modules/drizzle-kit/bin.cjs

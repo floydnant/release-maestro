@@ -22,7 +22,9 @@
                 "assets": ["apps/maestro-electron/src/assets"]
             },
             "configurations": {
-                "development": {},
+                "development": {
+                    "outputPath": "dist/apps/maestro-electron-development"
+                },
                 "production": {
                     "optimization": true,
                     "extractLicenses": true,
@@ -39,16 +41,19 @@
         },
         "serve-internal": {
             "executor": "nx-electron:execute",
+            "continuous": true,
             "options": {
-                "buildTarget": "maestro-electron:build-app",
+                "buildTarget": "maestro-electron:build-app:development",
                 "remoteDebuggingPort": 9222,
+                "args": ["--remote-debugging-address=127.0.0.1"],
                 "inspect": "inspect",
                 "port": 5858
             }
         },
         "serve": {
-            "dependsOn": ["maestro-renderer:serve", "metadata-engine:build"],
-            "command": "wait-on tcp:4200 && nx serve-internal maestro-electron"
+            "dependsOn": ["metadata-engine:build"],
+            "continuous": true,
+            "command": "node tools/dev-instance/cli.mjs run-dev"
         },
         "package": {
             "dependsOn": [

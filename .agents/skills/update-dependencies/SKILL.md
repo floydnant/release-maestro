@@ -39,8 +39,9 @@ Preserve existing product behavior.
 Follow [verification-loop](../verification-loop/SKILL.md) from focused checks through `make sure`.
 Verify installs from the final lockfiles and inspect generated changes for unrelated churn. Also run:
 
-- `make agents-check` for changes to agent tooling, its root dependencies, or files under `.agents/`
-  or `tools/`.
+- `make agents-check` for changes to agent skills, harness tooling, their root dependencies, or files
+  under `.agents/`.
+- `make test-tools` for changes to repository tools, their dependencies, or files under `tools/`.
 - `make build-prod` for compiler, bundler, or build-tool updates.
 - `make e2e-production` for Electron, native modules, sidecar packaging, or packaged loading changes.
   Use CI for other platforms.

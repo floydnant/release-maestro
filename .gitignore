@@ -35,6 +35,9 @@ testem.log
 .nx
 .env
 .app-data*
+.release-maestro-instance.json
+.release-maestro-instance.json.corrupt-*
+.release-maestro-instance.json.tmp-*
 .native-home
 nice-explorer-reference
 

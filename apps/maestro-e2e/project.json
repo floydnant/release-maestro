@@ -7,8 +7,8 @@
     "// targets": "to see all targets run: nx show project maestro-e2e --web",
     "targets": {
         "e2e": {
-            "dependsOn": ["typecheck", "maestro-electron:build"],
-            "command": "playwright test -c apps/maestro-e2e/playwright.electron.config.ts"
+            "dependsOn": ["typecheck"],
+            "command": "node tools/dev-instance/cli.mjs run-workflow electron-e2e -- nx run maestro-electron:build -c development --then playwright test -c apps/maestro-e2e/playwright.electron.config.ts"
         },
         "e2e-production": {
             "dependsOn": ["typecheck", "maestro-electron:package"],
@@ -16,7 +16,7 @@
         },
         "e2e-renderer": {
             "dependsOn": ["typecheck"],
-            "command": "playwright test -c apps/maestro-e2e/playwright.renderer.config.ts"
+            "command": "node tools/dev-instance/cli.mjs run-workflow renderer-e2e -- playwright test -c apps/maestro-e2e/playwright.renderer.config.ts"
         },
         "lint": {
             "executor": "@nx/eslint:lint"

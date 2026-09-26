@@ -48,11 +48,16 @@ intentional convenience summaries.
   `pnpm exec nx build maestro-core`. Prefer it for focused work; file/name-filtered examples are in
   [docs/testing.md](docs/testing.md#fast-iteration).
 - `make sure` formats, lints, builds, unit-tests, and runs development Electron and renderer E2E. It
-  mutates formatting. Use `make e2e` or `make e2e-renderer` when only one E2E layer is relevant.
+  also runs `make test-tools` and mutates formatting. Use `make e2e` or `make e2e-renderer` when only
+  one E2E layer is relevant.
+- `make test-tools` runs the repository tools suite. `make test` includes it; `make agents-check`
+  checks only agent skills and harness adapters.
 - `make e2e-production` packages the app for the host OS and runs the production-compatible Electron
   suite. Use it for file-URL, lazy-loading, packaging, and cross-platform behavior.
 - `make affected` runs build, lint, unit tests, development Electron E2E, and renderer E2E for
   affected projects. It does not check or mutate formatting.
+- `make dev-instance-self-test` starts two temporary worktrees and verifies the development instance
+  manager. CI runs it separately from `make sure`.
 - Never use package scripts directly. Use the Make or Nx commands documented here.
 
 Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verification-loop/SKILL.md).

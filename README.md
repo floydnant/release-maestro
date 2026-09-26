@@ -23,8 +23,7 @@ A desktop app for your music. Scan your local collection into a searchable libra
 ## Prerequisites
 
 - Node.js (use the version in `.node-version`)
-- pnpm (if the command is unavailable, enable the Node.js-provided launcher with
-  `corepack enable pnpm`)
+- pnpm (install it separately if the command is unavailable)
 - A Rust toolchain (`cargo` and `rustc`) for the metadata-engine sidecar. Development builds only the
   host architecture; `make dev` does not require `rustup`.
 - `rustup` for macOS packaging, which builds the sidecar for both Apple Silicon and Intel
@@ -49,6 +48,15 @@ main process with hot reload. The host binary lives in `apps/metadata-engine/tar
 separate from the packaging binary in `target/release`. Development always uses this host path.
 If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
 
+Each Git worktree gets stable debug ports and its own `.app-data.dev`. The Electron window title shows
+the slot number when the bundle matches a standard slot, or the renderer port otherwise. Use `make dev-status` to inspect this worktree. The [development instance guide](docs/dev-instances.md)
+covers the full command list, lifecycle, concurrency rules, and recovery.
+
+Codex and Claude Code use the same advisory session hook. Codex asks you to review the project hook
+in `/hooks` because it records trust against the command hash. Claude Code applies its normal project
+settings approval. Declining either hook does not break allocation or cleanup. The MCP wrappers in
+`.mcp.json` and `.codex/config.toml` resolve the current worktree's CDP endpoint when they start.
+
 Use `pnpm exec nx build metadata-engine` to build only the host sidecar.
 
 `make dev` also opens local debug endpoints for agent inspection. See
@@ -67,10 +75,11 @@ make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
 ```
 
-`make sure` mutates formatting.
+`make sure` mutates formatting. Electron E2E and renderer E2E may run together. The instance manager
+rejects Electron E2E while `make dev` owns the same worktree's development build output.
 
-After installation, run `make agents-check` to validate the agent skills and harness adapters and run
-their fixture tests.
+After installation, run `make agents-check` to validate the agent skills and harness adapters.
+`make test-tools` runs the repository tools tests and is part of `make test` and `make sure`.
 
 For focused work, use Nx; see the [fast-iteration examples](docs/testing.md#fast-iteration) for file
 and test-name filters.

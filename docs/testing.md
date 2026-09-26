@@ -82,6 +82,7 @@ pnpm exec nx build maestro-electron    # build/type gate for one project
 make e2e-renderer                      # renderer scenario suite
 make e2e                               # full development Electron suite
 make e2e-production                    # cached package + production Electron suite
+make dev-instance-self-test            # two-worktree instance-manager check
 make format-check                      # non-mutating repo formatting check
 make affected                          # affected build/lint/unit/development-Electron/renderer checks
 make sure                              # formats, then lint/build/unit/development Electron/renderer E2E
@@ -91,12 +92,20 @@ make sure                              # formats, then lint/build/unit/developme
 excludes the development-only debug-console spec, and checks file-URL routing, lazy chunks, and
 cross-platform packaging behavior.
 
+CI runs `make dev-instance-self-test` as a separate job. Run it locally after committing changes to
+`tools/dev-instance`; it starts two complete development stacks in temporary worktrees from `HEAD`,
+so uncommitted changes are not included.
+`make test-tools` runs the focused repository tools suite. `make test` and `make sure` include it.
+On Windows, CI also runs `make test-tools-windows` to check natural exit and cancellation with orphaned
+descendants, and literal argument passing through the Windows launcher.
+
 Production packaging is cached. The launcher resolves electron-builder's unpacked layout on macOS,
 Windows, and Linux, and CI runs the production suite on all three. E2E windows remain visible but
 unfocused by default, so a screenshot of a test run never steals focus; set
 `RELEASE_MAESTRO_E2E_BACKGROUND=0` to activate the window while debugging.
 
-To inspect the development app rather than a test run, attach to the debug ports `make dev` opens.
+To inspect the development app rather than a test run, attach to the worktree-specific debug ports
+that `make dev` opens. `make dev-status` prints them.
 The [`inspect-running-app`](../.agents/skills/inspect-running-app/SKILL.md) skill owns that
 workflow. Reach for it before you write a throwaway spec to look at something.
 
@@ -155,6 +164,15 @@ Electron E2E must isolate filesystem inputs and app state:
 - Launch with a fresh `RELEASE_MAESTRO_APP_DATA_DIR` so database, config, cache, logs, and temp files
   cannot leak between tests.
 - Keep full-app tests broad but few.
+
+The Electron and renderer suites obtain transient port bundles from the same instance manager as
+development. They release those bundles after Playwright exits and the transient renderer port is
+free, including in CI. Electron E2E
+and renderer E2E claim different mutable resources and can still run together. Electron E2E conflicts
+with a live development stack because both rebuild the Electron development output. If a run is
+rejected, `make dev-list` names the workflow holder and `make dev-log` shows the orchestration event.
+Use `make dev-status` for this worktree's development allocation. Set `JSON=1` on
+`make dev-log` for JSONL output.
 
 ## Fixtures
 

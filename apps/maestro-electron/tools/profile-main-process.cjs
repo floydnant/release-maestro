@@ -1,12 +1,25 @@
 #!/usr/bin/env node
 
+const { spawnSync } = require('node:child_process')
+const { join } = require('node:path')
+
 const durationSeconds = Number(process.argv[2] ?? 10)
 
 if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
     throw new Error('Usage: node apps/maestro-electron/tools/profile-main-process.cjs [seconds]')
 }
 
-const inspectorUrl = 'http://127.0.0.1:5858/json/list'
+const status = spawnSync(
+    process.execPath,
+    [join(process.cwd(), 'tools/dev-instance/cli.mjs'), 'dev-status', '--json'],
+    { encoding: 'utf8' },
+)
+if (status.status !== 0) {
+    throw new Error(status.stderr.trim() || 'Could not resolve the development instance')
+}
+const inspectorPort = JSON.parse(status.stdout).bundle?.inspector
+if (!Number.isSafeInteger(inspectorPort)) throw new Error('No development instance is allocated')
+const inspectorUrl = `http://127.0.0.1:${inspectorPort}/json/list`
 const requestTimeoutMs = 5_000
 
 async function main() {

@@ -1,6 +1,10 @@
 import { workspaceRoot } from '@nx/devkit'
 import { nxE2EPreset } from '@nx/playwright/preset'
 import { defineConfig } from '@playwright/test'
+import { environmentPort } from './src/support/environment-port'
+
+const electronE2EPort = environmentPort('RELEASE_MAESTRO_RENDERER_PORT', 4200)
+const electronE2EBaseURL = `http://localhost:${electronE2EPort}`
 
 export default defineConfig({
     ...nxE2EPreset(__filename, { testDir: './src/electron' }),
@@ -16,8 +20,8 @@ export default defineConfig({
         timeout: 20_000,
     },
     webServer: {
-        command: 'pnpm exec nx serve maestro-renderer --port 4200',
-        url: 'http://localhost:4200',
+        command: `pnpm exec nx serve maestro-renderer --host localhost --port ${electronE2EPort}`,
+        url: electronE2EBaseURL,
         reuseExistingServer: !process.env.CI,
         cwd: workspaceRoot,
         timeout: 120_000,
