@@ -2610,6 +2610,97 @@ test('an orphaned live listener remains an owner and dev-stop terminates it', as
     assert.equal(inactive.state, 'inactive')
 }, 45_000)
 
+test('a detached dev listener keeps the build claim after its launcher exits', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture()
+    const { launcherPath, listenerPidPath } = await createDetachedListenerLauncher(fixture)
+    const bin = join(fixture.base, 'bin')
+    const finishRenderer = join(fixture.base, 'finish-renderer')
+    const launcherPidPath = join(fixture.base, 'renderer-launcher.pid')
+    await mkdir(bin)
+    await writeFile(
+        join(bin, 'pnpm'),
+        `#!/usr/bin/env node
+import { spawn } from 'node:child_process'
+import { existsSync, writeFileSync } from 'node:fs'
+import net from 'node:net'
+if (process.argv.includes('maestro-renderer')) {
+  const launcher = spawn(process.execPath, [${JSON.stringify(launcherPath)}], { stdio: 'ignore' })
+  writeFileSync(${JSON.stringify(launcherPidPath)}, String(launcher.pid))
+  launcher.unref()
+  const timer = setInterval(() => {
+    if (existsSync(${JSON.stringify(finishRenderer)})) { clearInterval(timer); process.exit(0) }
+  }, 20)
+} else {
+  for (const flag of ['--port', '--remoteDebuggingPort']) {
+    const index = process.argv.indexOf(flag)
+    net.createServer(() => {}).listen(Number(process.argv[index + 1]), '127.0.0.1')
+  }
+  setInterval(() => {}, 1000)
+}
+`,
+    )
+    await chmod(join(bin, 'pnpm'), 0o755)
+    const dev = spawn(process.execPath, [cli, 'run-dev'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, {
+            PATH: `${bin}:${process.env.PATH}`,
+            RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    const devResult = childResult(dev)
+    try {
+        const active = await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+            status =>
+                status.holders?.filter(holder => holder.role === 'dev-renderer').length === 2 &&
+                status.holders?.filter(holder => holder.role === 'dev-electron').length === 2,
+            'dev listeners did not register',
+            25_000,
+        )
+        const listener = active.holders.find(
+            holder => holder.role === 'dev-renderer' && holder.processGroup === undefined,
+        )
+        assert.ok(listener)
+        await writeFile(finishRenderer, '')
+        const result = await devResult
+        assert.equal(result.code, 0, result.stderr)
+        const orphaned = runJson(fixture, fixture.main, ['dev-status', '--json'])
+        assert.ok(orphaned.holders.some(holder => holder.id === listener.id))
+        const e2e = run(fixture, fixture.main, [
+            'run-workflow',
+            'electron-e2e',
+            '--',
+            process.execPath,
+            '-e',
+            'process.exit(0)',
+        ])
+        assert.equal(e2e.status, 1)
+        assert.match(e2e.stderr, /RESOURCE_CONFLICT/)
+        assert.ok(
+            runJson(fixture, fixture.main, ['dev-stop']).stopped.some(holder => holder.pid === listener.pid),
+        )
+        await waitFor(
+            () => portIsAvailable(active.bundle.renderer),
+            available => available,
+            'detached renderer listener survived dev-stop',
+        )
+    } finally {
+        if (dev.exitCode === null && dev.signalCode === null) dev.kill('SIGKILL')
+        for (const path of [launcherPidPath, listenerPidPath]) {
+            const pid = Number(await readFile(path, 'utf8').catch(() => ''))
+            if (!pid) continue
+            try {
+                process.kill(pid, 'SIGKILL')
+            } catch (error) {
+                if (error?.code !== 'ESRCH') throw error
+            }
+        }
+    }
+}, 45_000)
+
 test('active worktrees cannot share a canonical app-data directory', async () => {
     const fixture = await createFixture({ worktrees: 2 })
     const bin = await createFakePnpm(fixture)

@@ -292,7 +292,9 @@ const runDevelopment = async () => {
         stopHeartbeat()
         stopForwarding()
         await Promise.all(children.map(stopChild))
-        for (const holder of childHolders) await removeDevelopmentHolder(holder.id).catch(() => {})
+        for (const holder of childHolders) {
+            if (!holderIsLive(holder)) await removeDevelopmentHolder(holder.id).catch(() => {})
+        }
         await removeDevelopmentHolder(supervisor.id).catch(() => {})
     }
 }
