@@ -1045,19 +1045,28 @@ const bundleIsAvailable = async bundle => {
     return true
 }
 
+export const parseWindowsListeningPids = (output, port) =>
+    output
+        .split('\n')
+        .map(line => line.trim().split(/\s+/))
+        .filter(
+            parts =>
+                parts.length >= 5 &&
+                parts[0] === 'TCP' &&
+                parts[1].endsWith(`:${port}`) &&
+                ['0.0.0.0:0', '[::]:0'].includes(parts[2]),
+        )
+        .map(parts => Number(parts.at(-1)))
+        .filter(Number.isSafeInteger)
+
 const listenerPids = port => {
     if (process.platform === 'win32') {
-        const result = spawnSync('netstat.exe', ['-ano', '-p', 'tcp'], {
+        const result = spawnSync('netstat.exe', ['-ano'], {
             encoding: 'utf8',
             windowsHide: true,
         })
         if (result.error || typeof result.stdout !== 'string') return []
-        return result.stdout
-            .split('\n')
-            .map(line => line.trim().split(/\s+/))
-            .filter(parts => parts.length >= 5 && parts[1]?.endsWith(`:${port}`) && parts[3] === 'LISTENING')
-            .map(parts => Number(parts[4]))
-            .filter(Number.isSafeInteger)
+        return parseWindowsListeningPids(result.stdout, port)
     }
     const lsof = process.platform === 'darwin' ? '/usr/sbin/lsof' : 'lsof'
     const result = spawnSync(lsof, ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'], {

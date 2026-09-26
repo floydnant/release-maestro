@@ -22,6 +22,7 @@ import { afterEach, jest, test } from '@jest/globals'
 import {
     currentProcessIdentity,
     holderIsLive,
+    parseWindowsListeningPids,
     parseUnixProcessIdentity,
     portIsAvailable,
     rootProcessHolders,
@@ -37,6 +38,18 @@ test('Unix process identities exclude zombie and exiting processes', () => {
     assert.equal(parseUnixProcessIdentity(`S+ ${started}`), started)
     assert.equal(parseUnixProcessIdentity(`Z ${started}`), null)
     assert.equal(parseUnixProcessIdentity(`?Es ${started}`), null)
+})
+
+test('Windows listener lookup includes IPv6 and localized netstat rows', () => {
+    const output = [
+        '  TCP    127.0.0.1:4200     0.0.0.0:0      LISTENING     1234',
+        '  TCP    [::1]:4200        [::]:0         ABHÖREN       5678',
+        '  TCP    127.0.0.1:14200    0.0.0.0:0      LISTENING     9012',
+        '  TCP    127.0.0.1:4200     192.0.2.1:1234 ESTABLISHED   3456',
+        '  UDP    127.0.0.1:4200     *:*                         7890',
+    ].join('\n')
+
+    assert.deepEqual(parseWindowsListeningPids(output, 4200), [1234, 5678])
 })
 
 test('process shutdown starts with supervisors and orphaned holders', () => {
@@ -1269,7 +1282,7 @@ test('Claude WorktreeRemove releases only after the directory is gone', async ()
     assert.equal(hookResult.status, 0, hookResult.stderr)
     let registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
     assert.ok(registry.allocations[allocation.worktreeId])
-    assert.equal(Object.hasOwn(registry.allocations[allocation.worktreeId], 'releaseWhenRemoved'), false)
+    assert.equal(registry.allocations[allocation.worktreeId].releaseWhenIdle, false)
     await rm(fixture.main, { recursive: true, force: true })
     registry = await waitFor(
         async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
