@@ -926,6 +926,16 @@ test('workflow releases its claim when a child ignores termination', async () =>
     assert.equal(instances.instances.some(instance => instance.workflow === 'renderer-e2e'), false)
 })
 
+test('development startup rejects an invalid deadline before allocating', async () => {
+    const fixture = await createFixture()
+    const result = run(fixture, fixture.main, ['run-dev'], {
+        RELEASE_MAESTRO_STARTUP_TIMEOUT_MS: 'not-a-number',
+    })
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /INVALID_CONFIG.*RELEASE_MAESTRO_STARTUP_TIMEOUT_MS/)
+    assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).state, 'unallocated')
+})
+
 test('dev conflicts with Electron E2E and a second dev supervisor reports its owner', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)

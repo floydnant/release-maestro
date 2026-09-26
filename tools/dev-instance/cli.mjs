@@ -93,6 +93,11 @@ const parseWorkflowCommands = tokens => {
 }
 
 const runDevelopment = async () => {
+    const configuredTimeout = process.env['RELEASE_MAESTRO_STARTUP_TIMEOUT_MS']
+    const startupTimeoutMs = configuredTimeout === undefined ? 600_000 : Number(configuredTimeout)
+    if (!Number.isSafeInteger(startupTimeoutMs) || startupTimeoutMs <= 0) {
+        throw new InstanceError('RELEASE_MAESTRO_STARTUP_TIMEOUT_MS must be a positive integer', 'INVALID_CONFIG')
+    }
     const { allocation, holder: supervisor } = await registerDevelopmentHolder('dev-supervisor')
     const instance = { ...allocation, slot: developmentSlot(allocation.bundle) }
     const environment = {
@@ -158,7 +163,7 @@ const runDevelopment = async () => {
             await Promise.race([
                 waitForPort(
                     allocation.bundle.renderer,
-                    120_000,
+                    startupTimeoutMs,
                     AbortSignal.any([rendererReadiness.signal, cancellation.signal]),
                 ),
                 rendererExit.then(result => {
@@ -218,12 +223,12 @@ const runDevelopment = async () => {
                 Promise.all([
                     waitForPort(
                         allocation.bundle.cdp,
-                        30_000,
+                        startupTimeoutMs,
                         AbortSignal.any([electronReadiness.signal, cancellation.signal]),
                     ),
                     waitForPort(
                         allocation.bundle.inspector,
-                        30_000,
+                        startupTimeoutMs,
                         AbortSignal.any([electronReadiness.signal, cancellation.signal]),
                     ),
                 ]),
