@@ -23,6 +23,7 @@ import {
     currentProcessIdentity,
     holderIsLive,
     parseUnixProcessIdentity,
+    portIsAvailable,
     rootProcessHolders,
     spawnManaged,
 } from './core.mjs'
@@ -1290,6 +1291,187 @@ test('run-workflow stops descendants left behind by a successful launcher', asyn
         'workflow descendant was left running',
     )
 })
+
+const createDetachedListenerLauncher = async fixture => {
+    const serverPath = join(fixture.base, 'detached-listener.cjs')
+    const launcherPath = join(fixture.base, 'detached-listener-launcher.cjs')
+    const listenerPidPath = join(fixture.base, 'detached-listener.pid')
+    await writeFile(
+        serverPath,
+        `require('node:net').createServer(() => {}).listen({ host: '127.0.0.1', port: Number(process.env.RELEASE_MAESTRO_RENDERER_PORT) })\n`,
+    )
+    await writeFile(
+        launcherPath,
+        `const { spawn } = require('node:child_process')
+const { writeFileSync } = require('node:fs')
+const listener = spawn(process.execPath, [${JSON.stringify(serverPath)}], {
+  detached: true,
+  stdio: 'ignore',
+  env: process.env,
+})
+writeFileSync(${JSON.stringify(listenerPidPath)}, String(listener.pid))
+listener.unref()
+setInterval(() => {}, 1000)
+`,
+    )
+    return { launcherPath, listenerPidPath }
+}
+
+test('a detached workflow listener retains its claim after the wrapper and launcher die', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture()
+    const { launcherPath, listenerPidPath } = await createDetachedListenerLauncher(fixture)
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, launcherPath],
+        {
+            cwd: fixture.main,
+            env: environmentFor(fixture),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        },
+    )
+    liveChildren.push(workflow)
+    let launcherPid
+    let listenerPid
+    try {
+        const started = await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-list', '--json'])),
+            listed => listed.instances.some(instance => instance.childHolder?.pid),
+            'workflow launcher did not register',
+        )
+        const startedTransient = started.instances.find(instance => instance.workflow === 'renderer-e2e')
+        launcherPid = startedTransient.childHolder.pid
+        listenerPid = Number(
+            await waitFor(
+                () => readFile(listenerPidPath, 'utf8'),
+                value => Number.isSafeInteger(Number(value)),
+                'detached listener did not spawn',
+            ),
+        )
+        await waitFor(
+            () => portIsAvailable(startedTransient.bundle.renderer),
+            available => !available,
+            'detached listener did not open the renderer port',
+        )
+        const active = await waitFor(
+            () => {
+                const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
+                launcherPid ??= listed.instances.find(instance => instance.workflow === 'renderer-e2e')
+                    ?.childHolder?.pid
+                return Promise.resolve(listed)
+            },
+            listed => listed.instances.some(instance => instance.listenerHolder?.pid),
+            'detached workflow listener was not recorded',
+        )
+        const transient = active.instances.find(instance => instance.workflow === 'renderer-e2e')
+        launcherPid = transient.childHolder.pid
+        listenerPid = transient.listenerHolder.pid
+        assert.notEqual(launcherPid, listenerPid)
+
+        workflow.kill('SIGKILL')
+        await childResult(workflow)
+        process.kill(launcherPid, 'SIGKILL')
+        const orphaned = runJson(fixture, fixture.main, ['dev-list', '--json'])
+        assert.ok(orphaned.instances.some(instance => instance.listenerHolder?.pid === listenerPid))
+        const duplicate = run(fixture, fixture.main, [
+            'run-workflow',
+            'renderer-e2e',
+            '--',
+            process.execPath,
+            '-e',
+            'process.exit(0)',
+        ])
+        assert.equal(duplicate.status, 1)
+        assert.match(duplicate.stderr, /RESOURCE_CONFLICT/)
+
+        process.kill(listenerPid, 'SIGKILL')
+        await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-list', '--json'])),
+            listed => !listed.instances.some(instance => instance.workflow === 'renderer-e2e'),
+            'claim remained after the detached listener exited',
+        )
+    } finally {
+        if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGKILL')
+        listenerPid ??= Number(await readFile(listenerPidPath, 'utf8').catch(() => ''))
+        for (const pid of [launcherPid, listenerPid]) {
+            if (!pid) continue
+            try {
+                process.kill(pid, 'SIGKILL')
+            } catch (error) {
+                if (error?.code !== 'ESRCH') throw error
+            }
+        }
+    }
+}, 45_000)
+
+test('run-workflow stops a detached listener after its launcher crashes', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture()
+    const { launcherPath, listenerPidPath } = await createDetachedListenerLauncher(fixture)
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, launcherPath],
+        {
+            cwd: fixture.main,
+            env: environmentFor(fixture),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        },
+    )
+    liveChildren.push(workflow)
+    let launcherPid
+    let listenerPid
+    try {
+        const started = await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-list', '--json'])),
+            listed => listed.instances.some(instance => instance.childHolder?.pid),
+            'workflow launcher did not register',
+        )
+        const transient = started.instances.find(instance => instance.workflow === 'renderer-e2e')
+        launcherPid = transient.childHolder.pid
+        listenerPid = Number(
+            await waitFor(
+                () => readFile(listenerPidPath, 'utf8'),
+                value => Number.isSafeInteger(Number(value)),
+                'detached listener did not spawn',
+            ),
+        )
+        await waitFor(
+            () => portIsAvailable(transient.bundle.renderer),
+            available => !available,
+            'detached listener did not open the renderer port',
+        )
+        await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-list', '--json'])),
+            listed => listed.instances.some(instance => instance.listenerHolder?.pid === listenerPid),
+            'detached workflow listener was not recorded',
+        )
+
+        process.kill(launcherPid, 'SIGKILL')
+        const result = await childResult(workflow)
+        assert.equal(result.code, 137, result.stderr)
+        await waitFor(
+            () => portIsAvailable(transient.bundle.renderer),
+            available => available,
+            'detached listener survived workflow cleanup',
+        )
+        assert.equal(
+            runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
+                instance => instance.workflow === 'renderer-e2e',
+            ),
+            false,
+        )
+    } finally {
+        if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGKILL')
+        for (const pid of [launcherPid, listenerPid]) {
+            if (!pid) continue
+            try {
+                process.kill(pid, 'SIGKILL')
+            } catch (error) {
+                if (error?.code !== 'ESRCH') throw error
+            }
+        }
+    }
+}, 45_000)
 
 test('Windows workflow keeps its claim until an orphaned grandchild exits', async () => {
     if (process.platform !== 'win32') return

@@ -464,6 +464,7 @@ const parseTransient = value => {
     }
     parseHolder(value.holder)
     if (value.childHolder !== undefined) parseHolder(value.childHolder)
+    if (value.listenerHolder !== undefined) parseHolder(value.listenerHolder)
     return value
 }
 
@@ -488,7 +489,8 @@ const parseRegistry = value => {
         if (
             transient.id !== id ||
             transient.holder.worktreeId !== transient.worktreeId ||
-            (transient.childHolder && transient.childHolder.worktreeId !== transient.worktreeId)
+            (transient.childHolder && transient.childHolder.worktreeId !== transient.worktreeId) ||
+            (transient.listenerHolder && transient.listenerHolder.worktreeId !== transient.worktreeId)
         ) {
             throw new InstanceError('Transient key mismatch', 'CORRUPT_REGISTRY')
         }
@@ -760,7 +762,7 @@ const activeClaims = registry => {
                 workflow: transient.workflow,
                 worktreeId: transient.worktreeId,
                 path: transient.path,
-                holders: [transient.holder, transient.childHolder].filter(Boolean),
+                holders: [transient.listenerHolder, transient.childHolder, transient.holder].filter(Boolean),
                 startedAt: transient.createdAt,
             })
         }
@@ -827,10 +829,12 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
     for (const [id, transient] of Object.entries(registry.transients)) {
         const wrapperIsLive = isLive(transient.holder)
         const childIsLive = transient.childHolder ? isLive(transient.childHolder) : false
-        if (!wrapperIsLive && !childIsLive) {
+        const listenerIsLive = transient.listenerHolder ? isLive(transient.listenerHolder) : false
+        if (!wrapperIsLive && !childIsLive && !listenerIsLive) {
             delete registry.transients[id]
-        } else if (!childIsLive) {
-            delete transient.childHolder
+        } else {
+            if (!childIsLive) delete transient.childHolder
+            if (!listenerIsLive) delete transient.listenerHolder
         }
     }
     return registry
@@ -1020,16 +1024,15 @@ const listenerPids = port => {
         .filter(Number.isSafeInteger)
 }
 
-const ownedListenerPid = (rootPid, rootStartIdentity, ports) => {
+const ownedListenerProcess = (rootPid, rootStartIdentity, ports) => {
     const snapshot = snapshotProcessTree(rootPid)
     if (!snapshot.some(record => record.pid === rootPid && record.startIdentity === rootStartIdentity)) {
         return null
     }
-    const processTree = new Set(snapshot.map(processRecord => processRecord.pid))
     const candidates = ports
         .map(port => new Set(listenerPids(port)))
         .reduce((intersection, pids) => new Set([...intersection].filter(pid => pids.has(pid))))
-    return [...candidates].find(pid => processTree.has(pid)) ?? null
+    return snapshot.find(record => candidates.has(record.pid)) ?? null
 }
 
 const assertPersistedBundleUsable = async (allocation, registeringHolder) => {
@@ -1375,7 +1378,7 @@ export const registerDevelopmentListenerHolder = async (
         let pid = null
         try {
             if (processStartIdentity(launcherPid) !== launcherStartIdentity) break
-            pid = ownedListenerPid(launcherPid, launcherStartIdentity, ports)
+            pid = ownedListenerProcess(launcherPid, launcherStartIdentity, ports)?.pid ?? null
         } catch (error) {
             if (error?.code !== 'PROCESS_IDENTITY_UNKNOWN') throw error
         }
@@ -1504,7 +1507,9 @@ export const listInstances = async () => {
             ...describeDevelopmentAllocation(allocation),
         }))
         const workflows = Object.values(registry.transients).map(transient => {
-            const holders = [transient.holder, transient.childHolder].filter(Boolean)
+            const holders = [transient.holder, transient.childHolder, transient.listenerHolder].filter(
+                Boolean,
+            )
             return {
                 ...transient,
                 kind: 'workflow',
@@ -1653,6 +1658,9 @@ export const heartbeatTransient = async id => {
         if (transient?.childHolder && holderIsLive(transient.childHolder)) {
             transient.childHolder.heartbeatAt = iso(nowMs())
         }
+        if (transient?.listenerHolder && holderIsLive(transient.listenerHolder)) {
+            transient.listenerHolder.heartbeatAt = iso(nowMs())
+        }
     })
 }
 
@@ -1674,10 +1682,40 @@ export const setTransientChildHolder = async (id, pid, startIdentity = null) => 
     return true
 }
 
+export const registerTransientListenerHolder = async (id, launcherPid, launcherStartIdentity, port) => {
+    if (await portIsAvailable(port)) return null
+    const listener = ownedListenerProcess(launcherPid, launcherStartIdentity, [port])
+    if (!listener) return null
+    let holder = null
+    await withRegistry(async registry => {
+        const transient = registry.transients[id]
+        if (!transient) return
+        if (processStartIdentity(listener.pid) !== listener.startIdentity) return
+        if (
+            transient.listenerHolder?.pid === listener.pid &&
+            transient.listenerHolder.startIdentity === listener.startIdentity
+        ) {
+            holder = transient.listenerHolder
+            return
+        }
+        holder = await newHolder(
+            transient.worktreeId,
+            `workflow-listener:${transient.workflow}`,
+            listener.pid,
+            null,
+            false,
+            listener.startIdentity,
+        )
+        transient.listenerHolder = holder
+    })
+    return holder
+}
+
 export const releaseTransient = async id => {
     await withRegistry(async (registry, paths) => {
         const transient = registry.transients[id]
         if (!transient) return
+        if (transient.listenerHolder && holderIsLive(transient.listenerHolder)) return
         delete registry.transients[id]
         await appendEvent(paths, 'transient-allocation-released', {
             transientId: id,

@@ -63,6 +63,8 @@ renderer E2E can run together. Two copies of the same mutating E2E target cannot
 get transient bundles, which are released when their commands exit. MCP wrappers share their
 worktree's stable development bundle and may run before `make dev`.
 On Windows, a workflow waits for its command's descendants before releasing its transient bundle.
+On macOS and Linux, the manager records a verified E2E renderer listener so its claim survives an
+abrupt test-runner exit until the listener stops.
 
 ## Recovery
 

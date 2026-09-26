@@ -9,8 +9,10 @@ import {
     followLog,
     forwardSignals,
     heartbeatTransient,
+    holderIsLive,
     registerDevelopmentHolder,
     registerDevelopmentListenerHolder,
+    registerTransientListenerHolder,
     setTransientChildHolder,
     releaseDevelopment,
     releaseTransient,
@@ -351,8 +353,43 @@ const runWorkflow = async args => {
             }
             stopHeartbeat()
             stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
+            let listenerHolder = null
+            let listenerCapture = null
+            let listenerCaptureError = null
+            const captureListener = () => {
+                if (process.platform === 'win32' || listenerHolder || listenerCapture || !child?.pid) {
+                    return
+                }
+                listenerCapture = registerTransientListenerHolder(
+                    transient.id,
+                    child.pid,
+                    child.releaseMaestroStartIdentity,
+                    transient.bundle.renderer,
+                )
+                    .then(holder => {
+                        if (holder) {
+                            listenerHolder = holder
+                            listenerCaptureError = null
+                        }
+                    })
+                    .catch(error => {
+                        if (error?.code !== 'PROCESS_IDENTITY_UNKNOWN') listenerCaptureError = error
+                    })
+                    .finally(() => {
+                        listenerCapture = null
+                    })
+            }
+            const listenerTimer = setInterval(captureListener, 250)
+            listenerTimer.unref()
+            captureListener()
             const result = await waitForExit(child)
+            clearInterval(listenerTimer)
+            if (listenerCapture) await listenerCapture
             await stopChild(child)
+            if (listenerHolder && holderIsLive(listenerHolder)) {
+                await stopProcessTree(listenerHolder.pid, listenerHolder.startIdentity)
+            }
+            if (listenerCaptureError) throw listenerCaptureError
             child = null
             if (cancellationSignal) {
                 process.exitCode = exitForChild(null, cancellationSignal)
