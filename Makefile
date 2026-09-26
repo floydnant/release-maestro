@@ -1,4 +1,4 @@
-.PHONY: dev dev-allocate dev-release dev-reallocate dev-status dev-list dev-stop dev-log dev-instance-self-test serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-tools test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: dev dev-allocate dev-release dev-reallocate dev-status dev-list dev-stop dev-log dev-instance-self-test serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-tools test-tools-windows test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -79,6 +79,8 @@ test: test-tools ## Run all tests
 	$(PNPM) exec nx run-many -t test --skipNxCache=$(SKIP_NX_CACHE)
 test-tools: ## Run repository tools tests
 	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand
+test-tools-windows: ## Verify Windows workflow descendants and argument passing
+	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand --testNamePattern='Windows workflow keeps its claim|run-workflow passes separators'
 test-watch: ## Run all tests in watch mode
 	$(PNPM) exec nx run-many -t test -- --watch
 test-core: ## Run core library tests

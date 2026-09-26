@@ -5,6 +5,7 @@ import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'n
 import net from 'node:net'
 import { homedir } from 'node:os'
 import { basename, delimiter, dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { formatLogEvent } from './presentation.mjs'
 
 export const registryVersion = 1
@@ -126,7 +127,7 @@ const processStartIdentity = pid => {
                 '-NoProfile',
                 '-NonInteractive',
                 '-Command',
-                `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().Ticks`,
+                `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction Stop).CreationDate.ToUniversalTime().Ticks`,
             ],
             { encoding: 'utf8', windowsHide: true },
         )
@@ -278,33 +279,13 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity, signal = '
     signalProcessSnapshot(snapshot, 'SIGKILL')
 }
 
-const windowsTicksAt = milliseconds => BigInt(milliseconds) * 10_000n + 621355968000000000n
-export const windowsExitedRootChildren = (rows, rootPid, expectedStartIdentity, exitedAt) => {
-    if (!expectedStartIdentity || !exitedAt) return []
-    const started = BigInt(expectedStartIdentity)
-    const exited = windowsTicksAt(exitedAt)
-    return rows.filter(row => {
-        if (row.parentPid !== rootPid || !row.startIdentity) return false
-        const childStarted = BigInt(row.startIdentity)
-        return childStarted >= started && childStarted <= exited
-    })
-}
-
-export const stopProcessGroup = async (rootPid, expectedStartIdentity, exitedAt = null) => {
+export const stopProcessGroup = async (rootPid, expectedStartIdentity) => {
     if (process.platform === 'win32') {
         if (processStartIdentity(rootPid) === expectedStartIdentity) {
             spawnSync('taskkill.exe', ['/PID', String(rootPid), '/T', '/F'], {
                 encoding: 'utf8',
                 windowsHide: true,
             })
-        } else {
-            const children = windowsExitedRootChildren(
-                processTable(),
-                rootPid,
-                expectedStartIdentity,
-                exitedAt,
-            )
-            await Promise.all(children.map(child => stopProcessTree(child.pid, child.startIdentity)))
         }
         return
     }
@@ -1089,6 +1070,15 @@ const allocationForManifest = (registry, manifest, worktree, rejectCopied = true
         }
         return null
     }
+    if (allocation.worktreeIdentity && allocation.worktreeIdentity !== worktree.identity) {
+        if (rejectCopied) {
+            throw new InstanceError(
+                `Manifest belongs to another checkout, not ${worktree.root}. Allocate a new instance in this worktree.`,
+                'MANIFEST_OWNERSHIP_CONFLICT',
+            )
+        }
+        return null
+    }
     if (
         sameCanonicalPath(allocation.path, worktree.root) ||
         (!existsSync(allocation.path) && allocation.holders.length === 0)
@@ -1107,7 +1097,7 @@ const allocationForManifest = (registry, manifest, worktree, rejectCopied = true
 const allocationForWorktree = (registry, manifest, worktree, rejectCopied = true) => {
     if (manifest) {
         const ownedByManifest = allocationForManifest(registry, manifest, worktree, rejectCopied)
-        if (ownedByManifest || rejectCopied) return ownedByManifest
+        if (ownedByManifest) return ownedByManifest
     }
     const matches = Object.values(registry.allocations).filter(
         allocation =>
@@ -1641,12 +1631,46 @@ const spawnPortable = (command, args, options) => {
     })
 }
 
+const windowsTreeCommand = `
+$ErrorActionPreference = 'Stop'
+$arguments = '"' + $env:RELEASE_MAESTRO_TREE_SCRIPT + '"'
+$child = Start-Process -FilePath $env:RELEASE_MAESTRO_TREE_NODE -ArgumentList $arguments -NoNewWindow -PassThru -Wait
+exit $child.ExitCode
+`
+
 export const spawnManaged = (command, args, options = {}) => {
-    const child = spawnPortable(command, args, {
-        stdio: 'inherit',
-        detached: process.platform !== 'win32',
-        ...options,
-    })
+    const { waitForTree = false, ...spawnOptions } = options
+    const child =
+        waitForTree && process.platform === 'win32'
+            ? spawn(
+                  'powershell.exe',
+                  [
+                      '-NoProfile',
+                      '-NonInteractive',
+                      '-EncodedCommand',
+                      Buffer.from(windowsTreeCommand, 'utf16le').toString('base64'),
+                  ],
+                  {
+                      stdio: 'inherit',
+                      windowsHide: true,
+                      ...spawnOptions,
+                      env: {
+                          ...process.env,
+                          ...spawnOptions.env,
+                          RELEASE_MAESTRO_TREE_NODE: process.execPath,
+                          RELEASE_MAESTRO_TREE_SCRIPT: join(
+                              dirname(fileURLToPath(import.meta.url)),
+                              'windows-tree.mjs',
+                          ),
+                          RELEASE_MAESTRO_TREE_COMMAND: JSON.stringify({ command, args }),
+                      },
+                  },
+              )
+            : spawnPortable(command, args, {
+                  stdio: 'inherit',
+                  detached: process.platform !== 'win32',
+                  ...spawnOptions,
+              })
     child.releaseMaestroStartIdentity = processStartIdentity(child.pid)
     return child
 }

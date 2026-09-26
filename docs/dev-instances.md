@@ -63,6 +63,7 @@ Electron development build, so the manager rejects that overlap in one worktree.
 renderer E2E can run together. Two copies of the same mutating E2E target cannot. E2E workflows
 get transient bundles, which are released when their commands exit. MCP wrappers share their
 worktree's stable development bundle and may run before `make dev`.
+On Windows, a workflow waits for its command's descendants before releasing its transient bundle.
 
 ## Recovery
 

@@ -19,7 +19,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import net from 'node:net'
 import { afterEach, jest, test } from '@jest/globals'
-import { parseUnixProcessIdentity, rootProcessHolders, windowsExitedRootChildren } from './core.mjs'
+import { parseUnixProcessIdentity, rootProcessHolders } from './core.mjs'
 
 jest.setTimeout(30_000)
 
@@ -37,17 +37,6 @@ test('process shutdown starts with supervisors and orphaned holders', () => {
     const orphan = { id: 'orphan', parentHolderId: 'missing-parent' }
 
     assert.deepEqual(rootProcessHolders([supervisor, managedChild, orphan]), [supervisor, orphan])
-})
-
-test('Windows orphan cleanup selects only children from the verified launcher lifetime', () => {
-    const start = '621355968010000000'
-    const rows = [
-        { pid: 11, parentPid: 10, startIdentity: '621355968005000000' },
-        { pid: 12, parentPid: 10, startIdentity: '621355968015000000' },
-        { pid: 13, parentPid: 10, startIdentity: '621355968025000000' },
-        { pid: 14, parentPid: 12, startIdentity: '621355968015000000' },
-    ]
-    assert.deepEqual(windowsExitedRootChildren(rows, 10, start, 2_000), [rows[1]])
 })
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
@@ -435,6 +424,46 @@ test('a missing manifest recovers the live allocation from the registry', async 
 
     wrapper.kill('SIGTERM')
     await childResult(wrapper)
+})
+
+test('a stale valid manifest ID recovers the registry allocation', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const active = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 1,
+        'MCP holder did not register',
+    )
+    const manifestPath = join(fixture.main, '.release-maestro-instance.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    manifest.worktreeId = 'stale-worktree-id'
+    await writeFile(manifestPath, JSON.stringify(manifest))
+
+    const recovered = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(recovered.worktreeId, active.worktreeId)
+    assert.equal(recovered.holders[0].pid, wrapper.pid)
+    assert.equal(run(fixture, fixture.main, ['dev-release']).status, 1)
+
+    wrapper.kill('SIGTERM')
+    await childResult(wrapper)
+})
+
+test('a replacement checkout cannot inherit a retained manifest at the old path', async () => {
+    const fixture = await createFixture()
+    const first = runJson(fixture, fixture.main, ['dev-allocate'])
+    const retainedManifest = await readFile(join(fixture.main, '.release-maestro-instance.json'))
+    const moved = join(fixture.base, 'moved')
+    await rename(fixture.main, moved)
+    await mkdir(fixture.main)
+    git(fixture.main, ['init', '-q'])
+    await writeFile(join(fixture.main, '.release-maestro-instance.json'), retainedManifest)
+
+    const status = run(fixture, fixture.main, ['dev-status', '--json'])
+    assert.notEqual(status.status, 0)
+    assert.match(status.stderr, /MANIFEST_OWNERSHIP_CONFLICT/)
+    const replacement = runJson(fixture, fixture.main, ['dev-allocate'])
+    assert.notEqual(replacement.worktreeId, first.worktreeId)
 })
 
 test('a corrupt manifest does not hide a live holder from dev-stop', async () => {
@@ -1078,6 +1107,7 @@ test('a workflow tolerates a child that exits before holder registration', async
 })
 
 test('run-workflow stops descendants left behind by a successful launcher', async () => {
+    if (process.platform === 'win32') return
     const fixture = await createFixture()
     const descendantPidPath = join(fixture.base, 'descendant.pid')
     const launcher = `
@@ -1111,6 +1141,51 @@ test('run-workflow stops descendants left behind by a successful launcher', asyn
             }),
         alive => !alive,
         'workflow descendant was left running',
+    )
+})
+
+test('Windows workflow keeps its claim until an orphaned grandchild exits', async () => {
+    if (process.platform !== 'win32') return
+    const fixture = await createFixture()
+    const grandchildPidPath = join(fixture.base, 'grandchild.pid')
+    const intermediary = `
+        const { writeFileSync } = require('node:fs')
+        const { spawn } = require('node:child_process')
+        const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+        writeFileSync(${JSON.stringify(grandchildPidPath)}, String(grandchild.pid))
+        grandchild.unref()
+    `
+    const launcher = `
+        const { spawn } = require('node:child_process')
+        spawn(process.execPath, ['-e', ${JSON.stringify(intermediary)}], { stdio: 'ignore' }).unref()
+    `
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', launcher],
+        { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    liveChildren.push(workflow)
+    const grandchildPid = Number(
+        await waitFor(
+            () => readFile(grandchildPidPath, 'utf8'),
+            value => Number.isSafeInteger(Number(value)),
+            'grandchild did not start',
+        ),
+    )
+    try {
+        const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
+        assert.ok(listed.instances.some(instance => instance.workflow === 'renderer-e2e'))
+        assert.equal(workflow.exitCode, null)
+    } finally {
+        process.kill(grandchildPid, 'SIGTERM')
+    }
+    const result = await childResult(workflow)
+    assert.equal(result.code, 0, result.stderr)
+    assert.equal(
+        runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
+            instance => instance.workflow === 'renderer-e2e',
+        ),
+        false,
     )
 })
 

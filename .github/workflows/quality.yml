@@ -84,6 +84,10 @@ jobs:
             - name: Install Playwright browsers
               run: pnpm exec playwright install --with-deps chromium
 
+            - name: Verify Windows workflow descendants
+              if: runner.os == 'Windows'
+              run: make test-tools-windows
+
             - name: Run production e2e tests
               uses: GabrielBB/xvfb-action@b706e4e27b14669b486812790492dc50ca16b465 # v1.7
               with:

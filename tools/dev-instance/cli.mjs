@@ -50,14 +50,10 @@ const exitForChild = (code, signal) => {
 const waitForExit = child =>
     new Promise(resolve => {
         if (child.exitCode !== null || child.signalCode !== null) {
-            child.releaseMaestroExitedAt ??= Date.now()
             resolve({ child, code: child.exitCode, signal: child.signalCode })
             return
         }
-        child.once('exit', (code, signal) => {
-            child.releaseMaestroExitedAt = Date.now()
-            resolve({ child, code, signal })
-        })
+        child.once('exit', (code, signal) => resolve({ child, code, signal }))
         child.once('error', () => resolve({ child, code: 1, signal: null }))
     })
 
@@ -69,7 +65,7 @@ const stopChild = async child => {
         await waitForExit(child)
         return
     }
-    await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity, child.releaseMaestroExitedAt)
+    await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity)
 }
 
 const parseWorkflowCommands = tokens => {
@@ -312,6 +308,7 @@ const runWorkflow = async args => {
         const environment = {
             ...process.env,
             ...bundleEnvironment(transient.bundle, transient.appDataPath),
+            ...(process.platform === 'win32' ? { NX_DAEMON: 'false' } : {}),
         }
         for (const [command, ...commandArgs] of commands) {
             if (cancellationSignal) {
@@ -319,8 +316,8 @@ const runWorkflow = async args => {
                 break
             }
             child = ['nx', 'playwright'].includes(command)
-                ? spawnPackageBinary(command, commandArgs, { env: environment })
-                : spawnManaged(command, commandArgs, { env: environment })
+                ? spawnPackageBinary(command, commandArgs, { env: environment, waitForTree: true })
+                : spawnManaged(command, commandArgs, { env: environment, waitForTree: true })
             clearTimeout(startupShutdownTimer)
             startupShutdownTimer = null
             try {
