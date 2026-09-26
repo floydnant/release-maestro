@@ -1,6 +1,11 @@
 import type {
     QueryGenresRequest,
     GenreWindowResult,
+    QueryRecordLabelsRequest,
+    RecordLabelWindowResult,
+    RecordLabelDetailResult,
+    QueryRecordLabelArtistsRequest,
+    RecordLabelArtistsWindowResult,
     GenreDetailResult,
     QueryGenreRelatedRequest,
     GenreRelatedWindowResult,
@@ -26,7 +31,7 @@ import {
     type SongWindowResult,
 } from '@release-maestro/core'
 import { and, asc, count, countDistinct, desc, eq, exists, inArray, sql, sum, type SQL } from 'drizzle-orm'
-import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
+import { union, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { DatabaseClient } from '../../database/database.client'
 import {
     albumArtistsTable,
@@ -38,7 +43,12 @@ import {
     songGenresTable,
     songsTable,
 } from '../../database/drizzle.schema'
-import { albumSearchCondition, genreSearchCondition, songSearchCondition } from './catalog-search'
+import {
+    albumSearchCondition,
+    genreSearchCondition,
+    recordLabelSearchCondition,
+    songSearchCondition,
+} from './catalog-search'
 
 /**
  * The library read side: windowed catalog queries (ADR 0004).
@@ -53,6 +63,153 @@ import { albumSearchCondition, genreSearchCondition, songSearchCondition } from 
  */
 export class LibraryBrowseRepository {
     constructor(private readonly database: DatabaseClient) {}
+
+    queryRecordLabels(request: QueryRecordLabelsRequest): RecordLabelWindowResult {
+        const { offset } = normalizeWindow(request.window)
+        const where = recordLabelSearchCondition(request.query.search)
+        const total =
+            this.database.db.select({ value: count() }).from(recordLabelsTable).where(where).get()?.value ?? 0
+        const rows = this.recordLabelWindowQuery(request).all()
+        const stats = this.recordLabelStats(rows.map(row => row.id))
+        return { rows: rows.map(row => ({ ...row, ...stats(row.id) })), offset, total }
+    }
+
+    recordLabelWindowSql(request: QueryRecordLabelsRequest): { sql: string; params: unknown[] } {
+        return this.recordLabelWindowQuery(request).toSQL()
+    }
+
+    private recordLabelWindowQuery({ query, window }: QueryRecordLabelsRequest) {
+        const { offset, limit } = normalizeWindow(window)
+        const direction = query.sort.direction == 'desc' ? desc : asc
+        return this.database.db
+            .select({
+                id: recordLabelsTable.id,
+                name: recordLabelsTable.name,
+            })
+            .from(recordLabelsTable)
+            .where(recordLabelSearchCondition(query.search))
+            .orderBy(direction(recordLabelsTable.name))
+            .limit(limit)
+            .offset(offset)
+    }
+
+    getRecordLabelDetail(recordLabelId: string): RecordLabelDetailResult {
+        const recordLabel = this.database.db
+            .select({
+                id: recordLabelsTable.id,
+                name: recordLabelsTable.name,
+                externalRefs: recordLabelsTable.externalRefs,
+            })
+            .from(recordLabelsTable)
+            .where(eq(recordLabelsTable.id, recordLabelId))
+            .get()
+        return recordLabel
+            ? { ...recordLabel, ...this.recordLabelStats([recordLabelId])(recordLabelId) }
+            : null
+    }
+
+    private recordLabelStats(ids: string[]) {
+        if (ids.length == 0)
+            return () => ({ albumCount: 0, songCount: 0, artistCount: 0, firstYear: null, lastYear: null })
+        const albums = this.database.db
+            .select({
+                recordLabelId: albumsTable.recordLabelId,
+                albumCount: count(),
+                firstYear: sql<number | null>`min(${albumsTable.year})`,
+                lastYear: sql<number | null>`max(${albumsTable.year})`,
+            })
+            .from(albumsTable)
+            .where(inArray(albumsTable.recordLabelId, ids))
+            .groupBy(albumsTable.recordLabelId)
+            .all()
+        const songs = this.database.db
+            .select({
+                recordLabelId: albumsTable.recordLabelId,
+                songCount: countDistinct(songsTable.id),
+            })
+            .from(albumsTable)
+            .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
+            .where(inArray(albumsTable.recordLabelId, ids))
+            .groupBy(albumsTable.recordLabelId)
+            .all()
+        const albumArtists = this.database.db
+            .select({ recordLabelId: albumsTable.recordLabelId, artistId: albumArtistsTable.artistId })
+            .from(albumsTable)
+            .innerJoin(albumArtistsTable, eq(albumArtistsTable.albumId, albumsTable.id))
+            .where(inArray(albumsTable.recordLabelId, ids))
+        const songArtists = this.database.db
+            .select({ recordLabelId: albumsTable.recordLabelId, artistId: songArtistsTable.artistId })
+            .from(albumsTable)
+            .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
+            .innerJoin(songArtistsTable, eq(songArtistsTable.songId, songsTable.id))
+            .where(inArray(albumsTable.recordLabelId, ids))
+        const members = union(albumArtists, songArtists).as('record_label_artist_members')
+        const artistCounts = this.database.db
+            .select({ recordLabelId: members.recordLabelId, artistCount: count() })
+            .from(members)
+            .groupBy(members.recordLabelId)
+            .all()
+        const byAlbum = new Map(albums.map(row => [row.recordLabelId, row]))
+        const bySong = new Map(songs.map(row => [row.recordLabelId, row]))
+        const byArtist = new Map(artistCounts.map(row => [row.recordLabelId, row.artistCount]))
+        return (id: string) => ({
+            albumCount: byAlbum.get(id)?.albumCount ?? 0,
+            songCount: bySong.get(id)?.songCount ?? 0,
+            artistCount: byArtist.get(id) ?? 0,
+            firstYear: byAlbum.get(id)?.firstYear ?? null,
+            lastYear: byAlbum.get(id)?.lastYear ?? null,
+        })
+    }
+
+    queryRecordLabelArtists({
+        recordLabelId,
+        window,
+    }: QueryRecordLabelArtistsRequest): RecordLabelArtistsWindowResult {
+        const albumArtists = this.database.db
+            .select({ artistId: albumArtistsTable.artistId })
+            .from(albumsTable)
+            .innerJoin(albumArtistsTable, eq(albumArtistsTable.albumId, albumsTable.id))
+            .where(eq(albumsTable.recordLabelId, recordLabelId))
+        const songArtists = this.database.db
+            .select({ artistId: songArtistsTable.artistId })
+            .from(albumsTable)
+            .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
+            .innerJoin(songArtistsTable, eq(songArtistsTable.songId, songsTable.id))
+            .where(eq(albumsTable.recordLabelId, recordLabelId))
+        const members = union(albumArtists, songArtists)
+        const total =
+            this.database.db.select({ value: count() }).from(members.as('record_label_artists')).get()
+                ?.value ?? 0
+        const { offset, limit } = normalizeWindow(window)
+        const rows = this.database.db
+            .select({ id: sql<string>`${artistsTable.id}`, name: sql<string>`${artistsTable.name}` })
+            .from(sql`${artistsTable} indexed by ${sql.identifier('artists_name_key')}`)
+            .where(inArray(artistsTable.id, members))
+            .orderBy(asc(artistsTable.name))
+            .limit(limit)
+            .offset(offset)
+            .all()
+        const credited =
+            rows.length == 0
+                ? []
+                : this.database.db
+                      .selectDistinct({ artistId: songArtistsTable.artistId })
+                      .from(albumsTable)
+                      .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
+                      .innerJoin(songArtistsTable, eq(songArtistsTable.songId, songsTable.id))
+                      .where(
+                          and(
+                              eq(albumsTable.recordLabelId, recordLabelId),
+                              inArray(
+                                  songArtistsTable.artistId,
+                                  rows.map(row => row.id),
+                              ),
+                          ),
+                      )
+                      .all()
+        const creditedIds = new Set(credited.map(row => row.artistId))
+        return { rows: rows.map(row => ({ ...row, hasSongCredits: creditedIds.has(row.id) })), offset, total }
+    }
 
     queryGenres(request: QueryGenresRequest): GenreWindowResult {
         const { offset } = normalizeWindow(request.window)

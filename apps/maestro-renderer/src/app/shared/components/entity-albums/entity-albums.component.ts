@@ -12,32 +12,34 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
 import type { AlbumQuery, AlbumSortField, BrowseWindow } from '@release-maestro/core'
-import { HistoryService } from '../../core/services/history.service'
-import { LibraryBrowseService } from '../../core/services/library-browse.service'
+import { HistoryService } from '../../../core/services/history.service'
+import { LibraryBrowseService } from '../../../core/services/library-browse.service'
 import {
     albumQueryFromParams,
     albumQueryToParams,
     nextAlbumSort,
     sameAlbumQuery,
-} from '../../shared/browse/album-query-params'
-import { createBrowseQuery } from '../../shared/browse/browse-query'
-import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
+} from '../../browse/album-query-params'
+import { createBrowseQuery } from '../../browse/browse-query'
+import { libraryBrowseRefresh } from '../../browse/library-browse-refresh'
 import {
     AlbumGridComponent,
     estimatedAlbumWindowOffsetAt,
     initialWindowLimit,
-} from '../../shared/components/album-grid/album-grid.component'
-import { AlbumSortBarComponent } from '../../shared/components/album-grid/album-sort-bar.component'
+} from '../album-grid/album-grid.component'
+import { AlbumSortBarComponent } from '../album-grid/album-sort-bar.component'
 
 @Component({
-    selector: 'app-genre-albums',
-    templateUrl: './genre-albums.component.html',
+    selector: 'app-entity-albums',
+    templateUrl: './entity-albums.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [AlbumGridComponent, AlbumSortBarComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
-export class GenreAlbumsComponent {
-    genreId = input.required<string>()
+export class EntityAlbumsComponent {
+    entityId = input.required<string>()
+    kind = input.required<'genre' | 'recordLabel'>()
+    protected entityName = computed(() => (this.kind() == 'genre' ? 'genre' : 'record label'))
     private service = inject(LibraryBrowseService)
     private route = inject(ActivatedRoute)
     private router = inject(Router)
@@ -45,7 +47,14 @@ export class GenreAlbumsComponent {
     private grid = viewChild(AlbumGridComponent)
     private params = toSignal(this.route.queryParams, { initialValue: {} })
     protected query = computed<AlbumQuery>(
-        () => ({ ...albumQueryFromParams(this.params()), filter: { genreIds: [this.genreId()] } }),
+        () => ({
+            ...albumQueryFromParams(this.params()),
+            filter: {
+                ...(this.kind() == 'genre'
+                    ? { genreIds: [this.entityId()] }
+                    : { recordLabelIds: [this.entityId()] }),
+            },
+        }),
         { equal: sameAlbumQuery },
     )
     protected restoreScrollTop = linkedSignal<AlbumQuery, number | null>({

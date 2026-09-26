@@ -1,5 +1,9 @@
 import type {
     GenreQuery,
+    RecordLabelQuery,
+    RecordLabelWindowResult,
+    RecordLabelDetailResult,
+    RecordLabelArtistsWindowResult,
     GenreWindowResult,
     GenreDetailResult,
     GenreRelatedQuery,
@@ -49,6 +53,34 @@ const EMPTY_ALBUM_FILTER_DESCRIPTION: AlbumFilterDescription = {
 @Injectable({ providedIn: 'root' })
 export class LibraryBrowseService {
     private electronService = inject(ElectronService)
+
+    queryRecordLabels(query: RecordLabelQuery, window: BrowseWindow): Promise<RecordLabelWindowResult> {
+        if (!this.electronService.isElectron)
+            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryRecordLabels, {
+            query,
+            window,
+        })
+    }
+
+    getRecordLabelDetail(recordLabelId: string): Promise<RecordLabelDetailResult> {
+        if (!this.electronService.isElectron) return Promise.resolve(null)
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.getRecordLabelDetail, {
+            recordLabelId,
+        })
+    }
+
+    queryRecordLabelArtists(
+        recordLabelId: string,
+        window: BrowseWindow,
+    ): Promise<RecordLabelArtistsWindowResult> {
+        if (!this.electronService.isElectron)
+            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryRecordLabelArtists, {
+            recordLabelId,
+            window,
+        })
+    }
 
     queryGenres(query: GenreQuery, window: BrowseWindow): Promise<GenreWindowResult> {
         if (!this.electronService.isElectron)

@@ -56,6 +56,20 @@ export const appRoutes: Route[] = [
         canActivate: [libraryOnboardingGuard],
     },
     {
+        path: 'record-labels',
+        loadComponent: () =>
+            import('./pages/record-labels/record-labels.component').then(m => m.RecordLabelsComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
+        path: 'record-labels/:recordLabelId',
+        loadComponent: () =>
+            import('./pages/record-label-detail/record-label-detail.component').then(
+                m => m.RecordLabelDetailComponent,
+            ),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
         path: 'genres',
         loadComponent: () => import('./pages/genres/genres.component').then(m => m.GenresComponent),
         canActivate: [libraryOnboardingGuard],
