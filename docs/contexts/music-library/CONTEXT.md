@@ -155,6 +155,15 @@ artist's own albums; the two together account for every album the artist touches
 album never shows up here.
 _Avoid_: featured on, guest appearances, other releases
 
+**Years active**:
+The earliest and latest non-null year on songs credited to an artist through `song_artists`.
+A range does not claim the artist worked in every intervening year. With no tagged year, the UI says
+"Years unknown".
+
+**Released on record labels**:
+The distinct record labels of albums credited to an artist through `album_artists`. An album where
+the artist only has a song credit belongs under "Appears on" and does not add its record label here.
+
 **Record label**:
 The company that released a record: Warp, Ninja Tune, Hyperdub. Always **two words**, never "label"
 on its own. Bare "label" reads as a tag or a UI caption without context, which is why the concept was

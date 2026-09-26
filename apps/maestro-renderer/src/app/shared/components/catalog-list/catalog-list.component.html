@@ -27,6 +27,33 @@
                         (focus)="activeIndex.set(result().offset + index)"
                     >
                         <span class="min-w-0 flex-1 truncate" [title]="row.name">{{ row.name }}</span>
+                        @if (row.artistStats; as stats) {
+                            <span
+                                class="catalog-list__artist-tracks | w-24 shrink-0 text-right text-content-secondary tabular-nums"
+                                >{{ stats.songCount | number
+                                }}<span class="sr-only">
+                                    {{ stats.songCount === 1 ? 'track' : 'tracks' }}</span
+                                ></span
+                            >
+                            <span
+                                class="catalog-list__artist-albums | w-24 shrink-0 text-right text-content-secondary tabular-nums"
+                                >{{ stats.albumCount | number
+                                }}<span class="sr-only">
+                                    {{ stats.albumCount === 1 ? 'album' : 'albums' }}</span
+                                ></span
+                            >
+                            <span
+                                class="catalog-list__artist-years | w-24 shrink-0 text-right text-content-secondary tabular-nums"
+                            >
+                                <span class="sr-only">Years active </span>
+                                @if (stats.firstYear != null) {
+                                    {{ stats.firstYear
+                                    }}{{ stats.lastYear !== stats.firstYear ? '–' + stats.lastYear : '' }}
+                                } @else {
+                                    <span aria-label="Years unknown">Unknown</span>
+                                }
+                            </span>
+                        }
                         @if (showCounts() && row.counts; as counts) {
                             <!-- The unit is spoken but not drawn: the header row above
                                  labels the columns, and repeating "tracks" on every row

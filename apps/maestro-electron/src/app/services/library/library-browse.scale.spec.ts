@@ -17,6 +17,7 @@ import { join } from 'path'
 import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
 import {
+    albumArtistsTable,
     albumsTable,
     artistsTable,
     genresTable,
@@ -201,6 +202,9 @@ describe('LibraryBrowseRepository at library scale', () => {
                     .run()
             }
         })
+        db.insert(albumArtistsTable)
+            .values({ albumId: 'genre-album-1', artistId: 'artist-scale-1', position: 0 })
+            .run()
         sqlite.exec('ANALYZE')
 
         repository = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
@@ -225,6 +229,38 @@ describe('LibraryBrowseRepository at library scale', () => {
         expect(
             result.rows.every(row => row.songCount === 50 && row.artistCount === 50 && row.albumCount === 50),
         ).toBe(true)
+    })
+
+    it.each(['asc', 'desc'] as const)('windows artists by indexed name %s', direction => {
+        const statement = repository.artistWindowSql({
+            query: { search: '', sort: { field: 'name', direction } },
+            window: { offset: 900, limit: 20 },
+        })
+        const plan = JSON.stringify(
+            sqlite.prepare(`EXPLAIN QUERY PLAN ${statement.sql}`).all(...statement.params),
+        )
+        expect(plan).toContain('artists_name_key')
+        expect(plan).not.toMatch(/TEMP B-TREE FOR ORDER BY/i)
+        expect(
+            repository.queryArtists({
+                query: { search: '', sort: { field: 'name', direction } },
+                window: { offset: 0, limit: 20 },
+            }).total,
+        ).toBe(1_000)
+    })
+
+    it('orders artist record labels through the name index', () => {
+        const window = { offset: 0, limit: 20 }
+        const statement = repository.artistRecordLabelWindowSql('artist-scale-1', window)
+        const plan = JSON.stringify(
+            sqlite.prepare(`EXPLAIN QUERY PLAN ${statement.sql}`).all(...statement.params),
+        )
+        expect(plan).toContain('record_labels_name_key')
+        expect(plan).toContain('LIST SUBQUERY')
+        expect(plan).not.toMatch(/CORRELATED|TEMP B-TREE FOR ORDER BY/i)
+        expect(repository.queryArtistRecordLabels('artist-scale-1', window).rows).toEqual([
+            { id: 'genre-label-1', name: 'Record label 1' },
+        ])
     })
 
     it.each(['artists', 'recordLabels'] as const)(

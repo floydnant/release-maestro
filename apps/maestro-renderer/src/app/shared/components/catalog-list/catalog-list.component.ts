@@ -15,7 +15,7 @@ import {
 } from '@angular/core'
 import { DecimalPipe } from '@angular/common'
 import { RouterLink, type Params } from '@angular/router'
-import type { BrowseWindow, CatalogEntityRef, GenreRow } from '@release-maestro/core'
+import type { BrowseWindow, CatalogEntityRef, GenreRow, ArtistRow } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
 import { LIST_ROW_HEIGHT as ROW_HEIGHT, listWindowAt } from '../../browse/list-window'
 
@@ -23,6 +23,7 @@ export interface CatalogListRow extends CatalogEntityRef {
     link: string[]
     queryParams?: Params
     counts?: Pick<GenreRow, 'songCount' | 'artistCount' | 'albumCount'>
+    artistStats?: Pick<ArtistRow, 'songCount' | 'albumCount' | 'firstYear' | 'lastYear'>
 }
 
 /** A bounded list of entity links. The scroll container stays keyboard reachable at every window. */
