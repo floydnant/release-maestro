@@ -125,7 +125,9 @@
                                                 (mousedown)="$event.preventDefault()"
                                                 (click)="seekTrack($event, track.streamUrl)"
                                             >
-                                                <span class="truncate">{{ track.title }}</span>
+                                                <span class="truncate" [title]="track.title">{{
+                                                    track.title
+                                                }}</span>
                                                 <span class="shrink-0">
                                                     {{ track.duration ? formatDuration(track.duration) : '' }}
                                                 </span>
@@ -157,7 +159,9 @@
                                                     {{ $index + 1 }}.
                                                 }
                                             </span>
-                                            <span class="min-w-0 grow truncate">{{ track.title }}</span>
+                                            <span class="min-w-0 grow truncate" [title]="track.title">{{
+                                                track.title
+                                            }}</span>
                                             <span class="shrink-0">
                                                 {{ track.duration ? formatDuration(track.duration) : '' }}
                                             </span>
@@ -174,7 +178,7 @@
                         <div
                             class="text-column | relative flex max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] min-w-0 flex-col justify-between"
                         >
-                            <div class="overflow-x-hidden overflow-y-scroll wrap-anywhere">
+                            <div class="wrap-nicely overflow-x-hidden overflow-y-scroll">
                                 @if (feedItem.error; as error) {
                                     <div class="error | mb-1.5 flex items-center gap-2">
                                         <p class="text-content-danger">
@@ -239,7 +243,7 @@
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 class="flex max-w-full items-center gap-1.5 truncate rounded-lg bg-background-surface px-2 py-1 transition-colors duration-fast hover:bg-background-elevated not-hover:text-content-muted"
-                                                [title]="link.url"
+                                                [title]="link.title + '\n' + link.url"
                                             >
                                                 <img
                                                     class="favicon |"
@@ -288,7 +292,7 @@
 
                         @if (feedItem.data.band) {
                             <div
-                                class="label-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto wrap-anywhere"
+                                class="label-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] wrap-nicely overflow-y-auto"
                             >
                                 @if (feedItem.data.band.imageUrl; as imageUrl) {
                                     <img
@@ -331,7 +335,7 @@
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 class="max-w-full truncate text-content-primary not-hover:no-underline"
-                                                [title]="link.url"
+                                                [title]="link.text + '\n' + link.url"
                                             >
                                                 {{ link.text }}
                                             </a>

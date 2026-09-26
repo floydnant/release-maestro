@@ -118,6 +118,9 @@ test.describe('release feed scenario states', () => {
         const baseRelease = createHydratedRelease()
         const longWord = 'Puffycon'.repeat(24)
         const previewTitle = `Preview${longWord}`
+        const playableTrackTitle = `PlayableTrack${longWord}`
+        const unavailableTrackTitle = `UnavailableTrack${longWord}`
+        const labelLinkText = `LabelLink${longWord}`
         const release = createHydratedRelease({
             error: { message: `Error${longWord}` },
             data: {
@@ -127,13 +130,16 @@ test.describe('release feed scenario states', () => {
                 links: [
                     { title: previewTitle, favicon: baseRelease.data.imageUrl, url: 'https://example.com' },
                 ],
-                tracks: baseRelease.data.tracks.map(track => ({ ...track, title: `Track${longWord}` })),
+                tracks: baseRelease.data.tracks.flatMap(track => [
+                    { ...track, title: playableTrackTitle },
+                    { ...track, title: unavailableTrackTitle, streamUrl: null },
+                ]),
                 band: {
                     name: `Label${longWord}`,
                     imageUrl: null,
                     location: `Location${longWord}`,
                     bio: `Bio${longWord}`,
-                    links: [{ url: 'https://example.com', text: `LabelLink${longWord}` }],
+                    links: [{ url: 'https://example.com', text: labelLinkText }],
                 },
             },
         })
@@ -141,8 +147,15 @@ test.describe('release feed scenario states', () => {
 
         const titleLink = page.getByRole('link', { name: release.data.releaseName })
         const previewLink = page.getByRole('link', { name: previewTitle })
+        const labelLink = page.getByRole('link', { name: labelLinkText })
         await expect(titleLink).toBeVisible()
         await expect(previewLink).toBeVisible()
+        await expect(
+            page.getByRole('button', { name: `Seek within ${playableTrackTitle}` }).locator('span.truncate'),
+        ).toHaveAttribute('title', playableTrackTitle)
+        await expect(page.getByText(unavailableTrackTitle)).toHaveAttribute('title', unavailableTrackTitle)
+        await expect(previewLink).toHaveAttribute('title', `${previewTitle}\nhttps://example.com`)
+        await expect(labelLink).toHaveAttribute('title', `${labelLinkText}\nhttps://example.com`)
 
         for (const width of [1280, 960]) {
             await page.setViewportSize({ width, height: 720 })
