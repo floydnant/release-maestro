@@ -843,7 +843,7 @@ const assertClaimsAvailable = (registry, claims, worktreeId, allowedWorkflow = n
     if (conflict) throw new InstanceError(describeConflict(conflict), 'RESOURCE_CONFLICT')
 }
 
-const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()) => {
+const reconcileRegistry = async (registry, at = nowMs(), graceMs = configuredGraceMs()) => {
     const processIdentities =
         process.platform === 'darwin'
             ? new Map(processTable().map(row => [row.pid, row.startIdentity]))
@@ -856,7 +856,7 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
         const hadDevelopmentHolder = allocation.holders.some(isDevelopmentHolder)
         allocation.holders = allocation.holders.filter(isLive)
         const lostDevelopmentHolder = hadDevelopmentHolder && !allocation.holders.some(isDevelopmentHolder)
-        allocation.unverifiedPorts = unverifiedDevelopmentPorts(allocation, lostDevelopmentHolder)
+        allocation.unverifiedPorts = await unverifiedDevelopmentPorts(allocation, lostDevelopmentHolder)
         if (
             !existsSync(allocation.path) &&
             allocation.holders.length === 0 &&
@@ -948,7 +948,7 @@ const withRegistry = async action => {
     const paths = getStatePaths()
     const releaseLock = await acquireLock(paths)
     try {
-        const registry = reconcileRegistry(await readRegistry(paths))
+        const registry = await reconcileRegistry(await readRegistry(paths))
         const result = await action(registry, paths)
         registry.generation += 1
         await atomicWriteJson(paths.registryBackup, registry)
@@ -1099,12 +1099,20 @@ const listenerPids = port => {
         .filter(Number.isSafeInteger)
 }
 
-const unverifiedDevelopmentPorts = (allocation, lostDevelopmentHolder) => {
+export const unverifiedDevelopmentPorts = async (
+    allocation,
+    lostDevelopmentHolder,
+    listenersFor = listenerPids,
+    portAvailable = portIsAvailable,
+) => {
     if (allocation.holders.some(isDevelopmentHolder)) return []
     const ports = lostDevelopmentHolder
         ? Object.values(allocation.bundle)
         : (allocation.unverifiedPorts ?? [])
-    return ports.filter(port => listenerPids(port).length > 0)
+    const occupied = await Promise.all(
+        ports.map(async port => listenersFor(port).length > 0 || !(await portAvailable(port))),
+    )
+    return ports.filter((_, index) => occupied[index])
 }
 
 const unverifiedListenerMessage = allocation =>
@@ -1548,7 +1556,7 @@ export const removeDevelopmentHolder = async holderId => {
             allocation.updatedAt = iso(nowMs())
             const lostDevelopmentHolder =
                 hadDevelopmentHolder && !allocation.holders.some(isDevelopmentHolder)
-            allocation.unverifiedPorts = unverifiedDevelopmentPorts(allocation, lostDevelopmentHolder)
+            allocation.unverifiedPorts = await unverifiedDevelopmentPorts(allocation, lostDevelopmentHolder)
             if (allocation.holders.length === 0) {
                 allocation.inactiveSince = allocation.unverifiedPorts.length ? null : iso(nowMs())
             }

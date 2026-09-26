@@ -26,6 +26,7 @@ import {
     portIsAvailable,
     rootProcessHolders,
     spawnManaged,
+    unverifiedDevelopmentPorts,
 } from './core.mjs'
 
 jest.setTimeout(30_000)
@@ -44,6 +45,26 @@ test('process shutdown starts with supervisors and orphaned holders', () => {
     const orphan = { id: 'orphan', parentHolderId: 'missing-parent' }
 
     assert.deepEqual(rootProcessHolders([supervisor, managedChild, orphan]), [supervisor, orphan])
+})
+
+test('occupied dev ports survive a missing listener PID lookup', async () => {
+    const allocation = {
+        bundle: { renderer: 4200, cdp: 9222, inspector: 5858 },
+        holders: [],
+        unverifiedPorts: [],
+    }
+    const noPids = () => []
+    const onlyRendererOccupied = async port => port !== allocation.bundle.renderer
+    assert.deepEqual(await unverifiedDevelopmentPorts(allocation, true, noPids, onlyRendererOccupied), [
+        allocation.bundle.renderer,
+    ])
+    allocation.unverifiedPorts = [allocation.bundle.renderer]
+    assert.deepEqual(await unverifiedDevelopmentPorts(allocation, false, noPids, onlyRendererOccupied), [
+        allocation.bundle.renderer,
+    ])
+    assert.deepEqual(await unverifiedDevelopmentPorts(allocation, false, noPids, async () => true), [])
+    allocation.unverifiedPorts = []
+    assert.deepEqual(await unverifiedDevelopmentPorts(allocation, false, noPids, async () => false), [])
 })
 
 test('readable process identity wins over a denied existence probe', () => {
