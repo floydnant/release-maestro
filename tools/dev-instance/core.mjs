@@ -1051,6 +1051,7 @@ const listenerPids = port => {
             encoding: 'utf8',
             windowsHide: true,
         })
+        if (result.error || typeof result.stdout !== 'string') return []
         return result.stdout
             .split('\n')
             .map(line => line.trim().split(/\s+/))

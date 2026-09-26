@@ -29,7 +29,7 @@
                     {
                         "type": "command",
                         "command": "node \"$(git rev-parse --show-toplevel)/tools/dev-instance/hook.mjs\"",
-                        "timeout": 3
+                        "timeout": 10
                     }
                 ]
             }

@@ -33,6 +33,7 @@ const waitForVerifierReady = child =>
             child.unref()
             resolveReady()
         }
+        // Leave time before the WorktreeRemove hook's timeout in .claude/settings.json.
         const timeout = setTimeout(finish, 5_000)
         child.once('message', finish)
         child.once('error', finish)
@@ -53,10 +54,11 @@ const handleHook = async () => {
             return
         case 'WorktreeRemove': {
             if (typeof payload.worktree_path !== 'string') return
+            const worktreePath = resolve(payload.worktree_path)
             let worktreeId = ''
             try {
                 const manifest = JSON.parse(
-                    await readFile(resolve(payload.worktree_path, '.release-maestro-instance.json'), 'utf8'),
+                    await readFile(resolve(worktreePath, '.release-maestro-instance.json'), 'utf8'),
                 )
                 if (typeof manifest.worktreeId === 'string') worktreeId = manifest.worktreeId
             } catch {
@@ -64,9 +66,9 @@ const handleHook = async () => {
             }
             const child = spawn(
                 process.execPath,
-                [fileURLToPath(import.meta.url), 'verify-remove', payload.worktree_path, worktreeId],
+                [fileURLToPath(import.meta.url), 'verify-remove', worktreePath, worktreeId],
                 {
-                    cwd: parse(resolve(payload.worktree_path)).root,
+                    cwd: parse(worktreePath).root,
                     detached: true,
                     stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
                 },
