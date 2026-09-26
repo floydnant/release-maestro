@@ -20,7 +20,7 @@ Include this instruction in every brief sent to the reviewing agent:
 > skill or request another second opinion. This call is the final review level.
 
 ```sh
-codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only "<brief>"
+codex exec -m gpt-6-sol -c model_reasoning_effort="medium" -s read-only "<brief>"
 ```
 
 `-s read-only` keeps it from writing. The brief is one argument: what to look at, where — paths, or a
@@ -35,7 +35,7 @@ If run alongside [code-review](../code-review/SKILL.md), this is a fourth axis. 
 and lead with the harness and model that produced it:
 
     ## Second opinion
-    codex / gpt-5.6-sol, medium reasoning
+    codex / gpt-6-sol, medium reasoning
 
 Keep its findings verbatim. Don't merge or rerank them into the other axes — separation is the point
 there, and a different vendor's read is exactly what averaging destroys.
