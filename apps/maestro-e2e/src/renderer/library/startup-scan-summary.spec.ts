@@ -59,6 +59,11 @@ test.describe('startup scan summary', () => {
             await createRendererScenario(page, scenario, '/home')
 
             await expect(page.getByRole('status')).toHaveText(summary)
+            if (summary === 'Nothing new') {
+                const icon = page.getByRole('status').locator('app-icon')
+                await expect(icon).toHaveAttribute('name', 'success')
+                await expect(icon).toHaveAttribute('color', 'content.secondary')
+            }
         })
     }
 
