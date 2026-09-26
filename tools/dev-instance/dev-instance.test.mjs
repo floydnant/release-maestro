@@ -92,9 +92,11 @@ const createFixture = async ({ worktrees = 1 } = {}) => {
 
 const createWindowsOrphanLauncher = async fixture => {
     const grandchildPidPath = join(fixture.base, 'grandchild.pid')
+    const grandchildLogPath = join(fixture.base, 'grandchild.log')
     const grandchildPath = join(fixture.base, 'grandchild.cjs')
     const intermediaryPath = join(fixture.base, 'intermediary.cjs')
     const launcherPath = join(fixture.base, 'launcher.cjs')
+    await writeFile(grandchildLogPath, '')
     await writeFile(
         grandchildPath,
         `require('node:fs').writeFileSync(${JSON.stringify(grandchildPidPath)}, String(process.pid))
@@ -104,8 +106,10 @@ setInterval(() => {}, 1000)
     await writeFile(
         intermediaryPath,
         `const { spawn } = require('node:child_process')
+const { openSync } = require('node:fs')
 spawn(process.execPath, [${JSON.stringify(grandchildPath)}], {
-    stdio: ['ignore', 'ignore', 'inherit'],
+    detached: true,
+    stdio: ['ignore', 'ignore', openSync(${JSON.stringify(grandchildLogPath)}, 'a')],
 }).unref()
 `,
     )
@@ -117,7 +121,7 @@ spawn(process.execPath, [${JSON.stringify(intermediaryPath)}], {
 })
 `,
     )
-    return { launcherPath, grandchildPidPath }
+    return { launcherPath, grandchildPidPath, grandchildLogPath }
 }
 
 const environmentFor = (fixture, extra = {}) => ({
@@ -1231,7 +1235,7 @@ test('run-workflow stops descendants left behind by a successful launcher', asyn
 test('Windows workflow keeps its claim until an orphaned grandchild exits', async () => {
     if (process.platform !== 'win32') return
     const fixture = await createFixture()
-    const { launcherPath, grandchildPidPath } = await createWindowsOrphanLauncher(fixture)
+    const { launcherPath, grandchildPidPath, grandchildLogPath } = await createWindowsOrphanLauncher(fixture)
     const workflow = spawn(
         process.execPath,
         [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, launcherPath],
@@ -1253,7 +1257,7 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
                 if (workflow.exitCode !== null || workflow.signalCode !== null) {
                     await workflowClosed
                     assert.fail(
-                        `workflow exited ${workflow.exitCode} before grandchild started: stdout=${workflowStdout} stderr=${workflowStderr}`,
+                        `workflow exited ${workflow.exitCode} before grandchild started: stdout=${workflowStdout} stderr=${workflowStderr} grandchild=${await readFile(grandchildLogPath, 'utf8')}`,
                     )
                 }
                 return readFile(grandchildPidPath, 'utf8')
@@ -1298,7 +1302,7 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
 test('Windows workflow cancellation kills an orphaned grandchild before releasing its claim', async () => {
     if (process.platform !== 'win32') return
     const fixture = await createFixture()
-    const { launcherPath, grandchildPidPath } = await createWindowsOrphanLauncher(fixture)
+    const { launcherPath, grandchildPidPath, grandchildLogPath } = await createWindowsOrphanLauncher(fixture)
     const workflow = spawn(
         process.execPath,
         [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, launcherPath],
@@ -1320,7 +1324,7 @@ test('Windows workflow cancellation kills an orphaned grandchild before releasin
                 if (workflow.exitCode !== null || workflow.signalCode !== null) {
                     await workflowClosed
                     assert.fail(
-                        `workflow exited ${workflow.exitCode} before grandchild started: stdout=${workflowStdout} stderr=${workflowStderr}`,
+                        `workflow exited ${workflow.exitCode} before grandchild started: stdout=${workflowStdout} stderr=${workflowStderr} grandchild=${await readFile(grandchildLogPath, 'utf8')}`,
                     )
                 }
                 return readFile(grandchildPidPath, 'utf8')
