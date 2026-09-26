@@ -36,14 +36,14 @@ import {
     developmentAppName,
     formatDevelopmentStatus,
     formatDevelopmentSummary,
+    formatErrorMessage,
     formatInstanceList,
+    useColor,
 } from './presentation.mjs'
 
 const print = value => process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)
-const useColor = () => {
-    if ('FORCE_COLOR' in process.env) return process.env['FORCE_COLOR'] !== '0'
-    return Boolean(process.stdout.isTTY && !('NO_COLOR' in process.env))
-}
+const printError = message =>
+    process.stderr.write(`${formatErrorMessage(message, { color: useColor(process.stderr) })}\n`)
 
 const exitForChild = (code, signal) => {
     if (signal) return 128 + (osConstants.signals[signal] ?? 0)
@@ -151,7 +151,7 @@ const runDevelopment = async () => {
                 '--port',
                 String(allocation.bundle.renderer),
             ],
-            { env: environment, waitForTree: true },
+            { env: environment },
         )
         children.push(renderer)
         const rendererExit = waitForExit(renderer)
@@ -218,7 +218,7 @@ const runDevelopment = async () => {
                 '--port',
                 String(allocation.bundle.inspector),
             ],
-            { env: electronEnvironment, waitForTree: true },
+            { env: electronEnvironment },
         )
         children.push(electron)
         const electronExit = waitForExit(electron)
@@ -339,7 +339,6 @@ const runWorkflow = async args => {
         const environment = {
             ...process.env,
             ...bundleEnvironment(transient.bundle, transient.appDataPath),
-            ...(process.platform === 'win32' ? { NX_DAEMON: 'false' } : {}),
         }
         for (const [command, ...commandArgs] of commands) {
             if (cancellationSignal) {
@@ -347,8 +346,8 @@ const runWorkflow = async args => {
                 break
             }
             child = ['nx', 'playwright'].includes(command)
-                ? spawnPackageBinary(command, commandArgs, { env: environment, waitForTree: true })
-                : spawnManaged(command, commandArgs, { env: environment, waitForTree: true })
+                ? spawnPackageBinary(command, commandArgs, { env: environment })
+                : spawnManaged(command, commandArgs, { env: environment })
             clearTimeout(startupShutdownTimer)
             startupShutdownTimer = null
             try {
@@ -422,8 +421,8 @@ const runWorkflow = async args => {
         if (transient) {
             const release = await releaseTransient(transient.id)
             if (release.reason === 'occupied-port') {
-                process.stderr.write(
-                    `Workflow renderer port ${release.port} remains occupied after ${transient.workflow}; its claim stays active. Stop the listener before retrying.\n`,
+                printError(
+                    `Workflow renderer port ${release.port} remains occupied after ${transient.workflow}; its claim stays active. Stop the listener before retrying.`,
                 )
             }
         }
@@ -490,7 +489,7 @@ const main = async () => {
 main().catch(async error => {
     const prefix = error instanceof InstanceError ? error.code : 'UNEXPECTED_ERROR'
     const message = error instanceof Error ? error.message : String(error)
-    process.stderr.write(`${prefix}: ${message}\n`)
+    printError(`${prefix}: ${message}`)
     await logDiagnostic('command-failed', { code: prefix, reason: message }).catch(() => {})
     process.exitCode = 1
 })

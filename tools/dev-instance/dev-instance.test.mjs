@@ -22,7 +22,6 @@ import { afterEach, jest, test } from '@jest/globals'
 import {
     currentProcessIdentity,
     holderIsLive,
-    parseWindowsListeningPids,
     parseUnixProcessIdentity,
     portIsAvailable,
     rootProcessHolders,
@@ -38,18 +37,6 @@ test('Unix process identities exclude zombie and exiting processes', () => {
     assert.equal(parseUnixProcessIdentity(`S+ ${started}`), started)
     assert.equal(parseUnixProcessIdentity(`Z ${started}`), null)
     assert.equal(parseUnixProcessIdentity(`?Es ${started}`), null)
-})
-
-test('Windows listener lookup includes IPv6 and localized netstat rows', () => {
-    const output = [
-        '  TCP    127.0.0.1:4200     0.0.0.0:0      LISTENING     1234',
-        '  TCP    [::1]:4200        [::]:0         ABHÖREN       5678',
-        '  TCP    127.0.0.1:14200    0.0.0.0:0      LISTENING     9012',
-        '  TCP    127.0.0.1:4200     192.0.2.1:1234 ESTABLISHED   3456',
-        '  UDP    127.0.0.1:4200     *:*                         7890',
-    ].join('\n')
-
-    assert.deepEqual(parseWindowsListeningPids(output, 4200), [1234, 5678])
 })
 
 test('process shutdown starts with supervisors and orphaned holders', () => {
@@ -177,40 +164,6 @@ const createFixture = async ({ worktrees = 1 } = {}) => {
     return { base, main, roots, state }
 }
 
-const createWindowsOrphanLauncher = async fixture => {
-    const grandchildPidPath = join(fixture.base, 'grandchild.pid')
-    const grandchildLogPath = join(fixture.base, 'grandchild.log')
-    const grandchildPath = join(fixture.base, 'grandchild.cjs')
-    const intermediaryPath = join(fixture.base, 'intermediary.cjs')
-    const launcherPath = join(fixture.base, 'launcher.cjs')
-    await writeFile(grandchildLogPath, '')
-    await writeFile(
-        grandchildPath,
-        `require('node:fs').writeFileSync(${JSON.stringify(grandchildPidPath)}, String(process.pid))
-setInterval(() => {}, 1000)
-`,
-    )
-    await writeFile(
-        intermediaryPath,
-        `const { spawn } = require('node:child_process')
-const { openSync } = require('node:fs')
-spawn(process.execPath, [${JSON.stringify(grandchildPath)}], {
-    detached: true,
-    stdio: ['ignore', 'ignore', openSync(${JSON.stringify(grandchildLogPath)}, 'a')],
-}).unref()
-`,
-    )
-    await writeFile(
-        launcherPath,
-        `const { spawn } = require('node:child_process')
-spawn(process.execPath, [${JSON.stringify(intermediaryPath)}], {
-    stdio: ['ignore', 'ignore', 'inherit'],
-})
-`,
-    )
-    return { launcherPath, grandchildPidPath, grandchildLogPath }
-}
-
 const environmentFor = (fixture, extra = {}) => ({
     ...process.env,
     RELEASE_MAESTRO_INSTANCE_STATE_DIR: fixture.state,
@@ -230,6 +183,22 @@ const runJson = (fixture, cwd, args, extra = {}) => {
     assert.equal(result.status, 0, result.stderr)
     return JSON.parse(result.stdout)
 }
+
+test('CLI and MCP errors are red when terminal color is requested', async () => {
+    const fixture = await createFixture()
+    const environment = environmentFor(fixture, { FORCE_COLOR: '1' })
+    const cliError = run(fixture, fixture.main, ['unknown-command'], { FORCE_COLOR: '1' })
+    assert.equal(cliError.status, 1)
+    assert.match(cliError.stderr, /\u001b\[31mUSAGE: .*\u001b\[0m/)
+
+    const wrapperError = spawnSync(process.execPath, [mcpWrapper, 'unknown-server'], {
+        cwd: fixture.main,
+        env: environment,
+        encoding: 'utf8',
+    })
+    assert.equal(wrapperError.status, 2)
+    assert.match(wrapperError.stderr, /\u001b\[31mUsage: mcp-wrapper\.mjs .*\u001b\[0m/)
+})
 
 const waitFor = async (read, predicate, message, timeoutMs = 15_000) => {
     const deadline = Date.now() + timeoutMs
@@ -1952,68 +1921,6 @@ test('an MCP child retains its allocation after the wrapper is killed', async ()
     }
 })
 
-test('Windows MCP wrapper death closes its managed child job', async () => {
-    if (process.platform !== 'win32') return
-    const fixture = await createFixture()
-    const bin = await createFakePnpm(fixture)
-    const childPidPath = join(fixture.base, 'mcp-child.pid')
-    const wrapper = spawnMcp(fixture, fixture.main, bin, 'chrome-devtools', {
-        FAKE_CHILD_PID_PATH: childPidPath,
-    })
-    let wrapperStderr = ''
-    wrapper.stderr.on('data', chunk => (wrapperStderr += chunk))
-    const wrapperExit = childResult(wrapper)
-    let childPid
-    try {
-        childPid = Number(
-            await waitFor(
-                () => {
-                    assert.equal(wrapper.exitCode, null, wrapperStderr)
-                    return readFile(childPidPath, 'utf8')
-                },
-                value => Number.isSafeInteger(Number(value)),
-                'MCP child process did not start',
-                60_000,
-            ),
-        )
-        await waitFor(
-            () => {
-                assert.equal(wrapper.exitCode, null, wrapperStderr)
-                return Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json']))
-            },
-            status => status.holders?.some(holder => holder.role === 'mcp-child:chrome-devtools'),
-            'MCP child job did not register',
-            60_000,
-        )
-        wrapper.kill('SIGKILL')
-        await wrapperExit
-        await waitFor(
-            () => {
-                try {
-                    process.kill(childPid, 0)
-                    return Promise.resolve(false)
-                } catch (error) {
-                    if (error?.code === 'ESRCH') return Promise.resolve(true)
-                    throw error
-                }
-            },
-            dead => dead,
-            'MCP child survived wrapper death',
-        )
-        assert.deepEqual(runJson(fixture, fixture.main, ['dev-status', '--json']).holders, [])
-    } finally {
-        if (wrapper.exitCode === null && wrapper.signalCode === null) wrapper.kill('SIGKILL')
-        await wrapperExit
-        if (childPid) {
-            try {
-                process.kill(childPid, 'SIGKILL')
-            } catch (error) {
-                if (error?.code !== 'ESRCH') throw error
-            }
-        }
-    }
-}, 120_000)
-
 test('run-workflow records a replacement detached listener before its wrapper exits', async () => {
     if (process.platform === 'win32') return
     const fixture = await createFixture()
@@ -2146,263 +2053,30 @@ test('run-workflow stops a detached listener after its launcher crashes', async 
     }
 }, 45_000)
 
-test('Windows workflow keeps its claim until an orphaned grandchild exits', async () => {
-    if (process.platform !== 'win32') return
-    const fixture = await createFixture()
-    const { launcherPath, grandchildPidPath, grandchildLogPath } = await createWindowsOrphanLauncher(fixture)
-    const workflow = spawn(
-        process.execPath,
-        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, launcherPath],
-        {
-            cwd: fixture.main,
-            env: environmentFor(fixture, { RELEASE_MAESTRO_TREE_DEBUG: '1' }),
-            stdio: ['ignore', 'pipe', 'pipe'],
-        },
-    )
-    liveChildren.push(workflow)
-    let workflowStdout = ''
-    workflow.stdout.on('data', chunk => (workflowStdout += chunk))
-    let workflowStderr = ''
-    workflow.stderr.on('data', chunk => (workflowStderr += chunk))
-    const workflowClosed = new Promise(resolve => workflow.once('close', resolve))
-    const grandchildPid = Number(
-        await waitFor(
-            async () => {
-                if (workflow.exitCode !== null || workflow.signalCode !== null) {
-                    await workflowClosed
-                    assert.fail(
-                        `workflow exited ${workflow.exitCode} before grandchild started: stdout=${workflowStdout} stderr=${workflowStderr} grandchild=${await readFile(grandchildLogPath, 'utf8')}`,
-                    )
-                }
-                return readFile(grandchildPidPath, 'utf8')
-            },
-            value => Number.isSafeInteger(Number(value)),
-            'grandchild did not start',
-        ),
-    )
-    try {
-        const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
-        assert.ok(listed.instances.some(instance => instance.workflow === 'renderer-e2e'))
-        assert.equal(workflow.exitCode, null)
-        let grandchildAlive = true
-        try {
-            process.kill(grandchildPid, 0)
-        } catch (error) {
-            if (error.code !== 'ESRCH') throw error
-            grandchildAlive = false
-        }
-        assert.equal(
-            grandchildAlive,
-            true,
-            `grandchild exited early; workflow=${workflow.exitCode} stdout=${workflowStdout} stderr=${workflowStderr}`,
-        )
-    } finally {
-        try {
-            process.kill(grandchildPid, 'SIGTERM')
-        } catch (error) {
-            if (error.code !== 'ESRCH') throw error
-        }
-    }
-    const result = await childResult(workflow)
-    assert.equal(result.code, 0, result.stderr)
-    assert.equal(
-        runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
-            instance => instance.workflow === 'renderer-e2e',
-        ),
-        false,
-    )
-})
-
-test('Windows workflow cancellation kills an orphaned grandchild before releasing its claim', async () => {
-    if (process.platform !== 'win32') return
-    const fixture = await createFixture()
-    const { launcherPath, grandchildPidPath, grandchildLogPath } = await createWindowsOrphanLauncher(fixture)
-    const workflow = spawn(
-        process.execPath,
-        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, launcherPath],
-        {
-            cwd: fixture.main,
-            env: environmentFor(fixture, { RELEASE_MAESTRO_TREE_DEBUG: '1' }),
-            stdio: ['ignore', 'pipe', 'pipe'],
-        },
-    )
-    liveChildren.push(workflow)
-    let workflowStdout = ''
-    workflow.stdout.on('data', chunk => (workflowStdout += chunk))
-    let workflowStderr = ''
-    workflow.stderr.on('data', chunk => (workflowStderr += chunk))
-    const workflowClosed = new Promise(resolve => workflow.once('close', resolve))
-    const grandchildPid = Number(
-        await waitFor(
-            async () => {
-                if (workflow.exitCode !== null || workflow.signalCode !== null) {
-                    await workflowClosed
-                    assert.fail(
-                        `workflow exited ${workflow.exitCode} before grandchild started: stdout=${workflowStdout} stderr=${workflowStderr} grandchild=${await readFile(grandchildLogPath, 'utf8')}`,
-                    )
-                }
-                return readFile(grandchildPidPath, 'utf8')
-            },
-            value => Number.isSafeInteger(Number(value)),
-            'grandchild did not start',
-        ),
-    )
-    try {
-        workflow.kill('SIGTERM')
-        const result = await childResult(workflow)
-        assert.notEqual(result.code, 0, result.stderr)
-        await waitFor(
-            () => {
-                try {
-                    process.kill(grandchildPid, 0)
-                    return false
-                } catch (error) {
-                    if (error.code === 'ESRCH') return true
-                    throw error
-                }
-            },
-            dead => dead,
-            'grandchild survived workflow cancellation',
-        )
-        assert.equal(
-            runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
-                instance => instance.workflow === 'renderer-e2e',
-            ),
-            false,
-        )
-    } finally {
-        if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGTERM')
-        try {
-            process.kill(grandchildPid, 'SIGTERM')
-        } catch (error) {
-            if (error.code !== 'ESRCH') throw error
-        }
-    }
-})
-
-test('Windows workflow cancellation kills a running command before releasing its claim', async () => {
-    if (process.platform !== 'win32') return
-    const fixture = await createFixture()
-    const commandPath = join(fixture.base, 'running-command.cjs')
-    const commandPidPath = join(fixture.base, 'running-command.pid')
-    await writeFile(
-        commandPath,
-        `require('node:fs').writeFileSync(${JSON.stringify(commandPidPath)}, String(process.pid))
-setInterval(() => {}, 1000)
-`,
-    )
-    const workflow = spawn(
-        process.execPath,
-        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, commandPath],
-        {
-            cwd: fixture.main,
-            env: environmentFor(fixture, { RELEASE_MAESTRO_TREE_DEBUG: '1' }),
-            stdio: ['ignore', 'pipe', 'pipe'],
-        },
-    )
-    liveChildren.push(workflow)
-    let workflowStderr = ''
-    workflow.stderr.on('data', chunk => (workflowStderr += chunk))
-    const workflowClosed = new Promise(resolve => workflow.once('close', resolve))
-    const commandPid = Number(
-        await waitFor(
-            async () => {
-                if (workflow.exitCode !== null || workflow.signalCode !== null) {
-                    await workflowClosed
-                    assert.fail(
-                        `workflow exited ${workflow.exitCode} before command started: ${workflowStderr}`,
-                    )
-                }
-                return readFile(commandPidPath, 'utf8')
-            },
-            value => Number.isSafeInteger(Number(value)),
-            'workflow command did not start',
-        ),
-    )
-    try {
-        workflow.kill('SIGTERM')
-        const result = await childResult(workflow)
-        assert.notEqual(result.code, 0, workflowStderr)
-        await waitFor(
-            () => {
-                try {
-                    process.kill(commandPid, 0)
-                    return false
-                } catch (error) {
-                    if (error.code === 'ESRCH') return true
-                    throw error
-                }
-            },
-            dead => dead,
-            'running workflow command survived cancellation',
-        )
-        assert.equal(
-            runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
-                instance => instance.workflow === 'renderer-e2e',
-            ),
-            false,
-        )
-    } finally {
-        if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGTERM')
-        try {
-            process.kill(commandPid, 'SIGTERM')
-        } catch (error) {
-            if (error.code !== 'ESRCH') throw error
-        }
-    }
-})
-
 test('run-workflow passes separators and shell metacharacters as literal child arguments', async () => {
     const fixture = await createFixture()
-    const result = run(
-        fixture,
-        fixture.main,
-        [
-            'run-workflow',
-            'renderer-e2e',
-            '--',
-            process.execPath,
-            '-e',
-            'process.exit(process.argv[1] === "--then" && process.argv[2] === "value with spaces & pipes | literally" ? 0 : 9)',
-            '--',
-            '--literal',
-            '--then',
-            'value with spaces & pipes | literally',
-        ],
-        { RELEASE_MAESTRO_TREE_DEBUG: '1' },
-    )
+    const result = run(fixture, fixture.main, [
+        'run-workflow',
+        'renderer-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        'process.exit(process.argv[1] === "--then" && process.argv[2] === "value with spaces & pipes | literally" ? 0 : 9)',
+        '--',
+        '--literal',
+        '--then',
+        'value with spaces & pipes | literally',
+    ])
     assert.equal(result.status, 0, result.stderr)
-    const nonzero = run(
-        fixture,
-        fixture.main,
-        ['run-workflow', 'renderer-e2e', '--', process.execPath, '-e', 'process.exit(9)'],
-        { RELEASE_MAESTRO_TREE_DEBUG: '1' },
-    )
+    const nonzero = run(fixture, fixture.main, [
+        'run-workflow',
+        'renderer-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        'process.exit(9)',
+    ])
     assert.equal(nonzero.status, 9, nonzero.stderr)
-})
-
-test('Windows workflow prefers pnpm.cmd over an extensionless pnpm shim', async () => {
-    if (process.platform !== 'win32') return
-    const fixture = await createFixture()
-    const bin = join(fixture.base, 'bin')
-    const capture = join(fixture.base, 'pnpm-arguments.txt')
-    await mkdir(bin)
-    await writeFile(join(bin, 'pnpm'), '#!/bin/sh\nexit 9\n')
-    await writeFile(join(bin, 'pnpm.cmd'), '@echo off\r\necho %* > "%FAKE_CAPTURE%"\r\n')
-    const result = run(
-        fixture,
-        fixture.main,
-        ['run-workflow', 'renderer-e2e', '--', 'playwright', '--version'],
-        {
-            PATH: `${bin}${delimiter}${process.env.PATH}`,
-            npm_execpath: '',
-            RELEASE_MAESTRO_PNPM_COMMAND: '',
-            FAKE_CAPTURE: capture,
-            PATHEXT: ';.COM;.EXE;.BAT;.CMD',
-        },
-    )
-    assert.equal(result.status, 0, result.stderr)
-    assert.match(await readFile(capture, 'utf8'), /exec.*playwright.*--version/)
 })
 
 test('run-workflow launches pnpm from npm_execpath with Node', async () => {

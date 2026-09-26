@@ -71,8 +71,6 @@ Electron development build, so the manager rejects that overlap in one worktree.
 renderer E2E can run together. Two copies of the same mutating E2E target cannot. E2E workflows
 get transient bundles, which are released when their commands exit. MCP wrappers share their
 worktree's stable development bundle and may run before `make dev`.
-On Windows, development, MCP, and E2E launchers use process jobs so descendants stop with the
-launcher or keep its allocation active until they exit.
 On macOS and Linux, the manager records a verified E2E renderer listener so its claim survives an
 abrupt test-runner exit until the listener stops. If a runner exits before the listener can be
 verified, an occupied transient renderer port keeps the claim until the port is free.
@@ -84,6 +82,7 @@ the development and Electron build claims until the port is free.
 Use `make dev-status` for this worktree's development allocation and `make dev-list` for workflow
 holders or other worktrees. `make dev-log` shows the event that caused a failure. If an unrelated
 process took a persisted port, stop your dev stack and MCP clients, then run `make dev-reallocate`.
+Errors and failed log entries appear red in color-capable terminals; JSON output and stored logs stay plain.
 `make dev-stop` is the manual resort for stuck processes in agent terminals and orphaned E2E
 processes. It checks both worktree ownership and process start identity before signaling them.
 For a transient port with no verified holder, stop the port owner manually; the claim clears when

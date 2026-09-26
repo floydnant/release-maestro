@@ -13,10 +13,14 @@ import {
     logDiagnostic,
 } from './core.mjs'
 import { constants as osConstants } from 'node:os'
+import { formatErrorMessage, useColor } from './presentation.mjs'
+
+const printError = message =>
+    process.stderr.write(`${formatErrorMessage(message, { color: useColor(process.stderr) })}\n`)
 
 const server = process.argv[2]
 if (!['chrome-devtools', 'playwright'].includes(server)) {
-    process.stderr.write('Usage: mcp-wrapper.mjs <chrome-devtools|playwright>\n')
+    printError('Usage: mcp-wrapper.mjs <chrome-devtools|playwright>')
     process.exit(2)
 }
 
@@ -63,7 +67,6 @@ try {
     const [binary, ...binaryArgs] = commandArgs.slice(1)
     child = spawnPackageBinary(binary, binaryArgs, {
         env: { ...process.env, ...bundleEnvironment(allocation.bundle, allocation.appDataPath) },
-        waitForTree: true,
     })
     const childExit = new Promise(resolve => {
         child.once('exit', (code, signal) => resolve({ code, signal }))
@@ -100,7 +103,7 @@ try {
     }
 } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    process.stderr.write(`MCP wrapper failed: ${message}\n`)
+    printError(`MCP wrapper failed: ${message}`)
     await logDiagnostic('mcp-wrapper-failed', { server, reason: message }).catch(() => {})
     process.exitCode = 1
 } finally {
@@ -125,7 +128,7 @@ try {
     }
     if (stopError) {
         const message = stopError instanceof Error ? stopError.message : String(stopError)
-        process.stderr.write(`MCP child cleanup failed: ${message}\n`)
+        printError(`MCP child cleanup failed: ${message}`)
         await logDiagnostic('mcp-child-cleanup-failed', { server, reason: message }).catch(() => {})
         process.exitCode = 1
     }

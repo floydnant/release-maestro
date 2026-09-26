@@ -5,7 +5,6 @@ import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'n
 import net from 'node:net'
 import { homedir } from 'node:os'
 import { basename, delimiter, dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { formatLogEvent } from './presentation.mjs'
 
 export const registryVersion = 1
@@ -1045,29 +1044,19 @@ const bundleIsAvailable = async bundle => {
     return true
 }
 
-export const parseWindowsListeningPids = (output, port) =>
-    output
-        .split('\n')
-        .map(line => line.trim().split(/\s+/))
-        .filter(
-            parts =>
-                parts.length >= 5 &&
-                parts[0] === 'TCP' &&
-                parts[1].endsWith(`:${port}`) &&
-                ['0.0.0.0:0', '[::]:0'].includes(parts[2]),
-        )
-        .map(parts => Number(parts.at(-1)))
-        .filter(Number.isSafeInteger)
-
 const listenerPids = port => {
     if (process.platform === 'win32') {
-        const result = spawnSync('netstat.exe', ['-ano'], {
+        const result = spawnSync('netstat.exe', ['-ano', '-p', 'tcp'], {
             encoding: 'utf8',
-            maxBuffer: 16 * 1024 * 1024,
             windowsHide: true,
         })
         if (result.error || typeof result.stdout !== 'string') return []
-        return parseWindowsListeningPids(result.stdout, port)
+        return result.stdout
+            .split('\n')
+            .map(line => line.trim().split(/\s+/))
+            .filter(parts => parts.length >= 5 && parts[1]?.endsWith(`:${port}`) && parts[3] === 'LISTENING')
+            .map(parts => Number(parts[4]))
+            .filter(Number.isSafeInteger)
     }
     const lsof = process.platform === 'darwin' ? '/usr/sbin/lsof' : 'lsof'
     const result = spawnSync(lsof, ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'], {
@@ -1983,84 +1972,12 @@ const spawnPortable = (command, args, options) => {
     })
 }
 
-const windowsTreeCommand = `
-$ErrorActionPreference = 'Stop'
-try {
-Add-Type -Path $env:RELEASE_MAESTRO_TREE_JOB_HELPER
-$parentPid = [uint32]$env:RELEASE_MAESTRO_TREE_PARENT_PID
-$parent = [ReleaseMaestro.Job]::OpenParent($parentPid)
-if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
-$parentProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $parentPid" -ErrorAction Stop
-if (-not $parentProcess) { exit 143 }
-if ([string]$parentProcess.CreationDate.ToUniversalTime().Ticks -ne $env:RELEASE_MAESTRO_TREE_PARENT_START) { exit 143 }
-if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
-$job = [ReleaseMaestro.Job]::CreateAndAssignCurrentProcess()
-$arguments = '"' + $env:RELEASE_MAESTRO_TREE_SCRIPT + '"'
-$startInfo = New-Object System.Diagnostics.ProcessStartInfo
-$startInfo.FileName = $env:RELEASE_MAESTRO_TREE_NODE
-$startInfo.Arguments = $arguments
-$startInfo.UseShellExecute = $false
-$child = New-Object System.Diagnostics.Process
-$child.StartInfo = $startInfo
-if (-not $child.Start()) { throw 'Failed to start workflow command' }
-while (-not $child.WaitForExit(100)) {
-    if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
-}
-$child.WaitForExit()
-$exitCode = $child.ExitCode
-if ($env:RELEASE_MAESTRO_TREE_DEBUG -eq '1') {
-    [Console]::Error.WriteLine("workflow tree: child exit=$exitCode active=$([ReleaseMaestro.Job]::ActiveProcessCount($job))")
-}
-while ([ReleaseMaestro.Job]::ActiveProcessCount($job) -gt 1) {
-    if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
-    Start-Sleep -Milliseconds 100
-}
-exit $exitCode
-} catch {
-    [Console]::Error.WriteLine($_.Exception.ToString())
-    exit 1
-}
-`
-
 export const spawnManaged = (command, args, options = {}) => {
-    const { waitForTree = false, ...spawnOptions } = options
-    const child =
-        waitForTree && process.platform === 'win32'
-            ? spawn(
-                  'powershell.exe',
-                  [
-                      '-NoProfile',
-                      '-NonInteractive',
-                      '-EncodedCommand',
-                      Buffer.from(windowsTreeCommand, 'utf16le').toString('base64'),
-                  ],
-                  {
-                      stdio: 'inherit',
-                      windowsHide: true,
-                      ...spawnOptions,
-                      env: {
-                          ...process.env,
-                          ...spawnOptions.env,
-                          RELEASE_MAESTRO_TREE_NODE: process.execPath,
-                          RELEASE_MAESTRO_TREE_PARENT_PID: String(process.pid),
-                          RELEASE_MAESTRO_TREE_PARENT_START: currentProcessIdentity().startIdentity,
-                          RELEASE_MAESTRO_TREE_SCRIPT: join(
-                              dirname(fileURLToPath(import.meta.url)),
-                              'windows-tree.mjs',
-                          ),
-                          RELEASE_MAESTRO_TREE_JOB_HELPER: join(
-                              dirname(fileURLToPath(import.meta.url)),
-                              'windows-job.cs',
-                          ),
-                          RELEASE_MAESTRO_TREE_COMMAND: JSON.stringify({ command, args }),
-                      },
-                  },
-              )
-            : spawnPortable(command, args, {
-                  stdio: 'inherit',
-                  detached: process.platform !== 'win32',
-                  ...spawnOptions,
-              })
+    const child = spawnPortable(command, args, {
+        stdio: 'inherit',
+        detached: process.platform !== 'win32',
+        ...options,
+    })
     try {
         child.releaseMaestroStartIdentity = processStartIdentity(child.pid)
     } catch (error) {

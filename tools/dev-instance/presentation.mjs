@@ -6,6 +6,7 @@ const ansi = {
     dim: '\u001b[2m',
     cyan: '\u001b[36m',
     green: '\u001b[32m',
+    red: '\u001b[31m',
     yellow: '\u001b[33m',
     reset: '\u001b[0m',
 }
@@ -14,6 +15,13 @@ const paint = (value, style, color) => (color ? `${style}${value}${ansi.reset}` 
 const label = (value, color) => paint(value, ansi.cyan, color)
 const state = (value, color) => paint(value, value === 'active' ? ansi.green : ansi.yellow, color)
 const health = (value, color) => paint(value, value === 'healthy' ? ansi.green : ansi.yellow, color)
+
+export const useColor = (stream = process.stdout) => {
+    if ('FORCE_COLOR' in process.env) return process.env['FORCE_COLOR'] !== '0'
+    return Boolean(stream.isTTY && !('NO_COLOR' in process.env))
+}
+
+export const formatErrorMessage = (message, { color = false } = {}) => paint(message, ansi.red, color)
 
 const formatHolders = (holders, color) =>
     holders.length
@@ -89,10 +97,14 @@ const formatLogValue = value => (typeof value === 'string' ? value : JSON.string
 
 export const formatLogEvent = (event, { color = false } = {}) => {
     const { at, event: name, ...details } = event
+    const failed = typeof name === 'string' && name.endsWith('-failed')
     return [
-        `${paint(name ?? 'unknown event', ansi.bold, color)} ${paint(at ?? 'unknown time', ansi.dim, color)}`,
+        `${paint(name ?? 'unknown event', failed ? ansi.red : ansi.bold, color)} ${paint(at ?? 'unknown time', ansi.dim, color)}`,
         ...Object.entries(details).map(([key, value]) => {
             const keyFormatted = paint(key + ':', ansi.dim, color)
+            if (failed && (key === 'code' || key === 'reason')) {
+                return `  ${keyFormatted} ${formatErrorMessage(formatLogValue(value), { color })}`
+            }
             if (key == 'role') return `  ${keyFormatted} ${paint(value, ansi.cyan, color)}`
             if (key == 'path') return `  ${keyFormatted} ${paint(value, ansi.green, color)}`
             if (key == 'ports') {
