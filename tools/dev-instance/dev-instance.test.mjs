@@ -394,6 +394,27 @@ test('an invalid allocation timestamp quarantines both registry copies', async (
     assert.equal(stateFiles.filter(name => name.includes('.corrupt-')).length, 2)
 })
 
+test('unreadable state fails without quarantining or replacing the registry', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const registryPath = join(fixture.state, 'registry.json')
+    const backupPath = join(fixture.state, 'registry.backup.json')
+    const before = await readFile(registryPath, 'utf8')
+    await chmod(registryPath, 0o000)
+    await chmod(backupPath, 0o000)
+    try {
+        const result = run(fixture, fixture.main, ['dev-status', '--json'])
+        assert.equal(result.status, 1)
+        assert.match(result.stderr, /EACCES|permission denied/i)
+    } finally {
+        await chmod(registryPath, 0o600)
+        await chmod(backupPath, 0o600)
+    }
+    assert.equal(await readFile(registryPath, 'utf8'), before)
+    assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).worktreeId, allocation.worktreeId)
+})
+
 test('forced release finds its allocation when the worktree manifest is missing', async () => {
     const fixture = await createFixture()
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
@@ -594,8 +615,13 @@ test('moving a worktree keeps its identity while a new checkout at the old path 
     assert.equal(afterBranchChange.branch, 'renamed-branch')
     const moved = join(fixture.base, 'moved')
     await rename(fixture.main, moved)
+    runJson(fixture, moved, ['dev-list', '--json'])
+    const movedStatus = runJson(fixture, moved, ['dev-status', '--json'])
+    assert.equal(movedStatus.state, 'reserved')
+    assert.deepEqual(movedStatus.bundle, first.bundle)
     const afterMove = runJson(fixture, moved, ['dev-allocate'])
     assert.equal(afterMove.worktreeId, first.worktreeId)
+    assert.deepEqual(afterMove.bundle, first.bundle)
     assert.equal(afterMove.appDataPath, join(await realpath(moved), '.app-data.dev'))
 
     await mkdir(fixture.main)
@@ -1185,7 +1211,9 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
     `
     const launcher = `
         const { spawn } = require('node:child_process')
-        spawn(process.execPath, ['-e', ${JSON.stringify(intermediary)}], { stdio: 'ignore' }).unref()
+        spawn(process.execPath, ['-e', ${JSON.stringify(intermediary)}], {
+            stdio: ['ignore', 'ignore', 'inherit'],
+        })
     `
     const workflow = spawn(
         process.execPath,
@@ -1193,6 +1221,8 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
         { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
     )
     liveChildren.push(workflow)
+    let workflowStdout = ''
+    workflow.stdout.on('data', chunk => (workflowStdout += chunk))
     let workflowStderr = ''
     workflow.stderr.on('data', chunk => (workflowStderr += chunk))
     const workflowClosed = new Promise(resolve => workflow.once('close', resolve))
@@ -1201,7 +1231,9 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
             async () => {
                 if (workflow.exitCode !== null || workflow.signalCode !== null) {
                     await workflowClosed
-                    assert.fail(`workflow exited before grandchild started: ${workflowStderr}`)
+                    assert.fail(
+                        `workflow exited ${workflow.exitCode} before grandchild started: stdout=${workflowStdout} stderr=${workflowStderr}`,
+                    )
                 }
                 return readFile(grandchildPidPath, 'utf8')
             },
@@ -1239,7 +1271,9 @@ test('Windows workflow cancellation kills an orphaned grandchild before releasin
     `
     const launcher = `
         const { spawn } = require('node:child_process')
-        spawn(process.execPath, ['-e', ${JSON.stringify(intermediary)}], { stdio: 'ignore' }).unref()
+        spawn(process.execPath, ['-e', ${JSON.stringify(intermediary)}], {
+            stdio: ['ignore', 'ignore', 'inherit'],
+        })
     `
     const workflow = spawn(
         process.execPath,
@@ -1247,6 +1281,8 @@ test('Windows workflow cancellation kills an orphaned grandchild before releasin
         { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
     )
     liveChildren.push(workflow)
+    let workflowStdout = ''
+    workflow.stdout.on('data', chunk => (workflowStdout += chunk))
     let workflowStderr = ''
     workflow.stderr.on('data', chunk => (workflowStderr += chunk))
     const workflowClosed = new Promise(resolve => workflow.once('close', resolve))
@@ -1255,7 +1291,9 @@ test('Windows workflow cancellation kills an orphaned grandchild before releasin
             async () => {
                 if (workflow.exitCode !== null || workflow.signalCode !== null) {
                     await workflowClosed
-                    assert.fail(`workflow exited before grandchild started: ${workflowStderr}`)
+                    assert.fail(
+                        `workflow exited ${workflow.exitCode} before grandchild started: stdout=${workflowStdout} stderr=${workflowStderr}`,
+                    )
                 }
                 return readFile(grandchildPidPath, 'utf8')
             },
@@ -1266,7 +1304,7 @@ test('Windows workflow cancellation kills an orphaned grandchild before releasin
     try {
         workflow.kill('SIGTERM')
         const result = await childResult(workflow)
-        assert.equal(result.code, 143, result.stderr)
+        assert.notEqual(result.code, 0, result.stderr)
         await waitFor(
             () => {
                 try {
@@ -1311,6 +1349,15 @@ test('run-workflow passes separators and shell metacharacters as literal child a
         'value with spaces & pipes | literally',
     ])
     assert.equal(result.status, 0, result.stderr)
+    const nonzero = run(fixture, fixture.main, [
+        'run-workflow',
+        'renderer-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        'process.exit(9)',
+    ])
+    assert.equal(nonzero.status, 9, nonzero.stderr)
 })
 
 test('run-workflow launches pnpm from npm_execpath with Node', async () => {

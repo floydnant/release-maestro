@@ -382,6 +382,7 @@ const parseAllocation = value => {
         !Array.isArray(value.claims) ||
         !value.claims.every(claim => typeof claim === 'string') ||
         !(value.inactiveSince === null || isTimestamp(value.inactiveSince)) ||
+        (value.missingSince !== undefined && !isTimestamp(value.missingSince)) ||
         typeof value.releaseWhenIdle !== 'boolean' ||
         typeof value.wasActive !== 'boolean' ||
         !value.holders.every(holder => {
@@ -558,8 +559,12 @@ const readRegistryCopy = async path => {
     try {
         return parseRegistry(await readJson(path))
     } catch (error) {
-        if (error?.code !== 'ENOENT') await quarantine(path)
-        return null
+        if (error?.code === 'ENOENT') return null
+        if (error instanceof SyntaxError || error?.code === 'CORRUPT_REGISTRY') {
+            await quarantine(path)
+            return null
+        }
+        throw error
     }
 }
 
@@ -746,8 +751,13 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
     for (const allocation of Object.values(registry.allocations)) {
         allocation.holders = allocation.holders.filter(isLive)
         if (!existsSync(allocation.path) && allocation.holders.length === 0) {
-            delete registry.allocations[allocation.worktreeId]
-            continue
+            allocation.missingSince ??= iso(at)
+            if (at - Date.parse(allocation.missingSince) >= graceMs) {
+                delete registry.allocations[allocation.worktreeId]
+                continue
+            }
+        } else {
+            delete allocation.missingSince
         }
         if (allocation.holders.length === 0 && allocation.wasActive && !allocation.inactiveSince) {
             allocation.inactiveSince = iso(at)
@@ -837,8 +847,12 @@ const readManifest = async worktree => {
     try {
         return parseManifest(await readJson(worktree.manifestPath))
     } catch (error) {
-        if (error?.code !== 'ENOENT') await quarantine(worktree.manifestPath)
-        return null
+        if (error?.code === 'ENOENT') return null
+        if (error instanceof SyntaxError || error?.code === 'CORRUPT_MANIFEST') {
+            await quarantine(worktree.manifestPath)
+            return null
+        }
+        throw error
     }
 }
 
@@ -1109,6 +1123,23 @@ const allocationForWorktree = (registry, manifest, worktree, rejectCopied = true
     return matches[0] ?? null
 }
 
+const updateAllocationLocation = async (allocation, worktree) => {
+    if (!sameCanonicalPath(allocation.path, worktree.root)) {
+        const oldDefaultAppDataPath = await canonicalizePath(join(allocation.path, '.app-data.dev'))
+        if (allocation.appDataPath === oldDefaultAppDataPath) {
+            allocation.appDataPath = await canonicalizePath(join(worktree.root, '.app-data.dev'))
+            allocation.claims = [
+                `electron-development-bundle:${allocation.worktreeId}`,
+                `app-data:${allocation.appDataPath}`,
+            ]
+        }
+    }
+    allocation.path = worktree.root
+    delete allocation.missingSince
+    allocation.worktreeIdentity = worktree.identity
+    allocation.branch = worktree.branch
+}
+
 const allocateDevelopmentWithResult = async ({ reallocate = false } = {}) => {
     const worktree = await resolveWorktree()
     const initialManifest = await readManifest(worktree)
@@ -1145,6 +1176,7 @@ const allocateDevelopmentWithResult = async ({ reallocate = false } = {}) => {
         const requestedBundle = manualBundle()
         if (existing && !reallocate) {
             existing.path = worktree.root
+            delete existing.missingSince
             existing.worktreeIdentity = worktree.identity
             existing.branch = worktree.branch
             existing.appDataPath = appDataPath
@@ -1212,8 +1244,7 @@ export const getDevelopment = async ({ allocate = false } = {}) => {
     await withRegistry(async registry => {
         const allocation = allocationForManifest(registry, manifest, worktree)
         if (!allocation) return
-        allocation.path = worktree.root
-        allocation.branch = worktree.branch
+        await updateAllocationLocation(allocation, worktree)
         allocation.updatedAt = iso(nowMs())
         allocation.generation = registry.generation + 1
         result = allocation
@@ -1381,9 +1412,7 @@ export const statusDevelopment = async () => {
                 : { state: 'unallocated', path: worktree.root, branch: worktree.branch }
             return
         }
-        allocation.path = worktree.root
-        allocation.worktreeIdentity = worktree.identity
-        allocation.branch = worktree.branch
+        await updateAllocationLocation(allocation, worktree)
         allocation.updatedAt = iso(nowMs())
         allocation.generation = registry.generation + 1
         await writeManifest(worktree, allocation, registry.generation + 1)
@@ -1511,6 +1540,9 @@ export const allocateTransient = async workflow => {
     await withRegistry(async (registry, paths) => {
         const allocation = allocationForWorktree(registry, manifest, worktree)
         const worktreeId = allocation?.worktreeId ?? manifest.worktreeId
+        if (allocation) {
+            await updateAllocationLocation(allocation, worktree)
+        }
         if (allocation && manifest.worktreeId !== worktreeId) {
             await writeManifest(worktree, allocation, registry.generation + 1)
         }
@@ -1635,16 +1667,22 @@ const spawnPortable = (command, args, options) => {
 
 const windowsTreeCommand = `
 $ErrorActionPreference = 'Stop'
-Add-Type -Path $env:RELEASE_MAESTRO_TREE_JOB_HELPER
-$job = [ReleaseMaestro.Job]::CreateAndAssignCurrentProcess()
 try {
+Add-Type -Path $env:RELEASE_MAESTRO_TREE_JOB_HELPER
+$parent = [ReleaseMaestro.Job]::OpenParent([uint32]$env:RELEASE_MAESTRO_TREE_PARENT_PID)
+if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
+$job = [ReleaseMaestro.Job]::CreateAndAssignCurrentProcess()
 $arguments = '"' + $env:RELEASE_MAESTRO_TREE_SCRIPT + '"'
 $child = Start-Process -FilePath $env:RELEASE_MAESTRO_TREE_NODE -ArgumentList $arguments -NoNewWindow -PassThru
-while ([ReleaseMaestro.Job]::ActiveProcessCount($job) -gt 1) { Start-Sleep -Milliseconds 100 }
+while ([ReleaseMaestro.Job]::ActiveProcessCount($job) -gt 1) {
+    if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
+    Start-Sleep -Milliseconds 100
+}
 $child.Refresh()
 exit $child.ExitCode
-} finally {
-    [ReleaseMaestro.Job]::Close($job)
+} catch {
+    [Console]::Error.WriteLine($_.Exception.ToString())
+    exit 1
 }
 `
 
@@ -1668,6 +1706,7 @@ export const spawnManaged = (command, args, options = {}) => {
                           ...process.env,
                           ...spawnOptions.env,
                           RELEASE_MAESTRO_TREE_NODE: process.execPath,
+                          RELEASE_MAESTRO_TREE_PARENT_PID: String(process.pid),
                           RELEASE_MAESTRO_TREE_SCRIPT: join(
                               dirname(fileURLToPath(import.meta.url)),
                               'windows-tree.mjs',

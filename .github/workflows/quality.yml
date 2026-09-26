@@ -80,13 +80,13 @@ jobs:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
             - uses: ./.github/actions/setup-node
 
-            # The e2e targets depend on maestro-e2e:typecheck, so tsc runs before Playwright does.
-            - name: Install Playwright browsers
-              run: pnpm exec playwright install --with-deps chromium
-
             - name: Verify Windows workflow descendants
               if: runner.os == 'Windows'
               run: make test-tools-windows
+
+            # The e2e targets depend on maestro-e2e:typecheck, so tsc runs before Playwright does.
+            - name: Install Playwright browsers
+              run: pnpm exec playwright install --with-deps chromium
 
             - name: Run production e2e tests
               uses: GabrielBB/xvfb-action@b706e4e27b14669b486812790492dc50ca16b465 # v1.7

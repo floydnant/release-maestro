@@ -16,6 +16,7 @@ if (
 const environment = { ...process.env }
 delete environment.RELEASE_MAESTRO_TREE_COMMAND
 delete environment.RELEASE_MAESTRO_TREE_NODE
+delete environment.RELEASE_MAESTRO_TREE_PARENT_PID
 delete environment.RELEASE_MAESTRO_TREE_SCRIPT
 delete environment.RELEASE_MAESTRO_TREE_JOB_HELPER
 

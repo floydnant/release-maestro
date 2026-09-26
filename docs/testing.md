@@ -92,8 +92,9 @@ make sure                              # formats, then lint/build/unit/developme
 excludes the development-only debug-console spec, and checks file-URL routing, lazy chunks, and
 cross-platform packaging behavior.
 
-CI runs `make dev-instance-self-test` as a separate job. Run it locally after changing
-`tools/dev-instance`; it starts two complete development stacks in temporary worktrees.
+CI runs `make dev-instance-self-test` as a separate job. Run it locally after committing changes to
+`tools/dev-instance`; it starts two complete development stacks in temporary worktrees from `HEAD`,
+so uncommitted changes are not included.
 `make test-tools` runs the focused repository tools suite. `make test` and `make sure` include it.
 On Windows, CI also runs `make test-tools-windows` to check natural exit and cancellation with orphaned
 descendants, and literal argument passing through the Windows launcher.

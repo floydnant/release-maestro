@@ -47,6 +47,8 @@ namespace ReleaseMaestro
         {
             public long TotalUserTime;
             public long TotalKernelTime;
+            public long ThisPeriodTotalUserTime;
+            public long ThisPeriodTotalKernelTime;
             public uint TotalPageFaultCount;
             public uint TotalProcesses;
             public uint ActiveProcesses;
@@ -76,6 +78,12 @@ namespace ReleaseMaestro
 
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetCurrentProcess();
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(uint access, bool inheritHandle, uint processId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr handle);
@@ -113,10 +121,22 @@ namespace ReleaseMaestro
             return accounting.ActiveProcesses;
         }
 
-        public static void Close(IntPtr job)
+        public static IntPtr OpenParent(uint processId)
         {
-            if (!CloseHandle(job))
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "CloseHandle failed");
+            const uint synchronize = 0x00100000;
+            IntPtr parent = OpenProcess(synchronize, false, processId);
+            if (parent == IntPtr.Zero)
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "OpenProcess for workflow parent failed");
+            return parent;
         }
+
+        public static bool ParentExited(IntPtr parent)
+        {
+            uint state = WaitForSingleObject(parent, 0);
+            if (state == 0) return true;
+            if (state == 0x102) return false;
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "WaitForSingleObject failed");
+        }
+
     }
 }
