@@ -779,12 +779,12 @@ const describeDevelopmentAllocation = allocation => ({
     slot: developmentSlot(allocation.bundle),
 })
 
+const isDevelopmentHolder = holder => ['dev-supervisor', 'dev-renderer', 'dev-electron'].includes(holder.role)
+
 const activeClaims = registry => {
     const claims = []
     for (const allocation of Object.values(registry.allocations)) {
-        const developmentHolders = allocation.holders.filter(holder =>
-            ['dev-supervisor', 'dev-renderer', 'dev-electron'].includes(holder.role),
-        )
+        const developmentHolders = allocation.holders.filter(isDevelopmentHolder)
         for (const resource of allocation.claims) {
             const holders = resource.startsWith('electron-development-bundle:')
                 ? developmentHolders
@@ -853,8 +853,10 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
             ? processIdentities.get(holder.pid) === holder.startIdentity
             : holderIsLive(holder)
     for (const allocation of Object.values(registry.allocations)) {
+        const hadDevelopmentHolder = allocation.holders.some(isDevelopmentHolder)
         allocation.holders = allocation.holders.filter(isLive)
-        allocation.unverifiedPorts = unverifiedDevelopmentPorts(allocation)
+        const lostDevelopmentHolder = hadDevelopmentHolder && !allocation.holders.some(isDevelopmentHolder)
+        allocation.unverifiedPorts = unverifiedDevelopmentPorts(allocation, lostDevelopmentHolder)
         if (
             !existsSync(allocation.path) &&
             allocation.holders.length === 0 &&
@@ -1097,10 +1099,13 @@ const listenerPids = port => {
         .filter(Number.isSafeInteger)
 }
 
-const unverifiedDevelopmentPorts = allocation =>
-    allocation.wasActive && allocation.holders.length === 0
-        ? Object.values(allocation.bundle).filter(port => listenerPids(port).length > 0)
-        : []
+const unverifiedDevelopmentPorts = (allocation, lostDevelopmentHolder) => {
+    if (allocation.holders.some(isDevelopmentHolder)) return []
+    const ports = lostDevelopmentHolder
+        ? Object.values(allocation.bundle)
+        : (allocation.unverifiedPorts ?? [])
+    return ports.filter(port => listenerPids(port).length > 0)
+}
 
 const unverifiedListenerMessage = allocation =>
     `Development ports ${allocation.unverifiedPorts.map(port => `${port} (PIDs ${listenerPids(port).join(', ') || 'unknown'})`).join('; ')} remain occupied without a verified holder. Stop these listeners manually; dev-stop will not signal an unverified PID.`
@@ -1537,10 +1542,13 @@ export const removeDevelopmentHolder = async holderId => {
     await withRegistry(async (registry, paths) => {
         for (const allocation of Object.values(registry.allocations)) {
             const before = allocation.holders.length
+            const hadDevelopmentHolder = allocation.holders.some(isDevelopmentHolder)
             allocation.holders = allocation.holders.filter(holder => holder.id !== holderId)
             if (allocation.holders.length === before) continue
             allocation.updatedAt = iso(nowMs())
-            allocation.unverifiedPorts = unverifiedDevelopmentPorts(allocation)
+            const lostDevelopmentHolder =
+                hadDevelopmentHolder && !allocation.holders.some(isDevelopmentHolder)
+            allocation.unverifiedPorts = unverifiedDevelopmentPorts(allocation, lostDevelopmentHolder)
             if (allocation.holders.length === 0) {
                 allocation.inactiveSince = allocation.unverifiedPorts.length ? null : iso(nowMs())
             }
@@ -1670,8 +1678,8 @@ export const stopDevelopment = async () => {
     let unverifiedMessage = null
     await withRegistry(async (registry, paths) => {
         const allocation = allocationForWorktree(registry, manifest, worktree)
-        if (allocation?.unverifiedPorts?.length && allocation.holders.length === 0) {
-            throw new InstanceError(unverifiedListenerMessage(allocation), 'UNVERIFIED_LISTENER')
+        if (allocation?.unverifiedPorts?.length) {
+            unverifiedMessage = unverifiedListenerMessage(allocation)
         }
         const developmentHolders = allocation
             ? allocation.holders.filter(holder => holder.worktreeId === allocation.worktreeId)
@@ -1690,6 +1698,9 @@ export const stopDevelopment = async () => {
             targets: targets.map(({ role, pid, startIdentity }) => ({ role, pid, startIdentity })),
         })
     })
+    if (holders.length === 0 && unverifiedMessage) {
+        throw new InstanceError(unverifiedMessage, 'UNVERIFIED_LISTENER')
+    }
     await Promise.all(
         targets.map(holder =>
             holderIsLive(holder) ? stopProcessTree(holder.pid, holder.startIdentity) : undefined,
@@ -1709,9 +1720,7 @@ export const stopDevelopment = async () => {
     }
     await withRegistry(async registry => {
         const allocation = allocationForWorktree(registry, manifest, worktree)
-        if (allocation?.unverifiedPorts?.length) {
-            unverifiedMessage = unverifiedListenerMessage(allocation)
-        }
+        unverifiedMessage = allocation?.unverifiedPorts?.length ? unverifiedListenerMessage(allocation) : null
     })
     const failed = holders.filter(holderIsLive)
     if (failed.length > 0) {

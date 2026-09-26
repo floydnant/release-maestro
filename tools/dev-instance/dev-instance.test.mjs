@@ -2767,7 +2767,16 @@ test('unverified dev listener retains its build claim until the port is free', a
         const entry = registry.allocations[allocation.worktreeId]
         entry.wasActive = true
         entry.inactiveSince = null
-        entry.holders = []
+        entry.holders = [
+            {
+                id: 'exited-dev-launcher',
+                role: 'dev-supervisor',
+                pid: process.pid,
+                startIdentity: 'stale',
+                heartbeatAt: new Date().toISOString(),
+                worktreeId: allocation.worktreeId,
+            },
+        ]
         await writeFile(path, JSON.stringify(registry))
     }
 
@@ -2805,6 +2814,84 @@ test('unverified dev listener retains its build claim until the port is free', a
     await new Promise(resolve => server.close(resolve))
     liveServers.splice(liveServers.indexOf(server), 1)
     assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).state, 'reclaimable')
+})
+
+test('a surviving MCP holder does not hide an unverified dev listener', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    await listen('127.0.0.1', allocation.bundle.renderer)
+    for (const file of ['registry.json', 'registry.backup.json']) {
+        const path = join(fixture.state, file)
+        const registry = JSON.parse(await readFile(path, 'utf8'))
+        const entry = registry.allocations[allocation.worktreeId]
+        entry.wasActive = true
+        entry.holders = [
+            {
+                id: 'exited-dev-launcher',
+                role: 'dev-supervisor',
+                pid: process.pid,
+                startIdentity: 'stale',
+                heartbeatAt: new Date().toISOString(),
+                worktreeId: allocation.worktreeId,
+            },
+            {
+                id: 'live-mcp',
+                role: 'mcp:fixture',
+                pid: process.pid,
+                startIdentity: currentProcessIdentity().startIdentity,
+                heartbeatAt: new Date().toISOString(),
+                worktreeId: allocation.worktreeId,
+            },
+        ]
+        await writeFile(path, JSON.stringify(registry))
+    }
+
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(status.state, 'active')
+    assert.equal(status.health, 'degraded')
+    assert.equal(status.holders.length, 1)
+    assert.deepEqual(status.unverifiedListeners, [{ port: allocation.bundle.renderer, pids: [process.pid] }])
+    const conflict = run(fixture, fixture.main, [
+        'run-workflow',
+        'electron-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        'process.exit(0)',
+    ])
+    assert.equal(conflict.status, 1)
+    assert.match(conflict.stderr, /RESOURCE_CONFLICT.*unverified listeners/)
+})
+
+test('a later unrelated listener does not block reallocation after a clean dev stop', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const cleanStop = spawnSync(
+        process.execPath,
+        [
+            '--input-type=module',
+            '-e',
+            `
+        import { registerDevelopmentHolder, removeDevelopmentHolder } from ${JSON.stringify(coreModule)}
+        const { holder } = await registerDevelopmentHolder('dev-supervisor')
+        await removeDevelopmentHolder(holder.id)
+    `,
+        ],
+        {
+            cwd: fixture.main,
+            env: environmentFor(fixture),
+            encoding: 'utf8',
+        },
+    )
+    assert.equal(cleanStop.status, 0, cleanStop.stderr)
+    assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).state, 'inactive')
+    await listen('127.0.0.1', allocation.bundle.renderer)
+
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(status.state, 'inactive')
+    assert.equal(status.unverifiedListeners, undefined)
+    const replacement = runJson(fixture, fixture.main, ['dev-reallocate'])
+    assert.notDeepEqual(replacement.bundle, allocation.bundle)
 })
 
 test('logs redact sensitive query values, rotate, and render through dev-log', async () => {

@@ -45,6 +45,9 @@ An allocation starts **reserved**. A holder is a concrete process using it, such
 supervisor or an MCP wrapper. The allocation is **active** while at least one holder remains. After
 the last holder leaves, it is **inactive** for a 20-minute grace period, then **expired** and
 available for reclamation. An absent registry allocation with a local manifest is **reclaimable**.
+If the last dev holder exits while a bundle listener remains, the allocation reports
+**unverified-listener** until that port is free. A remaining MCP holder keeps the state **active**
+with degraded health.
 The manager checks process start identity as well as PID before accepting a holder. A clean
 SessionEnd hook requests release when idle; `/clear` keeps the session's allocation. Hooks are
 advisory, so normal commands also reconcile dead holders and expired allocations.
