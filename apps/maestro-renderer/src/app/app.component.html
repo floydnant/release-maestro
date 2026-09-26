@@ -212,10 +212,14 @@
                             <span
                                 class="flex items-center gap-1 px-2"
                                 [class.text-content-success]="
-                                    scan.failedFiles === 0 && (scan.newSongs > 0 || scan.changedSongs > 0)
+                                    scan.failedFiles === 0 &&
+                                    scan.missingSongs === 0 &&
+                                    (scan.newSongs > 0 || scan.changedSongs > 0)
                                 "
                                 [class.text-content-secondary]="
-                                    scan.failedFiles === 0 && scan.newSongs === 0 && scan.changedSongs === 0
+                                    scan.failedFiles === 0 &&
+                                    (scan.missingSongs > 0 ||
+                                        (scan.newSongs === 0 && scan.changedSongs === 0))
                                 "
                                 [class.text-content-danger]="scan.failedFiles > 0"
                             >
@@ -223,10 +227,14 @@
                                     <app-icon name="error" color="content.danger" size="16"></app-icon>
                                     Scan finished · {{ scan.failedFiles }}
                                     {{ scan.failedFiles === 1 ? 'track' : 'tracks' }} failed
-                                } @else if (scan.newSongs === 0 && scan.changedSongs === 0) {
+                                } @else if (
+                                    scan.newSongs === 0 && scan.changedSongs === 0 && scan.missingSongs === 0
+                                ) {
                                     Nothing new
                                 } @else {
-                                    <app-icon name="success" color="content.success" size="16"></app-icon>
+                                    @if (scan.missingSongs === 0) {
+                                        <app-icon name="success" color="content.success" size="16"></app-icon>
+                                    }
                                     @if (scan.newSongs > 0) {
                                         Added {{ scan.newSongs }}
                                         {{ scan.newSongs === 1 ? 'track' : 'tracks' }}
@@ -237,6 +245,13 @@
                                         }
                                         Updated {{ scan.changedSongs }}
                                         {{ scan.changedSongs === 1 ? 'track' : 'tracks' }}
+                                    }
+                                    @if (scan.missingSongs > 0) {
+                                        @if (scan.newSongs > 0 || scan.changedSongs > 0) {
+                                            ·
+                                        }
+                                        {{ scan.missingSongs }}
+                                        {{ scan.missingSongs === 1 ? 'track' : 'tracks' }} missing
                                     }
                                 }
                             </span>

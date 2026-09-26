@@ -7,6 +7,7 @@ const completedStatus = (
     changedSongs: number,
     trigger: LibraryScanStatus['trigger'] = 'startup',
     failedFiles = 0,
+    missingSongs = 0,
 ): LibraryScanStatus => {
     const terminal: LibraryScanTerminalResult = {
         outcome: 'completed',
@@ -19,7 +20,7 @@ const completedStatus = (
         new: newSongs,
         changed: changedSongs,
         unchanged: 0,
-        missing: 0,
+        missing: missingSongs,
         unavailableFolders: [],
         readTotal: newSongs + changedSongs,
         readsAttempted: newSongs + changedSongs,
@@ -71,6 +72,30 @@ test.describe('startup scan summary', () => {
         await createRendererScenario(page, scenario, '/home')
 
         await expect(page.getByRole('status')).toHaveText('Scan finished · 1 track failed')
+    })
+
+    test('reports missing tracks instead of saying nothing changed', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: completedStatus(0, 0, 'startup', 0, 5), albums: [], lastScan: null },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/home')
+
+        await expect(page.getByRole('status')).toHaveText('5 tracks missing')
+    })
+
+    test('shows additions alongside missing tracks', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: completedStatus(2, 0, 'startup', 0, 3), albums: [], lastScan: null },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/home')
+
+        await expect(page.getByRole('status')).toHaveText('Added 2 tracks · 3 tracks missing')
     })
 
     test('announces the result after paced progress, not each progress update', async ({ page }) => {

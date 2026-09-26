@@ -37,7 +37,13 @@ type ScanIndicatorView =
           readTotal: number
           failedFiles: number
       }
-    | { phase: 'completed'; newSongs: number; changedSongs: number; failedFiles: number }
+    | {
+          phase: 'completed'
+          newSongs: number
+          changedSongs: number
+          missingSongs: number
+          failedFiles: number
+      }
 
 /**
  * Minimum time each phase of a *startup* scan stays visible in the title bar. Startup
@@ -229,6 +235,7 @@ export class AppComponent {
                     phase: 'completed' as const,
                     newSongs: status.terminal.new,
                     changedSongs: status.terminal.changed,
+                    missingSongs: status.terminal.missing,
                     failedFiles: status.terminal.discoveryFailureCount + status.terminal.readFailureCount,
                 },
                 minDwellMs: 0,
