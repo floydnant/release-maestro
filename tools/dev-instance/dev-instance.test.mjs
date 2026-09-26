@@ -246,6 +246,17 @@ if (process.env.FAKE_OPEN_PORT === '1') {
     }
     const server = net.createServer()
     server.listen({ host: 'localhost', port: Number(port) })
+    const reopenDelay = Number(process.env.FAKE_REOPEN_AFTER_FIRST_CONNECTION_MS ?? 0)
+    if (reopenDelay > 0 && remoteIndex < 0) {
+      server.once('connection', () => {
+        server.close()
+        setTimeout(() => {
+          const reopened = net.createServer()
+          reopened.listen({ host: 'localhost', port: Number(port) })
+          servers.push(reopened)
+        }, reopenDelay)
+      })
+    }
     if (process.env.FAKE_READY_PROBED_PATH) {
       server.once('connection', () => writeFileSync(process.env.FAKE_READY_PROBED_PATH, ''))
     }
@@ -1292,7 +1303,7 @@ test('run-workflow stops descendants left behind by a successful launcher', asyn
     )
 })
 
-const createDetachedListenerLauncher = async fixture => {
+const createDetachedListenerLauncher = async (fixture, { restart = false } = {}) => {
     const serverPath = join(fixture.base, 'detached-listener.cjs')
     const launcherPath = join(fixture.base, 'detached-listener-launcher.cjs')
     const listenerPidPath = join(fixture.base, 'detached-listener.pid')
@@ -1304,13 +1315,17 @@ const createDetachedListenerLauncher = async fixture => {
         launcherPath,
         `const { spawn } = require('node:child_process')
 const { writeFileSync } = require('node:fs')
-const listener = spawn(process.execPath, [${JSON.stringify(serverPath)}], {
-  detached: true,
-  stdio: 'ignore',
-  env: process.env,
-})
-writeFileSync(${JSON.stringify(listenerPidPath)}, String(listener.pid))
-listener.unref()
+const launch = () => {
+  const listener = spawn(process.execPath, [${JSON.stringify(serverPath)}], {
+    detached: true,
+    stdio: 'ignore',
+    env: process.env,
+  })
+  writeFileSync(${JSON.stringify(listenerPidPath)}, String(listener.pid))
+  if (${JSON.stringify(restart)}) listener.once('exit', launch)
+  listener.unref()
+}
+launch()
 setInterval(() => {}, 1000)
 `,
     )
@@ -1401,6 +1416,107 @@ test('a detached workflow listener retains its claim after the wrapper and launc
         if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGKILL')
         listenerPid ??= Number(await readFile(listenerPidPath, 'utf8').catch(() => ''))
         for (const pid of [launcherPid, listenerPid]) {
+            if (!pid) continue
+            try {
+                process.kill(pid, 'SIGKILL')
+            } catch (error) {
+                if (error?.code !== 'ESRCH') throw error
+            }
+        }
+    }
+}, 45_000)
+
+test('dev-stop recovers a workflow child left running after its wrapper dies', async () => {
+    const fixture = await createFixture()
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', 'setInterval(() => {}, 1000)'],
+        { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    liveChildren.push(workflow)
+    let childPid
+    try {
+        const listed = await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-list', '--json'])),
+            value => value.instances.some(instance => instance.childHolder?.pid),
+            'workflow child did not register',
+        )
+        childPid = listed.instances.find(instance => instance.workflow === 'renderer-e2e').childHolder.pid
+        workflow.kill('SIGKILL')
+        await childResult(workflow)
+
+        const stopped = runJson(fixture, fixture.main, ['dev-stop'])
+        assert.ok(stopped.stopped.some(holder => holder.pid === childPid))
+        await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-list', '--json'])),
+            value => !value.instances.some(instance => instance.workflow === 'renderer-e2e'),
+            'workflow claim remained after dev-stop',
+        )
+    } finally {
+        if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGKILL')
+        if (childPid) {
+            try {
+                process.kill(childPid, 'SIGKILL')
+            } catch (error) {
+                if (error?.code !== 'ESRCH') throw error
+            }
+        }
+    }
+})
+
+test('run-workflow records a replacement detached listener before its wrapper exits', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture()
+    const { launcherPath, listenerPidPath } = await createDetachedListenerLauncher(fixture, {
+        restart: true,
+    })
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, launcherPath],
+        { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    liveChildren.push(workflow)
+    let launcherPid
+    let firstListenerPid
+    let secondListenerPid
+    try {
+        const first = await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-list', '--json'])),
+            value => value.instances.some(instance => instance.listenerHolder?.pid),
+            'first workflow listener was not recorded',
+        )
+        const transient = first.instances.find(instance => instance.workflow === 'renderer-e2e')
+        launcherPid = transient.childHolder.pid
+        firstListenerPid = transient.listenerHolder.pid
+        process.kill(firstListenerPid, 'SIGKILL')
+        secondListenerPid = Number(
+            await waitFor(
+                () => readFile(listenerPidPath, 'utf8'),
+                value => Number(value) !== firstListenerPid && Number.isSafeInteger(Number(value)),
+                'replacement listener did not spawn',
+            ),
+        )
+        await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-list', '--json'])),
+            value => value.instances.some(instance => instance.listenerHolder?.pid === secondListenerPid),
+            'replacement workflow listener was not recorded',
+        )
+        workflow.kill('SIGKILL')
+        await childResult(workflow)
+        process.kill(launcherPid, 'SIGKILL')
+        assert.ok(
+            runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
+                instance => instance.listenerHolder?.pid === secondListenerPid,
+            ),
+        )
+        assert.ok(
+            runJson(fixture, fixture.main, ['dev-stop']).stopped.some(
+                holder => holder.pid === secondListenerPid,
+            ),
+        )
+    } finally {
+        if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGKILL')
+        for (const pid of [launcherPid, firstListenerPid, secondListenerPid]) {
             if (!pid) continue
             try {
                 process.kill(pid, 'SIGKILL')
@@ -1942,6 +2058,34 @@ test('run-dev exits promptly when the renderer dies before opening its port', as
     assert.deepEqual(JSON.parse(await readFile(capture, 'utf8')).slice(0, 3), ['exec', 'nx', 'serve'])
     assert.ok(Date.now() - startedAt < 10_000, 'startup failure waited for the port timeout')
 })
+
+test('run-dev waits for an owned renderer listener after an early connection closes', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const dev = spawn(process.execPath, [cli, 'run-dev'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, {
+            PATH: `${bin}:${process.env.PATH}`,
+            RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+            RELEASE_MAESTRO_STARTUP_TIMEOUT_MS: '15000',
+            FAKE_OPEN_PORT: '1',
+            FAKE_REOPEN_AFTER_FIRST_CONNECTION_MS: '6000',
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    try {
+        await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+            status => status.holders?.filter(holder => holder.role === 'dev-electron').length === 2,
+            'dev stack did not recover after the first renderer listener closed',
+            20_000,
+        )
+    } finally {
+        if (dev.exitCode === null && dev.signalCode === null) dev.kill('SIGTERM')
+        await childResult(dev)
+    }
+}, 25_000)
 
 test('run-dev latches cancellation while waiting for the renderer', async () => {
     const fixture = await createFixture()

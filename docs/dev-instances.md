@@ -23,7 +23,7 @@ Run these from the worktree whose instance you want to manage.
 | `make dev-list`               | Show all registered development and verification instances. `JSON=1` prints JSON.          |
 | `make dev-release`            | Release an idle allocation now. Refuses while holders are live.                            |
 | `make dev-reallocate`         | Give an idle instance a new bundle after a port conflict or a manual override.             |
-| `make dev-stop`               | Stop validated dev processes and orphaned E2E listeners owned by this worktree.            |
+| `make dev-stop`               | Stop validated dev processes and orphaned E2E processes owned by this worktree.            |
 | `make dev-log`                | Read lifecycle events. `FOLLOW=1` follows; `JSON=1` prints JSON Lines.                     |
 | `make dev-instance-self-test` | Start two temporary worktrees and verify independent stacks and shutdown.                  |
 
@@ -72,7 +72,8 @@ Use `make dev-status` to find the holder and port, then `make dev-log` for the e
 failure. `make dev-list` helps when another worktree owns the resource. If an unrelated process
 took a persisted port, stop your dev stack and MCP clients, then run `make dev-reallocate`.
 `make dev-stop` is the manual resort for stuck processes in agent terminals and orphaned E2E
-listeners. It checks both worktree ownership and process start identity before signaling them. `make dev-release` only
+processes. It checks both worktree ownership and process start identity before signaling them.
+`make dev-release` only
 changes allocation state and never kills a process. `FORCE=1 make dev-release` can discard corrupt
 ownership metadata, but still refuses live holders.
 

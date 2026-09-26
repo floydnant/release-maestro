@@ -166,7 +166,8 @@ Electron E2E must isolate filesystem inputs and app state:
 - Keep full-app tests broad but few.
 
 The Electron and renderer suites obtain transient port bundles from the same instance manager as
-development. They release those bundles as soon as Playwright exits, including in CI. Electron E2E
+development. They release those bundles after Playwright and any verified surviving listener exit,
+including in CI. Electron E2E
 and renderer E2E claim different mutable resources and can still run together. Electron E2E conflicts
 with a live development stack because both rebuild the Electron development output. If a run is
 rejected, `make dev-status` names the holder and `make dev-log` shows the orchestration event.

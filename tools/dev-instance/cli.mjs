@@ -194,6 +194,7 @@ const runDevelopment = async () => {
             rendererHolder.holder.startIdentity,
             supervisor.id,
             cancellation.signal,
+            startupTimeoutMs,
         )
         if (rendererListener) childHolders.push(rendererListener.holder)
         if (stopIfCancelled()) return
@@ -263,6 +264,7 @@ const runDevelopment = async () => {
             electronHolder.holder.startIdentity,
             supervisor.id,
             cancellation.signal,
+            startupTimeoutMs,
         )
         if (electronListener) childHolders.push(electronListener.holder)
         if (stopIfCancelled()) return
@@ -357,7 +359,12 @@ const runWorkflow = async args => {
             let listenerCapture = null
             let listenerCaptureError = null
             const captureListener = () => {
-                if (process.platform === 'win32' || listenerHolder || listenerCapture || !child?.pid) {
+                if (
+                    process.platform === 'win32' ||
+                    (listenerHolder && holderIsLive(listenerHolder)) ||
+                    listenerCapture ||
+                    !child?.pid
+                ) {
                     return
                 }
                 listenerCapture = registerTransientListenerHolder(

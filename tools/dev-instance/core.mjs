@@ -1373,8 +1373,9 @@ export const registerDevelopmentListenerHolder = async (
     launcherStartIdentity,
     parentHolderId,
     signal = null,
+    timeoutMs = 5_000,
 ) => {
-    const deadline = nowMs() + 5_000
+    const deadline = nowMs() + timeoutMs
     do {
         if (signal?.aborted) return null
         let pid = null
@@ -1540,16 +1541,13 @@ export const stopDevelopment = async () => {
         const developmentHolders = allocation
             ? allocation.holders.filter(holder => holder.worktreeId === allocation.worktreeId)
             : []
-        const orphanedListeners = Object.values(registry.transients)
+        const orphanedWorkflowHolders = Object.values(registry.transients)
             .filter(
                 transient =>
-                    transient.worktreeIdentity === worktree.identity &&
-                    !holderIsLive(transient.holder) &&
-                    !transient.childHolder &&
-                    transient.listenerHolder,
+                    transient.worktreeIdentity === worktree.identity && !holderIsLive(transient.holder),
             )
-            .map(transient => transient.listenerHolder)
-        holders = [...developmentHolders, ...orphanedListeners]
+            .flatMap(transient => [transient.childHolder, transient.listenerHolder].filter(Boolean))
+        holders = [...developmentHolders, ...orphanedWorkflowHolders]
         if (holders.length === 0) return
         targets = rootProcessHolders(holders)
         await appendEvent(paths, 'dev-stop-requested', {
