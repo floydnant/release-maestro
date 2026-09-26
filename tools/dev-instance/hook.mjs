@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { parse, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { reconcileInstances, releaseDevelopment, releaseRemovedWorktree } from './core.mjs'
+import { getStatePaths, reconcileInstances, releaseDevelopment, releaseRemovedWorktree } from './core.mjs'
 
 const readStdin = async () => {
     const chunks = []
@@ -70,6 +70,10 @@ const handleHook = async () => {
                 {
                     cwd: parse(worktreePath).root,
                     detached: true,
+                    env: {
+                        ...process.env,
+                        RELEASE_MAESTRO_INSTANCE_STATE_DIR: getStatePaths().root,
+                    },
                     stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
                 },
             )

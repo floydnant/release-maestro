@@ -1095,7 +1095,7 @@ const listenerPids = port => {
         }
         return pids
     }
-    if (result.error?.code === 'ENOENT') return []
+    if (result.error || typeof result.stdout !== 'string') return []
     return result.stdout
         .split('\n')
         .filter(line => line.startsWith('p'))

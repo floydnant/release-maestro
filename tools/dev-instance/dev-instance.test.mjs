@@ -1258,7 +1258,7 @@ test('Claude WorktreeRemove releases only after the directory is gone', async ()
     }
     const hookResult = spawnSync(process.execPath, [join(hostedTools, 'hook.mjs')], {
         cwd: fixture.main,
-        env: environmentFor(fixture),
+        env: environmentFor(fixture, { RELEASE_MAESTRO_INSTANCE_STATE_DIR: '../state' }),
         input: JSON.stringify({
             hook_event_name: 'WorktreeRemove',
             cwd: fixture.main,

@@ -99,5 +99,6 @@ copies and stops rather than discarding possible live ownership. After stopping 
 inspecting the quarantined files, run `make dev-recover` to clear the recovery marker and permit a
 fresh registry. Older registry entries without checkout identity cannot be assigned to a replacement
 checkout by path alone. Their live holders must exit before a new allocation can claim the same
-resources. The central JSONL log rotates at about 5 MiB with three retained files. It records lifecycle events, ports,
+resources. Once its holders and listeners have stopped, release an idle legacy allocation from its
+checkout with `FORCE=1 make dev-release`. The central JSONL log rotates at about 5 MiB with three retained files. It records lifecycle events, ports,
 holder identity, and conflict reasons, without application output or full command arguments.
