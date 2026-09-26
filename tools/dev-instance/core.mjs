@@ -121,7 +121,8 @@ const processStartIdentity = pid => {
                 .slice(statLine.lastIndexOf(')') + 2)
                 .trim()
                 .split(/\s+/)
-            started = /[ZX]/.test(afterName[0] ?? '') ? '' : (afterName[19] ?? '')
+            if (/[ZX]/.test(afterName[0] ?? '')) return null
+            started = afterName[19] ?? ''
         } catch (error) {
             if (error?.code === 'ENOENT' && !processExists(pid)) return null
             throw error
@@ -150,7 +151,12 @@ const processStartIdentity = pid => {
             if (!processExists(pid)) return null
             throw new InstanceError(`Could not read process start identity for PID ${pid}`)
         }
+        const state = result.stdout.trim().split(/\s+/)[0] ?? ''
+        if (/[ZE]/.test(state)) return null
         started = parseUnixProcessIdentity(result.stdout) ?? ''
+    }
+    if (!started && processExists(pid)) {
+        throw new InstanceError(`Could not read process start identity for PID ${pid}`)
     }
     return started || null
 }
@@ -761,7 +767,7 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
             ? new Map(processTable().map(row => [row.pid, row.startIdentity]))
             : null
     const isLive = holder =>
-        processIdentities?.has(holder.pid)
+        processIdentities?.get(holder.pid)
             ? processIdentities.get(holder.pid) === holder.startIdentity
             : holderIsLive(holder)
     for (const allocation of Object.values(registry.allocations)) {
