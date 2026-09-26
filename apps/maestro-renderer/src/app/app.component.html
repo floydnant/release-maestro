@@ -209,6 +209,7 @@
                 <p class="scan-summary | type-body-sm" role="status" aria-live="polite">
                     @if (scanIndicator(); as scan) {
                         @if (scan.phase === 'completed') {
+                            <!-- The spinner's 25px box draws an 18px ring. Match both dimensions. -->
                             <span
                                 class="flex items-center gap-1 px-2"
                                 [class.text-content-success]="
@@ -224,17 +225,39 @@
                                 [class.text-content-danger]="scan.failedFiles > 0"
                             >
                                 @if (scan.failedFiles > 0) {
-                                    <app-icon name="error" color="content.danger" size="16"></app-icon>
+                                    <app-icon
+                                        class="size-[25px] shrink-0"
+                                        name="error"
+                                        color="content.danger"
+                                        size="18"
+                                    ></app-icon>
                                     Scan finished · {{ scan.failedFiles }}
                                     {{ scan.failedFiles === 1 ? 'track' : 'tracks' }} failed
                                 } @else if (
                                     scan.newSongs === 0 && scan.changedSongs === 0 && scan.missingSongs === 0
                                 ) {
-                                    <app-icon name="success" color="content.secondary" size="16"></app-icon>
+                                    <app-icon
+                                        class="size-[25px] shrink-0"
+                                        name="success"
+                                        color="content.secondary"
+                                        size="18"
+                                    ></app-icon>
                                     Nothing new
                                 } @else {
                                     @if (scan.missingSongs === 0) {
-                                        <app-icon name="success" color="content.success" size="16"></app-icon>
+                                        <app-icon
+                                            class="size-[25px] shrink-0"
+                                            name="success"
+                                            color="content.success"
+                                            size="18"
+                                        ></app-icon>
+                                    } @else {
+                                        <app-icon
+                                            class="size-[25px] shrink-0"
+                                            name="missingSong"
+                                            color="content.secondary"
+                                            size="18"
+                                        ></app-icon>
                                     }
                                     @if (scan.newSongs > 0) {
                                         Added {{ scan.newSongs }}

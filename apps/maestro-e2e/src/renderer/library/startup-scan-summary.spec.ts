@@ -89,6 +89,58 @@ test.describe('startup scan summary', () => {
         await expect(page.getByRole('status')).toHaveText('Updated 1 track')
     })
 
+    test('keeps the completed icon aligned with the running indicator', async ({ page }) => {
+        const completed = completedStatus(0, 0)
+        const reading: LibraryScanStatus = {
+            ...completed,
+            revision: 1,
+            phase: 'reading',
+            terminal: null,
+            finishedAt: null,
+            readDone: 0,
+        }
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: reading, albums: [], lastScan: null },
+            })
+            .build()
+        const controller = await createRendererScenario(page, scenario, '/home')
+
+        const running = page.locator('.scan-indicator')
+        await expect(running).toContainText('Reading')
+        const runningLayout = await running.evaluate(element => {
+            const ring = element.querySelector('app-progress-ring')
+            if (!ring) throw new Error('Running scan ring is missing')
+            const style = getComputedStyle(element)
+            return {
+                left: element.getBoundingClientRect().left,
+                iconLeft: ring.getBoundingClientRect().left,
+                iconWidth: ring.getBoundingClientRect().width,
+                gap: style.columnGap,
+                paddingLeft: style.paddingLeft,
+            }
+        })
+
+        await controller.emit('library:scan-status', { status: completed, newAlbums: [] })
+        const summary = page.getByRole('status')
+        await expect(summary).toHaveText('Nothing new')
+        const completedLayout = await summary.locator('span').evaluate(element => {
+            const icon = element.querySelector('app-icon')
+            if (!icon) throw new Error('Completed scan icon is missing')
+            const style = getComputedStyle(element)
+            return {
+                left: element.getBoundingClientRect().left,
+                iconLeft: icon.getBoundingClientRect().left,
+                iconWidth: icon.getBoundingClientRect().width,
+                gap: style.columnGap,
+                paddingLeft: style.paddingLeft,
+            }
+        })
+
+        expect(completedLayout).toEqual(runningLayout)
+    })
+
     test('does not claim failed reads were added', async ({ page }) => {
         const scenario = scenarioBuilder()
             .handler('library:get-scan-status', {
@@ -111,6 +163,7 @@ test.describe('startup scan summary', () => {
         await createRendererScenario(page, scenario, '/home')
 
         await expect(page.getByRole('status')).toHaveText('5 tracks missing')
+        await expect(page.getByRole('status').locator('app-icon')).toHaveAttribute('name', 'missingSong')
     })
 
     test('shows additions alongside missing tracks', async ({ page }) => {
