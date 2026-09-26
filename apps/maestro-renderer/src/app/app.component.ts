@@ -39,6 +39,7 @@ type ScanIndicatorView =
       }
     | {
           phase: 'completed'
+          scanId: number
           newSongs: number
           changedSongs: number
           missingSongs: number
@@ -52,6 +53,7 @@ type ScanIndicatorView =
  * follow. Other scans (manual rescans) are shown in real time.
  */
 const STARTUP_PHASE_MIN_DWELL_MS = 1000
+const STARTUP_SUMMARY_VISIBLE_MS = 4000
 
 /** Where a keystroke means "move the caret", not "move through history". */
 const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contenteditable="false"])'
@@ -182,8 +184,11 @@ export class AppComponent {
      * Written by {@link scanIndicatorPacer}.
      */
     readonly scanIndicator = signal<ScanIndicatorView | null>(null)
+    private readonly dismissedScanId = signal<number | null>(null)
+    private visibleSummaryScanId: number | null = null
+    private summaryTimer: ReturnType<typeof setTimeout> | null = null
     private readonly scanIndicatorPacer = new MinDwellPacer<ScanIndicatorView>(view =>
-        this.scanIndicator.set(view),
+        this.showScanIndicator(view),
     )
 
     /**
@@ -221,18 +226,38 @@ export class AppComponent {
         effect(() => {
             this.scanIndicatorPacer.set(this.targetScanIndicator())
         })
-        inject(DestroyRef).onDestroy(() => this.scanIndicatorPacer.dispose())
+        inject(DestroyRef).onDestroy(() => {
+            this.scanIndicatorPacer.dispose()
+            if (this.summaryTimer !== null) clearTimeout(this.summaryTimer)
+        })
+    }
+
+    private showScanIndicator(view: ScanIndicatorView | null): void {
+        this.scanIndicator.set(view)
+        const scanId = view?.phase === 'completed' ? view.scanId : null
+        if (scanId === this.visibleSummaryScanId) return
+
+        if (this.summaryTimer !== null) clearTimeout(this.summaryTimer)
+        this.summaryTimer = null
+        this.visibleSummaryScanId = scanId
+        if (scanId !== null) {
+            this.summaryTimer = setTimeout(() => {
+                this.summaryTimer = null
+                this.dismissedScanId.set(scanId)
+            }, STARTUP_SUMMARY_VISIBLE_MS)
+        }
     }
 
     /** The indicator the sidebar *wants* to show right now (pre-pacing), or null to hide. */
     private targetScanIndicator() {
         const status = this.libraryService.scanStatus()
-        if (!status || this.isImportRoute()) return null
+        if (!status || this.isImportRoute() || status.scanId === this.dismissedScanId()) return null
         if (status.phase === 'completed' && status.trigger === 'startup' && status.terminal) {
             return {
                 key: `${status.scanId}:completed`,
                 value: {
                     phase: 'completed' as const,
+                    scanId: status.scanId,
                     newSongs: status.terminal.new,
                     // A resumed deep read can update an unchanged file's metadata.
                     changedSongs: Math.max(

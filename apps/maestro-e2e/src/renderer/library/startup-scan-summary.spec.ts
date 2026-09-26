@@ -45,6 +45,22 @@ const completedStatus = (
 }
 
 test.describe('startup scan summary', () => {
+    test('hides the completed summary after four seconds', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: completedStatus(0, 0), albums: [], lastScan: null },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/home')
+
+        const summary = page.getByRole('status')
+        await expect(summary).toHaveText('Nothing new')
+        await page.waitForTimeout(3000)
+        await expect(summary).toHaveText('Nothing new')
+        await expect(summary).toBeEmpty({ timeout: 2500 })
+    })
+
     for (const { newSongs, changedSongs, summary } of [
         { newSongs: 0, changedSongs: 0, summary: 'Nothing new' },
         { newSongs: 0, changedSongs: 2, summary: 'Updated 2 tracks' },
