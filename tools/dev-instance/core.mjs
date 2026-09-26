@@ -434,6 +434,7 @@ const parseAllocation = value => {
         (value.unverifiedPorts !== undefined &&
             (!Array.isArray(value.unverifiedPorts) ||
                 !value.unverifiedPorts.every(port => Object.values(value.bundle).includes(port)))) ||
+        (value.releaseWhenRemoved !== undefined && typeof value.releaseWhenRemoved !== 'boolean') ||
         !(value.inactiveSince === null || isTimestamp(value.inactiveSince)) ||
         (value.missingSince !== undefined && !isTimestamp(value.missingSince)) ||
         typeof value.releaseWhenIdle !== 'boolean' ||
@@ -853,6 +854,9 @@ const reconcileRegistry = async (registry, at = nowMs(), graceMs = configuredGra
             ? processIdentities.get(holder.pid) === holder.startIdentity
             : holderIsLive(holder)
     for (const allocation of Object.values(registry.allocations)) {
+        if (allocation.releaseWhenRemoved && !existsSync(allocation.path)) {
+            allocation.releaseWhenIdle = true
+        }
         const hadDevelopmentHolder = allocation.holders.some(isDevelopmentHolder)
         allocation.holders = allocation.holders.filter(isLive)
         const lostDevelopmentHolder = hadDevelopmentHolder && !allocation.holders.some(isDevelopmentHolder)
@@ -1379,6 +1383,7 @@ const allocateDevelopmentWithResult = async ({ reallocate = false } = {}) => {
             updatedAt: iso(nowMs()),
             inactiveSince: null,
             releaseWhenIdle: false,
+            releaseWhenRemoved: false,
             wasActive: false,
         }
         registry.allocations[worktreeId] = allocation
@@ -2184,20 +2189,33 @@ export const followLog = async ({ follow = false, json = false, color = false } 
     }
 }
 
+const allocationAtWorktreePath = async (registry, canonical, worktreeId) => {
+    for (const allocation of Object.values(registry.allocations)) {
+        if (
+            sameCanonicalPath(await canonicalizePath(allocation.path), canonical) &&
+            (!worktreeId || allocation.worktreeId === worktreeId)
+        ) {
+            return allocation
+        }
+    }
+    return null
+}
+
+export const requestRemovedWorktreeRelease = async (worktreePath, worktreeId = null) => {
+    const canonical = await canonicalizePath(worktreePath)
+    return withRegistry(async registry => {
+        const match = await allocationAtWorktreePath(registry, canonical, worktreeId)
+        if (!match) return { requested: false, reason: 'unallocated' }
+        match.releaseWhenRemoved = true
+        return { requested: true }
+    })
+}
+
 export const releaseRemovedWorktree = async (worktreePath, worktreeId = null) => {
     const canonical = await canonicalizePath(worktreePath)
     if (existsSync(canonical)) return { released: false, reason: 'worktree-still-exists' }
     return withRegistry(async (registry, paths) => {
-        let match
-        for (const allocation of Object.values(registry.allocations)) {
-            if (
-                sameCanonicalPath(await canonicalizePath(allocation.path), canonical) &&
-                (!worktreeId || allocation.worktreeId === worktreeId)
-            ) {
-                match = allocation
-                break
-            }
-        }
+        const match = await allocationAtWorktreePath(registry, canonical, worktreeId)
         if (!match) return { released: false, reason: 'unallocated' }
         if (match.holders.length > 0 || match.unverifiedPorts?.length) {
             match.releaseWhenIdle = true

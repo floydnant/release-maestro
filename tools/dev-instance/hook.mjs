@@ -5,7 +5,12 @@ import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { reconcileInstances, releaseDevelopment, releaseRemovedWorktree } from './core.mjs'
+import {
+    reconcileInstances,
+    releaseDevelopment,
+    releaseRemovedWorktree,
+    requestRemovedWorktreeRelease,
+} from './core.mjs'
 
 const readStdin = async () => {
     const chunks = []
@@ -45,6 +50,7 @@ const handleHook = async () => {
             } catch {
                 // Registry path matching is the fallback when the manifest is missing.
             }
+            await requestRemovedWorktreeRelease(payload.worktree_path, worktreeId)
             const child = spawn(
                 process.execPath,
                 [fileURLToPath(import.meta.url), 'verify-remove', payload.worktree_path, worktreeId],

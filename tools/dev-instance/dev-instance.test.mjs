@@ -1264,12 +1264,50 @@ test('Claude WorktreeRemove releases only after the directory is gone', async ()
     assert.equal(hookResult.status, 0, hookResult.stderr)
     let registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
     assert.ok(registry.allocations[allocation.worktreeId])
+    assert.equal(registry.allocations[allocation.worktreeId].releaseWhenRemoved, true)
     await rm(fixture.main, { recursive: true, force: true })
     registry = await waitFor(
         async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
         value => !value.allocations[allocation.worktreeId],
         'removed worktree allocation was not released',
     )
+    assert.equal(registry.allocations[allocation.worktreeId], undefined)
+})
+
+test('a later registry command completes a delayed worktree removal', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const request = spawnSync(
+        process.execPath,
+        [
+            '--input-type=module',
+            '-e',
+            `
+        import { requestRemovedWorktreeRelease } from ${JSON.stringify(coreModule)}
+        await requestRemovedWorktreeRelease(${JSON.stringify(fixture.main)}, ${JSON.stringify(allocation.worktreeId)})
+    `,
+        ],
+        { cwd: fixture.main, env: environmentFor(fixture), encoding: 'utf8' },
+    )
+    assert.equal(request.status, 0, request.stderr)
+    let registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.equal(registry.allocations[allocation.worktreeId].releaseWhenRemoved, true)
+
+    await rm(fixture.main, { recursive: true, force: true })
+    const reconcile = spawnSync(
+        process.execPath,
+        [
+            '--input-type=module',
+            '-e',
+            `
+        import { listInstances } from ${JSON.stringify(coreModule)}
+        await listInstances()
+    `,
+        ],
+        { cwd: fixture.base, env: environmentFor(fixture), encoding: 'utf8' },
+    )
+    assert.equal(reconcile.status, 0, reconcile.stderr)
+    registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
     assert.equal(registry.allocations[allocation.worktreeId], undefined)
 })
 
