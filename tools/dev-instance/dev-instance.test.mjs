@@ -428,6 +428,24 @@ test('a copied manifest does not attach another worktree to the original allocat
     assert.equal(firstAfterCopy.path, await realpath(fixture.roots[0]))
 })
 
+test('a copied manifest cannot inspect, release, or stop another worktree allocation', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const first = runJson(fixture, fixture.roots[0], ['dev-allocate'])
+    await cp(
+        join(fixture.roots[0], '.release-maestro-instance.json'),
+        join(fixture.roots[1], '.release-maestro-instance.json'),
+    )
+
+    for (const command of ['dev-status', 'dev-release', 'dev-stop']) {
+        const result = run(fixture, fixture.roots[1], [command])
+        assert.notEqual(result.status, 0, command)
+        assert.match(result.stderr, /MANIFEST_OWNERSHIP_CONFLICT/)
+        const original = runJson(fixture, fixture.roots[0], ['dev-status', '--json'])
+        assert.equal(original.worktreeId, first.worktreeId)
+        assert.equal(original.path, await realpath(fixture.roots[0]))
+    }
+})
+
 test('a persisted port taken by an unrelated process fails with owner and reallocation details', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)

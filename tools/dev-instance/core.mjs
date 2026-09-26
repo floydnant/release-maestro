@@ -1002,6 +1002,21 @@ const newHolder = async (
     }
 }
 
+const allocationForManifest = (registry, manifest, worktree, rejectCopied = true) => {
+    const allocation = manifest ? registry.allocations[manifest.worktreeId] : null
+    if (!allocation) return null
+    if (allocation.path === worktree.root || (!existsSync(allocation.path) && allocation.holders.length === 0)) {
+        return allocation
+    }
+    if (rejectCopied) {
+        throw new InstanceError(
+            `Manifest belongs to ${allocation.path}, not ${worktree.root}. Allocate a new instance in this worktree.`,
+            'MANIFEST_OWNERSHIP_CONFLICT',
+        )
+    }
+    return null
+}
+
 export const allocateDevelopment = async ({ reallocate = false } = {}) => {
     const worktree = await resolveWorktree()
     const initialManifest = await readManifest(worktree)
@@ -1012,12 +1027,7 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
         const manifest = (await readManifest(worktree)) ?? initialManifest
         const manifestId = manifest?.worktreeId
         const persisted = manifestId ? registry.allocations[manifestId] : null
-        const existing =
-            persisted &&
-            (persisted.path === worktree.root ||
-                (!existsSync(persisted.path) && persisted.holders.length === 0))
-                ? persisted
-                : null
+        const existing = allocationForManifest(registry, manifest, worktree, false)
         const worktreeId = existing
             ? existing.worktreeId
             : persisted
@@ -1096,7 +1106,7 @@ export const getDevelopment = async ({ allocate = false } = {}) => {
     let result = null
     let generation = null
     await withRegistry(async registry => {
-        const allocation = registry.allocations[manifest.worktreeId]
+        const allocation = allocationForManifest(registry, manifest, worktree)
         if (!allocation) return
         allocation.path = worktree.root
         allocation.branch = worktree.branch
@@ -1217,7 +1227,7 @@ export const releaseDevelopment = async ({ force = false, requestWhenIdle = fals
     if (!manifest && !force) return { released: false, reason: 'unallocated' }
     return withRegistry(async (registry, paths) => {
         const allocation = manifest
-            ? registry.allocations[manifest.worktreeId]
+            ? allocationForManifest(registry, manifest, worktree)
             : Object.values(registry.allocations).find(candidate => candidate.path === worktree.root)
         if (!allocation) return { released: false, reason: 'unallocated' }
         if (allocation.holders.length > 0) {
@@ -1257,7 +1267,7 @@ export const statusDevelopment = async () => {
     if (!manifest) return { state: 'unallocated', path: worktree.root, branch: worktree.branch }
     let status
     await withRegistry(async registry => {
-        const allocation = registry.allocations[manifest.worktreeId]
+        const allocation = allocationForManifest(registry, manifest, worktree)
         if (!allocation) {
             status = { state: 'reclaimable', path: worktree.root, branch: worktree.branch, manifest }
             return
@@ -1306,7 +1316,7 @@ export const stopDevelopment = async () => {
     let holders = []
     let targets = []
     await withRegistry(async (registry, paths) => {
-        const allocation = registry.allocations[manifest.worktreeId]
+        const allocation = allocationForManifest(registry, manifest, worktree)
         if (!allocation) return
         holders = allocation.holders.filter(holder => holder.worktreeId === allocation.worktreeId)
         targets = rootProcessHolders(holders)
