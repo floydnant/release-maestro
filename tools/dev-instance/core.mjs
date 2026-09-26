@@ -1673,9 +1673,15 @@ $parent = [ReleaseMaestro.Job]::OpenParent([uint32]$env:RELEASE_MAESTRO_TREE_PAR
 if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
 $job = [ReleaseMaestro.Job]::CreateAndAssignCurrentProcess()
 $arguments = '"' + $env:RELEASE_MAESTRO_TREE_SCRIPT + '"'
-$child = Start-Process -FilePath $env:RELEASE_MAESTRO_TREE_NODE -ArgumentList $arguments -NoNewWindow -PassThru
+$startInfo = New-Object System.Diagnostics.ProcessStartInfo
+$startInfo.FileName = $env:RELEASE_MAESTRO_TREE_NODE
+$startInfo.Arguments = $arguments
+$startInfo.UseShellExecute = $false
+$child = New-Object System.Diagnostics.Process
+$child.StartInfo = $startInfo
+if (-not $child.Start()) { throw 'Failed to start workflow command' }
 $child.WaitForExit()
-$exitCode = [ReleaseMaestro.Job]::ProcessExitCode($child.Handle)
+$exitCode = $child.ExitCode
 if ($env:RELEASE_MAESTRO_TREE_DEBUG -eq '1') {
     [Console]::Error.WriteLine("workflow tree: child exit=$exitCode active=$([ReleaseMaestro.Job]::ActiveProcessCount($job))")
 }
