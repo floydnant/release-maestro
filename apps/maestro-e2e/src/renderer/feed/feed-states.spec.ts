@@ -84,6 +84,118 @@ test.describe('release feed scenario states', () => {
             .toMatchObject({ channel: 'load-feed', payload: { index: 0, count: 5 } })
     })
 
+    test('keeps a long release title and the label within the feed', async ({ page }) => {
+        const baseRelease = createHydratedRelease()
+        const title = 'Supercalifragilisticexpialidocious'.repeat(12)
+        const release = createHydratedRelease({
+            data: { ...baseRelease.data, releaseName: title },
+        })
+        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+
+        const titleLink = page.getByRole('link', { name: title })
+        const label = page.getByText('Shiva Chandra', { exact: true })
+        await expect(titleLink).toBeVisible()
+        await expect(label).toBeVisible()
+
+        for (const width of [1280, 900]) {
+            await page.setViewportSize({ width, height: 720 })
+            await expect
+                .poll(async () => {
+                    const titleBounds = await titleLink.boundingBox()
+                    const labelBounds = await label.boundingBox()
+                    return Boolean(
+                        titleBounds &&
+                        labelBounds &&
+                        titleBounds.x + titleBounds.width <= labelBounds.x &&
+                        labelBounds.x + labelBounds.width <= width,
+                    )
+                })
+                .toBe(true)
+        }
+    })
+
+    test('keeps feed content within its columns when metadata is long', async ({ page }) => {
+        const baseRelease = createHydratedRelease()
+        const longWord = 'Puffycon'.repeat(24)
+        const previewTitle = `Preview${longWord}`
+        const playableTrackTitle = `PlayableTrack${longWord}`
+        const unavailableTrackTitle = `UnavailableTrack${longWord}`
+        const labelLinkText = `LabelLink${longWord}`
+        const release = createHydratedRelease({
+            error: { message: `Error${longWord}` },
+            data: {
+                ...baseRelease.data,
+                artist: `Artist${longWord}`,
+                about: `<p>About${longWord}</p><p><a href="https://example.com">AboutLink${longWord}</a></p>`,
+                links: [
+                    { title: previewTitle, favicon: baseRelease.data.imageUrl, url: 'https://example.com' },
+                ],
+                tracks: baseRelease.data.tracks.flatMap(track => [
+                    { ...track, title: playableTrackTitle },
+                    { ...track, title: unavailableTrackTitle, streamUrl: null },
+                ]),
+                band: {
+                    name: `Label${longWord}`,
+                    imageUrl: null,
+                    location: `Location${longWord}`,
+                    bio: `Bio${longWord}`,
+                    links: [{ url: 'https://example.com', text: labelLinkText }],
+                },
+            },
+        })
+        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+
+        const titleLink = page.getByRole('link', { name: release.data.releaseName })
+        const previewLink = page.getByRole('link', { name: previewTitle })
+        const labelLink = page.getByRole('link', { name: labelLinkText })
+        await expect(titleLink).toBeVisible()
+        await expect(previewLink).toBeVisible()
+        await expect(
+            page.getByRole('button', { name: `Seek within ${playableTrackTitle}` }).locator('span.truncate'),
+        ).toHaveAttribute('title', playableTrackTitle)
+        await expect(page.getByText(unavailableTrackTitle)).toHaveAttribute('title', unavailableTrackTitle)
+        await expect(previewLink).toHaveAttribute('title', `${previewTitle}\nhttps://example.com`)
+        await expect(labelLink).toHaveAttribute('title', `${labelLinkText}\nhttps://example.com`)
+
+        for (const width of [1280, 960]) {
+            await page.setViewportSize({ width, height: 720 })
+            await expect
+                .poll(async () =>
+                    titleLink.evaluate(link => {
+                        const entry = link.closest('.feed-entry')
+                        const selectors = ['.feed-entry', '.text-column > div', '.label-column', '.tracks']
+                        return selectors.flatMap(selector => {
+                            const element =
+                                selector === '.feed-entry' ? entry : entry?.querySelector(selector)
+                            return element && element.scrollWidth > element.clientWidth + 1
+                                ? [`${selector}: ${element.scrollWidth}/${element.clientWidth}`]
+                                : []
+                        })
+                    }),
+                )
+                .toEqual([])
+
+            await expect
+                .poll(async () =>
+                    previewLink.evaluate(link => {
+                        const column = link.closest('.text-column')
+                        return Boolean(
+                            column &&
+                            link.getBoundingClientRect().right <= column.getBoundingClientRect().right,
+                        )
+                    }),
+                )
+                .toBe(true)
+            await expect
+                .poll(async () =>
+                    page
+                        .getByRole('img', { name: `Favicon for ${previewTitle}` })
+                        .evaluate(icon => icon.getBoundingClientRect().width),
+                )
+                .toBe(16)
+        }
+    })
+
     test('updates a failed release feed scenario with a new handler before retrying', async ({ page }) => {
         const release = createHydratedRelease({ id: 'release-after-handler-update' })
         const controller = await createRendererScenario(page, rendererScenarios.feed.loadError())
