@@ -1050,9 +1050,20 @@ const newHolder = async (
     }
 }
 
+const manifestPathBelongsElsewhere = (manifest, worktree) =>
+    manifest && !sameCanonicalPath(manifest.path, worktree.root) && existsSync(manifest.path)
+
 const allocationForManifest = (registry, manifest, worktree, rejectCopied = true) => {
     const allocation = manifest ? registry.allocations[manifest.worktreeId] : null
-    if (!allocation) return null
+    if (!allocation) {
+        if (rejectCopied && manifestPathBelongsElsewhere(manifest, worktree)) {
+            throw new InstanceError(
+                `Manifest belongs to ${manifest.path}, not ${worktree.root}. Allocate a new instance in this worktree.`,
+                'MANIFEST_OWNERSHIP_CONFLICT',
+            )
+        }
+        return null
+    }
     if (
         sameCanonicalPath(allocation.path, worktree.root) ||
         (!existsSync(allocation.path) && allocation.holders.length === 0)
@@ -1081,7 +1092,7 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
         const existing = allocationForManifest(registry, manifest, worktree, false)
         const worktreeId = existing
             ? existing.worktreeId
-            : persisted
+            : persisted || manifestPathBelongsElsewhere(manifest, worktree)
               ? randomUUID()
               : (manifestId ?? randomUUID())
         const oldDefaultAppDataPath = existing
@@ -1440,12 +1451,13 @@ export const allocateTransient = async workflow => {
     const appDataPath = await canonicalizePath(join(worktree.root, '.app-data.e2e', workflow))
     let manifest = await readManifest(worktree)
     const copiedManifest = manifest
-        ? await withRegistry(async registry =>
+        ? manifestPathBelongsElsewhere(manifest, worktree) ||
+          (await withRegistry(async registry =>
               Boolean(
                   registry.allocations[manifest.worktreeId] &&
                   !allocationForManifest(registry, manifest, worktree, false),
               ),
-          )
+          ))
         : false
     if (!manifest || copiedManifest) {
         await allocateDevelopment()

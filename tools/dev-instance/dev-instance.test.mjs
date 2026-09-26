@@ -511,6 +511,30 @@ test('a copied manifest does not attach another worktree to the original allocat
     assert.equal(firstAfterCopy.path, await realpath(fixture.roots[0]))
 })
 
+test('a copied manifest gets a new identity after the source releases its allocation', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const first = runJson(fixture, fixture.roots[0], ['dev-allocate'])
+    runJson(fixture, fixture.roots[0], ['dev-release', '--force'])
+    await cp(
+        join(fixture.roots[0], '.release-maestro-instance.json'),
+        join(fixture.roots[1], '.release-maestro-instance.json'),
+    )
+
+    const second = runJson(fixture, fixture.roots[1], ['dev-allocate'])
+    assert.notEqual(second.worktreeId, first.worktreeId)
+})
+
+test('a moved worktree keeps its identity after releasing its allocation', async () => {
+    const fixture = await createFixture()
+    const first = runJson(fixture, fixture.main, ['dev-allocate'])
+    runJson(fixture, fixture.main, ['dev-release', '--force'])
+    const moved = join(fixture.base, 'moved')
+    await rename(fixture.main, moved)
+
+    const allocation = runJson(fixture, moved, ['dev-allocate'])
+    assert.equal(allocation.worktreeId, first.worktreeId)
+})
+
 test('a copied manifest cannot inspect, release, or stop another worktree allocation', async () => {
     const fixture = await createFixture({ worktrees: 2 })
     const first = runJson(fixture, fixture.roots[0], ['dev-allocate'])
@@ -550,6 +574,31 @@ test('a copied manifest cannot lend another worktree identity to a workflow', as
     const transient = listed.instances.find(instance => instance.workflow === 'renderer-e2e')
     assert.notEqual(transient.worktreeId, original.worktreeId)
     assert.equal(transient.path, await realpath(fixture.roots[1]))
+    workflow.kill('SIGTERM')
+    await childResult(workflow)
+})
+
+test('a copied manifest cannot lend a released worktree identity to a workflow', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const original = runJson(fixture, fixture.roots[0], ['dev-allocate'])
+    runJson(fixture, fixture.roots[0], ['dev-release', '--force'])
+    await cp(
+        join(fixture.roots[0], '.release-maestro-instance.json'),
+        join(fixture.roots[1], '.release-maestro-instance.json'),
+    )
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', 'setInterval(() => {}, 1000)'],
+        { cwd: fixture.roots[1], env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    liveChildren.push(workflow)
+    const listed = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.roots[0], ['dev-list', '--json'])),
+        value => value.instances.some(instance => instance.workflow === 'renderer-e2e'),
+        'workflow did not register',
+    )
+    const transient = listed.instances.find(instance => instance.workflow === 'renderer-e2e')
+    assert.notEqual(transient.worktreeId, original.worktreeId)
     workflow.kill('SIGTERM')
     await childResult(workflow)
 })
