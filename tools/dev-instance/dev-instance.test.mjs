@@ -19,7 +19,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import net from 'node:net'
 import { afterEach, jest, test } from '@jest/globals'
-import { holderIsLive, parseUnixProcessIdentity, rootProcessHolders } from './core.mjs'
+import { holderIsLive, parseUnixProcessIdentity, rootProcessHolders, spawnManaged } from './core.mjs'
 
 jest.setTimeout(30_000)
 
@@ -39,7 +39,7 @@ test('process shutdown starts with supervisors and orphaned holders', () => {
     assert.deepEqual(rootProcessHolders([supervisor, managedChild, orphan]), [supervisor, orphan])
 })
 
-test('inaccessible process identity does not make a holder appear dead', () => {
+test('inaccessible process identity keeps a holder reserved', () => {
     const originalKill = process.kill
     const kill = jest.spyOn(process, 'kill').mockImplementation((pid, signal) => {
         if (pid === process.pid && signal === 0) {
@@ -50,11 +50,36 @@ test('inaccessible process identity does not make a holder appear dead', () => {
         return originalKill(pid, signal)
     })
     try {
-        assert.throws(() => holderIsLive({ pid: process.pid, startIdentity: 'unknown' }), {
-            code: 'EPERM',
-        })
+        assert.equal(holderIsLive({ pid: process.pid, startIdentity: 'unknown' }), true)
     } finally {
         kill.mockRestore()
+    }
+})
+
+test('spawned child remains owned when its start identity cannot be read', async () => {
+    const originalKill = process.kill
+    const kill = jest.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+        if (pid !== process.pid && signal === 0) {
+            const error = new Error('permission denied')
+            error.code = 'EPERM'
+            throw error
+        }
+        return originalKill(pid, signal)
+    })
+    let child
+    try {
+        child = spawnManaged(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+            stdio: 'ignore',
+        })
+        assert.ok(child.pid)
+        assert.equal(child.releaseMaestroStartIdentity, null)
+        assert.equal(child.releaseMaestroIdentityError?.code, 'PROCESS_IDENTITY_UNKNOWN')
+    } finally {
+        kill.mockRestore()
+        if (child) {
+            if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+            await childResult(child)
+        }
     }
 })
 
@@ -1503,6 +1528,7 @@ test('Windows workflow prefers pnpm.cmd over an extensionless pnpm shim', async 
             npm_execpath: '',
             RELEASE_MAESTRO_PNPM_COMMAND: '',
             FAKE_CAPTURE: capture,
+            PATHEXT: ';.COM;.EXE;.BAT;.CMD',
         },
     )
     assert.equal(result.status, 0, result.stderr)

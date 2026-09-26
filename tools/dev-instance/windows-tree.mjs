@@ -22,6 +22,7 @@ delete environment.RELEASE_MAESTRO_TREE_SCRIPT
 delete environment.RELEASE_MAESTRO_TREE_JOB_HELPER
 
 const child = spawnManaged(specification.command, specification.args, { env: environment })
+if (child.releaseMaestroIdentityError) throw child.releaseMaestroIdentityError
 const stopForwarding = forwardSignals(() => [child])
 try {
     const { code, signal } = await new Promise((resolve, reject) => {

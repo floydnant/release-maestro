@@ -107,6 +107,12 @@ const processExists = pid => {
         return true
     } catch (error) {
         if (error?.code === 'ESRCH') return false
+        if (error?.code === 'EPERM' || error?.code === 'EACCES') {
+            throw new InstanceError(
+                `Could not verify process identity for PID ${pid}`,
+                'PROCESS_IDENTITY_UNKNOWN',
+            )
+        }
         throw error
     }
 }
@@ -125,6 +131,12 @@ const processStartIdentity = pid => {
             started = afterName[19] ?? ''
         } catch (error) {
             if (error?.code === 'ENOENT' && !processExists(pid)) return null
+            if (error?.code === 'EACCES' || error?.code === 'EPERM') {
+                throw new InstanceError(
+                    `Could not verify process identity for PID ${pid}`,
+                    'PROCESS_IDENTITY_UNKNOWN',
+                )
+            }
             throw error
         }
     } else if (process.platform === 'win32') {
@@ -140,7 +152,10 @@ const processStartIdentity = pid => {
         )
         if (result.status !== 0) {
             if (!processExists(pid)) return null
-            throw new InstanceError(`Could not read process start identity for PID ${pid}`)
+            throw new InstanceError(
+                `Could not read process start identity for PID ${pid}`,
+                'PROCESS_IDENTITY_UNKNOWN',
+            )
         }
         started = result.stdout.trim()
     } else {
@@ -149,14 +164,20 @@ const processStartIdentity = pid => {
         })
         if (result.status !== 0) {
             if (!processExists(pid)) return null
-            throw new InstanceError(`Could not read process start identity for PID ${pid}`)
+            throw new InstanceError(
+                `Could not read process start identity for PID ${pid}`,
+                'PROCESS_IDENTITY_UNKNOWN',
+            )
         }
         const state = result.stdout.trim().split(/\s+/)[0] ?? ''
         if (/[ZE]/.test(state)) return null
         started = parseUnixProcessIdentity(result.stdout) ?? ''
     }
     if (!started && processExists(pid)) {
-        throw new InstanceError(`Could not read process start identity for PID ${pid}`)
+        throw new InstanceError(
+            `Could not read process start identity for PID ${pid}`,
+            'PROCESS_IDENTITY_UNKNOWN',
+        )
     }
     return started || null
 }
@@ -167,7 +188,14 @@ export const currentProcessIdentity = () => {
     return { pid: process.pid, startIdentity }
 }
 
-export const holderIsLive = holder => processStartIdentity(holder.pid) === holder.startIdentity
+export const holderIsLive = holder => {
+    try {
+        return processStartIdentity(holder.pid) === holder.startIdentity
+    } catch (error) {
+        if (error?.code === 'PROCESS_IDENTITY_UNKNOWN') return true
+        throw error
+    }
+}
 
 export const rootProcessHolders = holders => {
     const holderIds = new Set(holders.map(holder => holder.id))
@@ -1654,7 +1682,7 @@ const escapeWindowsArgument = (argument, doubleEscape) => {
 
 const resolveWindowsCommand = command => {
     if (command.includes('/') || command.includes('\\')) return command
-    const extensions = (process.env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD').split(';')
+    const extensions = (process.env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)
     for (const directory of (process.env['PATH'] ?? '').split(';')) {
         if (/\.(?:com|exe|bat|cmd)$/i.test(command)) {
             const candidate = join(directory, command)
@@ -1780,7 +1808,13 @@ export const spawnManaged = (command, args, options = {}) => {
                   detached: process.platform !== 'win32',
                   ...spawnOptions,
               })
-    child.releaseMaestroStartIdentity = processStartIdentity(child.pid)
+    try {
+        child.releaseMaestroStartIdentity = processStartIdentity(child.pid)
+    } catch (error) {
+        child.releaseMaestroStartIdentity = null
+        child.releaseMaestroIdentityError = error
+        if (child.pid) child.kill('SIGKILL')
+    }
     return child
 }
 

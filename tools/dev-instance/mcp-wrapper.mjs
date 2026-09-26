@@ -61,6 +61,7 @@ try {
     child = spawnPackageBinary(binary, binaryArgs, {
         env: { ...process.env, ...bundleEnvironment(allocation.bundle, allocation.appDataPath) },
     })
+    if (child.releaseMaestroIdentityError) throw child.releaseMaestroIdentityError
     if (pendingSignal) {
         clearTimeout(startupShutdownTimer)
         startupShutdownTimer = null

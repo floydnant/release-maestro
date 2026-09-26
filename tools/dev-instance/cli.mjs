@@ -150,6 +150,7 @@ const runDevelopment = async () => {
         )
         children.push(renderer)
         const rendererExit = waitForExit(renderer)
+        if (renderer.releaseMaestroIdentityError) throw renderer.releaseMaestroIdentityError
         if (!renderer.pid) {
             const result = await rendererExit
             throw new InstanceError(
@@ -209,6 +210,7 @@ const runDevelopment = async () => {
         )
         children.push(electron)
         const electronExit = waitForExit(electron)
+        if (electron.releaseMaestroIdentityError) throw electron.releaseMaestroIdentityError
         if (!electron.pid) {
             const result = await electronExit
             throw new InstanceError(
@@ -329,6 +331,7 @@ const runWorkflow = async args => {
             clearTimeout(startupShutdownTimer)
             startupShutdownTimer = null
             try {
+                if (child.releaseMaestroIdentityError) throw child.releaseMaestroIdentityError
                 const registered = await setTransientChildHolder(
                     transient.id,
                     child.pid,
