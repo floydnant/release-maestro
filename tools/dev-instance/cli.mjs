@@ -279,7 +279,7 @@ const runWorkflow = async args => {
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
         const listener = () => {
             cancellationSignal ??= signal
-            if (child?.pid) signalProcessTree(child.pid, signal, child.releaseMaestroStartIdentity)
+            if (child?.pid) void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
         }
         process.on(signal, listener)
         signalListeners.set(signal, listener)

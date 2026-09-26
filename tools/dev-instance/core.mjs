@@ -250,7 +250,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
     const descendants = snapshot.filter(processRecord => processRecord.pid !== rootPid)
     signalProcessSnapshot(descendants, 'SIGTERM')
     if (descendants.length > 0) {
-        const naturalExitDeadline = nowMs() + 250
+        const naturalExitDeadline = nowMs() + 500
         while (processStartIdentity(rootPid) === expectedStartIdentity && nowMs() < naturalExitDeadline) {
             await sleep(25)
         }
@@ -259,7 +259,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
         snapshot.filter(processRecord => processRecord.pid === rootPid),
         'SIGTERM',
     )
-    const deadline = nowMs() + 250
+    const deadline = nowMs() + 5_000
     while (
         snapshot.some(
             processRecord => processStartIdentity(processRecord.pid) === processRecord.startIdentity,
@@ -292,7 +292,16 @@ export const stopProcessGroup = async (rootPid, expectedStartIdentity) => {
         }
     }
     if (!signalGroup('SIGTERM')) return
-    await sleep(250)
+    const deadline = nowMs() + 5_000
+    while (nowMs() < deadline) {
+        try {
+            process.kill(-rootPid, 0)
+        } catch (error) {
+            if (error?.code === 'ESRCH') return
+            throw error
+        }
+        await sleep(50)
+    }
     signalGroup('SIGKILL')
 }
 

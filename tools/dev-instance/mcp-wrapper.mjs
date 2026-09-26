@@ -5,6 +5,7 @@ import {
     registerDevelopmentHolder,
     removeDevelopmentHolder,
     signalProcessTree,
+    stopProcessTree,
     spawnPackageBinary,
     startHeartbeat,
     heartbeatDevelopmentHolder,
@@ -25,8 +26,8 @@ let pendingSignal = null
 const signalListeners = new Map()
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     const listener = () => {
-        if (child?.pid) signalProcessTree(child.pid, signal, child.releaseMaestroStartIdentity)
-        else pendingSignal = signal
+        pendingSignal ??= signal
+        if (child?.pid) void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
     }
     process.on(signal, listener)
     signalListeners.set(signal, listener)
@@ -58,8 +59,8 @@ try {
         child.once('exit', (code, signal) => resolve({ code, signal }))
         child.once('error', reject)
     })
-    if (signal) {
-        const signalNumber = osConstants.signals[signal] ?? 0
+    if (pendingSignal || signal) {
+        const signalNumber = osConstants.signals[pendingSignal || signal] ?? 0
         process.exitCode = 128 + signalNumber
     } else {
         process.exitCode = code ?? 1

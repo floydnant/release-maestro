@@ -880,6 +880,52 @@ test('run-workflow does not launch a chained command after cancellation', async 
     assert.equal(existsSync(secondRan), false)
 })
 
+test('MCP wrapper exits when its child ignores termination', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const capture = join(fixture.base, 'mcp-started')
+    const wrapper = spawnMcp(fixture, fixture.main, bin, 'chrome-devtools', {
+        FAKE_IGNORE_SIGTERM: '1',
+        FAKE_CAPTURE: capture,
+    })
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 1,
+        'MCP holder did not register',
+    )
+    await waitFor(() => Promise.resolve(existsSync(capture)), Boolean, 'MCP child did not start')
+    wrapper.kill('SIGTERM')
+    const result = await childResult(wrapper)
+    assert.equal(result.code, 143)
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.deepEqual(status.holders, [])
+})
+
+test('workflow releases its claim when a child ignores termination', async () => {
+    const fixture = await createFixture()
+    const ready = join(fixture.base, 'workflow-started')
+    const workflow = spawn(
+        process.execPath,
+        [
+            cli,
+            'run-workflow',
+            'renderer-e2e',
+            '--',
+            process.execPath,
+            '-e',
+            `require('node:fs').writeFileSync(${JSON.stringify(ready)}, ''); process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)`,
+        ],
+        { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    liveChildren.push(workflow)
+    await waitFor(() => Promise.resolve(existsSync(ready)), Boolean, 'workflow child did not start')
+    workflow.kill('SIGTERM')
+    const result = await childResult(workflow)
+    assert.equal(result.code, 143)
+    const instances = runJson(fixture, fixture.main, ['dev-list', '--json'])
+    assert.equal(instances.instances.some(instance => instance.workflow === 'renderer-e2e'), false)
+})
+
 test('dev conflicts with Electron E2E and a second dev supervisor reports its owner', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)
