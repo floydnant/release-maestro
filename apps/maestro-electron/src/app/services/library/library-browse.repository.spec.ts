@@ -139,6 +139,90 @@ describe('LibraryBrowseRepository', () => {
 
     afterEach(() => sqlite.close())
 
+    describe('record labels', () => {
+        it('windows names and derives distinct stats from linked albums and songs', () => {
+            db.insert(recordLabelsTable)
+                .values([
+                    { id: 'a', name: '100% Records', externalRefs: { MUSICBRAINZ_LABEL_ID: ['mb-1'] } },
+                    { id: 'b', name: 'Other Records' },
+                ])
+                .run()
+            db.insert(artistsTable)
+                .values([
+                    { id: 'artist', name: 'Artist' },
+                    { id: 'album-artist', name: 'Album artist' },
+                ])
+                .run()
+            seedAlbum({ id: 'album1', title: 'One', recordLabelId: 'a', year: 2018 })
+            seedAlbum({ id: 'album2', title: 'Two', recordLabelId: 'a', year: 2024 })
+            seedAlbum({ id: 'album3', title: 'Other', recordLabelId: 'b', year: 2020 })
+            db.insert(albumArtistsTable)
+                .values({ albumId: 'album2', artistId: 'album-artist', position: 0 })
+                .run()
+            seedSong({ id: 'song1', title: 'First', albumId: 'album1', recordLabelText: 'Wrong text' })
+            seedSong({ id: 'song2', title: 'Second', albumId: 'album2', present: false })
+            db.insert(songArtistsTable)
+                .values([
+                    { songId: 'song1', artistId: 'artist', position: 0 },
+                    { songId: 'song2', artistId: 'artist', position: 0 },
+                ])
+                .run()
+            const recordLabelQuery = { search: '', sort: { field: 'name', direction: 'asc' } } as const
+            expect(
+                repository.queryRecordLabels({ query: recordLabelQuery, window: { offset: 0, limit: 1 } }),
+            ).toEqual({
+                offset: 0,
+                total: 2,
+                rows: [
+                    {
+                        id: 'a',
+                        name: '100% Records',
+                        albumCount: 2,
+                        songCount: 2,
+                        artistCount: 2,
+                        firstYear: 2018,
+                        lastYear: 2024,
+                    },
+                ],
+            })
+            expect(
+                repository.queryRecordLabels({
+                    query: { ...recordLabelQuery, search: '%' },
+                    window: { offset: 0, limit: 10 },
+                }).total,
+            ).toBe(1)
+            expect(
+                repository.queryRecordLabels({
+                    query: { ...recordLabelQuery, sort: { field: 'name', direction: 'desc' } },
+                    window: { offset: 0, limit: 1 },
+                }).rows[0]?.id,
+            ).toBe('b')
+            expect(repository.getRecordLabelDetail('a')?.externalRefs).toEqual({
+                MUSICBRAINZ_LABEL_ID: ['mb-1'],
+            })
+            expect(repository.getRecordLabelDetail('missing')).toBeNull()
+            expect(
+                repository.queryRecordLabelArtists({ recordLabelId: 'a', window: { offset: 0, limit: 2 } }),
+            ).toEqual({
+                offset: 0,
+                total: 2,
+                rows: [
+                    { id: 'album-artist', name: 'Album artist', hasSongCredits: false },
+                    { id: 'artist', name: 'Artist', hasSongCredits: true },
+                ],
+            })
+            expect(
+                repository
+                    .querySongs({
+                        query: query({ filter: { recordLabelIds: ['a'] } }),
+                        window: { offset: 0, limit: 10 },
+                    })
+                    .rows.map(row => row.id)
+                    .sort(),
+            ).toEqual(['song1', 'song2'])
+        })
+    })
+
     describe('genres', () => {
         beforeEach(() => {
             db.insert(genresTable)

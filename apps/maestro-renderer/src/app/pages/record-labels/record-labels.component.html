@@ -1,0 +1,51 @@
+<app-browse-shell
+    [state]="shellState()"
+    [filters]="filters()"
+    (searchChange)="onSearch($event)"
+    (clearFilters)="onClear()"
+    (retry)="onRetry()"
+>
+    <!-- Match the widths of the values in the virtual list. -->
+    <div class="overflow-x-auto border-b border-border-subtle">
+        <div class="record-label-sort | flex min-w-[43rem] items-center gap-6 px-6">
+            <button
+                type="button"
+                class="type-label-sm flex min-w-0 flex-1 items-center gap-1 py-2 text-content-primary"
+                (click)="onSort()"
+                [attr.aria-label]="
+                    query().sort.direction === 'asc'
+                        ? 'Sort record labels Z to A'
+                        : 'Sort record labels A to Z'
+                "
+            >
+                Name
+                <app-icon
+                    [name]="query().sort.direction === 'asc' ? 'sortAscending' : 'sortDescending'"
+                    size="12"
+                    color="content.action"
+                ></app-icon>
+            </button>
+            <span class="type-label-sm w-24 shrink-0 py-2 text-right text-content-muted" aria-hidden="true"
+                >Albums</span
+            >
+            <span class="type-label-sm w-24 shrink-0 py-2 text-right text-content-muted" aria-hidden="true"
+                >Tracks</span
+            >
+            <span class="type-label-sm w-24 shrink-0 py-2 text-right text-content-muted" aria-hidden="true"
+                >Artists</span
+            >
+            <span class="type-label-sm w-32 shrink-0 py-2 text-right text-content-muted" aria-hidden="true"
+                >Years active</span
+            >
+        </div>
+    </div>
+    <app-catalog-list
+        label="Record labels"
+        [result]="result()"
+        [query]="query()"
+        [minContentWidth]="688"
+        [restoreScrollTop]="restoreScrollTop()"
+        (viewportChange)="viewport.set($event)"
+        (scrollRestored)="onScrollRestored()"
+    ></app-catalog-list>
+</app-browse-shell>

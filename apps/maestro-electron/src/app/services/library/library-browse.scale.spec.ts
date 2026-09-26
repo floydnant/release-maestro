@@ -227,6 +227,20 @@ describe('LibraryBrowseRepository at library scale', () => {
         ).toBe(true)
     })
 
+    it.each(['asc', 'desc'] as const)('windows record labels by indexed name %s', direction => {
+        const request = {
+            query: { search: '', sort: { field: 'name' as const, direction } },
+            window: { offset: 3, limit: 5 },
+        }
+        const statement = repository.recordLabelWindowSql(request)
+        const plan = JSON.stringify(
+            sqlite.prepare(`EXPLAIN QUERY PLAN ${statement.sql}`).all(...statement.params),
+        )
+        expect(plan).toContain('record_labels_name_key')
+        expect(plan).not.toMatch(/TEMP B-TREE/i)
+        expect(repository.queryRecordLabels(request)).toMatchObject({ offset: 3, total: 17 })
+    })
+
     it.each(['artists', 'recordLabels'] as const)(
         'builds %s membership once while keeping name ordering indexed',
         kind => {

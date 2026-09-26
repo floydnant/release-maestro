@@ -121,6 +121,8 @@ describe('LibraryBackendRepository', () => {
                 coverPath: '/cache/cover.jpg',
                 extraMetadata: [
                     ['Custom: MUSICBRAINZ_RECORDING_ID', 'recording-1'],
+                    ['Custom: BEATPORT_LABEL_URL', 'https://www.beatport.com/label/example/1'],
+                    ['Custom: BANDCAMP_LABEL_URL', 'https://example.bandcamp.com'],
                     ['Custom: SERATO_DATA', 'ignored'],
                 ],
             }),
@@ -154,7 +156,13 @@ describe('LibraryBackendRepository', () => {
             recordLabelText: 'Label',
             externalRefs: { MUSICBRAINZ_RECORDING_ID: ['recording-1'] },
         })
-        expect(recordLabel).toMatchObject({ name: 'Label' })
+        expect(recordLabel).toMatchObject({
+            name: 'Label',
+            externalRefs: {
+                BEATPORT_LABEL_URL: ['https://www.beatport.com/label/example/1'],
+                BANDCAMP_LABEL_URL: ['https://example.bandcamp.com'],
+            },
+        })
         expect(album?.recordLabelId).toBe(recordLabel?.id ?? null)
         expect(song?.lastSeenAt).toEqual(seenAt)
         expect(song?.lastScannedAt).toEqual(new Date('2026-06-15T10:05:00Z'))

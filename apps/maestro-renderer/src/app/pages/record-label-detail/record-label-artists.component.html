@@ -1,0 +1,20 @@
+@if (result().status === 'error') {
+    <div class="flex items-center justify-center gap-3 p-4" role="alert">
+        <p class="type-body-sm text-content-secondary">Could not load artists for this record label</p>
+        <button type="button" class="btn-neutral" (click)="onRetry()">Try again</button>
+    </div>
+}
+@if (!result().loaded && result().status === 'loading') {
+    <p class="type-body-sm p-8 text-content-secondary" role="status">Loading artists…</p>
+} @else if (result().loaded && result().total === 0) {
+    <p class="type-body-sm p-8 text-content-secondary">No artists linked to this record label</p>
+} @else if (result().loaded) {
+    <app-catalog-list
+        label="Artists"
+        [query]="recordLabelId()"
+        [result]="result()"
+        [restoreScrollTop]="restoreScrollTop()"
+        (viewportChange)="viewport.set($event)"
+        (scrollRestored)="onScrollRestored()"
+    ></app-catalog-list>
+}

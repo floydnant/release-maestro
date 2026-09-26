@@ -5,6 +5,7 @@
 .angular
 drizzle/meta
 apps/metadata-engine/target
+apps/metadata-engine/target-dev
 playwright-report
 apps/maestro-renderer/design-tokens/tailwind.generated.json
 apps/maestro-renderer/src/app/shared/design-tokens.generated.ts

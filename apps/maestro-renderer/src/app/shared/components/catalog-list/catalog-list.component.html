@@ -8,7 +8,7 @@
     (keydown)="onKeydown($event)"
     [attr.aria-busy]="result().status === 'loading'"
 >
-    <div class="relative min-w-max" [style.height.px]="height()">
+    <div class="relative min-w-max" [style.height.px]="height()" [style.min-width.px]="minContentWidth()">
         <ul
             class="absolute inset-x-0 top-0 m-0 list-none p-0"
             [style.transform]="'translateY(' + offset() + 'px)'"
@@ -27,6 +27,35 @@
                         (focus)="activeIndex.set(result().offset + index)"
                     >
                         <span class="min-w-0 flex-1 truncate" [title]="row.name">{{ row.name }}</span>
+                        @if (row.recordLabelStats; as stats) {
+                            <span class="w-24 shrink-0 text-right text-content-secondary tabular-nums"
+                                >{{ stats.albumCount | number
+                                }}<span class="sr-only">
+                                    {{ stats.albumCount === 1 ? 'album' : 'albums' }}</span
+                                ></span
+                            >
+                            <span class="w-24 shrink-0 text-right text-content-secondary tabular-nums"
+                                >{{ stats.songCount | number
+                                }}<span class="sr-only">
+                                    {{ stats.songCount === 1 ? 'track' : 'tracks' }}</span
+                                ></span
+                            >
+                            <span class="w-24 shrink-0 text-right text-content-secondary tabular-nums"
+                                >{{ stats.artistCount | number
+                                }}<span class="sr-only">
+                                    {{ stats.artistCount === 1 ? 'artist' : 'artists' }}</span
+                                ></span
+                            >
+                            <span class="w-32 shrink-0 text-right text-content-secondary tabular-nums"
+                                >{{
+                                    stats.firstYear == null
+                                        ? 'Unknown'
+                                        : stats.firstYear === stats.lastYear
+                                          ? stats.firstYear
+                                          : stats.firstYear + '–' + stats.lastYear
+                                }}<span class="sr-only"> years active</span></span
+                            >
+                        }
                         @if (showCounts() && row.counts; as counts) {
                             <!-- The unit is spoken but not drawn: the header row above
                                  labels the columns, and repeating "tracks" on every row
