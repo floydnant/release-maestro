@@ -50,10 +50,14 @@ const exitForChild = (code, signal) => {
 const waitForExit = child =>
     new Promise(resolve => {
         if (child.exitCode !== null || child.signalCode !== null) {
+            child.releaseMaestroExitedAt ??= Date.now()
             resolve({ child, code: child.exitCode, signal: child.signalCode })
             return
         }
-        child.once('exit', (code, signal) => resolve({ child, code, signal }))
+        child.once('exit', (code, signal) => {
+            child.releaseMaestroExitedAt = Date.now()
+            resolve({ child, code, signal })
+        })
         child.once('error', () => resolve({ child, code: 1, signal: null }))
     })
 
@@ -65,7 +69,7 @@ const stopChild = async child => {
         await waitForExit(child)
         return
     }
-    await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity)
+    await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity, child.releaseMaestroExitedAt)
 }
 
 const parseWorkflowCommands = tokens => {
@@ -289,7 +293,7 @@ const runWorkflow = async args => {
         const listener = () => {
             cancellationSignal ??= signal
             if (child?.pid) {
-                void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+                void stopProcessTree(child.pid, child.releaseMaestroStartIdentity, signal).catch(() => {})
             } else if (!startupShutdownTimer) {
                 startupShutdownTimer = setTimeout(
                     () => process.exit(exitForChild(null, cancellationSignal)),
@@ -318,6 +322,7 @@ const runWorkflow = async args => {
                 ? spawnPackageBinary(command, commandArgs, { env: environment })
                 : spawnManaged(command, commandArgs, { env: environment })
             clearTimeout(startupShutdownTimer)
+            startupShutdownTimer = null
             try {
                 await setTransientChildHolder(transient.id, child.pid, child.releaseMaestroStartIdentity)
             } catch (error) {

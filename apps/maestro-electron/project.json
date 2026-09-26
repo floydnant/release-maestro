@@ -22,7 +22,9 @@
                 "assets": ["apps/maestro-electron/src/assets"]
             },
             "configurations": {
-                "development": {},
+                "development": {
+                    "outputPath": "dist/apps/maestro-electron-development"
+                },
                 "production": {
                     "optimization": true,
                     "extractLicenses": true,
@@ -41,7 +43,7 @@
             "executor": "nx-electron:execute",
             "continuous": true,
             "options": {
-                "buildTarget": "maestro-electron:build-app",
+                "buildTarget": "maestro-electron:build-app:development",
                 "remoteDebuggingPort": 9222,
                 "args": ["--remote-debugging-address=127.0.0.1"],
                 "inspect": "inspect",

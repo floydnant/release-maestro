@@ -89,7 +89,9 @@ const runGit = (cwd, args) => {
 export const resolveWorktree = async (cwd = process.cwd()) => {
     const root = await realpath(runGit(cwd, ['rev-parse', '--show-toplevel']))
     const branch = runGit(root, ['branch', '--show-current']) || '(detached)'
-    return { root, branch, manifestPath: join(root, manifestName) }
+    const gitEntry = await stat(join(root, '.git'))
+    const identity = `${gitEntry.dev}:${gitEntry.ino}:${gitEntry.birthtimeMs}`
+    return { root, branch, identity, manifestPath: join(root, manifestName) }
 }
 
 export const parseUnixProcessIdentity = output => {
@@ -159,7 +161,7 @@ const processTable = () => {
                 '-NoProfile',
                 '-NonInteractive',
                 '-Command',
-                'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress',
+                'Get-CimInstance Win32_Process | ForEach-Object { [pscustomobject]@{ ProcessId=$_.ProcessId; ParentProcessId=$_.ParentProcessId; StartTicks=[string]$_.CreationDate.ToUniversalTime().Ticks } } | ConvertTo-Json -Compress',
             ],
             { encoding: 'utf8', windowsHide: true },
         )
@@ -168,6 +170,7 @@ const processTable = () => {
         return (Array.isArray(rows) ? rows : [rows]).map(row => ({
             pid: Number(row.ProcessId),
             parentPid: Number(row.ParentProcessId),
+            startIdentity: row.StartTicks,
         }))
     }
     const columns = process.platform === 'darwin' ? 'pid=,ppid=,state=,lstart=' : 'pid=,ppid='
@@ -245,7 +248,7 @@ export const signalProcessTree = (rootPid, signal, expectedStartIdentity) => {
     signalProcessSnapshot(snapshot, signal)
 }
 
-export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
+export const stopProcessTree = async (rootPid, expectedStartIdentity, signal = 'SIGTERM') => {
     if (!expectedStartIdentity) return
     const snapshot = snapshotProcessTree(rootPid)
     if (
@@ -257,7 +260,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
         return
     }
     const descendants = snapshot.filter(processRecord => processRecord.pid !== rootPid)
-    signalProcessSnapshot(descendants, 'SIGTERM')
+    signalProcessSnapshot(descendants, signal)
     if (descendants.length > 0) {
         const naturalExitDeadline = nowMs() + 500
         while (processStartIdentity(rootPid) === expectedStartIdentity && nowMs() < naturalExitDeadline) {
@@ -266,7 +269,7 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
     }
     signalProcessSnapshot(
         snapshot.filter(processRecord => processRecord.pid === rootPid),
-        'SIGTERM',
+        signal,
     )
     const deadline = nowMs() + 5_000
     while (snapshotHasLiveProcess(snapshot) && nowMs() < deadline) {
@@ -275,13 +278,34 @@ export const stopProcessTree = async (rootPid, expectedStartIdentity) => {
     signalProcessSnapshot(snapshot, 'SIGKILL')
 }
 
-export const stopProcessGroup = async (rootPid, expectedStartIdentity) => {
+const windowsTicksAt = milliseconds => BigInt(milliseconds) * 10_000n + 621355968000000000n
+export const windowsExitedRootChildren = (rows, rootPid, expectedStartIdentity, exitedAt) => {
+    if (!expectedStartIdentity || !exitedAt) return []
+    const started = BigInt(expectedStartIdentity)
+    const exited = windowsTicksAt(exitedAt)
+    return rows.filter(row => {
+        if (row.parentPid !== rootPid || !row.startIdentity) return false
+        const childStarted = BigInt(row.startIdentity)
+        return childStarted >= started && childStarted <= exited
+    })
+}
+
+export const stopProcessGroup = async (rootPid, expectedStartIdentity, exitedAt = null) => {
     if (process.platform === 'win32') {
-        if (processStartIdentity(rootPid) !== expectedStartIdentity) return
-        spawnSync('taskkill.exe', ['/PID', String(rootPid), '/T', '/F'], {
-            encoding: 'utf8',
-            windowsHide: true,
-        })
+        if (processStartIdentity(rootPid) === expectedStartIdentity) {
+            spawnSync('taskkill.exe', ['/PID', String(rootPid), '/T', '/F'], {
+                encoding: 'utf8',
+                windowsHide: true,
+            })
+        } else {
+            const children = windowsExitedRootChildren(
+                processTable(),
+                rootPid,
+                expectedStartIdentity,
+                exitedAt,
+            )
+            await Promise.all(children.map(child => stopProcessTree(child.pid, child.startIdentity)))
+        }
         return
     }
     const currentStartIdentity = processStartIdentity(rootPid)
@@ -302,7 +326,7 @@ export const stopProcessGroup = async (rootPid, expectedStartIdentity) => {
             process.kill(-rootPid, 0)
         } catch (error) {
             if (error?.code === 'ESRCH') return
-            throw error
+            if (error?.code !== 'EPERM') throw error
         }
         await sleep(50)
     }
@@ -365,6 +389,7 @@ const parseAllocation = value => {
         !isRecord(value) ||
         typeof value.worktreeId !== 'string' ||
         typeof value.path !== 'string' ||
+        (value.worktreeIdentity !== undefined && typeof value.worktreeIdentity !== 'string') ||
         typeof value.branch !== 'string' ||
         !isTimestamp(value.createdAt) ||
         !isTimestamp(value.updatedAt) ||
@@ -1079,17 +1104,34 @@ const allocationForManifest = (registry, manifest, worktree, rejectCopied = true
     return null
 }
 
-export const allocateDevelopment = async ({ reallocate = false } = {}) => {
+const allocationForWorktree = (registry, manifest, worktree, rejectCopied = true) => {
+    if (manifest) {
+        const ownedByManifest = allocationForManifest(registry, manifest, worktree, rejectCopied)
+        if (ownedByManifest || rejectCopied) return ownedByManifest
+    }
+    const matches = Object.values(registry.allocations).filter(
+        allocation =>
+            allocation.worktreeIdentity === worktree.identity &&
+            sameCanonicalPath(allocation.path, worktree.root),
+    )
+    if (matches.length > 1) {
+        throw new InstanceError('Multiple allocations match this worktree', 'REGISTRY_CONFLICT')
+    }
+    return matches[0] ?? null
+}
+
+const allocateDevelopmentWithResult = async ({ reallocate = false } = {}) => {
     const worktree = await resolveWorktree()
     const initialManifest = await readManifest(worktree)
     const requestedAppDataPath = await appDataFor(worktree)
     const hasAppDataOverride = process.env['RELEASE_MAESTRO_APP_DATA_DIR'] !== undefined
     let result
+    let created = false
     await withRegistry(async (registry, paths) => {
         const manifest = (await readManifest(worktree)) ?? initialManifest
         const manifestId = manifest?.worktreeId
         const persisted = manifestId ? registry.allocations[manifestId] : null
-        const existing = allocationForManifest(registry, manifest, worktree, false)
+        const existing = allocationForWorktree(registry, manifest, worktree, false)
         const worktreeId = existing
             ? existing.worktreeId
             : persisted || manifestPathBelongsElsewhere(manifest, worktree)
@@ -1112,12 +1154,9 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
         assertClaimsAvailable(registry, [appDataClaim], worktreeId, 'dev')
 
         const requestedBundle = manualBundle()
-        const bundleChanged =
-            requestedBundle &&
-            existing &&
-            Object.keys(requestedBundle).some(key => requestedBundle[key] !== existing.bundle[key])
-        if (existing && !reallocate && !bundleChanged) {
+        if (existing && !reallocate) {
             existing.path = worktree.root
+            existing.worktreeIdentity = worktree.identity
             existing.branch = worktree.branch
             existing.appDataPath = appDataPath
             existing.claims = [`electron-development-bundle:${worktreeId}`, appDataClaim]
@@ -1148,6 +1187,7 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
             worktreeId,
             generation: registry.generation + 1,
             path: worktree.root,
+            worktreeIdentity: worktree.identity,
             branch: worktree.branch,
             bundle,
             appDataPath,
@@ -1161,6 +1201,7 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
         }
         registry.allocations[worktreeId] = allocation
         result = allocation
+        created = !existing
         await writeManifest(worktree, allocation, registry.generation + 1)
         await appendEvent(paths, reallocate ? 'dev-allocation-reallocated' : 'dev-allocation-created', {
             worktreeId,
@@ -1168,8 +1209,10 @@ export const allocateDevelopment = async ({ reallocate = false } = {}) => {
             ports: bundle,
         })
     })
-    return result
+    return { allocation: result, created }
 }
+
+export const allocateDevelopment = async options => (await allocateDevelopmentWithResult(options)).allocation
 
 export const getDevelopment = async ({ allocate = false } = {}) => {
     const worktree = await resolveWorktree()
@@ -1296,9 +1339,8 @@ export const removeDevelopmentHolder = async holderId => {
 export const releaseDevelopment = async ({ force = false, requestWhenIdle = false } = {}) => {
     const worktree = await resolveWorktree()
     const manifest = await readManifest(worktree)
-    if (!manifest && !force) return { released: false, reason: 'unallocated' }
     return withRegistry(async (registry, paths) => {
-        const ownedByManifest = manifest ? allocationForManifest(registry, manifest, worktree, !force) : null
+        const ownedByManifest = allocationForWorktree(registry, manifest, worktree, !force)
         const allocation =
             ownedByManifest ??
             (force
@@ -1341,15 +1383,17 @@ export const releaseDevelopment = async ({ force = false, requestWhenIdle = fals
 export const statusDevelopment = async () => {
     const worktree = await resolveWorktree()
     const manifest = await readManifest(worktree)
-    if (!manifest) return { state: 'unallocated', path: worktree.root, branch: worktree.branch }
     let status
     await withRegistry(async registry => {
-        const allocation = allocationForManifest(registry, manifest, worktree)
+        const allocation = allocationForWorktree(registry, manifest, worktree)
         if (!allocation) {
-            status = { state: 'reclaimable', path: worktree.root, branch: worktree.branch, manifest }
+            status = manifest
+                ? { state: 'reclaimable', path: worktree.root, branch: worktree.branch, manifest }
+                : { state: 'unallocated', path: worktree.root, branch: worktree.branch }
             return
         }
         allocation.path = worktree.root
+        allocation.worktreeIdentity = worktree.identity
         allocation.branch = worktree.branch
         allocation.updatedAt = iso(nowMs())
         allocation.generation = registry.generation + 1
@@ -1388,12 +1432,11 @@ export const listInstances = async () => {
 export const stopDevelopment = async () => {
     const worktree = await resolveWorktree()
     const manifest = await readManifest(worktree)
-    if (!manifest) return []
     const stopped = []
     let holders = []
     let targets = []
     await withRegistry(async (registry, paths) => {
-        const allocation = allocationForManifest(registry, manifest, worktree)
+        const allocation = allocationForWorktree(registry, manifest, worktree)
         if (!allocation) return
         holders = allocation.holders.filter(holder => holder.worktreeId === allocation.worktreeId)
         targets = rootProcessHolders(holders)
@@ -1460,8 +1503,18 @@ export const allocateTransient = async workflow => {
           ))
         : false
     if (!manifest || copiedManifest) {
-        await allocateDevelopment()
-        await releaseDevelopment()
+        const { allocation, created } = await allocateDevelopmentWithResult()
+        if (created) {
+            await withRegistry(async (registry, paths) => {
+                const current = registry.allocations[allocation.worktreeId]
+                if (!current || current.holders.length > 0) return
+                delete registry.allocations[allocation.worktreeId]
+                await appendEvent(paths, 'dev-allocation-released', {
+                    worktreeId: allocation.worktreeId,
+                    reason: 'transient-identity-initialization',
+                })
+            })
+        }
         manifest = await readManifest(worktree)
     }
     if (!manifest) throw new InstanceError('Could not create the worktree identity manifest')

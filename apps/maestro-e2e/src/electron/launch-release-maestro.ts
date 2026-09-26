@@ -5,7 +5,7 @@ import { _electron as electron, ElectronApplication } from 'playwright'
 
 export const workspaceRoot = join(__dirname, '../../../..')
 
-const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron/main.js')
+const electronMainPath = join(workspaceRoot, 'dist/apps/maestro-electron-development/main.js')
 const traceCounts = new WeakMap<TestInfo, number>()
 
 /** Resolve electron-builder's unpacked executable for the host OS and architecture. */

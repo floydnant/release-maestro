@@ -28,7 +28,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     const listener = () => {
         pendingSignal ??= signal
         if (child?.pid) {
-            void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+            void stopProcessTree(child.pid, child.releaseMaestroStartIdentity, signal).catch(() => {})
         } else if (!startupShutdownTimer) {
             startupShutdownTimer = setTimeout(
                 () => process.exit(128 + (osConstants.signals[pendingSignal] ?? 0)),
@@ -63,7 +63,8 @@ try {
     })
     if (pendingSignal) {
         clearTimeout(startupShutdownTimer)
-        void stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+        startupShutdownTimer = null
+        void stopProcessTree(child.pid, child.releaseMaestroStartIdentity, pendingSignal).catch(() => {})
     }
     stopHeartbeat = startHeartbeat(() => heartbeatDevelopmentHolder(holder.id))
     const { code, signal } = await new Promise((resolve, reject) => {

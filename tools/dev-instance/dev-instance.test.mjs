@@ -19,7 +19,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import net from 'node:net'
 import { afterEach, jest, test } from '@jest/globals'
-import { parseUnixProcessIdentity, rootProcessHolders } from './core.mjs'
+import { parseUnixProcessIdentity, rootProcessHolders, windowsExitedRootChildren } from './core.mjs'
 
 jest.setTimeout(30_000)
 
@@ -37,6 +37,17 @@ test('process shutdown starts with supervisors and orphaned holders', () => {
     const orphan = { id: 'orphan', parentHolderId: 'missing-parent' }
 
     assert.deepEqual(rootProcessHolders([supervisor, managedChild, orphan]), [supervisor, orphan])
+})
+
+test('Windows orphan cleanup selects only children from the verified launcher lifetime', () => {
+    const start = '621355968010000000'
+    const rows = [
+        { pid: 11, parentPid: 10, startIdentity: '621355968005000000' },
+        { pid: 12, parentPid: 10, startIdentity: '621355968015000000' },
+        { pid: 13, parentPid: 10, startIdentity: '621355968025000000' },
+        { pid: 14, parentPid: 12, startIdentity: '621355968015000000' },
+    ]
+    assert.deepEqual(windowsExitedRootChildren(rows, 10, start, 2_000), [rows[1]])
 })
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
@@ -325,14 +336,17 @@ test('manual bundles must be complete and distinct', async () => {
     assert.deepEqual(allocation.bundle, { renderer: 4310, cdp: 9310, inspector: 5910 })
 })
 
-test('a complete manual override replaces an existing idle bundle', async () => {
+test('a complete manual override only replaces an existing idle bundle on reallocation', async () => {
     const fixture = await createFixture()
     const original = runJson(fixture, fixture.main, ['dev-allocate'])
-    const changed = runJson(fixture, fixture.main, ['dev-allocate'], {
+    const manualPorts = {
         RELEASE_MAESTRO_RENDERER_PORT: '4311',
         RELEASE_MAESTRO_CDP_PORT: '9311',
         RELEASE_MAESTRO_INSPECTOR_PORT: '5911',
-    })
+    }
+    const reused = runJson(fixture, fixture.main, ['dev-allocate'], manualPorts)
+    assert.deepEqual(reused.bundle, original.bundle)
+    const changed = runJson(fixture, fixture.main, ['dev-reallocate'], manualPorts)
     assert.equal(changed.worktreeId, original.worktreeId)
     assert.deepEqual(changed.bundle, { renderer: 4311, cdp: 9311, inspector: 5911 })
 })
@@ -400,6 +414,72 @@ test('forced release finds its allocation when the worktree manifest is missing'
     assert.equal(released.released, true)
     const registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
     assert.equal(registry.allocations[allocation.worktreeId], undefined)
+})
+
+test('a missing manifest recovers the live allocation from the registry', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const active = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 1,
+        'MCP holder did not register',
+    )
+    await rm(join(fixture.main, '.release-maestro-instance.json'))
+
+    const recovered = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(recovered.worktreeId, active.worktreeId)
+    assert.equal(recovered.holders[0].pid, wrapper.pid)
+    assert.equal(runJson(fixture, fixture.main, ['dev-allocate']).worktreeId, active.worktreeId)
+    assert.equal(run(fixture, fixture.main, ['dev-release']).status, 1)
+
+    wrapper.kill('SIGTERM')
+    await childResult(wrapper)
+})
+
+test('a corrupt manifest does not hide a live holder from dev-stop', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const active = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 1,
+        'MCP holder did not register',
+    )
+    await writeFile(join(fixture.main, '.release-maestro-instance.json'), '{broken')
+
+    const stopped = runJson(fixture, fixture.main, ['dev-stop'])
+    assert.ok(stopped.stopped.some(holder => holder.pid === wrapper.pid))
+    await childResult(wrapper)
+    const recovered = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(recovered.worktreeId, active.worktreeId)
+    assert.deepEqual(recovered.holders, [])
+})
+
+test('a workflow reuses a live allocation when its manifest is missing', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const active = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.length === 1,
+        'MCP holder did not register',
+    )
+    await rm(join(fixture.main, '.release-maestro-instance.json'))
+
+    const workflow = run(fixture, fixture.main, [
+        'run-workflow',
+        'renderer-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        'process.exit(0)',
+    ])
+    assert.equal(workflow.status, 0, workflow.stderr)
+    assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).worktreeId, active.worktreeId)
+
+    wrapper.kill('SIGTERM')
+    await childResult(wrapper)
 })
 
 test('registry recovery keeps live ownership from the last known good copy', async () => {
