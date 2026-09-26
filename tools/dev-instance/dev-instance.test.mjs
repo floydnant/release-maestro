@@ -233,15 +233,18 @@ const createFakePnpm = async (fixture, directoryName = 'bin') => {
 import { writeFileSync } from 'node:fs'
 import net from 'node:net'
 if (process.env.FAKE_CAPTURE) writeFileSync(process.env.FAKE_CAPTURE, JSON.stringify(process.argv.slice(2)))
-if (process.env.FAKE_LISTENER_PID_PATH) writeFileSync(process.env.FAKE_LISTENER_PID_PATH, String(process.pid))
 const portIndex = process.argv.indexOf('--port')
 const remoteIndex = process.argv.indexOf('--remoteDebuggingPort')
 const servers = []
 if (process.env.FAKE_OPEN_PORT === '1') {
   for (const index of [portIndex, remoteIndex]) {
     if (index < 0) continue
+    const port = process.argv[index + 1]
+    if (process.env.FAKE_LISTENER_PID_DIR) {
+      writeFileSync(process.env.FAKE_LISTENER_PID_DIR + '/' + port, String(process.pid))
+    }
     const server = net.createServer()
-    server.listen({ host: 'localhost', port: Number(process.argv[index + 1]) })
+    server.listen({ host: 'localhost', port: Number(port) })
     if (process.env.FAKE_READY_PROBED_PATH) {
       server.once('connection', () => writeFileSync(process.env.FAKE_READY_PROBED_PATH, ''))
     }
@@ -1821,7 +1824,8 @@ test('run-dev rechecks a live listener after one missed ownership lookup', async
     const bin = await createFakePnpm(fixture)
     const marker = join(fixture.base, 'first-lsof-call')
     const readyProbed = join(fixture.base, 'ready-probed')
-    const listenerPidPath = join(fixture.base, 'listener.pid')
+    const listenerPidDir = join(fixture.base, 'listener-pids')
+    await mkdir(listenerPidDir)
     const lsof = join(bin, 'lsof')
     await writeFile(
         lsof,
@@ -1835,7 +1839,8 @@ while (!existsSync(process.env.FAKE_READY_PROBED_PATH) && Date.now() < deadline)
 if (existsSync(process.env.FAKE_READY_PROBED_PATH) && !existsSync(process.env.FAKE_LSOF_MARKER)) {
   writeFileSync(process.env.FAKE_LSOF_MARKER, '')
 } else {
-  process.stdout.write('p' + readFileSync(process.env.FAKE_LISTENER_PID_PATH, 'utf8') + '\\n')
+  const port = process.argv.find(argument => argument.startsWith('-iTCP:')).slice(6)
+  process.stdout.write('p' + readFileSync(process.env.FAKE_LISTENER_PID_DIR + '/' + port, 'utf8') + '\\n')
 }
 `,
     )
@@ -1846,7 +1851,7 @@ if (existsSync(process.env.FAKE_READY_PROBED_PATH) && !existsSync(process.env.FA
             PATH: `${bin}:${process.env.PATH}`,
             RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
             FAKE_OPEN_PORT: '1',
-            FAKE_LISTENER_PID_PATH: listenerPidPath,
+            FAKE_LISTENER_PID_DIR: listenerPidDir,
             FAKE_LSOF_MARKER: marker,
             FAKE_READY_PROBED_PATH: readyProbed,
         }),
