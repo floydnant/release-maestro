@@ -1063,6 +1063,7 @@ const listenerPids = port => {
     if (process.platform === 'win32') {
         const result = spawnSync('netstat.exe', ['-ano'], {
             encoding: 'utf8',
+            maxBuffer: 16 * 1024 * 1024,
             windowsHide: true,
         })
         if (result.error || typeof result.stdout !== 'string') return []
