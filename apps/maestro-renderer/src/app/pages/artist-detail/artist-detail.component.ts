@@ -25,14 +25,25 @@ const externalLinks = (artist: ArtistDetail): { label: string; url: string }[] =
             value: refs[ExternalRefKeys.MusicBrainzArtistId]?.[0],
             base: 'https://musicbrainz.org/artist/',
         },
-        { label: 'Discogs', value: refs[ExternalRefKeys.DiscogsArtistLink]?.[0] },
-        { label: 'Beatport', value: refs[ExternalRefKeys.BeatportArtistUrl]?.[0] },
+        {
+            label: 'Discogs',
+            value: refs[ExternalRefKeys.DiscogsArtistLink]?.[0],
+            hosts: ['discogs.com', 'www.discogs.com'],
+        },
+        {
+            label: 'Beatport',
+            value: refs[ExternalRefKeys.BeatportArtistUrl]?.[0],
+            hosts: ['beatport.com', 'www.beatport.com'],
+        },
     ]
     const direct = links.flatMap(link => {
         if (!link.value) return []
         const url = link.base ? link.base + encodeURIComponent(link.value) : link.value
         try {
-            if (new URL(url).protocol !== 'https:') return []
+            const parsed = new URL(url)
+            if (parsed.protocol !== 'https:' || (link.hosts && !link.hosts.includes(parsed.hostname))) {
+                return []
+            }
         } catch {
             return []
         }
