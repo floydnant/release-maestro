@@ -1674,12 +1674,16 @@ if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
 $job = [ReleaseMaestro.Job]::CreateAndAssignCurrentProcess()
 $arguments = '"' + $env:RELEASE_MAESTRO_TREE_SCRIPT + '"'
 $child = Start-Process -FilePath $env:RELEASE_MAESTRO_TREE_NODE -ArgumentList $arguments -NoNewWindow -PassThru
+$child.WaitForExit()
+$exitCode = $child.ExitCode
+if ($env:RELEASE_MAESTRO_TREE_DEBUG -eq '1') {
+    [Console]::Error.WriteLine("workflow tree: child exit=$exitCode active=$([ReleaseMaestro.Job]::ActiveProcessCount($job))")
+}
 while ([ReleaseMaestro.Job]::ActiveProcessCount($job) -gt 1) {
     if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
     Start-Sleep -Milliseconds 100
 }
-$child.Refresh()
-exit $child.ExitCode
+exit $exitCode
 } catch {
     [Console]::Error.WriteLine($_.Exception.ToString())
     exit 1

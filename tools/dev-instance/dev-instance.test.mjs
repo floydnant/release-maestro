@@ -1218,7 +1218,11 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
     const workflow = spawn(
         process.execPath,
         [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', launcher],
-        { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+        {
+            cwd: fixture.main,
+            env: environmentFor(fixture, { RELEASE_MAESTRO_TREE_DEBUG: '1' }),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        },
     )
     liveChildren.push(workflow)
     let workflowStdout = ''
@@ -1245,8 +1249,24 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
         const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
         assert.ok(listed.instances.some(instance => instance.workflow === 'renderer-e2e'))
         assert.equal(workflow.exitCode, null)
+        let grandchildAlive = true
+        try {
+            process.kill(grandchildPid, 0)
+        } catch (error) {
+            if (error.code !== 'ESRCH') throw error
+            grandchildAlive = false
+        }
+        assert.equal(
+            grandchildAlive,
+            true,
+            `grandchild exited early; workflow=${workflow.exitCode} stdout=${workflowStdout} stderr=${workflowStderr}`,
+        )
     } finally {
-        process.kill(grandchildPid, 'SIGTERM')
+        try {
+            process.kill(grandchildPid, 'SIGTERM')
+        } catch (error) {
+            if (error.code !== 'ESRCH') throw error
+        }
     }
     const result = await childResult(workflow)
     assert.equal(result.code, 0, result.stderr)
@@ -1278,7 +1298,11 @@ test('Windows workflow cancellation kills an orphaned grandchild before releasin
     const workflow = spawn(
         process.execPath,
         [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, '-e', launcher],
-        { cwd: fixture.main, env: environmentFor(fixture), stdio: ['ignore', 'pipe', 'pipe'] },
+        {
+            cwd: fixture.main,
+            env: environmentFor(fixture, { RELEASE_MAESTRO_TREE_DEBUG: '1' }),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        },
     )
     liveChildren.push(workflow)
     let workflowStdout = ''
@@ -1336,27 +1360,30 @@ test('Windows workflow cancellation kills an orphaned grandchild before releasin
 
 test('run-workflow passes separators and shell metacharacters as literal child arguments', async () => {
     const fixture = await createFixture()
-    const result = run(fixture, fixture.main, [
-        'run-workflow',
-        'renderer-e2e',
-        '--',
-        process.execPath,
-        '-e',
-        'process.exit(process.argv[1] === "--then" && process.argv[2] === "value with spaces & pipes | literally" ? 0 : 9)',
-        '--',
-        '--literal',
-        '--then',
-        'value with spaces & pipes | literally',
-    ])
+    const result = run(
+        fixture,
+        fixture.main,
+        [
+            'run-workflow',
+            'renderer-e2e',
+            '--',
+            process.execPath,
+            '-e',
+            'process.exit(process.argv[1] === "--then" && process.argv[2] === "value with spaces & pipes | literally" ? 0 : 9)',
+            '--',
+            '--literal',
+            '--then',
+            'value with spaces & pipes | literally',
+        ],
+        { RELEASE_MAESTRO_TREE_DEBUG: '1' },
+    )
     assert.equal(result.status, 0, result.stderr)
-    const nonzero = run(fixture, fixture.main, [
-        'run-workflow',
-        'renderer-e2e',
-        '--',
-        process.execPath,
-        '-e',
-        'process.exit(9)',
-    ])
+    const nonzero = run(
+        fixture,
+        fixture.main,
+        ['run-workflow', 'renderer-e2e', '--', process.execPath, '-e', 'process.exit(9)'],
+        { RELEASE_MAESTRO_TREE_DEBUG: '1' },
+    )
     assert.equal(nonzero.status, 9, nonzero.stderr)
 })
 

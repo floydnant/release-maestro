@@ -27,6 +27,9 @@ try {
         child.once('exit', (code, signal) => resolve({ code, signal }))
         child.once('error', reject)
     })
+    if (process.env['RELEASE_MAESTRO_TREE_DEBUG'] === '1') {
+        process.stderr.write(`workflow command: child exit=${code} signal=${signal}\n`)
+    }
     process.exitCode = signal ? 128 + (osConstants.signals[signal] ?? 0) : (code ?? 1)
 } finally {
     stopForwarding()
