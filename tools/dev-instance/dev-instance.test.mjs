@@ -19,7 +19,13 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import net from 'node:net'
 import { afterEach, jest, test } from '@jest/globals'
-import { holderIsLive, parseUnixProcessIdentity, rootProcessHolders, spawnManaged } from './core.mjs'
+import {
+    currentProcessIdentity,
+    holderIsLive,
+    parseUnixProcessIdentity,
+    rootProcessHolders,
+    spawnManaged,
+} from './core.mjs'
 
 jest.setTimeout(30_000)
 
@@ -39,7 +45,8 @@ test('process shutdown starts with supervisors and orphaned holders', () => {
     assert.deepEqual(rootProcessHolders([supervisor, managedChild, orphan]), [supervisor, orphan])
 })
 
-test('inaccessible process identity keeps a holder reserved', () => {
+test('readable process identity wins over a denied existence probe', () => {
+    const startIdentity = currentProcessIdentity().startIdentity
     const originalKill = process.kill
     const kill = jest.spyOn(process, 'kill').mockImplementation((pid, signal) => {
         if (pid === process.pid && signal === 0) {
@@ -50,13 +57,14 @@ test('inaccessible process identity keeps a holder reserved', () => {
         return originalKill(pid, signal)
     })
     try {
-        assert.equal(holderIsLive({ pid: process.pid, startIdentity: 'unknown' }), true)
+        assert.equal(holderIsLive({ pid: process.pid, startIdentity }), true)
+        assert.equal(holderIsLive({ pid: process.pid, startIdentity: 'stale' }), false)
     } finally {
         kill.mockRestore()
     }
 })
 
-test('spawned child remains owned when its start identity cannot be read', async () => {
+test('spawned child identity remains readable when its existence probe is denied', async () => {
     const originalKill = process.kill
     const kill = jest.spyOn(process, 'kill').mockImplementation((pid, signal) => {
         if (pid !== process.pid && signal === 0) {
@@ -72,8 +80,8 @@ test('spawned child remains owned when its start identity cannot be read', async
             stdio: 'ignore',
         })
         assert.ok(child.pid)
-        assert.equal(child.releaseMaestroStartIdentity, null)
-        assert.equal(child.releaseMaestroIdentityError?.code, 'PROCESS_IDENTITY_UNKNOWN')
+        assert.ok(child.releaseMaestroStartIdentity)
+        assert.equal(child.releaseMaestroIdentityError, undefined)
     } finally {
         kill.mockRestore()
         if (child) {
@@ -225,6 +233,7 @@ const createFakePnpm = async (fixture, directoryName = 'bin') => {
 import { writeFileSync } from 'node:fs'
 import net from 'node:net'
 if (process.env.FAKE_CAPTURE) writeFileSync(process.env.FAKE_CAPTURE, JSON.stringify(process.argv.slice(2)))
+if (process.env.FAKE_LISTENER_PID_PATH) writeFileSync(process.env.FAKE_LISTENER_PID_PATH, String(process.pid))
 const portIndex = process.argv.indexOf('--port')
 const remoteIndex = process.argv.indexOf('--remoteDebuggingPort')
 const servers = []
@@ -1801,6 +1810,53 @@ test('run-dev escalates cancellation after both launchers are ready', async () =
     ])
 
     assert.equal(result.code, 143, result.stderr)
+})
+
+test('run-dev rechecks a live listener after one missed ownership lookup', async () => {
+    if (process.platform !== 'linux') return
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const marker = join(fixture.base, 'first-lsof-call')
+    const listenerPidPath = join(fixture.base, 'listener.pid')
+    const lsof = join(bin, 'lsof')
+    await writeFile(
+        lsof,
+        `#!/usr/bin/env node
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+if (!existsSync(process.env.FAKE_LSOF_MARKER)) {
+  writeFileSync(process.env.FAKE_LSOF_MARKER, '')
+} else {
+  process.stdout.write('p' + readFileSync(process.env.FAKE_LISTENER_PID_PATH, 'utf8') + '\\n')
+}
+`,
+    )
+    await chmod(lsof, 0o755)
+    const dev = spawn(process.execPath, [cli, 'run-dev'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, {
+            PATH: `${bin}:${process.env.PATH}`,
+            RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+            FAKE_OPEN_PORT: '1',
+            FAKE_LISTENER_PID_PATH: listenerPidPath,
+            FAKE_LSOF_MARKER: marker,
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    let stderr = ''
+    dev.stderr.on('data', chunk => (stderr += chunk))
+    await waitFor(
+        () => {
+            if (dev.exitCode !== null || dev.signalCode !== null) assert.fail(stderr)
+            return Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json']))
+        },
+        status => status.holders?.filter(holder => holder.role === 'dev-electron').length === 2,
+        'listener holders did not register after the first lookup missed',
+        15_000,
+    )
+    assert.equal(existsSync(marker), true)
+    dev.kill('SIGTERM')
+    await childResult(dev)
 })
 
 test('run-dev reports a missing renderer launcher through its cleanup path', async () => {

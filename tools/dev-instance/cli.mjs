@@ -189,9 +189,11 @@ const runDevelopment = async () => {
             'dev-renderer',
             [allocation.bundle.renderer],
             renderer.pid,
+            rendererHolder.holder.startIdentity,
             supervisor.id,
+            cancellation.signal,
         )
-        childHolders.push(rendererListener.holder)
+        if (rendererListener) childHolders.push(rendererListener.holder)
         if (stopIfCancelled()) return
 
         const electronEnvironment = { ...environment }
@@ -256,9 +258,12 @@ const runDevelopment = async () => {
             'dev-electron',
             [allocation.bundle.cdp, allocation.bundle.inspector],
             electron.pid,
+            electronHolder.holder.startIdentity,
             supervisor.id,
+            cancellation.signal,
         )
-        childHolders.push(electronListener.holder)
+        if (electronListener) childHolders.push(electronListener.holder)
+        if (stopIfCancelled()) return
 
         process.stdout.write(formatDevelopmentSummary(instance, { color: useColor() }))
 

@@ -118,7 +118,7 @@ const processExists = pid => {
 }
 
 const processStartIdentity = pid => {
-    if (!Number.isSafeInteger(pid) || pid <= 0 || !processExists(pid)) return null
+    if (!Number.isSafeInteger(pid) || pid <= 0) return null
     let started = ''
     if (process.platform === 'linux') {
         try {
@@ -1020,8 +1020,12 @@ const listenerPids = port => {
         .filter(Number.isSafeInteger)
 }
 
-const ownedListenerPid = (rootPid, ports) => {
-    const processTree = new Set(snapshotProcessTree(rootPid).map(processRecord => processRecord.pid))
+const ownedListenerPid = (rootPid, rootStartIdentity, ports) => {
+    const snapshot = snapshotProcessTree(rootPid)
+    if (!snapshot.some(record => record.pid === rootPid && record.startIdentity === rootStartIdentity)) {
+        return null
+    }
+    const processTree = new Set(snapshot.map(processRecord => processRecord.pid))
     const candidates = ports
         .map(port => new Set(listenerPids(port)))
         .reduce((intersection, pids) => new Set([...intersection].filter(pid => pids.has(pid))))
@@ -1357,15 +1361,31 @@ export const registerDevelopmentHolder = async (
     return { allocation, holder }
 }
 
-export const registerDevelopmentListenerHolder = async (role, ports, launcherPid, parentHolderId) => {
-    const pid = ownedListenerPid(launcherPid, ports)
-    if (!pid) {
-        throw new InstanceError(
-            `Could not identify the ${role} listener under launcher PID ${launcherPid}.`,
-            'LISTENER_OWNER_NOT_FOUND',
-        )
-    }
-    return registerDevelopmentHolder(role, pid, parentHolderId)
+export const registerDevelopmentListenerHolder = async (
+    role,
+    ports,
+    launcherPid,
+    launcherStartIdentity,
+    parentHolderId,
+    signal = null,
+) => {
+    const deadline = nowMs() + 5_000
+    do {
+        if (signal?.aborted) return null
+        if (processStartIdentity(launcherPid) !== launcherStartIdentity) break
+        const pid = ownedListenerPid(launcherPid, launcherStartIdentity, ports)
+        if (pid) {
+            if (signal?.aborted) return null
+            return registerDevelopmentHolder(role, pid, parentHolderId)
+        }
+        await sleep(100)
+    } while (nowMs() < deadline)
+    if (signal?.aborted) return null
+    const listeners = ports.map(port => `${port}: ${listenerPids(port).join(',') || 'none'}`)
+    throw new InstanceError(
+        `Could not identify the ${role} listener under launcher PID ${launcherPid} (${listeners.join('; ')}).`,
+        'LISTENER_OWNER_NOT_FOUND',
+    )
 }
 
 export const heartbeatDevelopmentHolder = async holderId => {
