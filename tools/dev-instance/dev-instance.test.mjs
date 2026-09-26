@@ -234,6 +234,7 @@ const createFakePnpm = async (fixture, directoryName = 'bin') => {
 import { writeFileSync } from 'node:fs'
 import net from 'node:net'
 if (process.env.FAKE_CAPTURE) writeFileSync(process.env.FAKE_CAPTURE, JSON.stringify(process.argv.slice(2)))
+if (process.env.FAKE_CHILD_PID_PATH) writeFileSync(process.env.FAKE_CHILD_PID_PATH, String(process.pid))
 const portIndex = process.argv.indexOf('--port')
 const remoteIndex = process.argv.indexOf('--remoteDebuggingPort')
 const servers = []
@@ -245,7 +246,10 @@ if (process.env.FAKE_OPEN_PORT === '1') {
       writeFileSync(process.env.FAKE_LISTENER_PID_DIR + '/' + port, String(process.pid))
     }
     const server = net.createServer()
-    server.listen({ host: 'localhost', port: Number(port) })
+    const initialDelay = Number(process.env.FAKE_INITIAL_LISTEN_DELAY_MS ?? 0)
+    const open = () => server.listen({ host: 'localhost', port: Number(port) })
+    if (initialDelay > 0 && remoteIndex < 0) setTimeout(open, initialDelay)
+    else open()
     const reopenDelay = Number(process.env.FAKE_REOPEN_AFTER_FIRST_CONNECTION_MS ?? 0)
     if (reopenDelay > 0 && remoteIndex < 0) {
       server.once('connection', () => {
@@ -453,20 +457,44 @@ test('automatic reallocation reserves the previous bundle while choosing its rep
     assert.notDeepEqual(second.bundle, first.bundle)
 })
 
-test('malformed registry, manifest, and interrupted write repair automatically', async () => {
+test('missing registry, malformed manifest, and interrupted write repair automatically', async () => {
     const fixture = await createFixture()
     await mkdir(fixture.state, { recursive: true })
-    await writeFile(join(fixture.state, 'registry.json'), '{broken')
     await writeFile(join(fixture.state, 'registry.json.tmp-interrupted'), '{partial')
     await writeFile(join(fixture.main, '.release-maestro-instance.json'), '{broken')
 
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
     assert.ok(allocation.worktreeId)
     const stateFiles = await import('node:fs/promises').then(fs => fs.readdir(fixture.state))
-    assert.ok(stateFiles.some(name => name.startsWith('registry.json.corrupt-')))
+    assert.ok(stateFiles.includes('registry.json'))
     const worktreeFiles = await import('node:fs/promises').then(fs => fs.readdir(fixture.main))
     assert.ok(worktreeFiles.some(name => name.startsWith('.release-maestro-instance.json.corrupt-')))
     assert.ok(existsSync(join(fixture.state, 'registry.json.tmp-interrupted')))
+})
+
+test('loss of both registry copies cannot silently discard a live holder', async () => {
+    const fixture = await createFixture({ worktrees: 2 })
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.roots[0], bin)
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.roots[0], ['dev-status', '--json'])),
+        status => status.holders?.some(holder => holder.pid === wrapper.pid),
+        'MCP holder did not register',
+    )
+    await writeFile(join(fixture.state, 'registry.json'), '{broken')
+    await writeFile(join(fixture.state, 'registry.backup.json'), '{broken')
+
+    const attempt = run(fixture, fixture.roots[1], ['dev-allocate'])
+    assert.equal(attempt.status, 1)
+    assert.match(attempt.stderr, /REGISTRY_UNRECOVERABLE/)
+    const retry = run(fixture, fixture.roots[1], ['dev-allocate'])
+    assert.equal(retry.status, 1)
+    assert.match(retry.stderr, /REGISTRY_UNRECOVERABLE/)
+    assert.equal(wrapper.exitCode, null)
+    wrapper.kill('SIGTERM')
+    await childResult(wrapper)
+    await rm(join(fixture.state, 'registry.recovery-required.json'))
+    assert.ok(runJson(fixture, fixture.roots[1], ['dev-allocate']).worktreeId)
 })
 
 test('an abandoned registry lock is recovered after its heartbeat becomes stale', async () => {
@@ -482,7 +510,7 @@ test('an abandoned registry lock is recovered after its heartbeat becomes stale'
     assert.equal(existsSync(lock), false)
 })
 
-test('an invalid allocation timestamp quarantines both registry copies', async () => {
+test('invalid registry copies are quarantined without replacing allocation state', async () => {
     const fixture = await createFixture()
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
     const registryPath = join(fixture.state, 'registry.json')
@@ -492,10 +520,11 @@ test('an invalid allocation timestamp quarantines both registry copies', async (
     await writeFile(registryPath, JSON.stringify(registry))
     await writeFile(backupPath, JSON.stringify(registry))
 
-    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    const status = run(fixture, fixture.main, ['dev-status', '--json'])
     const stateFiles = await import('node:fs/promises').then(fs => fs.readdir(fixture.state))
 
-    assert.equal(status.state, 'reclaimable')
+    assert.equal(status.status, 1)
+    assert.match(status.stderr, /REGISTRY_UNRECOVERABLE/)
     assert.equal(stateFiles.filter(name => name.includes('.corrupt-')).length, 2)
 })
 
@@ -537,7 +566,7 @@ test('a missing manifest recovers the live allocation from the registry', async 
     const wrapper = spawnMcp(fixture, fixture.main, bin)
     const active = await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 1,
+        status => status.holders?.some(holder => holder.role.startsWith('mcp-child:')),
         'MCP holder did not register',
     )
     await rm(join(fixture.main, '.release-maestro-instance.json'))
@@ -558,7 +587,7 @@ test('a stale valid manifest ID recovers the registry allocation', async () => {
     const wrapper = spawnMcp(fixture, fixture.main, bin)
     const active = await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 1,
+        status => status.holders?.some(holder => holder.role.startsWith('mcp-child:')),
         'MCP holder did not register',
     )
     const manifestPath = join(fixture.main, '.release-maestro-instance.json')
@@ -592,13 +621,37 @@ test('a replacement checkout cannot inherit a retained manifest at the old path'
     assert.notEqual(replacement.worktreeId, first.worktreeId)
 })
 
+test('a replacement checkout gets a new identity when a released manifest stays at the path', async () => {
+    const fixture = await createFixture()
+    const first = runJson(fixture, fixture.main, ['dev-allocate'])
+    runJson(fixture, fixture.main, ['dev-release', '--force'])
+    await rename(join(fixture.main, '.git'), join(fixture.base, 'old-git'))
+    git(fixture.main, ['init', '-q'])
+
+    const replacement = runJson(fixture, fixture.main, ['dev-allocate'])
+    assert.notEqual(replacement.worktreeId, first.worktreeId)
+})
+
+test('a legacy manifest without checkout identity is only a hint after release', async () => {
+    const fixture = await createFixture()
+    const first = runJson(fixture, fixture.main, ['dev-allocate'])
+    runJson(fixture, fixture.main, ['dev-release', '--force'])
+    const manifestPath = join(fixture.main, '.release-maestro-instance.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    delete manifest.worktreeIdentity
+    await writeFile(manifestPath, JSON.stringify(manifest))
+
+    assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).state, 'reclaimable')
+    assert.notEqual(runJson(fixture, fixture.main, ['dev-allocate']).worktreeId, first.worktreeId)
+})
+
 test('a corrupt manifest does not hide a live holder from dev-stop', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)
     const wrapper = spawnMcp(fixture, fixture.main, bin)
     const active = await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 1,
+        status => status.holders?.some(holder => holder.role.startsWith('mcp-child:')),
         'MCP holder did not register',
     )
     await writeFile(join(fixture.main, '.release-maestro-instance.json'), '{broken')
@@ -617,7 +670,7 @@ test('a workflow reuses a live allocation when its manifest is missing', async (
     const wrapper = spawnMcp(fixture, fixture.main, bin)
     const active = await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 1,
+        status => status.holders?.some(holder => holder.role.startsWith('mcp-child:')),
         'MCP holder did not register',
     )
     await rm(join(fixture.main, '.release-maestro-instance.json'))
@@ -643,13 +696,13 @@ test('registry recovery keeps live ownership from the last known good copy', asy
     const wrapper = spawnMcp(fixture, fixture.main, bin)
     const active = await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 1,
+        status => status.holders?.some(holder => holder.role.startsWith('mcp-child:')),
         'MCP holder did not register',
     )
     await writeFile(join(fixture.state, 'registry.json'), '{broken')
 
     const recovered = runJson(fixture, fixture.main, ['dev-status', '--json'])
-    assert.equal(recovered.holders.length, 1)
+    assert.equal(recovered.holders.length, 2)
     assert.equal(recovered.holders[0].id, active.holders[0].id)
     assert.equal(recovered.holders[0].pid, wrapper.pid)
     wrapper.kill('SIGTERM')
@@ -696,7 +749,7 @@ test('a missed heartbeat reports degraded health while preserving a live holder'
     const wrapper = spawnMcp(fixture, fixture.main, bin)
     const active = await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 1,
+        status => status.holders?.some(holder => holder.role.startsWith('mcp-child:')),
         'MCP holder did not register',
     )
     const registryPath = join(fixture.state, 'registry.json')
@@ -781,7 +834,7 @@ test('a moved worktree recovers a live allocation with or without its manifest',
     const wrapper = spawnMcp(fixture, fixture.main, bin)
     const active = await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 1,
+        status => status.holders?.some(holder => holder.role.startsWith('mcp-child:')),
         'MCP holder did not register',
     )
 
@@ -954,11 +1007,11 @@ test('MCP wrapper forwards signals and dev-stop leaves unrelated processes alive
     liveChildren.push(unrelated)
     await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 1,
+        status => status.holders?.some(holder => holder.role.startsWith('mcp-child:')),
         'MCP holder did not register',
     )
     const stopped = runJson(fixture, fixture.main, ['dev-stop'])
-    assert.equal(stopped.stopped.length, 1)
+    assert.equal(stopped.stopped.length, 2)
     const result = await childResult(wrapper)
     assert.equal(result.code, 0)
     assert.equal((await readFile(signalCapture, 'utf8')).trim(), 'SIGTERM')
@@ -1012,7 +1065,9 @@ test('several MCP sessions share one allocation and release-when-idle waits for 
     const second = spawnMcp(fixture, fixture.main, bin)
     await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 2,
+        status =>
+            status.holders?.filter(holder => holder.role === 'mcp:chrome-devtools').length === 2 &&
+            status.holders?.filter(holder => holder.role === 'mcp-child:chrome-devtools').length === 2,
         'holders did not register',
     )
     const hookResult = spawnSync(process.execPath, [hook], {
@@ -1026,7 +1081,7 @@ test('several MCP sessions share one allocation and release-when-idle waits for 
     await childResult(first)
     const active = runJson(fixture, fixture.main, ['dev-status', '--json'])
     assert.equal(active.state, 'active')
-    assert.equal(active.holders.length, 1)
+    assert.equal(active.holders.length, 2)
     const forced = run(fixture, fixture.main, ['dev-release', '--force'])
     assert.equal(forced.status, 1)
     assert.match(forced.stderr, /LIVE_HOLDERS/)
@@ -1426,7 +1481,47 @@ test('a detached workflow listener retains its claim after the wrapper and launc
     }
 }, 45_000)
 
+test('an occupied transient port keeps its claim when a wrapper dies before listener capture', async () => {
+    const fixture = await createFixture()
+    const allocation = spawnSync(
+        process.execPath,
+        [
+            '--input-type=module',
+            '-e',
+            `import { allocateTransient } from ${JSON.stringify(coreModule)}; console.log(JSON.stringify(await allocateTransient('renderer-e2e')))`,
+        ],
+        { cwd: fixture.main, env: environmentFor(fixture), encoding: 'utf8' },
+    )
+    assert.equal(allocation.status, 0, allocation.stderr)
+    const transient = JSON.parse(allocation.stdout)
+    const server = await listen('127.0.0.1', transient.bundle.renderer)
+    try {
+        const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
+        assert.ok(listed.instances.some(instance => instance.id === transient.id))
+        const duplicate = run(fixture, fixture.main, [
+            'run-workflow',
+            'renderer-e2e',
+            '--',
+            process.execPath,
+            '-e',
+            'process.exit(0)',
+        ])
+        assert.equal(duplicate.status, 1)
+        assert.match(duplicate.stderr, /RESOURCE_CONFLICT/)
+    } finally {
+        await new Promise(resolve => server.close(resolve))
+        liveServers.splice(liveServers.indexOf(server), 1)
+    }
+    assert.equal(
+        runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
+            instance => instance.id === transient.id,
+        ),
+        false,
+    )
+})
+
 test('dev-stop recovers a workflow child left running after its wrapper dies', async () => {
+    if (process.platform === 'win32') return
     const fixture = await createFixture()
     const workflow = spawn(
         process.execPath,
@@ -1454,6 +1549,89 @@ test('dev-stop recovers a workflow child left running after its wrapper dies', a
         )
     } finally {
         if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGKILL')
+        if (childPid) {
+            try {
+                process.kill(childPid, 'SIGKILL')
+            } catch (error) {
+                if (error?.code !== 'ESRCH') throw error
+            }
+        }
+    }
+})
+
+test('an MCP child retains its allocation after the wrapper is killed', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const wrapper = spawnMcp(fixture, fixture.main, bin)
+    const active = await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.some(holder => holder.role === 'mcp-child:chrome-devtools'),
+        'MCP child did not register as a holder',
+        5_000,
+    )
+    const childHolder = active.holders.find(holder => holder.role === 'mcp-child:chrome-devtools')
+    try {
+        wrapper.kill('SIGKILL')
+        await childResult(wrapper)
+        const orphaned = runJson(fixture, fixture.main, ['dev-status', '--json'])
+        assert.ok(orphaned.holders.some(holder => holder.pid === childHolder.pid))
+        assert.equal(run(fixture, fixture.main, ['dev-release']).status, 1)
+        assert.ok(
+            runJson(fixture, fixture.main, ['dev-stop']).stopped.some(
+                holder => holder.pid === childHolder.pid,
+            ),
+        )
+    } finally {
+        if (wrapper.exitCode === null && wrapper.signalCode === null) wrapper.kill('SIGKILL')
+        try {
+            process.kill(childHolder.pid, 'SIGKILL')
+        } catch (error) {
+            if (error?.code !== 'ESRCH') throw error
+        }
+    }
+})
+
+test('Windows MCP wrapper death closes its managed child job', async () => {
+    if (process.platform !== 'win32') return
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const childPidPath = join(fixture.base, 'mcp-child.pid')
+    const wrapper = spawnMcp(fixture, fixture.main, bin, 'chrome-devtools', {
+        FAKE_CHILD_PID_PATH: childPidPath,
+    })
+    let childPid
+    try {
+        await waitFor(
+            () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+            status => status.holders?.some(holder => holder.role === 'mcp-child:chrome-devtools'),
+            'MCP child job did not register',
+        )
+        childPid = Number(
+            await waitFor(
+                () => readFile(childPidPath, 'utf8'),
+                value => Number.isSafeInteger(Number(value)),
+                'MCP child process did not start',
+            ),
+        )
+        wrapper.kill('SIGKILL')
+        await childResult(wrapper)
+        await waitFor(
+            () => {
+                try {
+                    process.kill(childPid, 0)
+                    return Promise.resolve(false)
+                } catch (error) {
+                    if (error?.code === 'ESRCH') return Promise.resolve(true)
+                    throw error
+                }
+            },
+            dead => dead,
+            'MCP child survived wrapper death',
+        )
+        assert.deepEqual(runJson(fixture, fixture.main, ['dev-status', '--json']).holders, [])
+    } finally {
+        if (wrapper.exitCode === null && wrapper.signalCode === null) wrapper.kill('SIGKILL')
         if (childPid) {
             try {
                 process.kill(childPid, 'SIGKILL')
@@ -1921,7 +2099,7 @@ test('MCP wrapper exits when its child ignores termination', async () => {
     })
     await waitFor(
         () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
-        status => status.holders?.length === 1,
+        status => status.holders?.some(holder => holder.role.startsWith('mcp-child:')),
         'MCP holder did not register',
     )
     await waitFor(() => Promise.resolve(existsSync(capture)), Boolean, 'MCP child did not start')
@@ -2086,6 +2264,22 @@ test('run-dev waits for an owned renderer listener after an early connection clo
         await childResult(dev)
     }
 }, 25_000)
+
+test('run-dev counts readiness and listener ownership against one renderer deadline', async () => {
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const result = run(fixture, fixture.main, ['run-dev'], {
+        PATH: `${bin}:${process.env.PATH}`,
+        RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm'),
+        RELEASE_MAESTRO_STARTUP_TIMEOUT_MS: '2500',
+        FAKE_OPEN_PORT: '1',
+        FAKE_INITIAL_LISTEN_DELAY_MS: '1200',
+        FAKE_REOPEN_AFTER_FIRST_CONNECTION_MS: '2200',
+    })
+
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stderr, /LISTENER_OWNER_NOT_FOUND/)
+}, 20_000)
 
 test('run-dev latches cancellation while waiting for the renderer', async () => {
     const fixture = await createFixture()

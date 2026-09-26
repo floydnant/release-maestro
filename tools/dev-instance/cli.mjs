@@ -136,8 +136,10 @@ const runDevelopment = async () => {
         process.exitCode = exitForChild(null, cancellationSignal)
         return true
     }
+    const startupRemaining = deadline => Math.max(0, deadline - Date.now())
 
     try {
+        const rendererDeadline = Date.now() + startupTimeoutMs
         const renderer = spawnPackageBinary(
             'nx',
             [
@@ -173,7 +175,7 @@ const runDevelopment = async () => {
             await Promise.race([
                 waitForPort(
                     allocation.bundle.renderer,
-                    startupTimeoutMs,
+                    startupRemaining(rendererDeadline),
                     AbortSignal.any([rendererReadiness.signal, cancellation.signal]),
                 ),
                 rendererExit.then(result => {
@@ -194,13 +196,14 @@ const runDevelopment = async () => {
             rendererHolder.holder.startIdentity,
             supervisor.id,
             cancellation.signal,
-            startupTimeoutMs,
+            startupRemaining(rendererDeadline),
         )
         if (rendererListener) childHolders.push(rendererListener.holder)
         if (stopIfCancelled()) return
 
         const electronEnvironment = { ...environment }
         delete electronEnvironment.ELECTRON_RUN_AS_NODE
+        const electronDeadline = Date.now() + startupTimeoutMs
         const electron = spawnPackageBinary(
             'nx',
             [
@@ -237,12 +240,12 @@ const runDevelopment = async () => {
                 Promise.all([
                     waitForPort(
                         allocation.bundle.cdp,
-                        startupTimeoutMs,
+                        startupRemaining(electronDeadline),
                         AbortSignal.any([electronReadiness.signal, cancellation.signal]),
                     ),
                     waitForPort(
                         allocation.bundle.inspector,
-                        startupTimeoutMs,
+                        startupRemaining(electronDeadline),
                         AbortSignal.any([electronReadiness.signal, cancellation.signal]),
                     ),
                 ]),
@@ -264,7 +267,7 @@ const runDevelopment = async () => {
             electronHolder.holder.startIdentity,
             supervisor.id,
             cancellation.signal,
-            startupTimeoutMs,
+            startupRemaining(electronDeadline),
         )
         if (electronListener) childHolders.push(electronListener.holder)
         if (stopIfCancelled()) return

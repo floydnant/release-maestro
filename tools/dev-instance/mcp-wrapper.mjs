@@ -7,7 +7,7 @@ import {
     stopProcessTree,
     spawnPackageBinary,
     startHeartbeat,
-    heartbeatDevelopmentHolder,
+    heartbeatDevelopmentHolders,
     logDiagnostic,
 } from './core.mjs'
 import { constants as osConstants } from 'node:os'
@@ -19,6 +19,7 @@ if (!['chrome-devtools', 'playwright'].includes(server)) {
 }
 
 let holder
+let childHolder
 let child
 let stopHeartbeat = () => {}
 let pendingSignal = null
@@ -60,18 +61,34 @@ try {
     const [binary, ...binaryArgs] = commandArgs.slice(1)
     child = spawnPackageBinary(binary, binaryArgs, {
         env: { ...process.env, ...bundleEnvironment(allocation.bundle, allocation.appDataPath) },
+        waitForTree: true,
+    })
+    const childExit = new Promise(resolve => {
+        child.once('exit', (code, signal) => resolve({ code, signal }))
+        child.once('error', error => resolve({ error }))
     })
     if (child.releaseMaestroIdentityError) throw child.releaseMaestroIdentityError
+    if (child.pid && child.releaseMaestroStartIdentity) {
+        childHolder = (
+            await registerDevelopmentHolder(
+                `mcp-child:${server}`,
+                child.pid,
+                holder.id,
+                process.platform !== 'win32',
+                child.releaseMaestroStartIdentity,
+            )
+        ).holder
+    }
     if (pendingSignal) {
         clearTimeout(startupShutdownTimer)
         startupShutdownTimer = null
         void stopProcessTree(child.pid, child.releaseMaestroStartIdentity, pendingSignal).catch(() => {})
     }
-    stopHeartbeat = startHeartbeat(() => heartbeatDevelopmentHolder(holder.id))
-    const { code, signal } = await new Promise((resolve, reject) => {
-        child.once('exit', (code, signal) => resolve({ code, signal }))
-        child.once('error', reject)
-    })
+    stopHeartbeat = startHeartbeat(() =>
+        heartbeatDevelopmentHolders([holder.id, childHolder?.id].filter(Boolean)),
+    )
+    const { code, signal, error } = await childExit
+    if (error) throw error
     if (pendingSignal || signal) {
         const signalNumber = osConstants.signals[pendingSignal || signal] ?? 0
         process.exitCode = 128 + signalNumber
@@ -87,5 +104,14 @@ try {
     clearTimeout(startupShutdownTimer)
     stopHeartbeat()
     signalListeners.forEach((listener, signal) => process.off(signal, listener))
+    if (
+        child?.pid &&
+        child.exitCode === null &&
+        child.signalCode === null &&
+        child.releaseMaestroStartIdentity
+    ) {
+        await stopProcessTree(child.pid, child.releaseMaestroStartIdentity).catch(() => {})
+    }
+    if (childHolder) await removeDevelopmentHolder(childHolder.id).catch(() => {})
     if (holder) await removeDevelopmentHolder(holder.id).catch(() => {})
 }

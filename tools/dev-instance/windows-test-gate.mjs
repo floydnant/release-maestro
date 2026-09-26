@@ -15,6 +15,7 @@ const expected = [
     'Windows workflow cancellation kills an orphaned grandchild before releasing its claim',
     'Windows workflow cancellation kills a running command before releasing its claim',
     'Windows workflow prefers pnpm.cmd over an extensionless pnpm shim',
+    'Windows MCP wrapper death closes its managed child job',
     'run-workflow passes separators and shell metacharacters as literal child arguments',
 ]
 const result = spawnSync(
@@ -24,7 +25,7 @@ const result = spawnSync(
         '--config',
         join(repositoryRoot, 'tools/jest.config.cjs'),
         '--runInBand',
-        '--testNamePattern=Windows workflow|run-workflow passes separators',
+        '--testNamePattern=Windows workflow|Windows MCP|run-workflow passes separators',
         '--json',
     ],
     { cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 },

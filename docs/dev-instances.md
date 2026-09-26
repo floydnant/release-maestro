@@ -6,9 +6,9 @@ and 5858. Later slots offset all three ports together. If any port in a slot is 
 tries the next complete slot. Debug endpoints listen on loopback.
 
 The manager stores a manifest at `.release-maestro-instance.json` in the worktree and a locked,
-user-scoped registry under the home directory. The manifest holds a generated worktree ID and a
-copy of its bundle. The registry owns the allocation. A branch change keeps the ID. A new worktree
-at an old path gets a new ID. The manager uses only the Node standard library, so allocation,
+user-scoped registry under the home directory. The manifest holds a generated worktree ID, checkout
+identity, and a copy of its bundle. The registry owns the allocation. A branch change keeps the ID.
+A new worktree at an old path gets a new ID. The manager uses only the Node standard library, so allocation,
 status, recovery, and hooks work before `make install`.
 
 ## Commands
@@ -54,8 +54,8 @@ disappears.
 Set `graceMs` in `~/.release-maestro/dev-instances/settings.json` to change the grace period for
 all worktrees, for example `{ "graceMs": 600000 }`. `RELEASE_MAESTRO_INSTANCE_GRACE_MS` overrides
 the setting for one command. `0` releases an inactive allocation at the next reconciliation.
-`RELEASE_MAESTRO_STARTUP_TIMEOUT_MS` sets the renderer and Electron startup deadline. The default
-is ten minutes; a child exit fails startup immediately.
+`RELEASE_MAESTRO_STARTUP_TIMEOUT_MS` sets a deadline for each renderer and Electron startup, including
+listener ownership checks. The default is ten minutes per process. A child exit fails startup immediately.
 
 A claim names a mutable resource held by a workflow. `make dev` and Electron E2E both use the
 Electron development build, so the manager rejects that overlap in one worktree. Electron E2E and
@@ -64,20 +64,24 @@ get transient bundles, which are released when their commands exit. MCP wrappers
 worktree's stable development bundle and may run before `make dev`.
 On Windows, a workflow waits for its command's descendants before releasing its transient bundle.
 On macOS and Linux, the manager records a verified E2E renderer listener so its claim survives an
-abrupt test-runner exit until the listener stops.
+abrupt test-runner exit until the listener stops. If a runner exits before the listener can be
+verified, an occupied transient renderer port keeps the claim until the port is free.
 
 ## Recovery
 
-Use `make dev-status` to find the holder and port, then `make dev-log` for the event that caused a
-failure. `make dev-list` helps when another worktree owns the resource. If an unrelated process
-took a persisted port, stop your dev stack and MCP clients, then run `make dev-reallocate`.
+Use `make dev-status` for this worktree's development allocation and `make dev-list` for workflow
+holders or other worktrees. `make dev-log` shows the event that caused a failure. If an unrelated
+process took a persisted port, stop your dev stack and MCP clients, then run `make dev-reallocate`.
 `make dev-stop` is the manual resort for stuck processes in agent terminals and orphaned E2E
 processes. It checks both worktree ownership and process start identity before signaling them.
-`make dev-release` only
-changes allocation state and never kills a process. `FORCE=1 make dev-release` can discard corrupt
-ownership metadata, but still refuses live holders.
+For a transient port with no verified holder, stop the port owner manually; the claim clears when
+the port is free.
+`make dev-release` only changes allocation state and never kills a process. `FORCE=1 make dev-release` can discard corrupt
+ownership metadata, but still refuses live holders and cannot bypass a registry recovery marker.
 
-The registry and manifest are versioned. The manager quarantines malformed state and repairs
-missing registries, stale locks, and dead holders while preserving live processes. Its central
-JSONL log rotates at about 5 MiB with three retained files. It records lifecycle events, ports,
+The registry and manifest are versioned. The manager repairs missing registries, stale locks, and
+dead holders while preserving live processes. If neither registry copy is valid, it quarantines corrupt
+copies and stops rather than discarding possible live ownership. After stopping the processes and
+inspecting the quarantined files, remove `registry.recovery-required.json` in the state directory to
+permit a fresh registry. Its central JSONL log rotates at about 5 MiB with three retained files. It records lifecycle events, ports,
 holder identity, and conflict reasons, without application output or full command arguments.

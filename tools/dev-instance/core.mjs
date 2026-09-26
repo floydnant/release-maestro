@@ -73,6 +73,7 @@ export const getStatePaths = () => {
         root,
         registry: join(root, 'registry.json'),
         registryBackup: join(root, 'registry.backup.json'),
+        registryFailure: join(root, 'registry.recovery-required.json'),
         lock: join(root, 'registry.lock'),
         log: join(root, 'orchestration.jsonl'),
         settings: join(root, 'settings.json'),
@@ -380,6 +381,7 @@ const parseManifest = value => {
         !Number.isSafeInteger(value.registryGeneration) ||
         value.registryGeneration < 0 ||
         typeof value.path !== 'string' ||
+        (value.worktreeIdentity !== undefined && typeof value.worktreeIdentity !== 'string') ||
         typeof value.branch !== 'string' ||
         !isBundle(value.bundle)
     ) {
@@ -620,11 +622,28 @@ const readRegistryCopy = async path => {
 }
 
 const readRegistry = async paths => {
+    if (existsSync(paths.registryFailure)) {
+        throw new InstanceError(
+            `No valid instance registry copy remains. Stop live processes, inspect the quarantined state, then remove ${paths.registryFailure} to reset it.`,
+            'REGISTRY_UNRECOVERABLE',
+        )
+    }
+    const hadRegistryCopy = existsSync(paths.registry) || existsSync(paths.registryBackup)
     const [primary, backup] = await Promise.all([
         readRegistryCopy(paths.registry),
         readRegistryCopy(paths.registryBackup),
     ])
-    if (!primary) return backup ?? emptyRegistry()
+    if (!primary && !backup) {
+        if (hadRegistryCopy) {
+            await atomicWriteJson(paths.registryFailure, { detectedAt: iso(nowMs()) })
+            throw new InstanceError(
+                `No valid instance registry copy remains. Stop live processes, inspect the quarantined state, then remove ${paths.registryFailure} to reset it.`,
+                'REGISTRY_UNRECOVERABLE',
+            )
+        }
+        return emptyRegistry()
+    }
+    if (!primary) return backup
     if (!backup) return primary
     return primary.generation >= backup.generation ? primary : backup
 }
@@ -831,7 +850,12 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
         const wrapperIsLive = isLive(transient.holder)
         const childIsLive = transient.childHolder ? isLive(transient.childHolder) : false
         const listenerIsLive = transient.listenerHolder ? isLive(transient.listenerHolder) : false
-        if (!wrapperIsLive && !childIsLive && !listenerIsLive) {
+        if (
+            !wrapperIsLive &&
+            !childIsLive &&
+            !listenerIsLive &&
+            listenerPids(transient.bundle.renderer).length === 0
+        ) {
             delete registry.transients[id]
         } else {
             if (!childIsLive) delete transient.childHolder
@@ -917,6 +941,7 @@ const writeManifest = async (worktree, allocation, generation) =>
         worktreeId: allocation.worktreeId,
         registryGeneration: generation,
         path: worktree.root,
+        worktreeIdentity: worktree.identity,
         branch: worktree.branch,
         bundle: allocation.bundle,
     })
@@ -1130,7 +1155,9 @@ const newHolder = async (
 }
 
 const manifestPathBelongsElsewhere = (manifest, worktree) =>
-    manifest && !sameCanonicalPath(manifest.path, worktree.root) && existsSync(manifest.path)
+    manifest &&
+    ((manifest.worktreeIdentity && manifest.worktreeIdentity !== worktree.identity) ||
+        (!sameCanonicalPath(manifest.path, worktree.root) && existsSync(manifest.path)))
 
 const allocationForManifest = (registry, manifest, worktree, rejectCopied = true) => {
     const allocation = manifest ? registry.allocations[manifest.worktreeId] : null
@@ -1211,11 +1238,11 @@ const allocateDevelopmentWithResult = async ({ reallocate = false } = {}) => {
         const manifestId = manifest?.worktreeId
         const persisted = manifestId ? registry.allocations[manifestId] : null
         const existing = allocationForWorktree(registry, manifest, worktree, false)
-        const worktreeId = existing
-            ? existing.worktreeId
-            : persisted || manifestPathBelongsElsewhere(manifest, worktree)
-              ? randomUUID()
-              : (manifestId ?? randomUUID())
+        const reusableManifest =
+            manifest?.worktreeIdentity === worktree.identity &&
+            !manifestPathBelongsElsewhere(manifest, worktree) &&
+            !persisted
+        const worktreeId = existing?.worktreeId ?? (reusableManifest ? manifestId : randomUUID())
         const oldDefaultAppDataPath = existing
             ? await canonicalizePath(join(existing.path, '.app-data.dev'))
             : null
@@ -1320,9 +1347,17 @@ export const registerDevelopmentHolder = async (
     pid = process.pid,
     parentHolderId = null,
     processGroup = false,
+    knownStartIdentity = null,
 ) => {
     let allocation = await allocateDevelopment()
-    const holder = await newHolder(allocation.worktreeId, role, pid, parentHolderId, processGroup)
+    const holder = await newHolder(
+        allocation.worktreeId,
+        role,
+        pid,
+        parentHolderId,
+        processGroup,
+        knownStartIdentity,
+    )
     await assertPersistedBundleUsable(allocation, holder)
     await withRegistry(async (registry, paths) => {
         const current = registry.allocations[allocation.worktreeId]
@@ -1728,6 +1763,7 @@ export const releaseTransient = async id => {
         const transient = registry.transients[id]
         if (!transient) return
         if (transient.listenerHolder && holderIsLive(transient.listenerHolder)) return
+        if (listenerPids(transient.bundle.renderer).length > 0) return
         delete registry.transients[id]
         await appendEvent(paths, 'transient-allocation-released', {
             transientId: id,
