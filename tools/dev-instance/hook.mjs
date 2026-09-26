@@ -22,6 +22,23 @@ const verifyRemoved = async (path, worktreeId) => {
     if (!existsSync(path)) await releaseRemovedWorktree(path, worktreeId || null)
 }
 
+const waitForVerifierReady = child =>
+    new Promise(resolveReady => {
+        let settled = false
+        const finish = () => {
+            if (settled) return
+            settled = true
+            clearTimeout(timeout)
+            if (child.connected) child.disconnect()
+            child.unref()
+            resolveReady()
+        }
+        const timeout = setTimeout(finish, 5_000)
+        child.once('message', finish)
+        child.once('error', finish)
+        child.once('exit', finish)
+    })
+
 const handleHook = async () => {
     const payload = await readStdin()
     if (typeof payload.cwd === 'string' && existsSync(payload.cwd)) process.chdir(payload.cwd)
@@ -48,9 +65,13 @@ const handleHook = async () => {
             const child = spawn(
                 process.execPath,
                 [fileURLToPath(import.meta.url), 'verify-remove', payload.worktree_path, worktreeId],
-                { cwd: parse(resolve(payload.worktree_path)).root, detached: true, stdio: 'ignore' },
+                {
+                    cwd: parse(resolve(payload.worktree_path)).root,
+                    detached: true,
+                    stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+                },
             )
-            child.unref()
+            await waitForVerifierReady(child)
             return
         }
         default:
@@ -60,6 +81,7 @@ const handleHook = async () => {
 
 try {
     if (process.argv[2] === 'verify-remove') {
+        if (process.send) await new Promise(done => process.send('ready', done))
         await verifyRemoved(resolve(process.argv[3]), process.argv[4] || '')
     } else {
         await handleHook()

@@ -1254,20 +1254,7 @@ const allocationForManifest = (registry, manifest, worktree, rejectCopied = true
         }
         return null
     }
-    if (
-        allocation.worktreeIdentity === worktree.identity ||
-        sameCanonicalPath(allocation.path, worktree.root) ||
-        (!existsSync(allocation.path) && allocation.holders.length === 0)
-    ) {
-        return allocation
-    }
-    if (rejectCopied) {
-        throw new InstanceError(
-            `Manifest belongs to ${allocation.path}, not ${worktree.root}. Allocate a new instance in this worktree.`,
-            'MANIFEST_OWNERSHIP_CONFLICT',
-        )
-    }
-    return null
+    return allocation
 }
 
 const allocationForWorktree = (registry, manifest, worktree, rejectCopied = true) => {

@@ -1251,7 +1251,12 @@ test('Claude clear keeps an idle allocation for the continuing session', async (
 test('Claude WorktreeRemove releases only after the directory is gone', async () => {
     const fixture = await createFixture()
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
-    const hookResult = spawnSync(process.execPath, [hook], {
+    const hostedTools = join(fixture.main, 'tools', 'dev-instance')
+    await mkdir(hostedTools, { recursive: true })
+    for (const name of ['hook.mjs', 'core.mjs', 'presentation.mjs']) {
+        await cp(join(repositoryRoot, 'tools', 'dev-instance', name), join(hostedTools, name))
+    }
+    const hookResult = spawnSync(process.execPath, [join(hostedTools, 'hook.mjs')], {
         cwd: fixture.main,
         env: environmentFor(fixture),
         input: JSON.stringify({
