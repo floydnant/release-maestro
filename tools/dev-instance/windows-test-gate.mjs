@@ -17,6 +17,7 @@ const expected = [
     'Windows workflow prefers pnpm.cmd over an extensionless pnpm shim',
     'Windows MCP wrapper death closes its managed child job',
     'run-workflow passes separators and shell metacharacters as literal child arguments',
+    'Claude WorktreeRemove releases only after the directory is gone',
 ]
 const result = spawnSync(
     process.execPath,
@@ -25,7 +26,7 @@ const result = spawnSync(
         '--config',
         join(repositoryRoot, 'tools/jest.config.cjs'),
         '--runInBand',
-        '--testNamePattern=Windows workflow|Windows MCP|run-workflow passes separators',
+        '--testNamePattern=Windows workflow|Windows MCP|run-workflow passes separators|Claude WorktreeRemove',
         '--json',
     ],
     { cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 },
@@ -41,4 +42,4 @@ const passed = new Set(
     ),
 )
 for (const name of expected) assert.ok(passed.has(name), `Windows workflow check did not run: ${name}`)
-process.stdout.write(`Verified ${expected.length} Windows workflow checks.\n`)
+process.stdout.write(`Verified ${expected.length} Windows instance-manager checks.\n`)

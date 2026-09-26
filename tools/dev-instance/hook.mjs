@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { reconcileInstances, releaseDevelopment, releaseRemovedWorktree } from './core.mjs'
 
@@ -48,7 +48,7 @@ const handleHook = async () => {
             const child = spawn(
                 process.execPath,
                 [fileURLToPath(import.meta.url), 'verify-remove', payload.worktree_path, worktreeId],
-                { detached: true, stdio: 'ignore' },
+                { cwd: dirname(resolve(payload.worktree_path)), detached: true, stdio: 'ignore' },
             )
             child.unref()
             return
