@@ -59,13 +59,22 @@ test.describe('startup scan summary', () => {
             await createRendererScenario(page, scenario, '/home')
 
             await expect(page.getByRole('status')).toHaveText(summary)
-            if (summary === 'Nothing new') {
-                const icon = page.getByRole('status').locator('app-icon')
-                await expect(icon).toHaveAttribute('name', 'success')
-                await expect(icon).toHaveAttribute('color', 'content.secondary')
-            }
         })
     }
+
+    test('uses a muted check for an unchanged scan', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: completedStatus(0, 0), albums: [], lastScan: null },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/home')
+
+        const icon = page.getByRole('status').locator('app-icon')
+        await expect(icon).toHaveAttribute('name', 'success')
+        await expect(icon).toHaveAttribute('color', 'content.secondary')
+    })
 
     test('does not claim failed reads were added', async ({ page }) => {
         const scenario = scenarioBuilder()
