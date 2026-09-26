@@ -20,7 +20,7 @@ export default defineConfig({
         timeout: 20_000,
     },
     webServer: {
-        command: `pnpm exec nx serve maestro-renderer --host localhost --port ${electronE2EPort}`,
+        command: `pnpm exec nx serve maestro-renderer -c electron-e2e --host localhost --port ${electronE2EPort}`,
         url: electronE2EBaseURL,
         reuseExistingServer: !process.env.CI,
         cwd: workspaceRoot,

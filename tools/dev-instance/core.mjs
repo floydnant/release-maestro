@@ -1736,11 +1736,7 @@ export const stopDevelopment = async () => {
 const workflowClaims = (workflow, appDataPath, worktreeId) => {
     switch (workflow) {
         case 'electron-e2e':
-            return [
-                `electron-development-bundle:${worktreeId}`,
-                `workflow:electron-e2e:${worktreeId}`,
-                `app-data:${appDataPath}`,
-            ]
+            return [`workflow:electron-e2e:${worktreeId}`, `app-data:${appDataPath}`]
         case 'renderer-e2e':
             return [`workflow:renderer-e2e:${worktreeId}`]
         default:

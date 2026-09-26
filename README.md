@@ -75,8 +75,8 @@ make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
 ```
 
-`make sure` mutates formatting. Electron E2E and renderer E2E may run together. The instance manager
-rejects Electron E2E while `make dev` owns the same worktree's development build output.
+`make sure` mutates formatting. Electron E2E and renderer E2E may run together. Electron E2E uses
+its own build output, so it can also run alongside `make dev` in the same worktree.
 
 After installation, run `make agents-check` to validate the agent skills and harness adapters.
 `make test-tools` runs the repository tools tests and is part of `make test` and `make sure`.

@@ -66,9 +66,9 @@ the setting for one command. `0` releases an inactive allocation at the next rec
 `RELEASE_MAESTRO_STARTUP_TIMEOUT_MS` sets a deadline for each renderer and Electron startup, including
 listener ownership checks. The default is ten minutes per process. A child exit fails startup immediately.
 
-A claim names a mutable resource held by a workflow. `make dev` and Electron E2E both use the
-Electron development build, so the manager rejects that overlap in one worktree. Electron E2E and
-renderer E2E can run together. Two copies of the same mutating E2E target cannot. E2E workflows
+A claim names a mutable resource held by a workflow. `make dev` and Electron E2E use separate
+Electron build outputs, so they can run together in one worktree. Electron E2E and renderer E2E
+can also run together. Two copies of the same mutating E2E target cannot. E2E workflows
 get transient bundles, which are released when their commands exit. MCP wrappers share their
 worktree's stable development bundle and may run before `make dev`.
 On macOS and Linux, the manager records a verified E2E renderer listener so its claim survives an

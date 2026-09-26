@@ -74,6 +74,9 @@
                 "e2e": {
                     "buildTarget": "maestro-renderer:build:development",
                     "port": 4201
+                },
+                "electron-e2e": {
+                    "buildTarget": "maestro-renderer:build:development"
                 }
             },
             "defaultConfiguration": "development",

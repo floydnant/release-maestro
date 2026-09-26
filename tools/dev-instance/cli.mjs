@@ -75,30 +75,6 @@ const stopChild = async child => {
     await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity)
 }
 
-const parseWorkflowCommands = tokens => {
-    const commands = [[]]
-    for (let index = 0; index < tokens.length; index += 1) {
-        const token = tokens[index]
-        if (token === '--literal') {
-            if (index === tokens.length - 1) {
-                throw new InstanceError('--literal must be followed by an argument', 'USAGE')
-            }
-            commands.at(-1).push(tokens[(index += 1)])
-        } else if (token === '--then') {
-            if (commands.length === 2 || commands.at(-1).length === 0) {
-                throw new InstanceError('run-workflow accepts at most two non-empty commands', 'USAGE')
-            }
-            commands.push([])
-        } else {
-            commands.at(-1).push(token)
-        }
-    }
-    if (commands.some(command => command.length === 0)) {
-        throw new InstanceError('Each run-workflow command must name an executable', 'USAGE')
-    }
-    return commands
-}
-
 const runDevelopment = async () => {
     const configuredTimeout = process.env['RELEASE_MAESTRO_STARTUP_TIMEOUT_MS']
     const startupTimeoutMs = configuredTimeout === undefined ? 600_000 : Number(configuredTimeout)
@@ -307,7 +283,7 @@ const runWorkflow = async args => {
         )
     }
     const workflow = args[0]
-    const commands = parseWorkflowCommands(args.slice(separator + 1))
+    const [command, ...commandArgs] = args.slice(separator + 1)
     let child
     let cancellationSignal = null
     let startupShutdownTimer = null
@@ -340,80 +316,74 @@ const runWorkflow = async args => {
             ...process.env,
             ...bundleEnvironment(transient.bundle, transient.appDataPath),
         }
-        for (const [command, ...commandArgs] of commands) {
-            if (cancellationSignal) {
-                process.exitCode = exitForChild(null, cancellationSignal)
-                break
-            }
-            child = ['nx', 'playwright'].includes(command)
-                ? spawnPackageBinary(command, commandArgs, { env: environment })
-                : spawnManaged(command, commandArgs, { env: environment })
-            clearTimeout(startupShutdownTimer)
-            startupShutdownTimer = null
-            try {
-                if (child.releaseMaestroIdentityError) throw child.releaseMaestroIdentityError
-                const registered = await setTransientChildHolder(
-                    transient.id,
-                    child.pid,
-                    child.releaseMaestroStartIdentity,
-                )
-                if (!registered && child.exitCode === null && child.signalCode === null) {
-                    throw new InstanceError('Could not verify the workflow command process identity')
-                }
-            } catch (error) {
-                await stopChild(child)
-                throw error
-            }
-            stopHeartbeat()
-            stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
-            let listenerHolder = null
-            let listenerCapture = null
-            let listenerCaptureError = null
-            const captureListener = () => {
-                if (
-                    process.platform === 'win32' ||
-                    (listenerHolder && holderIsLive(listenerHolder)) ||
-                    listenerCapture ||
-                    !child?.pid
-                ) {
-                    return
-                }
-                listenerCapture = registerTransientListenerHolder(
-                    transient.id,
-                    child.pid,
-                    child.releaseMaestroStartIdentity,
-                    transient.bundle.renderer,
-                )
-                    .then(holder => {
-                        if (holder) listenerHolder = holder
-                        listenerCaptureError = null
-                    })
-                    .catch(error => {
-                        if (error?.code !== 'PROCESS_IDENTITY_UNKNOWN') listenerCaptureError = error
-                    })
-                    .finally(() => {
-                        listenerCapture = null
-                    })
-            }
-            const listenerTimer = setInterval(captureListener, 250)
-            listenerTimer.unref()
-            captureListener()
-            const result = await waitForExit(child)
-            clearInterval(listenerTimer)
-            if (listenerCapture) await listenerCapture
-            await stopChild(child)
-            if (listenerHolder && holderIsLive(listenerHolder)) {
-                await stopProcessTree(listenerHolder.pid, listenerHolder.startIdentity)
-            }
-            if (listenerCaptureError) throw listenerCaptureError
-            child = null
-            if (cancellationSignal) {
-                process.exitCode = exitForChild(null, cancellationSignal)
-                break
-            }
-            process.exitCode = exitForChild(result.code, result.signal)
-            if (result.code !== 0 || result.signal) break
+        if (cancellationSignal) {
+            process.exitCode = exitForChild(null, cancellationSignal)
+            return
         }
+        child = ['nx', 'playwright'].includes(command)
+            ? spawnPackageBinary(command, commandArgs, { env: environment })
+            : spawnManaged(command, commandArgs, { env: environment })
+        clearTimeout(startupShutdownTimer)
+        startupShutdownTimer = null
+        try {
+            if (child.releaseMaestroIdentityError) throw child.releaseMaestroIdentityError
+            const registered = await setTransientChildHolder(
+                transient.id,
+                child.pid,
+                child.releaseMaestroStartIdentity,
+            )
+            if (!registered && child.exitCode === null && child.signalCode === null) {
+                throw new InstanceError('Could not verify the workflow command process identity')
+            }
+        } catch (error) {
+            await stopChild(child)
+            throw error
+        }
+        stopHeartbeat = startHeartbeat(() => heartbeatTransient(transient.id))
+        let listenerHolder = null
+        let listenerCapture = null
+        let listenerCaptureError = null
+        const captureListener = () => {
+            if (
+                process.platform === 'win32' ||
+                (listenerHolder && holderIsLive(listenerHolder)) ||
+                listenerCapture ||
+                !child?.pid
+            ) {
+                return
+            }
+            listenerCapture = registerTransientListenerHolder(
+                transient.id,
+                child.pid,
+                child.releaseMaestroStartIdentity,
+                transient.bundle.renderer,
+            )
+                .then(holder => {
+                    if (holder) listenerHolder = holder
+                    listenerCaptureError = null
+                })
+                .catch(error => {
+                    if (error?.code !== 'PROCESS_IDENTITY_UNKNOWN') listenerCaptureError = error
+                })
+                .finally(() => {
+                    listenerCapture = null
+                })
+        }
+        const listenerTimer = setInterval(captureListener, 250)
+        listenerTimer.unref()
+        captureListener()
+        const result = await waitForExit(child)
+        clearInterval(listenerTimer)
+        if (listenerCapture) await listenerCapture
+        await stopChild(child)
+        if (listenerHolder && holderIsLive(listenerHolder)) {
+            await stopProcessTree(listenerHolder.pid, listenerHolder.startIdentity)
+        }
+        if (listenerCaptureError) throw listenerCaptureError
+        child = null
+        process.exitCode = cancellationSignal
+            ? exitForChild(null, cancellationSignal)
+            : exitForChild(result.code, result.signal)
     } finally {
         clearTimeout(startupShutdownTimer)
         stopHeartbeat()

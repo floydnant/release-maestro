@@ -39,6 +39,20 @@
             },
             "defaultConfiguration": "production"
         },
+        "build-e2e": {
+            "executor": "nx-electron:build",
+            "cache": true,
+            "inputs": ["production", "^production"],
+            "outputs": ["{options.outputPath}"],
+            "dependsOn": ["^build", "metadata-engine:build"],
+            "options": {
+                "outputPath": "dist/apps/maestro-electron-e2e",
+                "main": "apps/maestro-electron/src/main.ts",
+                "tsConfig": "apps/maestro-electron/tsconfig.app.json",
+                "webpackConfig": "apps/maestro-electron/webpack.config.cjs",
+                "assets": ["apps/maestro-electron/src/assets"]
+            }
+        },
         "serve-internal": {
             "executor": "nx-electron:execute",
             "continuous": true,

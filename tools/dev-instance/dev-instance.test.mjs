@@ -2053,7 +2053,7 @@ test('run-workflow stops a detached listener after its launcher crashes', async 
     }
 }, 45_000)
 
-test('run-workflow passes separators and shell metacharacters as literal child arguments', async () => {
+test('run-workflow passes shell metacharacters as literal child arguments', async () => {
     const fixture = await createFixture()
     const result = run(fixture, fixture.main, [
         'run-workflow',
@@ -2063,7 +2063,6 @@ test('run-workflow passes separators and shell metacharacters as literal child a
         '-e',
         'process.exit(process.argv[1] === "--then" && process.argv[2] === "value with spaces & pipes | literally" ? 0 : 9)',
         '--',
-        '--literal',
         '--then',
         'value with spaces & pipes | literally',
     ])
@@ -2097,42 +2096,6 @@ test('run-workflow launches pnpm from npm_execpath with Node', async () => {
         },
     )
     assert.equal(result.status, 0, result.stderr)
-})
-
-test('run-workflow does not launch a chained command after cancellation', async () => {
-    const fixture = await createFixture()
-    const ready = join(fixture.base, 'first-ready')
-    const secondRan = join(fixture.base, 'second-ran')
-    const workflow = spawn(
-        process.execPath,
-        [
-            cli,
-            'run-workflow',
-            'renderer-e2e',
-            '--',
-            process.execPath,
-            '-e',
-            `require('node:fs').writeFileSync(${JSON.stringify(ready)}, ''); process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000)`,
-            '--then',
-            process.execPath,
-            '-e',
-            `require('node:fs').writeFileSync(${JSON.stringify(secondRan)}, '')`,
-        ],
-        {
-            cwd: fixture.main,
-            env: environmentFor(fixture),
-            stdio: ['ignore', 'pipe', 'pipe'],
-        },
-    )
-    liveChildren.push(workflow)
-    await waitFor(() => Promise.resolve(existsSync(ready)), Boolean, 'first command did not start')
-
-    workflow.kill('SIGTERM')
-    const result = await childResult(workflow)
-
-    assert.equal(result.code, 143)
-    assert.equal(result.signal, null)
-    assert.equal(existsSync(secondRan), false)
 })
 
 test('MCP wrapper exits when its child ignores termination', async () => {
@@ -2215,7 +2178,7 @@ test('development startup rejects an invalid deadline before allocating', async 
     assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).state, 'unallocated')
 })
 
-test('dev conflicts with Electron E2E and a second dev supervisor reports its owner', async () => {
+test('dev runs alongside Electron E2E and a second dev supervisor reports its owner', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)
     const dev = spawn(process.execPath, [cli, 'run-dev'], {
@@ -2258,9 +2221,9 @@ test('dev conflicts with Electron E2E and a second dev supervisor reports its ow
         '-e',
         'process.exit(0)',
     ])
-    assert.equal(e2e.status, 1)
-    assert.match(e2e.stderr, /RESOURCE_CONFLICT.*electron-development-bundle/)
+    assert.equal(e2e.status, 0, e2e.stderr)
     assert.equal(JSON.parse(await readFile(manifestPath, 'utf8')).worktreeId, status.worktreeId)
+    assert.equal(dev.exitCode, null)
     dev.kill('SIGTERM')
     await childResult(dev)
 })
@@ -2498,7 +2461,7 @@ test('an orphaned live listener remains an owner and dev-stop terminates it', as
     assert.equal(inactive.state, 'inactive')
 }, 45_000)
 
-test('a detached dev listener keeps the build claim after its launcher exits', async () => {
+test('a detached dev listener keeps its dev ownership after its launcher exits', async () => {
     if (process.platform === 'win32') return
     const fixture = await createFixture()
     const { launcherPath, listenerPidPath } = await createDetachedListenerLauncher(fixture)
@@ -2565,8 +2528,12 @@ if (process.argv.includes('maestro-renderer')) {
             '-e',
             'process.exit(0)',
         ])
-        assert.equal(e2e.status, 1)
-        assert.match(e2e.stderr, /RESOURCE_CONFLICT/)
+        assert.equal(e2e.status, 0, e2e.stderr)
+        assert.ok(
+            runJson(fixture, fixture.main, ['dev-status', '--json']).holders.some(
+                holder => holder.id === listener.id,
+            ),
+        )
         assert.ok(
             runJson(fixture, fixture.main, ['dev-stop']).stopped.some(holder => holder.pid === listener.pid),
         )
@@ -2645,7 +2612,7 @@ test('dead or reused PIDs are reconciled without killing a live unrelated proces
     assert.equal(unrelated.exitCode, null)
 })
 
-test('unverified dev listener retains its build claim until the port is free', async () => {
+test('unverified dev listener blocks dev cleanup until the port is free', async () => {
     const fixture = await createFixture()
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
     const server = await listen('127.0.0.1', allocation.bundle.renderer)
@@ -2673,7 +2640,7 @@ test('unverified dev listener retains its build claim until the port is free', a
     assert.equal(status.health, 'degraded')
     assert.deepEqual(status.unverifiedListeners, [{ port: allocation.bundle.renderer, pids: [process.pid] }])
     assert.match(run(fixture, fixture.main, ['dev-status']).stdout, /unverified listeners:.*stop manually/)
-    const conflict = run(fixture, fixture.main, [
+    const e2e = run(fixture, fixture.main, [
         'run-workflow',
         'electron-e2e',
         '--',
@@ -2681,8 +2648,7 @@ test('unverified dev listener retains its build claim until the port is free', a
         '-e',
         'process.exit(0)',
     ])
-    assert.equal(conflict.status, 1)
-    assert.match(conflict.stderr, /RESOURCE_CONFLICT.*unverified listeners/)
+    assert.equal(e2e.status, 0, e2e.stderr)
     for (const args of [['dev-stop'], ['dev-release'], ['dev-release', '--force'], ['dev-reallocate']]) {
         const refused = run(fixture, fixture.main, args)
         assert.equal(refused.status, 1, `${args.join(' ')}: ${refused.stderr}`)
@@ -2739,7 +2705,7 @@ test('a surviving MCP holder does not hide an unverified dev listener', async ()
     assert.equal(status.health, 'degraded')
     assert.equal(status.holders.length, 1)
     assert.deepEqual(status.unverifiedListeners, [{ port: allocation.bundle.renderer, pids: [process.pid] }])
-    const conflict = run(fixture, fixture.main, [
+    const e2e = run(fixture, fixture.main, [
         'run-workflow',
         'electron-e2e',
         '--',
@@ -2747,8 +2713,8 @@ test('a surviving MCP holder does not hide an unverified dev listener', async ()
         '-e',
         'process.exit(0)',
     ])
-    assert.equal(conflict.status, 1)
-    assert.match(conflict.stderr, /RESOURCE_CONFLICT.*unverified listeners/)
+    assert.equal(e2e.status, 0, e2e.stderr)
+    assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).health, 'degraded')
 })
 
 test('a later unrelated listener does not block reallocation after a clean dev stop', async () => {
