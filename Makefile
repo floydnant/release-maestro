@@ -125,10 +125,12 @@ agents-check: ## Verify the canonical agent skills and their harness adapters
 	node tools/verify-agent-harness.mjs
 
 sure: format test-tools ## Format, lint, build, unit test, and development E2E; build is the app type gate
-	$(PNPM) exec nx run-many -t build,lint,test -c development --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx run-many -t build -c development --exclude=maestro-electron --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx run-many -t lint,test -c development --skipNxCache=$(SKIP_NX_CACHE)
 	$(PNPM) exec nx run-many -t e2e,e2e-renderer -c development --skipNxCache=$(SKIP_NX_CACHE)
 affected: ## Run checks only on affected projects based on git changes
-	$(PNPM) exec nx affected -t build,lint,test --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx affected -t build --exclude=maestro-electron --skipNxCache=$(SKIP_NX_CACHE)
+	$(PNPM) exec nx affected -t lint,test --skipNxCache=$(SKIP_NX_CACHE)
 	$(PNPM) exec nx affected -t e2e,e2e-renderer --skipNxCache=$(SKIP_NX_CACHE)
 
 # Database

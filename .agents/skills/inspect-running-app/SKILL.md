@@ -29,7 +29,7 @@ curl -s http://127.0.0.1:<CDP>/json/list
 curl -s http://127.0.0.1:<inspector>/json/list
 ```
 
-Wait for the renderer URL shown by `make dev-status`. If another program takes a persisted port,
+Open `http://localhost:<renderer port>` using the port from `make dev-status`. If another program takes a persisted port,
 startup fails and tells you to run `make dev-reallocate`. It does not move an active MCP endpoint.
 
 ## Drive the renderer through the MCP server
