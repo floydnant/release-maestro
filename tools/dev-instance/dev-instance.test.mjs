@@ -12,7 +12,7 @@ import {
     utimes,
     writeFile,
 } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
@@ -1823,9 +1823,11 @@ test('run-dev rechecks a live listener after one missed ownership lookup', async
         lsof,
         `#!/usr/bin/env node
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-if (!existsSync(process.env.FAKE_LSOF_MARKER)) {
-  writeFileSync(process.env.FAKE_LSOF_MARKER, '')
-} else {
+const count = existsSync(process.env.FAKE_LSOF_MARKER)
+  ? Number(readFileSync(process.env.FAKE_LSOF_MARKER, 'utf8')) + 1
+  : 1
+writeFileSync(process.env.FAKE_LSOF_MARKER, String(count))
+if (count !== 2) {
   process.stdout.write('p' + readFileSync(process.env.FAKE_LISTENER_PID_PATH, 'utf8') + '\\n')
 }
 `,
@@ -1854,7 +1856,7 @@ if (!existsSync(process.env.FAKE_LSOF_MARKER)) {
         'listener holders did not register after the first lookup missed',
         15_000,
     )
-    assert.equal(existsSync(marker), true)
+    assert.ok(Number(readFileSync(marker, 'utf8')) >= 3)
     dev.kill('SIGTERM')
     await childResult(dev)
 })
