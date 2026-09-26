@@ -916,7 +916,7 @@ test.describe('the album detail page', () => {
     test('links the album artist to that artist’s tracks', async ({ page }) => {
         await openDetail(page)
 
-        await page.getByRole('link', { name: 'Aurora Fields' }).click()
+        await page.locator('app-album-detail-header').getByRole('link', { name: 'Aurora Fields' }).click()
 
         await expect.poll(() => new URL(page.url()).pathname).toBe('/tracks')
         expect(new URL(page.url()).searchParams.get('artist')).toBe('artist-1')
@@ -930,12 +930,16 @@ test.describe('the album detail page', () => {
         await expect.poll(() => new URL(page.url()).searchParams.get('recordLabel')).toBe('label-1')
     })
 
-    test('links a track’s own artist to that artist’s tracks', async ({ page }) => {
+    test('links a track’s own artist to the artist page', async ({ page }) => {
         await openDetail(page)
 
-        await page.getByRole('button', { name: 'Aurora Fields', exact: true }).first().click()
+        await page
+            .getByRole('grid', { name: 'Tracks' })
+            .getByRole('link', { name: 'Aurora Fields' })
+            .first()
+            .click()
 
-        await expect.poll(() => new URL(page.url()).pathname).toBe('/tracks')
+        await expect.poll(() => new URL(page.url()).pathname).toBe('/artists/artist-1')
     })
 
     test('explains an orphaned album row rather than claiming its files are gone', async ({ page }) => {

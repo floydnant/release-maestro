@@ -291,9 +291,8 @@ test('an album detail page links out to its artist and record label', async ({},
     await page.getByRole('link', { name: /^Daybreak/ }).click()
     await expect(page.getByRole('heading', { name: 'Daybreak', level: 1 })).toBeVisible()
 
-    // Until the artist page lands (MAE-120), the honest form of this link is the track
-    // list scoped to that artist entity — and it has to resolve to real rows.
-    await page.getByRole('link', { name: 'Aurora Fields' }).click()
+    // The album header's artist link opens the track list scoped to that artist.
+    await page.locator('app-album-detail-header').getByRole('link', { name: 'Aurora Fields' }).click()
 
     await expect(page).toHaveURL(/\/tracks\?.*artist=/)
     // Sorted rather than compared in order: the track list opens in its own default order

@@ -92,13 +92,7 @@ export class ArtistSongsComponent {
         })
     }
     protected onEntity(request: EntityFilterRequest): void {
-        if (request.kind === 'artist') {
-            this.router.navigate(['/artists', request.id])
-            return
-        }
-        const param = { artist: 'artist', album: 'album', genre: 'genre', recordLabel: 'recordLabel' }[
-            request.kind
-        ]
+        const param = { album: 'album', genre: 'genre', recordLabel: 'recordLabel' }[request.kind]
         this.router.navigate(['/tracks'], { queryParams: { artist: this.artistId(), [param]: request.id } })
     }
     protected onMissing(): void {

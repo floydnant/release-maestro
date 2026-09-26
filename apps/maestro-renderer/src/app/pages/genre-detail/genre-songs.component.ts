@@ -92,9 +92,7 @@ export class GenreSongsComponent {
         })
     }
     protected onEntity(request: EntityFilterRequest): void {
-        const param = { artist: 'artist', album: 'album', genre: 'genre', recordLabel: 'recordLabel' }[
-            request.kind
-        ]
+        const param = { album: 'album', genre: 'genre', recordLabel: 'recordLabel' }[request.kind]
         this.router.navigate(['/tracks'], { queryParams: { genre: this.genreId(), [param]: request.id } })
     }
     protected onMissing(): void {

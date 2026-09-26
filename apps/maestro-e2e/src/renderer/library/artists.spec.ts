@@ -198,6 +198,6 @@ test('a co-artist credit opens that artist', async ({ page }) => {
             .build(),
         '/artists/aurora?section=songs',
     )
-    await page.getByRole('button', { name: 'Night Cartel & Aurora Fields' }).click()
+    await page.getByRole('link', { name: 'Night Cartel & Aurora Fields' }).click()
     await expect(page).toHaveURL(/\/artists\/compound$/)
 })

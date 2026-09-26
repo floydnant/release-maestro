@@ -75,7 +75,7 @@ test.describe('rendering a window', () => {
         await openTracks(page)
 
         await expect(
-            page.getByRole('button', { name: 'Night Cartel & Aurora Fields', exact: true }),
+            page.getByRole('link', { name: 'Night Cartel & Aurora Fields', exact: true }),
         ).toBeVisible()
     })
 
@@ -312,18 +312,33 @@ test.describe('search', () => {
     })
 })
 
-test.describe('filtering by entity', () => {
-    test('filters by the artist entity when an artist credit is clicked', async ({ page }) => {
-        const controller = await openTracks(page)
+test.describe('entity navigation and filtering', () => {
+    test('opens the artist page when an artist credit is clicked', async ({ page }) => {
+        await openTracks(
+            page,
+            scenarioBuilder()
+                .songs(createSongRows())
+                .handler('library:get-artist-detail', {
+                    kind: 'resolve',
+                    value: {
+                        id: 'artist-2',
+                        name: 'Night Cartel',
+                        songCount: 1,
+                        albumCount: 0,
+                        firstYear: null,
+                        lastYear: null,
+                        appearanceCount: 0,
+                        recordLabelCount: 0,
+                        externalRefs: {},
+                    },
+                })
+                .build(),
+        )
 
-        await page.getByRole('button', { name: 'Night Cartel', exact: true }).click()
+        await page.getByRole('link', { name: 'Night Cartel', exact: true }).click()
 
-        await expect
-            .poll(() => lastQuery(controller))
-            .toMatchObject({
-                query: { filter: { artistIds: ['artist-2'] } },
-            })
-        await expect(page).toHaveURL(/artist=artist-2/)
+        await expect(page).toHaveURL(/\/artists\/artist-2$/)
+        await expect(page.getByRole('heading', { name: 'Night Cartel' })).toBeVisible()
     })
 
     test('filters by record label from its cell', async ({ page }) => {
@@ -701,18 +716,18 @@ test.describe('selection', () => {
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
     })
 
-    test('selects the row instead of filtering when a modifier is held over a link', async ({ page }) => {
+    test('selects the row instead of navigating when a modifier is held over a link', async ({ page }) => {
         const controller = await openTracks(page)
         await clickRow(page, 'Dawn')
 
-        // A cmd-click on the artist link plainly means "add this row", not "filter".
+        // A cmd-click on the artist link adds this row without leaving the track list.
         await rowByTitle(page, 'Dusk')
-            .getByRole('button', { name: 'Night Cartel', exact: true })
+            .getByRole('link', { name: 'Night Cartel', exact: true })
             .click({ modifiers: ['ControlOrMeta'] })
 
         await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
-        await expect(page).not.toHaveURL(/artist=/)
+        await expect(page).toHaveURL(/\/tracks$/)
         expect((await lastQuery(controller))?.query.filter.artistIds).toBeUndefined()
     })
 
@@ -1076,7 +1091,7 @@ test.describe('the grid for keyboard and assistive tech', () => {
         // grid, where the arrow keys mean the selection again.
         await page.getByRole('grid', { name: 'Tracks' }).focus()
         await page.keyboard.press('ArrowRight')
-        await expect(rowByTitle(page, 'Dawn').getByRole('button').first()).toBeFocused()
+        await expect(rowByTitle(page, 'Dawn').getByRole('link', { name: 'Aurora Fields' })).toBeFocused()
 
         await page.keyboard.press('ArrowLeft')
         await expect(page.getByRole('grid', { name: 'Tracks' })).toBeFocused()
