@@ -832,6 +832,18 @@ test('run-workflow passes separators and shell metacharacters as literal child a
     assert.equal(result.status, 0, result.stderr)
 })
 
+test('run-workflow launches pnpm from npm_execpath with Node', async () => {
+    const fixture = await createFixture()
+    const pnpmScript = join(fixture.base, 'pnpm.cjs')
+    await writeFile(pnpmScript, 'process.exit(process.argv.slice(2).join(" ") === "exec playwright --version" ? 0 : 9)')
+    await chmod(pnpmScript, 0o644)
+    const result = run(fixture, fixture.main, ['run-workflow', 'renderer-e2e', '--', 'playwright', '--version'], {
+        npm_execpath: pnpmScript,
+        RELEASE_MAESTRO_PNPM_COMMAND: '',
+    })
+    assert.equal(result.status, 0, result.stderr)
+})
+
 test('run-workflow does not launch a chained command after cancellation', async () => {
     const fixture = await createFixture()
     const ready = join(fixture.base, 'first-ready')

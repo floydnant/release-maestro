@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync, readlinkSync } from 'node:fs'
 import { appendFile, mkdir, open, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
 import net from 'node:net'
 import { homedir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, delimiter, dirname, join, resolve } from 'node:path'
 import { formatLogEvent } from './presentation.mjs'
 
 export const registryVersion = 1
@@ -1513,9 +1513,19 @@ export const spawnManaged = (command, args, options = {}) => {
 
 export const spawnPackageBinary = (binary, args, options = {}) => {
     const configured = process.env['RELEASE_MAESTRO_PNPM_COMMAND']?.trim()
-    const command = configured || 'corepack'
-    const prefix = configured ? [] : ['pnpm']
-    return spawnManaged(command, [...prefix, 'exec', binary, ...args], options)
+    if (configured) return spawnManaged(configured, ['exec', binary, ...args], options)
+    const npmExecPath = process.env['npm_execpath']?.trim()
+    if (npmExecPath && existsSync(npmExecPath) && /(?:^|[/\\])pnpm(?:\.c?js)?$/i.test(npmExecPath)) {
+        return spawnManaged(process.execPath, [npmExecPath, 'exec', binary, ...args], options)
+    }
+    const executableNames = process.platform === 'win32' ? ['pnpm.cmd', 'pnpm.exe', 'pnpm'] : ['pnpm']
+    const available = (process.env['PATH'] ?? '')
+        .split(delimiter)
+        .some(directory => executableNames.some(name => existsSync(join(directory, name))))
+    if (!available) {
+        throw new InstanceError('pnpm is unavailable. Install pnpm or set RELEASE_MAESTRO_PNPM_COMMAND.', 'PNPM_NOT_FOUND')
+    }
+    return spawnManaged('pnpm', ['exec', binary, ...args], options)
 }
 
 export const forwardSignals = (children, onSignal = () => {}) => {
