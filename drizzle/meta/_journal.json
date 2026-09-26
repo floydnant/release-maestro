@@ -57,6 +57,13 @@
       "when": 1786054321812,
       "tag": "0007_drop-album-track-count",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790386689411,
+      "tag": "0008_mae-116-song-added-at",
+      "breakpoints": true
     }
   ]
 }

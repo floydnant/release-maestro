@@ -61,6 +61,40 @@ describe('LibraryBackendRepository', () => {
 
     afterEach(() => sqlite.close())
 
+    it('dates first-library songs from the file, then dates new discoveries from the scan', () => {
+        const firstScan = new Date('2026-06-15T10:00:00Z')
+        const nextScan = new Date('2026-07-15T10:00:00Z')
+        const oldFile = { ...fact, path: '/music/old.flac', fileName: 'old.flac' }
+        const arrivingFile = { ...fact, path: '/music/arriving.flac', fileName: 'arriving.flac' }
+
+        repository.processPrescanBatch([oldFile], firstScan, true)
+        repository.processPrescanBatch([oldFile, arrivingFile], nextScan, false)
+
+        const songs = db.select().from(songsTable).all()
+        expect(songs.find(song => song.path == oldFile.path)?.addedAt).toEqual(new Date(fact.createdAt))
+        expect(songs.find(song => song.path == arrivingFile.path)?.addedAt).toEqual(nextScan)
+
+        db.update(songsTable).set({ present: false }).where(eq(songsTable.path, oldFile.path)).run()
+        repository.processPrescanBatch([oldFile], new Date('2026-08-15T10:00:00Z'), false)
+        expect(db.select().from(songsTable).where(eq(songsTable.path, oldFile.path)).get()?.addedAt).toEqual(
+            new Date(fact.createdAt),
+        )
+    })
+
+    it('dates a song inserted directly during metadata ingest', () => {
+        const scannedAt = new Date('2026-07-15T10:00:00Z')
+        repository.ingestMetadata(newSongFixture(), fact, scannedAt)
+
+        expect(db.select().from(songsTable).get()?.addedAt).toEqual(scannedAt)
+    })
+
+    it('uses discovery time when an initial file has no creation time', () => {
+        const seenAt = new Date('2026-06-15T10:00:00Z')
+        repository.processPrescanBatch([{ ...fact, createdAt: undefined }], seenAt, true)
+
+        expect(db.select().from(songsTable).get()?.addedAt).toEqual(seenAt)
+    })
+
     it('creates discovery rows and skips unchanged files on the next prescan', () => {
         const firstSeenAt = new Date('2026-06-15T10:00:00Z')
         const first = repository.processPrescanBatch([fact], firstSeenAt)

@@ -227,7 +227,7 @@ export class LibraryBrowseRepository {
                 bpm: row.bpm,
                 musicalKey: row.musicalKey,
                 duration: row.duration,
-                dateAdded: row.createdAt?.getTime() ?? null,
+                dateAdded: row.addedAt?.getTime() ?? null,
             })),
             offset,
             total,
@@ -275,7 +275,7 @@ export class LibraryBrowseRepository {
                 bpm: songsTable.bpm,
                 musicalKey: songsTable.musicalKey,
                 duration: songsTable.duration,
-                createdAt: songsTable.createdAt,
+                addedAt: songsTable.addedAt,
             })
             .from(songsTable)
             .leftJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
@@ -777,7 +777,7 @@ const sortColumns: Record<SongSortField, AnySQLiteColumn> = {
     [SongSortField.duration]: songsTable.duration,
     [SongSortField.year]: songsTable.year,
     [SongSortField.recordLabel]: songsTable.recordLabelText,
-    [SongSortField.dateAdded]: songsTable.createdAt,
+    [SongSortField.dateAdded]: songsTable.addedAt,
     [SongSortField.trackNumber]: songsTable.trackNumber,
 }
 

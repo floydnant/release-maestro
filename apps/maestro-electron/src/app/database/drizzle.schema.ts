@@ -187,6 +187,7 @@ export const songsTable = sqliteTable(
         size: integer('size').notNull(),
         modifiedAt: integer('modified_at', { mode: 'timestamp_ms' }).notNull(),
         createdAt: integer('created_at', { mode: 'timestamp_ms' }),
+        addedAt: integer('added_at', { mode: 'timestamp_ms' }),
         fileFingerprint: text('file_fingerprint').notNull(),
         scannedFileFingerprint: text('scanned_file_fingerprint'),
         present: integer('present', { mode: 'boolean' }).notNull().default(true),
@@ -263,7 +264,7 @@ export const songsTable = sqliteTable(
         index('songs_bpm_idx').on(table.bpm, table.id),
         index('songs_musical_key_idx').on(table.musicalKey, table.id),
         index('songs_duration_idx').on(table.duration, table.id),
-        index('songs_created_at_idx').on(table.createdAt, table.id),
+        index('songs_added_at_idx').on(table.addedAt, table.id),
         index('songs_track_number_idx').on(table.trackNumber, table.id),
 
         // The album detail page's track list: `WHERE album_id = ? ORDER BY
