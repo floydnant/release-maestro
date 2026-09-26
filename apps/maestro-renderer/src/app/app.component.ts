@@ -28,17 +28,19 @@ import {
 import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
 import { MinDwellPacer } from './shared/utils/min-dwell-pacer'
 
-/** Compact model the sidebar renders for a running background scan. */
-interface ScanIndicatorView {
-    phase: 'discovering' | 'reading'
-    discovered: number
-    readDone: number
-    readTotal: number
-    failedFiles: number
-}
+/** Compact model the title bar renders for a background scan. */
+type ScanIndicatorView =
+    | {
+          phase: 'discovering' | 'reading'
+          discovered: number
+          readDone: number
+          readTotal: number
+          failedFiles: number
+      }
+    | { phase: 'completed'; newSongs: number; changedSongs: number; failedFiles: number }
 
 /**
- * Minimum time each phase of a *startup* scan stays visible in the sidebar. Startup
+ * Minimum time each phase of a *startup* scan stays visible in the title bar. Startup
  * rescans of an up-to-date library finish almost instantly; without this the
  * indicator flashes on and off, or blinks between phases, faster than the eye can
  * follow. Other scans (manual rescans) are shown in real time.
@@ -169,7 +171,7 @@ export class AppComponent {
     isImportRoute = computed(() => this.currentUrl().startsWith('/import'))
 
     /**
-     * Paced sidebar view of the running scan. Startup scans hold each phase for a
+     * Paced title bar view of the scan. Startup scans hold each phase for a
      * minimum time (and drop the progress bar); other scans pass through live.
      * Written by {@link scanIndicatorPacer}.
      */
@@ -194,7 +196,7 @@ export class AppComponent {
      */
     libraryScanPercent = computed(() => {
         const view = this.scanIndicator()
-        if (!view || view.readTotal === 0) return 0
+        if (!view || view.phase === 'completed' || view.readTotal === 0) return 0
         return (view.readDone / view.readTotal) * 100
     })
 
@@ -220,6 +222,18 @@ export class AppComponent {
     private targetScanIndicator() {
         const status = this.libraryService.scanStatus()
         if (!status || this.isImportRoute()) return null
+        if (status.phase === 'completed' && status.trigger === 'startup' && status.terminal) {
+            return {
+                key: `${status.scanId}:completed`,
+                value: {
+                    phase: 'completed' as const,
+                    newSongs: status.terminal.new,
+                    changedSongs: status.terminal.changed,
+                    failedFiles: status.terminal.discoveryFailureCount + status.terminal.readFailureCount,
+                },
+                minDwellMs: 0,
+            }
+        }
         if (status.phase !== 'discovering' && status.phase !== 'reading') return null
 
         const isStartup = status.trigger === 'startup'
@@ -231,7 +245,7 @@ export class AppComponent {
             failedFiles: status.failedFiles,
         }
         return {
-            key: status.phase,
+            key: `${status.scanId}:${status.phase}`,
             value: view,
             minDwellMs: isStartup ? STARTUP_PHASE_MIN_DWELL_MS : 0,
         }
