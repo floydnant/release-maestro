@@ -106,7 +106,7 @@ _Avoid_: `track` in any identifier; file, item, entry as synonyms for song
 
 **Date added** (`songs.addedAt`):
 When the song first entered the library. The first completed scan dates its songs from each file's
-creation time as a best guess. Later scans date new songs at discovery. Rescans and a missing song's
+creation time as a best guess, or from discovery when that time is unavailable. Later scans date new songs at discovery. Rescans and a missing song's
 return keep the original date. `songs.createdAt` remains the file creation time, and the album date
 still uses it (ADR 0005).
 

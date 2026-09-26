@@ -111,7 +111,7 @@ export class LibraryBackendRepository {
                             id: randomUUID(),
                             path: fact.path,
                             ...fileValues,
-                            addedAt: initialScan ? fileValues.createdAt : seenAt,
+                            addedAt: initialScan ? (fileValues.createdAt ?? seenAt) : seenAt,
                             title: titleFromFileName(fact.fileName),
                         })
                         .run()

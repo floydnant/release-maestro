@@ -88,6 +88,13 @@ describe('LibraryBackendRepository', () => {
         expect(db.select().from(songsTable).get()?.addedAt).toEqual(scannedAt)
     })
 
+    it('uses discovery time when an initial file has no creation time', () => {
+        const seenAt = new Date('2026-06-15T10:00:00Z')
+        repository.processPrescanBatch([{ ...fact, createdAt: undefined }], seenAt, true)
+
+        expect(db.select().from(songsTable).get()?.addedAt).toEqual(seenAt)
+    })
+
     it('creates discovery rows and skips unchanged files on the next prescan', () => {
         const firstSeenAt = new Date('2026-06-15T10:00:00Z')
         const first = repository.processPrescanBatch([fact], firstSeenAt)
