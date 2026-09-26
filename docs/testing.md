@@ -94,6 +94,7 @@ cross-platform packaging behavior.
 
 CI runs `make dev-instance-self-test` as a separate job. Run it locally after changing
 `tools/dev-instance`; it starts two complete development stacks in temporary worktrees.
+`make test-tools` runs the focused repository tools suite. `make test` and `make sure` include it.
 
 Production packaging is cached. The launcher resolves electron-builder's unpacked layout on macOS,
 Windows, and Linux, and CI runs the production suite on all three. E2E windows remain visible but

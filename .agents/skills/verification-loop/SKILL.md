@@ -30,7 +30,9 @@ description: Verification loop using repository make targets.
   and install Playwright Chromium with its system dependencies. Requires Node, pnpm, and Rust.
 
 - `make sure` — format, then lint, build, unit-test, and run development Electron and renderer E2E
-  across the repo. **Mutates formatting.**
+  across the repo. It also runs `make test-tools`. **Mutates formatting.**
+- `make test-tools` — repository tools tests. `make test` includes them; `make agents-check` checks
+  the agent skills and harness adapters.
 - `make format-check` — non-mutating formatting check, for review and CI-style verification.
 - `make affected` — build, lint, unit tests, development Electron E2E, and renderer E2E, scoped to
   what git says changed; does not check or mutate formatting.
