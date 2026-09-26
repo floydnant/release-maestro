@@ -68,6 +68,8 @@ launcher or keep its allocation active until they exit.
 On macOS and Linux, the manager records a verified E2E renderer listener so its claim survives an
 abrupt test-runner exit until the listener stops. If a runner exits before the listener can be
 verified, an occupied transient renderer port keeps the claim until the port is free.
+If a dev launcher exits before its listener can be verified, an occupied port in its bundle keeps
+the development and Electron build claims until the port is free.
 
 ## Recovery
 
@@ -78,8 +80,10 @@ process took a persisted port, stop your dev stack and MCP clients, then run `ma
 processes. It checks both worktree ownership and process start identity before signaling them.
 For a transient port with no verified holder, stop the port owner manually; the claim clears when
 the port is free.
+For an unverified dev listener, `make dev-status` and `make dev-stop` report its port and PID.
+Stop it manually; `make dev-stop` will not signal a process whose ownership was not verified.
 `make dev-release` only changes allocation state and never kills a process. `FORCE=1 make dev-release` can discard corrupt
-ownership metadata, but still refuses live holders and cannot bypass a registry recovery marker.
+ownership metadata, but still refuses live holders and unverified listeners and cannot bypass a registry recovery marker.
 
 The registry and manifest are versioned. The manager repairs missing registries, stale locks, and
 dead holders while preserving live processes. If neither registry copy is valid, it quarantines corrupt

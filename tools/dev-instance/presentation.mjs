@@ -25,6 +25,11 @@ const formatHolders = (holders, color) =>
               .join('\n')
         : '    none'
 
+const formatUnverifiedListeners = (listeners, color) =>
+    listeners?.length
+        ? `${label('unverified listeners', color)}: ${listeners.map(({ port, pids }) => `${port} (PIDs ${pids.join(', ') || 'unknown'})`).join('; ')}; stop manually`
+        : null
+
 export const developmentAppName = instance => `Release Maestro dev [${slotLabel(instance)}]`
 
 export const formatDevelopmentSummary = (instance, { color = false } = {}) =>
@@ -50,7 +55,10 @@ export const formatDevelopmentStatus = (status, { color = false } = {}) => {
         `${label('age', color)}: ${Math.round(status.ageMs / 1000)}s`,
         `${label('resources', color)}: ${status.claims.join(', ')}`,
         `${label('holders', color)}:\n${formatHolders(status.holders, color)}`,
-    ].join('\n')
+        formatUnverifiedListeners(status.unverifiedListeners, color),
+    ]
+        .filter(Boolean)
+        .join('\n')
 }
 
 export const formatInstanceList = ({ instances }, { color = false } = {}) => {
@@ -69,7 +77,10 @@ export const formatInstanceList = ({ instances }, { color = false } = {}) => {
                 `  ${label('CDP', color)}: ${instance.bundle.cdp}`,
                 `  ${label('inspector', color)}: ${instance.bundle.inspector}`,
                 `  ${label('holders', color)}:\n${formatHolders(instance.holders, color)}`,
-            ].join('\n')
+                formatUnverifiedListeners(instance.unverifiedListeners, color),
+            ]
+                .filter(Boolean)
+                .join('\n')
         })
         .join('\n\n')
 }

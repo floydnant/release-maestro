@@ -2757,6 +2757,56 @@ test('dead or reused PIDs are reconciled without killing a live unrelated proces
     assert.equal(unrelated.exitCode, null)
 })
 
+test('unverified dev listener retains its build claim until the port is free', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const server = await listen('127.0.0.1', allocation.bundle.renderer)
+    for (const file of ['registry.json', 'registry.backup.json']) {
+        const path = join(fixture.state, file)
+        const registry = JSON.parse(await readFile(path, 'utf8'))
+        const entry = registry.allocations[allocation.worktreeId]
+        entry.wasActive = true
+        entry.inactiveSince = null
+        entry.holders = []
+        await writeFile(path, JSON.stringify(registry))
+    }
+
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(status.state, 'unverified-listener')
+    assert.equal(status.health, 'degraded')
+    assert.deepEqual(status.unverifiedListeners, [{ port: allocation.bundle.renderer, pids: [process.pid] }])
+    assert.match(run(fixture, fixture.main, ['dev-status']).stdout, /unverified listeners:.*stop manually/)
+    const conflict = run(fixture, fixture.main, [
+        'run-workflow',
+        'electron-e2e',
+        '--',
+        process.execPath,
+        '-e',
+        'process.exit(0)',
+    ])
+    assert.equal(conflict.status, 1)
+    assert.match(conflict.stderr, /RESOURCE_CONFLICT.*unverified listeners/)
+    for (const args of [['dev-stop'], ['dev-release'], ['dev-release', '--force'], ['dev-reallocate']]) {
+        const refused = run(fixture, fixture.main, args)
+        assert.equal(refused.status, 1, `${args.join(' ')}: ${refused.stderr}`)
+        assert.match(refused.stderr, /UNVERIFIED_LISTENER.*Stop these listeners manually/)
+    }
+    assert.equal(server.listening, true)
+
+    const hookResult = spawnSync(process.execPath, [hook], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        input: JSON.stringify({ hook_event_name: 'SessionEnd', cwd: fixture.main, reason: 'other' }),
+        encoding: 'utf8',
+    })
+    assert.equal(hookResult.status, 0, hookResult.stderr)
+    assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).state, 'unverified-listener')
+
+    await new Promise(resolve => server.close(resolve))
+    liveServers.splice(liveServers.indexOf(server), 1)
+    assert.equal(runJson(fixture, fixture.main, ['dev-status', '--json']).state, 'reclaimable')
+})
+
 test('logs redact sensitive query values, rotate, and render through dev-log', async () => {
     const fixture = await createFixture({ worktrees: 2 })
     const bin = await createFakePnpm(fixture)
