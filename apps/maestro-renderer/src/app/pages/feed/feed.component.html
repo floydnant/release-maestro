@@ -54,7 +54,7 @@
                     #emailEntryIntersection="appIntersection"
                 >
                     <!-- @TODO: handle all feed item types -->
-                    <div class="inner-container | grid size-full grid-cols-[300px_1fr_120px] gap-4">
+                    <div class="inner-container | grid size-full grid-cols-[300px_minmax(0,1fr)_120px] gap-4">
                         <div class="artwork-column | grid h-full grid-rows-[300px_1fr]">
                             <img
                                 class="album-cover | aspect-square shrink-0 rounded-lg shadow-lg"
@@ -172,7 +172,7 @@
                         </div>
 
                         <div
-                            class="text-column | relative flex max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] flex-col justify-between"
+                            class="text-column | relative flex max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] min-w-0 flex-col justify-between"
                         >
                             <div class="overflow-x-hidden overflow-y-scroll">
                                 @if (feedItem.error; as error) {
@@ -191,7 +191,7 @@
                                     </div>
                                 }
 
-                                <h1 class="tralbum-title | type-hero-title">
+                                <h1 class="tralbum-title | type-hero-title wrap-anywhere">
                                     <a
                                         [href]="feedItem.data.releaseUrl"
                                         target="_blank"

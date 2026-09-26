@@ -84,6 +84,36 @@ test.describe('release feed scenario states', () => {
             .toMatchObject({ channel: 'load-feed', payload: { index: 0, count: 5 } })
     })
 
+    test('keeps a long release title and the label within the feed', async ({ page }) => {
+        const baseRelease = createHydratedRelease()
+        const title = 'Supercalifragilisticexpialidocious'.repeat(12)
+        const release = createHydratedRelease({
+            data: { ...baseRelease.data, releaseName: title },
+        })
+        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+
+        const titleLink = page.getByRole('link', { name: title })
+        const label = page.getByText('Shiva Chandra', { exact: true })
+        await expect(titleLink).toBeVisible()
+        await expect(label).toBeVisible()
+
+        for (const width of [1280, 900]) {
+            await page.setViewportSize({ width, height: 720 })
+            await expect
+                .poll(async () => {
+                    const titleBounds = await titleLink.boundingBox()
+                    const labelBounds = await label.boundingBox()
+                    return Boolean(
+                        titleBounds &&
+                        labelBounds &&
+                        titleBounds.x + titleBounds.width <= labelBounds.x &&
+                        labelBounds.x + labelBounds.width <= width,
+                    )
+                })
+                .toBe(true)
+        }
+    })
+
     test('updates a failed release feed scenario with a new handler before retrying', async ({ page }) => {
         const release = createHydratedRelease({ id: 'release-after-handler-update' })
         const controller = await createRendererScenario(page, rendererScenarios.feed.loadError())
