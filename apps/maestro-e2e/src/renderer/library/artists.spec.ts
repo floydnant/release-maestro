@@ -214,9 +214,9 @@ test('artist detail shows every valid external reference', async ({ page }) => {
         'href',
         'https://www.discogs.com/artist/456',
     )
-    await expect(page.getByRole('navigation', { name: 'Artist external links' }).getByRole('link')).toHaveCount(
-        4,
-    )
+    await expect(
+        page.getByRole('navigation', { name: 'Artist external links' }).getByRole('link'),
+    ).toHaveCount(4)
 })
 
 test('missing and failed artists offer a way back', async ({ page }) => {

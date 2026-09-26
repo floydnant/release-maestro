@@ -204,10 +204,7 @@ export class LibraryBackendRepository {
                 if (existing) {
                     tx.update(artistsTable)
                         .set({
-                            externalRefs: mergeExternalRefs([
-                                existing.externalRefs,
-                                artistRefs,
-                            ]),
+                            externalRefs: mergeExternalRefs([existing.externalRefs, artistRefs]),
                         })
                         .where(eq(artistsTable.id, existing.id))
                         .run()
@@ -396,7 +393,11 @@ export class LibraryBackendRepository {
                 return [genreId]
             }
 
-            const songArtists = resolveArtists(rawArtist, artistText, artistExternalRefs(externalRefs, 'song'))
+            const songArtists = resolveArtists(
+                rawArtist,
+                artistText,
+                artistExternalRefs(externalRefs, 'song'),
+            )
             const albumArtists = resolveArtists(
                 rawAlbumArtist,
                 albumArtistText,
