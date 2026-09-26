@@ -190,6 +190,8 @@ export const relevantExternalRefsMap = {
     recordLabels: [
         ExternalRefKeys.MusicBrainzLabelId,
         ExternalRefKeys.DiscogsLabelLink,
+        ExternalRefKeys.BeatportLabelUrl,
+        ExternalRefKeys.BandcampLabelUrl,
         ExternalRefKeys.BandcampLabelId,
     ],
     // For completeness. Not filtering tracks as they always need to

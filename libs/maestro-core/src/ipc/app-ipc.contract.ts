@@ -6,6 +6,12 @@ import type {
     QueryArtistRecordLabelsRequest,
     ArtistRecordLabelWindowResult,
     QueryGenresRequest,
+    QueryRecordLabelsRequest,
+    RecordLabelWindowResult,
+    GetRecordLabelDetailRequest,
+    RecordLabelDetailResult,
+    QueryRecordLabelArtistsRequest,
+    RecordLabelArtistsWindowResult,
     GenreWindowResult,
     GetGenreDetailRequest,
     GenreDetailResult,
@@ -129,6 +135,18 @@ export const MainIpcContract = defineIpcContract({
     [LibraryBrowseIpcChannel.queryGenreRelated]: defineIpcRequest<
         QueryGenreRelatedRequest,
         GenreRelatedWindowResult
+    >(),
+    [LibraryBrowseIpcChannel.queryRecordLabels]: defineIpcRequest<
+        QueryRecordLabelsRequest,
+        RecordLabelWindowResult
+    >(),
+    [LibraryBrowseIpcChannel.getRecordLabelDetail]: defineIpcRequest<
+        GetRecordLabelDetailRequest,
+        RecordLabelDetailResult
+    >(),
+    [LibraryBrowseIpcChannel.queryRecordLabelArtists]: defineIpcRequest<
+        QueryRecordLabelArtistsRequest,
+        RecordLabelArtistsWindowResult
     >(),
     [LibraryBrowseIpcChannel.querySongs]: defineIpcRequest<QuerySongsRequest, SongWindowResult>(),
     [LibraryBrowseIpcChannel.describeSongFilter]: defineIpcRequest<

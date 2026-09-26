@@ -1,0 +1,51 @@
+@switch (detail().status) {
+    @case ('loading') {
+        <p class="type-body-sm p-8 text-content-secondary" role="status">Loading record label…</p>
+    }
+    @case ('missing') {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+            <p class="type-body-md text-content-primary">This record label is no longer in your library</p>
+            <a class="btn-primary" routerLink="/record-labels">Back to record labels</a>
+        </div>
+    }
+    @case ('error') {
+        <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center" role="alert">
+            <p class="type-body-md text-content-primary">Could not load this record label</p>
+            <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
+            <a class="btn-neutral" routerLink="/record-labels">Back to record labels</a>
+        </div>
+    }
+}
+@for (entry of content(); track entry.recordLabel.id) {
+    <header class="record-label-detail__header | flex flex-col gap-3 px-6 pt-5 pb-4">
+        <h1 class="type-hero-title wrap-break-word text-content-primary">{{ entry.recordLabel.name }}</h1>
+        <p class="type-body-sm text-content-secondary">{{ years() }}</p>
+        @if (links().length) {
+            <nav class="flex flex-wrap gap-3" aria-label="Record label links">
+                @for (link of links(); track link.url) {
+                    <a
+                        class="type-body-sm text-content-action hover:underline focus-visible:ring"
+                        [href]="link.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >{{ link.name }}</a
+                    >
+                }
+            </nav>
+        }
+        <app-tab-bar label="Record label sections" [tabs]="sections()" [active]="section()"></app-tab-bar>
+    </header>
+    @for (sectionEntry of content(); track sectionEntry.key) {
+        @switch (section()) {
+            @case ('albums') {
+                <app-entity-albums [entityId]="entry.recordLabel.id" kind="recordLabel"></app-entity-albums>
+            }
+            @case ('artists') {
+                <app-record-label-artists [recordLabelId]="entry.recordLabel.id"></app-record-label-artists>
+            }
+            @default {
+                <app-entity-songs [entityId]="entry.recordLabel.id" kind="recordLabel"></app-entity-songs>
+            }
+        }
+    }
+}
