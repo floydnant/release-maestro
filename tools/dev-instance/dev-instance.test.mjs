@@ -284,6 +284,31 @@ test('allocator skips a slot held by a wildcard IPv4 listener', async () => {
     assert.ok(allocation.bundle.renderer > 4200)
 })
 
+test('allocator reports exhaustion when every candidate port is unavailable', async () => {
+    const fixture = await createFixture()
+    const blocker = join(fixture.base, 'block-ports.mjs')
+    await writeFile(
+        blocker,
+        `import net from 'node:net'
+net.createServer = () => {
+    let onError
+    return {
+        unref() { return this },
+        once(event, listener) { if (event === 'error') onError = listener; return this },
+        listen() { queueMicrotask(() => onError(Object.assign(new Error('in use'), { code: 'EADDRINUSE' }))); return this },
+    }
+}`,
+    )
+    const result = spawnSync(process.execPath, ['--import', blocker, cli, 'dev-allocate'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture),
+        encoding: 'utf8',
+        timeout: 15_000,
+    })
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stderr, /PORT_EXHAUSTED/)
+})
+
 test('manual bundles must be complete and distinct', async () => {
     const fixture = await createFixture()
     const partial = run(fixture, fixture.main, ['dev-allocate'], {
@@ -1468,4 +1493,22 @@ test('hook failures are advisory', async () => {
         encoding: 'utf8',
     })
     assert.equal(result.status, 0)
+})
+
+test('a timed-out hook leaves the session usable', async () => {
+    const fixture = await createFixture()
+    const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
+    const lock = join(fixture.state, 'registry.lock')
+    await mkdir(lock)
+    const result = spawnSync(process.execPath, [hook], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, { RELEASE_MAESTRO_INSTANCE_LOCK_WAIT_MS: '50' }),
+        input: JSON.stringify({ hook_event_name: 'SessionEnd', cwd: fixture.main, reason: 'other' }),
+        encoding: 'utf8',
+        timeout: 2_000,
+    })
+    assert.equal(result.status, 0, result.stderr)
+    await rm(lock, { recursive: true })
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.equal(status.worktreeId, allocation.worktreeId)
 })
