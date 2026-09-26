@@ -1,3 +1,5 @@
+import type { ExternalRefs } from './external-refs.schema'
+
 /**
  * The library **read side**: how a browse surface asks for catalog rows.
  *
@@ -17,6 +19,9 @@
 // ---------------------------------------------------------------------------
 
 export const LibraryBrowseIpcChannel = {
+    queryArtists: 'library:query-artists',
+    getArtistDetail: 'library:get-artist-detail',
+    queryArtistRecordLabels: 'library:query-artist-record-labels',
     queryGenres: 'library:query-genres',
     getGenreDetail: 'library:get-genre-detail',
     queryGenreRelated: 'library:query-genre-related',
@@ -317,6 +322,8 @@ export interface AlbumFilter {
 
 /** A filter + sort + search, and the unit the albums grid passes around. */
 export interface AlbumQuery {
+    /** Detail-page scope: a song credit without an album-artist credit. */
+    appearanceArtistId?: string
     filter: AlbumFilter
     sort: AlbumSort
     /**
@@ -507,3 +514,34 @@ export interface QueryGenreRelatedRequest {
     window: BrowseWindow
 }
 export type GenreRelatedWindowResult = BrowseWindowResult<CatalogEntityRef>
+
+// Artists are listed by indexed name; counts are computed only for the visible window.
+export interface ArtistQuery {
+    search: string
+    sort: { field: 'name'; direction: SortDirection }
+}
+export interface ArtistRow extends CatalogEntityRef {
+    songCount: number
+    albumCount: number
+    firstYear: number | null
+    lastYear: number | null
+}
+export interface QueryArtistsRequest {
+    query: ArtistQuery
+    window: BrowseWindow
+}
+export type ArtistWindowResult = BrowseWindowResult<ArtistRow>
+export interface GetArtistDetailRequest {
+    artistId: string
+}
+export interface ArtistDetail extends ArtistRow {
+    externalRefs: ExternalRefs
+    recordLabelCount: number
+    appearanceCount: number
+}
+export type ArtistDetailResult = ArtistDetail | null
+export interface QueryArtistRecordLabelsRequest {
+    artistId: string
+    window: BrowseWindow
+}
+export type ArtistRecordLabelWindowResult = BrowseWindowResult<CatalogEntityRef>

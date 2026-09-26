@@ -212,6 +212,19 @@ ipc.handle(LibraryBrowseIpcChannel.getAlbumDetail, async (_event, request) => {
     return browseRepository.getAlbumDetail(request.albumId)
 })
 
+ipc.handle(LibraryBrowseIpcChannel.queryArtists, async (_event, request) => {
+    const repository = await diContainer.get(LibraryBrowseRepository)
+    return repository.queryArtists(request)
+})
+ipc.handle(LibraryBrowseIpcChannel.getArtistDetail, async (_event, request) => {
+    const repository = await diContainer.get(LibraryBrowseRepository)
+    return repository.getArtistDetail(request.artistId)
+})
+ipc.handle(LibraryBrowseIpcChannel.queryArtistRecordLabels, async (_event, request) => {
+    const repository = await diContainer.get(LibraryBrowseRepository)
+    return repository.queryArtistRecordLabels(request.artistId, request.window)
+})
+
 ipc.handle(LibraryBrowseIpcChannel.queryGenres, async (_event, request) => {
     const repository = await diContainer.get(LibraryBrowseRepository)
     return repository.queryGenres(request)

@@ -120,6 +120,7 @@ const naturalAlbumDirection = (field: AlbumSortField): SortDirection =>
 /** Value equality for an album query, so a rebuilt but identical one is not a change. */
 export const sameAlbumQuery = (left: AlbumQuery, right: AlbumQuery): boolean =>
     left.search == right.search &&
+    left.appearanceArtistId == right.appearanceArtistId &&
     left.sort.field == right.sort.field &&
     left.sort.direction == right.sort.direction &&
     sameAlbumFilter(left.filter, right.filter)

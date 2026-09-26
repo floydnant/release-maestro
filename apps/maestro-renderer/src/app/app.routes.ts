@@ -56,6 +56,17 @@ export const appRoutes: Route[] = [
         canActivate: [libraryOnboardingGuard],
     },
     {
+        path: 'artists',
+        loadComponent: () => import('./pages/artists/artists.component').then(m => m.ArtistsComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
+        path: 'artists/:artistId',
+        loadComponent: () =>
+            import('./pages/artist-detail/artist-detail.component').then(m => m.ArtistDetailComponent),
+        canActivate: [libraryOnboardingGuard],
+    },
+    {
         path: 'genres',
         loadComponent: () => import('./pages/genres/genres.component').then(m => m.GenresComponent),
         canActivate: [libraryOnboardingGuard],

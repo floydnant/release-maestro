@@ -1,4 +1,8 @@
 import type {
+    ArtistQuery,
+    ArtistWindowResult,
+    ArtistDetailResult,
+    ArtistRecordLabelWindowResult,
     GenreQuery,
     GenreWindowResult,
     GenreDetailResult,
@@ -49,6 +53,29 @@ const EMPTY_ALBUM_FILTER_DESCRIPTION: AlbumFilterDescription = {
 @Injectable({ providedIn: 'root' })
 export class LibraryBrowseService {
     private electronService = inject(ElectronService)
+
+    queryArtists(query: ArtistQuery, window: BrowseWindow): Promise<ArtistWindowResult> {
+        if (!this.electronService.isElectron)
+            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryArtists, {
+            query,
+            window,
+        })
+    }
+
+    getArtistDetail(artistId: string): Promise<ArtistDetailResult> {
+        if (!this.electronService.isElectron) return Promise.resolve(null)
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.getArtistDetail, { artistId })
+    }
+
+    queryArtistRecordLabels(artistId: string, window: BrowseWindow): Promise<ArtistRecordLabelWindowResult> {
+        if (!this.electronService.isElectron)
+            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryArtistRecordLabels, {
+            artistId,
+            window,
+        })
+    }
 
     queryGenres(query: GenreQuery, window: BrowseWindow): Promise<GenreWindowResult> {
         if (!this.electronService.isElectron)

@@ -1,0 +1,53 @@
+@if (detail().status === 'loading') {
+    <p class="type-body-sm p-8 text-content-secondary" role="status">Loading artist…</p>
+} @else if (detail().status === 'missing') {
+    <div class="flex flex-col items-center gap-3 p-8 text-center">
+        <h1 class="type-section-title">Artist not found</h1>
+        <a class="btn-primary" routerLink="/artists">Back to artists</a>
+    </div>
+} @else if (detail().status === 'error') {
+    <div class="flex flex-col items-center gap-3 p-8 text-center" role="alert">
+        <h1 class="type-section-title">Could not load this artist</h1>
+        <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
+        <a class="btn-neutral" routerLink="/artists">Back to artists</a>
+    </div>
+}
+@for (entry of content(); track entry.artist.id) {
+    <header class="artist-detail__header | flex flex-col gap-4 px-6 pt-5 pb-4">
+        <h1 class="type-hero-title wrap-break-word text-content-primary">{{ entry.artist.name }}</h1>
+        <p class="type-body-sm text-content-secondary">
+            {{ entry.artist.songCount }} {{ entry.artist.songCount === 1 ? 'track' : 'tracks' }} ·
+            {{ entry.artist.albumCount }} {{ entry.artist.albumCount === 1 ? 'album' : 'albums' }} ·
+            @if (entry.artist.firstYear != null) {
+                {{ entry.artist.firstYear }}
+                @if (entry.artist.lastYear !== entry.artist.firstYear) {
+                    –{{ entry.artist.lastYear }}
+                }
+            } @else {
+                Years unknown
+            }
+        </p>
+        @if (links().length) {
+            <nav class="flex flex-wrap gap-2" aria-label="Artist external links">
+                @for (link of links(); track link.label) {
+                    <a class="btn-nkd-neutral" [href]="link.url" target="_blank" rel="noopener noreferrer">{{
+                        link.label
+                    }}</a>
+                }
+            </nav>
+        }
+        <app-tab-bar label="Artist sections" [tabs]="sections()" [active]="section()"></app-tab-bar>
+    </header>
+    @for (sectionEntry of content(); track sectionEntry.key) {
+        @if (section() === 'songs') {
+            <app-artist-songs [artistId]="entry.artist.id"></app-artist-songs>
+        } @else if (section() === 'recordLabels') {
+            <app-artist-record-labels [artistId]="entry.artist.id"></app-artist-record-labels>
+        } @else {
+            <app-artist-albums
+                [artistId]="entry.artist.id"
+                [appearsOn]="section() === 'appearsOn'"
+            ></app-artist-albums>
+        }
+    }
+}
