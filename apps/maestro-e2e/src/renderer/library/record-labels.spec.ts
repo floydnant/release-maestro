@@ -13,6 +13,7 @@ const recordLabel: RecordLabelDetail = {
     externalRefs: {
         MUSICBRAINZ_LABEL_ID: ['b00b4a1d-0000-0000-0000-000000000001'],
         BANDCAMP_LABEL_URL: ['https://kosmische.bandcamp.com'],
+        DISCOGS_LABEL_LINK: ['http://www.discogs.com/label/1'],
     },
 }
 const rows: RecordLabelRow[] = [
@@ -64,6 +65,10 @@ test('record label detail shows tracks, albums, artists and external links', asy
     await expect(page.getByRole('link', { name: 'Bandcamp' })).toHaveAttribute(
         'href',
         'https://kosmische.bandcamp.com',
+    )
+    await expect(page.getByRole('link', { name: 'Discogs' })).toHaveAttribute(
+        'href',
+        'http://www.discogs.com/label/1',
     )
     await expect
         .poll(async () => (await controller.lastCall('library:query-songs'))?.payload)
