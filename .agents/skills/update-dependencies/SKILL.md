@@ -59,5 +59,9 @@ Open ready for review after local gates pass. Watch CI on the pushed commit and 
 failures on the same PR. Keep blocked or incomplete work in draft and explain the blocker. Do not
 merge or enable auto-merge.
 
+After the ready-for-review update PR passes CI, close every open Dependabot-authored PR with the
+comment `Superseded by #<update PR number>.` Use the new update PR's repository-local number so the
+comment links to it. Leave Dependabot PRs open when the update PR is draft, blocked, or unpublished.
+
 Return the PR link, repairs, verification results, and blockers. If nothing needs updating, report
 that without an empty PR. If publishing is unavailable, leave the branch and PR body ready locally.
