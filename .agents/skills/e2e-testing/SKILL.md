@@ -38,5 +38,6 @@ description: Playwright E2E readiness and test authoring guidance.
   the smallest slice with `--repeat-each` and `--retries=0`
 - all suites type-check before they run (`maestro-e2e:e2e`, `:e2e-production`, and `:e2e-renderer`
   depend on `maestro-e2e:typecheck`), because Playwright transpiles without semantic checking
-- to point the renderer suite at an already-running server, set `BASE_URL`; otherwise it owns
-  `http://localhost:4201`. Development Electron E2E owns port 4200 so both targets can run concurrently
+- to point the renderer suite at an already-running server, set `BASE_URL`; otherwise the instance
+  manager assigns a transient renderer port. Electron E2E uses a separate transient allocation, so
+  both targets can run concurrently

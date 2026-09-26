@@ -5,6 +5,9 @@ import UpdateEvents from './app/events/update.events'
 import AppEvents from './app/events/app.events'
 import { app, BrowserWindow } from 'electron'
 import App from './app/app'
+import { developmentAppName } from './app/constants'
+
+if (developmentAppName) app.setName(developmentAppName)
 
 // handle setup events as quickly as possible
 if (SquirrelEvents.handleEvents()) {

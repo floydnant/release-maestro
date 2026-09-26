@@ -22,7 +22,9 @@
                 "assets": ["apps/maestro-electron/src/assets"]
             },
             "configurations": {
-                "development": {},
+                "development": {
+                    "outputPath": "dist/apps/maestro-electron-development"
+                },
                 "production": {
                     "optimization": true,
                     "extractLicenses": true,
@@ -37,18 +39,35 @@
             },
             "defaultConfiguration": "production"
         },
+        "build-e2e": {
+            "executor": "nx-electron:build",
+            "cache": true,
+            "inputs": ["production", "^production"],
+            "outputs": ["{options.outputPath}"],
+            "dependsOn": ["^build", "metadata-engine:build"],
+            "options": {
+                "outputPath": "dist/apps/maestro-electron-e2e",
+                "main": "apps/maestro-electron/src/main.ts",
+                "tsConfig": "apps/maestro-electron/tsconfig.app.json",
+                "webpackConfig": "apps/maestro-electron/webpack.config.cjs",
+                "assets": ["apps/maestro-electron/src/assets"]
+            }
+        },
         "serve-internal": {
             "executor": "nx-electron:execute",
+            "continuous": true,
             "options": {
-                "buildTarget": "maestro-electron:build-app",
+                "buildTarget": "maestro-electron:build-app:development",
                 "remoteDebuggingPort": 9222,
+                "args": ["--remote-debugging-address=127.0.0.1"],
                 "inspect": "inspect",
                 "port": 5858
             }
         },
         "serve": {
-            "dependsOn": ["maestro-renderer:serve", "metadata-engine:build"],
-            "command": "wait-on tcp:4200 && nx serve-internal maestro-electron"
+            "dependsOn": ["metadata-engine:build"],
+            "continuous": true,
+            "command": "node tools/dev-instance/cli.mjs run-dev"
         },
         "package": {
             "dependsOn": [

@@ -17,8 +17,8 @@ then may be a real directory instead of a link — anything else divergent is a 
 
 Install dependencies with `make install`. Then `make agents-check`
 runs offline and validates the manifest, canonical and divergent frontmatter, invocation policies,
-and cross-skill links. It also runs fixture tests for malformed inputs. Run it after adding,
-renaming, or removing a skill; CI installs only the tools package for this check.
+and cross-skill links. Run it after adding, renaming, or removing a skill. Run `make test-tools` for
+the repository tools tests, including malformed-input fixtures.
 
 Policy fields use YAML booleans, such as `true`, `True`, or `TRUE`. Strings such as `yes` and
 quoted `"true"` are rejected to avoid differences between YAML versions.

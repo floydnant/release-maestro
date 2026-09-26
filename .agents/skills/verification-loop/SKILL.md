@@ -30,7 +30,9 @@ description: Verification loop using repository make targets.
   and install Playwright Chromium with its system dependencies. Requires Node, pnpm, and Rust.
 
 - `make sure` — format, then lint, build, unit-test, and run development Electron and renderer E2E
-  across the repo. **Mutates formatting.**
+  across the repo. It also runs `make test-tools`. **Mutates formatting.**
+- `make test-tools` — repository tools tests. `make test` includes them; `make agents-check` checks
+  the agent skills and harness adapters.
 - `make format-check` — non-mutating formatting check, for review and CI-style verification.
 - `make affected` — build, lint, unit tests, development Electron E2E, and renderer E2E, scoped to
   what git says changed; does not check or mutate formatting.
@@ -39,6 +41,9 @@ description: Verification loop using repository make targets.
   themselves first.
 - `make e2e-production` — package the app for the host OS and run the production-compatible Electron
   suite. Use it for file-URL routing, lazy chunks, packaging-only, and cross-platform behavior.
+- `make dev-instance-self-test` — verify the instance manager by starting two complete development
+  stacks in temporary worktrees from committed `HEAD`. Run it after committing changes to
+  `tools/dev-instance`; CI runs it separately.
 - `make build-prod` — catches production-only build issues.
 - **A project's type gate is its `build`, unless it has no build.** A green unit test is not a type
   check. Non-buildable projects expose `typecheck`; inspect them with `pnpm exec nx show project <project>`.

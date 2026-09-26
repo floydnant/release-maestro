@@ -1,0 +1,29 @@
+{
+    "description": "Advisory development-instance lifecycle hooks.",
+    "hooks": {
+        "SessionStart": [
+            {
+                "matcher": "startup|resume|clear|compact",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "node \"$(git rev-parse --show-toplevel)/tools/dev-instance/hook.mjs\"",
+                        "timeout": 3,
+                        "statusMessage": "Reconciling development instances"
+                    }
+                ]
+            }
+        ],
+        "SessionEnd": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "node \"$(git rev-parse --show-toplevel)/tools/dev-instance/hook.mjs\"",
+                        "timeout": 3
+                    }
+                ]
+            }
+        ]
+    }
+}
