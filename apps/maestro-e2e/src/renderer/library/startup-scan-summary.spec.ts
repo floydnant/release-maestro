@@ -8,6 +8,7 @@ const completedStatus = (
     trigger: LibraryScanStatus['trigger'] = 'startup',
     failedFiles = 0,
     missingSongs = 0,
+    resumedReads = 0,
 ): LibraryScanStatus => {
     const terminal: LibraryScanTerminalResult = {
         outcome: 'completed',
@@ -16,15 +17,15 @@ const completedStatus = (
         scannedFolders: ['/music'],
         startedAt: 1,
         finishedAt: 2,
-        discovered: newSongs + changedSongs,
+        discovered: newSongs + changedSongs + resumedReads,
         new: newSongs,
         changed: changedSongs,
-        unchanged: 0,
+        unchanged: resumedReads,
         missing: missingSongs,
         unavailableFolders: [],
-        readTotal: newSongs + changedSongs,
-        readsAttempted: newSongs + changedSongs,
-        imported: newSongs + changedSongs - failedFiles,
+        readTotal: newSongs + changedSongs + resumedReads,
+        readsAttempted: newSongs + changedSongs + resumedReads,
+        imported: newSongs + changedSongs + resumedReads - failedFiles,
         discoveryFailureCount: 0,
         readFailureCount: failedFiles,
         failures: [],
@@ -74,6 +75,18 @@ test.describe('startup scan summary', () => {
         const icon = page.getByRole('status').locator('app-icon')
         await expect(icon).toHaveAttribute('name', 'success')
         await expect(icon).toHaveAttribute('color', 'content.secondary')
+    })
+
+    test('counts a resumed metadata read as an update', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: completedStatus(0, 0, 'startup', 0, 0, 1), albums: [], lastScan: null },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/home')
+
+        await expect(page.getByRole('status')).toHaveText('Updated 1 track')
     })
 
     test('does not claim failed reads were added', async ({ page }) => {

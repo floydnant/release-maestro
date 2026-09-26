@@ -234,7 +234,11 @@ export class AppComponent {
                 value: {
                     phase: 'completed' as const,
                     newSongs: status.terminal.new,
-                    changedSongs: status.terminal.changed,
+                    // A resumed deep read can update an unchanged file's metadata.
+                    changedSongs: Math.max(
+                        status.terminal.changed,
+                        status.terminal.imported - status.terminal.new,
+                    ),
                     missingSongs: status.terminal.missing,
                     failedFiles: status.terminal.discoveryFailureCount + status.terminal.readFailureCount,
                 },
