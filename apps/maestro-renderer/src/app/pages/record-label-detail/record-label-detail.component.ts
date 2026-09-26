@@ -89,20 +89,25 @@ export class RecordLabelDetailComponent {
         if (state.status != 'ready') return []
         const refs = state.recordLabel.externalRefs
         const entries = [
-            { key: ExternalRefKeys.DiscogsLabelLink, name: 'Discogs', prefix: '' },
-            { key: ExternalRefKeys.BeatportLabelUrl, name: 'Beatport', prefix: '' },
-            { key: ExternalRefKeys.BandcampLabelUrl, name: 'Bandcamp', prefix: '' },
+            { key: ExternalRefKeys.DiscogsLabelLink, name: 'Discogs', prefix: '', domain: 'discogs.com' },
+            { key: ExternalRefKeys.BeatportLabelUrl, name: 'Beatport', prefix: '', domain: 'beatport.com' },
+            { key: ExternalRefKeys.BandcampLabelUrl, name: 'Bandcamp', prefix: '', domain: 'bandcamp.com' },
             {
                 key: ExternalRefKeys.MusicBrainzLabelId,
                 name: 'MusicBrainz',
                 prefix: 'https://musicbrainz.org/label/',
+                domain: 'musicbrainz.org',
             },
         ] as const
-        return entries.flatMap(({ key, name, prefix }) =>
+        return entries.flatMap(({ key, name, prefix, domain }) =>
             (refs[key] ?? []).flatMap(value => {
                 const url = prefix ? `${prefix}${encodeURIComponent(value)}` : value
                 try {
-                    return ['http:', 'https:'].includes(new URL(url).protocol) ? [{ name, url }] : []
+                    const parsed = new URL(url)
+                    return ['http:', 'https:'].includes(parsed.protocol) &&
+                        (parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`))
+                        ? [{ name, url }]
+                        : []
                 } catch {
                     return []
                 }
