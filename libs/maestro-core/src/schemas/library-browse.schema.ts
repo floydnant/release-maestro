@@ -81,7 +81,7 @@ export const SongSortField = {
     duration: 'duration',
     year: 'year',
     recordLabel: 'recordLabel',
-    /** `songs.createdAt` (the file's creation time) stands in until MAE-116 lands a real `addedAt`. */
+    /** When the song entered the library. */
     dateAdded: 'dateAdded',
     /**
      * A song's position on its album. The one sort no column header offers, because it
@@ -277,15 +277,9 @@ export const AlbumSortField = {
     year: 'year',
     recordLabel: 'recordLabel',
     /**
-     * When the album arrived, taken as the newest {@link SongSortField.dateAdded} across
-     * its songs — a record is as new as the most recent file on it, so ripping the rest
-     * of a part-ripped album brings the whole record back to the top rather than leaving
-     * it where its oldest track put it.
-     *
-     * Named to match the song sort, and standing on the same footing: `songs.createdAt`
-     * until MAE-116 lands a real `addedAt`. An album whose files carry no creation time
-     * at all is `null`, which SQLite orders below every date — so it sits at the bottom
-     * under the newest-first default, which is where an unknown date belongs.
+     * The newest file creation time across the album's songs (ADR 0005). This differs
+     * from the song sort, which uses when each song entered the library. An album
+     * whose files have no creation time is `null` and sorts last under the default.
      */
     dateAdded: 'dateAdded',
 } as const

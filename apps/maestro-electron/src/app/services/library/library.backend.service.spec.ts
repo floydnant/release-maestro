@@ -49,7 +49,7 @@ describe('LibraryBackendService', () => {
 
         const updates = await firstValueFrom(service.scan(['/music']).pipe(toArray()))
 
-        expect(repository.processPrescanBatch).toHaveBeenCalledWith([fact], scanSeenAt)
+        expect(repository.processPrescanBatch).toHaveBeenCalledWith([fact], scanSeenAt, false)
         expect(repository.markNotSeenPresent).toHaveBeenCalledWith(scanSeenAt)
         expect(metadataService.readFiles).toHaveBeenCalledWith([fact.path], undefined)
         expect(repository.ingestMetadata).toHaveBeenCalledWith(metadata, fact, expect.any(Date))

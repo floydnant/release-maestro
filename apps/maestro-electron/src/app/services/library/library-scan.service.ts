@@ -168,7 +168,9 @@ export class LibraryScanService {
         let discoveryFailureCount = 0
         let readFailureCount = 0
 
-        this.library.scan(scannedFolders, signal).subscribe({
+        // A cancelled first scan leaves discovery rows behind. Only a completed
+        // scan ends the initial import, even if it took several attempts.
+        this.library.scan(scannedFolders, signal, this.stateStore.get('lastScan') == null).subscribe({
             next: update => {
                 switch (update.phase) {
                     case 'discovery':

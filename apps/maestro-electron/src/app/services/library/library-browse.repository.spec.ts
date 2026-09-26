@@ -51,6 +51,7 @@ type SongSeed = {
     musicalKey?: string | null
     duration?: number | null
     createdAt?: Date | null
+    addedAt?: Date | null
     present?: boolean
     coverPath?: string | null
 }
@@ -82,6 +83,7 @@ describe('LibraryBrowseRepository', () => {
                 size: 1_024,
                 modifiedAt: new Date('2026-01-01T00:00:00Z'),
                 createdAt: seed.createdAt === undefined ? new Date('2026-01-01T00:00:00Z') : seed.createdAt,
+                addedAt: seed.addedAt === undefined ? new Date('2026-01-01T00:00:00Z') : seed.addedAt,
                 fileFingerprint: `fingerprint-${seed.id}`,
                 lastSeenAt: new Date('2026-01-01T00:00:00Z'),
                 present: seed.present ?? true,
@@ -332,8 +334,13 @@ describe('LibraryBrowseRepository', () => {
             expect(titlesOf(result)).toEqual(expected)
         })
 
-        it('sorts by date added using the file creation time', () => {
-            seedSong({ id: 'd', title: 'Newest', createdAt: new Date('2026-07-01T00:00:00Z') })
+        it('sorts by when the song entered the library', () => {
+            seedSong({
+                id: 'd',
+                title: 'Newest',
+                createdAt: new Date('2011-01-01T00:00:00Z'),
+                addedAt: new Date('2026-07-01T00:00:00Z'),
+            })
 
             const result = repository.querySongs({
                 query: query({ sort: { field: SongSortField.dateAdded, direction: 'desc' } }),
@@ -341,6 +348,7 @@ describe('LibraryBrowseRepository', () => {
             })
 
             expect(titlesOf(result)).toEqual(['Newest'])
+            expect(result.rows[0]?.dateAdded).toBe(new Date('2026-07-01T00:00:00Z').getTime())
         })
     })
 
