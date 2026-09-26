@@ -130,6 +130,7 @@ describe('LibraryBrowseRepository at library scale', () => {
                 size: 1_024,
                 modifiedAt: new Date(1_750_000_000_000),
                 createdAt: new Date(1_740_000_000_000 + index),
+                addedAt: new Date(1_740_000_000_000 + index),
                 fileFingerprint: `fingerprint-${index}`,
                 lastSeenAt: new Date(1_750_000_000_000),
                 present: true,

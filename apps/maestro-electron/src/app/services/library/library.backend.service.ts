@@ -16,7 +16,7 @@ export class LibraryBackendService {
         private readonly metadata: MetadataBackendService,
     ) {}
 
-    scan(paths: string[], abortSignal?: AbortSignal): Observable<LibraryScanUpdate> {
+    scan(paths: string[], abortSignal?: AbortSignal, initialScan = false): Observable<LibraryScanUpdate> {
         return new Observable<LibraryScanUpdate>(subscriber => {
             const run = async () => {
                 const scanStartedAt = this.repository.nextScanSeenAt()
@@ -35,6 +35,7 @@ export class LibraryBackendService {
                                 const comparison = this.repository.processPrescanBatch(
                                     update.items,
                                     scanStartedAt,
+                                    initialScan,
                                 )
                                 unchanged += comparison.unchanged
                                 changed += comparison.changed

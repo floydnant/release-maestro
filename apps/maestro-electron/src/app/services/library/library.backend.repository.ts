@@ -66,7 +66,7 @@ export class LibraryBackendRepository {
         return new Date(Math.max(Date.now(), (latest?.getTime() ?? 0) + 1))
     }
 
-    processPrescanBatch(facts: PrescanFileFact[], seenAt: Date): PrescanBatchComparison {
+    processPrescanBatch(facts: PrescanFileFact[], seenAt: Date, initialScan = false): PrescanBatchComparison {
         if (facts.length == 0) {
             return { unchanged: 0, changed: 0, new: 0 }
         }
@@ -111,6 +111,7 @@ export class LibraryBackendRepository {
                             id: randomUUID(),
                             path: fact.path,
                             ...fileValues,
+                            addedAt: initialScan ? fileValues.createdAt : seenAt,
                             title: titleFromFileName(fact.fileName),
                         })
                         .run()
@@ -508,7 +509,7 @@ export class LibraryBackendRepository {
                 tx.update(songsTable).set(songValues).where(eq(songsTable.id, songId)).run()
             } else {
                 tx.insert(songsTable)
-                    .values({ id: songId, ...songValues })
+                    .values({ id: songId, ...songValues, addedAt: scannedAt })
                     .run()
             }
 

@@ -104,6 +104,12 @@ actually say. The same register split as _record label_ and as _discovery_, whic
 metadata-engine boundary.
 _Avoid_: `track` in any identifier; file, item, entry as synonyms for song
 
+**Date added** (`songs.addedAt`):
+When the song first entered the library. The first completed scan dates its songs from each file's
+creation time as a best guess. Later scans date new songs at discovery. Rescans and a missing song's
+return keep the original date. `songs.createdAt` remains the file creation time, and the album date
+still uses it (ADR 0005).
+
 **Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on an
 album, not a song. Do not "correct" it to `songNumber`.
 
