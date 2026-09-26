@@ -48,8 +48,8 @@ main process with hot reload. The host binary lives in `apps/metadata-engine/tar
 separate from the packaging binary in `target/release`. Development always uses this host path.
 If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
 
-Each Git worktree gets stable debug ports, its own `.app-data.dev`, and a slot number in the Electron
-window title. Use `make dev-status` to inspect this worktree. The [development instance guide](docs/dev-instances.md)
+Each Git worktree gets stable debug ports and its own `.app-data.dev`. The Electron window title shows
+the slot number for an automatic bundle, or the renderer port for a manual bundle. Use `make dev-status` to inspect this worktree. The [development instance guide](docs/dev-instances.md)
 covers the full command list, lifecycle, concurrency rules, and recovery.
 
 Codex and Claude Code use the same advisory session hook. Codex asks you to review the project hook
