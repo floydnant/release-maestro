@@ -1335,6 +1335,42 @@ test('pending removal releases a checkout replaced at the same path', async () =
     assert.equal(registry.allocations[original.worktreeId], undefined)
 })
 
+test('replacement checkout reclaims an abandoned reserved bundle after grace', async () => {
+    const fixture = await createFixture()
+    const original = runJson(fixture, fixture.main, ['dev-allocate'])
+    await rename(join(fixture.main, '.git'), join(fixture.base, 'old-git'))
+    git(fixture.main, ['init', '-q'])
+
+    const replacement = runJson(fixture, fixture.main, ['dev-allocate'], {
+        RELEASE_MAESTRO_INSTANCE_GRACE_MS: '0',
+    })
+    assert.notEqual(replacement.worktreeId, original.worktreeId)
+    assert.deepEqual(replacement.bundle, original.bundle)
+    const registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.equal(registry.allocations[original.worktreeId], undefined)
+})
+
+test('a moved checkout keeps its allocation during path-reuse grace', async () => {
+    const fixture = await createFixture()
+    const original = runJson(fixture, fixture.main, ['dev-allocate'])
+    const moved = join(fixture.base, 'moved')
+    await rename(fixture.main, moved)
+    await mkdir(fixture.main)
+    git(fixture.main, ['init', '-q'])
+
+    const replacement = runJson(fixture, fixture.main, ['dev-allocate'])
+    assert.notEqual(replacement.worktreeId, original.worktreeId)
+    assert.notDeepEqual(replacement.bundle, original.bundle)
+    let registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.ok(registry.allocations[original.worktreeId].missingSince)
+
+    const recovered = runJson(fixture, moved, ['dev-status', '--json'])
+    assert.equal(recovered.worktreeId, original.worktreeId)
+    assert.equal(recovered.path, await realpath(moved))
+    registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+    assert.equal(registry.allocations[original.worktreeId].missingSince, undefined)
+})
+
 test('a delayed removal for an old path keeps the allocation at its current path', async () => {
     const fixture = await createFixture()
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])

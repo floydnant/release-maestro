@@ -51,6 +51,9 @@ with degraded health.
 The manager checks process start identity as well as PID before accepting a holder. A clean
 SessionEnd hook requests release when idle; `/clear` keeps the session's allocation. Hooks are
 advisory, so normal commands also reconcile dead holders and expired allocations.
+If another checkout appears at an allocation's old path, the old allocation enters the same
+missing-worktree grace period. A moved checkout keeps its allocation when it runs a command from
+its new path during that period.
 [Claude Code removes Git worktrees itself](https://code.claude.com/docs/en/hooks#worktreeremove) and
 fires `WorktreeRemove` alongside that cleanup. The hook releases the allocation after the directory
 disappears and its holders and unverified listeners exit.

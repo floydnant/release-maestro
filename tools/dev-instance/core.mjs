@@ -836,8 +836,7 @@ const assertClaimsAvailable = (registry, claims, worktreeId, allowedWorkflow = n
     if (conflict) throw new InstanceError(describeConflict(conflict), 'RESOURCE_CONFLICT')
 }
 
-const pendingRemovalFinished = async allocation => {
-    if (!allocation.releaseWhenRemoved) return false
+const checkoutPathIsStale = async allocation => {
     if (!existsSync(allocation.path)) return true
     if (!allocation.worktreeIdentity) return false
     try {
@@ -858,18 +857,15 @@ const reconcileRegistry = async (registry, at = nowMs(), graceMs = configuredGra
             ? processIdentities.get(holder.pid) === holder.startIdentity
             : holderIsLive(holder)
     for (const allocation of Object.values(registry.allocations)) {
-        if (await pendingRemovalFinished(allocation)) {
+        const locationStale = await checkoutPathIsStale(allocation)
+        if (allocation.releaseWhenRemoved && locationStale) {
             allocation.releaseWhenIdle = true
         }
         const hadDevelopmentHolder = allocation.holders.some(isDevelopmentHolder)
         allocation.holders = allocation.holders.filter(isLive)
         const lostDevelopmentHolder = hadDevelopmentHolder && !allocation.holders.some(isDevelopmentHolder)
         allocation.unverifiedPorts = await unverifiedDevelopmentPorts(allocation, lostDevelopmentHolder)
-        if (
-            !existsSync(allocation.path) &&
-            allocation.holders.length === 0 &&
-            !allocation.unverifiedPorts.length
-        ) {
+        if (locationStale && allocation.holders.length === 0 && !allocation.unverifiedPorts.length) {
             allocation.missingSince ??= iso(at)
             if (at - Date.parse(allocation.missingSince) >= graceMs) {
                 delete registry.allocations[allocation.worktreeId]
