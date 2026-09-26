@@ -104,7 +104,9 @@ setInterval(() => {}, 1000)
     await writeFile(
         intermediaryPath,
         `const { spawn } = require('node:child_process')
-spawn(process.execPath, [${JSON.stringify(grandchildPath)}], { stdio: 'ignore' }).unref()
+spawn(process.execPath, [${JSON.stringify(grandchildPath)}], {
+    stdio: ['ignore', 'ignore', 'inherit'],
+}).unref()
 `,
     )
     await writeFile(
@@ -1354,6 +1356,78 @@ test('Windows workflow cancellation kills an orphaned grandchild before releasin
         if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGTERM')
         try {
             process.kill(grandchildPid, 'SIGTERM')
+        } catch (error) {
+            if (error.code !== 'ESRCH') throw error
+        }
+    }
+})
+
+test('Windows workflow cancellation kills a running command before releasing its claim', async () => {
+    if (process.platform !== 'win32') return
+    const fixture = await createFixture()
+    const commandPath = join(fixture.base, 'running-command.cjs')
+    const commandPidPath = join(fixture.base, 'running-command.pid')
+    await writeFile(
+        commandPath,
+        `require('node:fs').writeFileSync(${JSON.stringify(commandPidPath)}, String(process.pid))
+setInterval(() => {}, 1000)
+`,
+    )
+    const workflow = spawn(
+        process.execPath,
+        [cli, 'run-workflow', 'renderer-e2e', '--', process.execPath, commandPath],
+        {
+            cwd: fixture.main,
+            env: environmentFor(fixture, { RELEASE_MAESTRO_TREE_DEBUG: '1' }),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        },
+    )
+    liveChildren.push(workflow)
+    let workflowStderr = ''
+    workflow.stderr.on('data', chunk => (workflowStderr += chunk))
+    const workflowClosed = new Promise(resolve => workflow.once('close', resolve))
+    const commandPid = Number(
+        await waitFor(
+            async () => {
+                if (workflow.exitCode !== null || workflow.signalCode !== null) {
+                    await workflowClosed
+                    assert.fail(
+                        `workflow exited ${workflow.exitCode} before command started: ${workflowStderr}`,
+                    )
+                }
+                return readFile(commandPidPath, 'utf8')
+            },
+            value => Number.isSafeInteger(Number(value)),
+            'workflow command did not start',
+        ),
+    )
+    try {
+        workflow.kill('SIGTERM')
+        const result = await childResult(workflow)
+        assert.notEqual(result.code, 0, workflowStderr)
+        await waitFor(
+            () => {
+                try {
+                    process.kill(commandPid, 0)
+                    return false
+                } catch (error) {
+                    if (error.code === 'ESRCH') return true
+                    throw error
+                }
+            },
+            dead => dead,
+            'running workflow command survived cancellation',
+        )
+        assert.equal(
+            runJson(fixture, fixture.main, ['dev-list', '--json']).instances.some(
+                instance => instance.workflow === 'renderer-e2e',
+            ),
+            false,
+        )
+    } finally {
+        if (workflow.exitCode === null && workflow.signalCode === null) workflow.kill('SIGTERM')
+        try {
+            process.kill(commandPid, 'SIGTERM')
         } catch (error) {
             if (error.code !== 'ESRCH') throw error
         }

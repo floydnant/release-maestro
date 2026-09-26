@@ -1680,6 +1680,9 @@ $startInfo.UseShellExecute = $false
 $child = New-Object System.Diagnostics.Process
 $child.StartInfo = $startInfo
 if (-not $child.Start()) { throw 'Failed to start workflow command' }
+while (-not $child.WaitForExit(100)) {
+    if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
+}
 $child.WaitForExit()
 $exitCode = $child.ExitCode
 if ($env:RELEASE_MAESTRO_TREE_DEBUG -eq '1') {

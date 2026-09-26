@@ -12,6 +12,7 @@ const jestBin = join(dirname(require.resolve('jest/package.json')), 'bin', 'jest
 const expected = [
     'Windows workflow keeps its claim until an orphaned grandchild exits',
     'Windows workflow cancellation kills an orphaned grandchild before releasing its claim',
+    'Windows workflow cancellation kills a running command before releasing its claim',
     'run-workflow passes separators and shell metacharacters as literal child arguments',
 ]
 const result = spawnSync(
