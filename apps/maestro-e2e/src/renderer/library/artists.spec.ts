@@ -126,6 +126,30 @@ test('a stored Bandcamp artist ID offers an honest search link', async ({ page }
     )
 })
 
+test('named service links only open the matching service host', async ({ page }) => {
+    await createRendererScenario(
+        page,
+        scenario()
+            .handler('library:get-artist-detail', {
+                kind: 'resolve',
+                value: {
+                    ...artist,
+                    externalRefs: {
+                        DISCOGS_ARTIST_LINK: ['https://example.com/artist/123'],
+                        BEATPORT_ARTIST_URL: ['https://www.beatport.com/artist/aurora/123'],
+                    },
+                },
+            })
+            .build(),
+        '/artists/aurora',
+    )
+    await expect(page.getByRole('link', { name: 'Discogs' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Beatport' })).toHaveAttribute(
+        'href',
+        'https://www.beatport.com/artist/aurora/123',
+    )
+})
+
 test('an artist with tracks but no own albums opens on All tracks', async ({ page }) => {
     await createRendererScenario(
         page,

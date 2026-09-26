@@ -1,13 +1,19 @@
 @if (result().status === 'error') {
-    <div class="flex items-center justify-center gap-3 p-4" role="alert">
-        <p class="type-body-sm text-content-secondary">Could not load this artist's tracks</p>
+    <div class="artist-songs__error | flex items-center justify-center gap-3 p-4" role="alert">
+        <p class="artist-songs__error-message | type-body-sm text-content-secondary">
+            Could not load this artist's tracks
+        </p>
         <button type="button" class="btn-neutral" (click)="onRetry()">Try again</button>
     </div>
 }
 @if (!result().loaded && result().status === 'loading') {
-    <p class="type-body-sm p-8 text-content-secondary" role="status">Loading tracks…</p>
+    <p class="artist-songs__loading | type-body-sm p-8 text-content-secondary" role="status">
+        Loading tracks…
+    </p>
 } @else if (result().loaded && result().total === 0) {
-    <p class="type-body-sm p-8 text-content-secondary">No tracks linked to this artist</p>
+    <p class="artist-songs__empty | type-body-sm p-8 text-content-secondary">
+        No tracks linked to this artist
+    </p>
 } @else if (result().loaded) {
     <app-song-table
         [result]="result()"
