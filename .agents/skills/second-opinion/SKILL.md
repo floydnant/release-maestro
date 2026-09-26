@@ -16,7 +16,7 @@ Include this instruction in every brief sent to the reviewing agent:
 > skill or request another second opinion. This call is the final review level.
 
 ```sh
-claude -p --model claude-opus-5 --effort medium --permission-mode plan "<brief>"
+claude -p --model claude-opus-5-5 --effort medium --permission-mode plan "<brief>"
 ```
 
 Plan mode keeps it read-only. The brief is one argument: what to look at, where — paths, or a `git`
@@ -45,7 +45,7 @@ If run alongside [code-review](../code-review/SKILL.md), this is a fourth axis. 
 and lead with the harness and model that produced it:
 
     ## Second opinion
-    claude / claude-opus-5, medium effort
+    claude / claude-opus-5-5, medium effort
 
 Keep its findings verbatim. Don't merge or rerank them into the other axes — separation is the point
 there, and a different vendor's read is exactly what averaging destroys.
