@@ -36,8 +36,7 @@ RELEASE_MAESTRO_INSPECTOR_PORT=5900 \
 make dev-reallocate
 ```
 
-`RELEASE_MAESTRO_APP_DATA_DIR` selects a different writable app-data directory. Active worktrees
-cannot claim the same canonical directory. Use a distinct directory for each worktree.
+`RELEASE_MAESTRO_APP_DATA_DIR` selects a different writable app-data directory.
 
 ## Lifecycle and claims
 
