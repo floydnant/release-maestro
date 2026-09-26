@@ -101,7 +101,11 @@ export class RecordLabelDetailComponent {
         return entries.flatMap(({ key, name, prefix }) =>
             (refs[key] ?? []).flatMap(value => {
                 const url = prefix ? `${prefix}${encodeURIComponent(value)}` : value
-                return /^https:\/\//i.test(url) ? [{ name, url }] : []
+                try {
+                    return ['http:', 'https:'].includes(new URL(url).protocol) ? [{ name, url }] : []
+                } catch {
+                    return []
+                }
             }),
         )
     })
