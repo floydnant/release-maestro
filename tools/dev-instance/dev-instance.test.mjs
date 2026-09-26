@@ -14,12 +14,12 @@ import {
 } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import net from 'node:net'
 import { afterEach, jest, test } from '@jest/globals'
-import { parseUnixProcessIdentity, rootProcessHolders } from './core.mjs'
+import { holderIsLive, parseUnixProcessIdentity, rootProcessHolders } from './core.mjs'
 
 jest.setTimeout(30_000)
 
@@ -37,6 +37,25 @@ test('process shutdown starts with supervisors and orphaned holders', () => {
     const orphan = { id: 'orphan', parentHolderId: 'missing-parent' }
 
     assert.deepEqual(rootProcessHolders([supervisor, managedChild, orphan]), [supervisor, orphan])
+})
+
+test('inaccessible process identity does not make a holder appear dead', () => {
+    const originalKill = process.kill
+    const kill = jest.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+        if (pid === process.pid && signal === 0) {
+            const error = new Error('permission denied')
+            error.code = 'EPERM'
+            throw error
+        }
+        return originalKill(pid, signal)
+    })
+    try {
+        assert.throws(() => holderIsLive({ pid: process.pid, startIdentity: 'unknown' }), {
+            code: 'EPERM',
+        })
+    } finally {
+        kill.mockRestore()
+    }
 })
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
@@ -1465,6 +1484,29 @@ test('run-workflow passes separators and shell metacharacters as literal child a
         { RELEASE_MAESTRO_TREE_DEBUG: '1' },
     )
     assert.equal(nonzero.status, 9, nonzero.stderr)
+})
+
+test('Windows workflow prefers pnpm.cmd over an extensionless pnpm shim', async () => {
+    if (process.platform !== 'win32') return
+    const fixture = await createFixture()
+    const bin = join(fixture.base, 'bin')
+    const capture = join(fixture.base, 'pnpm-arguments.txt')
+    await mkdir(bin)
+    await writeFile(join(bin, 'pnpm'), '#!/bin/sh\nexit 9\n')
+    await writeFile(join(bin, 'pnpm.cmd'), '@echo off\r\necho %* > "%FAKE_CAPTURE%"\r\n')
+    const result = run(
+        fixture,
+        fixture.main,
+        ['run-workflow', 'renderer-e2e', '--', 'playwright', '--version'],
+        {
+            PATH: `${bin}${delimiter}${process.env.PATH}`,
+            npm_execpath: '',
+            RELEASE_MAESTRO_PNPM_COMMAND: '',
+            FAKE_CAPTURE: capture,
+        },
+    )
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(await readFile(capture, 'utf8'), /exec.*playwright.*--version/)
 })
 
 test('run-workflow launches pnpm from npm_execpath with Node', async () => {

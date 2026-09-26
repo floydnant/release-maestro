@@ -60,10 +60,14 @@ const waitForExit = child =>
 const stopChild = async child => {
     if (!child?.pid) return
     if (child.exitCode === null && child.signalCode === null) {
-        if (!child.releaseMaestroStartIdentity) return
-        await stopProcessTree(child.pid, child.releaseMaestroStartIdentity)
+        if (child.releaseMaestroStartIdentity) {
+            await stopProcessTree(child.pid, child.releaseMaestroStartIdentity)
+        } else {
+            child.kill('SIGTERM')
+            await Promise.race([waitForExit(child), new Promise(resolve => setTimeout(resolve, 500))])
+            if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+        }
         await waitForExit(child)
-        return
     }
     await stopProcessGroup(child.pid, child.releaseMaestroStartIdentity)
 }
@@ -289,7 +293,11 @@ const runWorkflow = async args => {
         const listener = () => {
             cancellationSignal ??= signal
             if (child?.pid) {
-                void stopProcessTree(child.pid, child.releaseMaestroStartIdentity, signal).catch(() => {})
+                if (child.releaseMaestroStartIdentity) {
+                    void stopProcessTree(child.pid, child.releaseMaestroStartIdentity, signal).catch(() => {})
+                } else {
+                    child.kill(signal)
+                }
             } else if (!startupShutdownTimer) {
                 startupShutdownTimer = setTimeout(
                     () => process.exit(exitForChild(null, cancellationSignal)),
@@ -321,7 +329,14 @@ const runWorkflow = async args => {
             clearTimeout(startupShutdownTimer)
             startupShutdownTimer = null
             try {
-                await setTransientChildHolder(transient.id, child.pid, child.releaseMaestroStartIdentity)
+                const registered = await setTransientChildHolder(
+                    transient.id,
+                    child.pid,
+                    child.releaseMaestroStartIdentity,
+                )
+                if (!registered && child.exitCode === null && child.signalCode === null) {
+                    throw new InstanceError('Could not verify the workflow command process identity')
+                }
             } catch (error) {
                 await stopChild(child)
                 throw error

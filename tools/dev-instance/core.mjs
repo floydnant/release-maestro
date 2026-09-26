@@ -101,13 +101,18 @@ export const parseUnixProcessIdentity = output => {
     return started.join(' ')
 }
 
-const processStartIdentity = pid => {
-    if (!Number.isSafeInteger(pid) || pid <= 0) return null
+const processExists = pid => {
     try {
         process.kill(pid, 0)
-    } catch {
-        return null
+        return true
+    } catch (error) {
+        if (error?.code === 'ESRCH') return false
+        throw error
     }
+}
+
+const processStartIdentity = pid => {
+    if (!Number.isSafeInteger(pid) || pid <= 0 || !processExists(pid)) return null
     let started = ''
     if (process.platform === 'linux') {
         try {
@@ -117,8 +122,9 @@ const processStartIdentity = pid => {
                 .trim()
                 .split(/\s+/)
             started = /[ZX]/.test(afterName[0] ?? '') ? '' : (afterName[19] ?? '')
-        } catch {
-            started = ''
+        } catch (error) {
+            if (error?.code === 'ENOENT' && !processExists(pid)) return null
+            throw error
         }
     } else if (process.platform === 'win32') {
         const result = spawnSync(
@@ -131,12 +137,20 @@ const processStartIdentity = pid => {
             ],
             { encoding: 'utf8', windowsHide: true },
         )
-        started = result.status === 0 ? result.stdout.trim() : ''
+        if (result.status !== 0) {
+            if (!processExists(pid)) return null
+            throw new InstanceError(`Could not read process start identity for PID ${pid}`)
+        }
+        started = result.stdout.trim()
     } else {
         const result = spawnSync('ps', ['-p', String(pid), '-o', 'state=', '-o', 'lstart='], {
             encoding: 'utf8',
         })
-        started = result.status === 0 ? (parseUnixProcessIdentity(result.stdout) ?? '') : ''
+        if (result.status !== 0) {
+            if (!processExists(pid)) return null
+            throw new InstanceError(`Could not read process start identity for PID ${pid}`)
+        }
+        started = parseUnixProcessIdentity(result.stdout) ?? ''
     }
     return started || null
 }
@@ -166,7 +180,7 @@ const processTable = () => {
             ],
             { encoding: 'utf8', windowsHide: true },
         )
-        if (result.status !== 0) return []
+        if (result.status !== 0) throw new InstanceError('Could not read Windows process table')
         const rows = JSON.parse(result.stdout || '[]')
         return (Array.isArray(rows) ? rows : [rows]).map(row => ({
             pid: Number(row.ProcessId),
@@ -176,7 +190,7 @@ const processTable = () => {
     }
     const columns = process.platform === 'darwin' ? 'pid=,ppid=,state=,lstart=' : 'pid=,ppid='
     const result = spawnSync('ps', ['-axo', columns], { encoding: 'utf8' })
-    if (result.status !== 0) return []
+    if (result.status !== 0) throw new InstanceError('Could not read process table')
     return result.stdout
         .trim()
         .split('\n')
@@ -747,7 +761,9 @@ const reconcileRegistry = (registry, at = nowMs(), graceMs = configuredGraceMs()
             ? new Map(processTable().map(row => [row.pid, row.startIdentity]))
             : null
     const isLive = holder =>
-        processIdentities ? processIdentities.get(holder.pid) === holder.startIdentity : holderIsLive(holder)
+        processIdentities?.has(holder.pid)
+            ? processIdentities.get(holder.pid) === holder.startIdentity
+            : holderIsLive(holder)
     for (const allocation of Object.values(registry.allocations)) {
         allocation.holders = allocation.holders.filter(isLive)
         if (!existsSync(allocation.path) && allocation.holders.length === 0) {
@@ -1634,9 +1650,24 @@ const resolveWindowsCommand = command => {
     if (command.includes('/') || command.includes('\\')) return command
     const extensions = (process.env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD').split(';')
     for (const directory of (process.env['PATH'] ?? '').split(';')) {
-        for (const extension of ['', ...extensions]) {
+        if (/\.(?:com|exe|bat|cmd)$/i.test(command)) {
+            const candidate = join(directory, command)
+            if (existsSync(candidate)) return candidate
+            continue
+        }
+        for (const extension of extensions) {
             const candidate = join(directory, `${command}${extension}`)
             if (existsSync(candidate)) return candidate
+        }
+        const unextended = join(directory, command)
+        if (existsSync(unextended)) {
+            try {
+                if (/^#!\s*(?:\/usr\/bin\/env\s+)?node(?:\s|$)/.test(readFileSync(unextended, 'utf8'))) {
+                    return unextended
+                }
+            } catch {
+                // A directory or unreadable shim cannot be launched as a Node script.
+            }
         }
     }
     return command
@@ -1669,7 +1700,12 @@ const windowsTreeCommand = `
 $ErrorActionPreference = 'Stop'
 try {
 Add-Type -Path $env:RELEASE_MAESTRO_TREE_JOB_HELPER
-$parent = [ReleaseMaestro.Job]::OpenParent([uint32]$env:RELEASE_MAESTRO_TREE_PARENT_PID)
+$parentPid = [uint32]$env:RELEASE_MAESTRO_TREE_PARENT_PID
+$parent = [ReleaseMaestro.Job]::OpenParent($parentPid)
+if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
+$parentProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $parentPid" -ErrorAction Stop
+if (-not $parentProcess) { exit 143 }
+if ([string]$parentProcess.CreationDate.ToUniversalTime().Ticks -ne $env:RELEASE_MAESTRO_TREE_PARENT_START) { exit 143 }
 if ([ReleaseMaestro.Job]::ParentExited($parent)) { exit 143 }
 $job = [ReleaseMaestro.Job]::CreateAndAssignCurrentProcess()
 $arguments = '"' + $env:RELEASE_MAESTRO_TREE_SCRIPT + '"'
@@ -1720,6 +1756,7 @@ export const spawnManaged = (command, args, options = {}) => {
                           ...spawnOptions.env,
                           RELEASE_MAESTRO_TREE_NODE: process.execPath,
                           RELEASE_MAESTRO_TREE_PARENT_PID: String(process.pid),
+                          RELEASE_MAESTRO_TREE_PARENT_START: currentProcessIdentity().startIdentity,
                           RELEASE_MAESTRO_TREE_SCRIPT: join(
                               dirname(fileURLToPath(import.meta.url)),
                               'windows-tree.mjs',
@@ -1768,7 +1805,11 @@ export const forwardSignals = (children, onSignal = () => {}) => {
             onSignal(signal)
             for (const child of children()) {
                 if (!child?.pid || child.exitCode !== null || child.signalCode !== null) continue
-                signalProcessTree(child.pid, signal, child.releaseMaestroStartIdentity)
+                if (child.releaseMaestroStartIdentity) {
+                    signalProcessTree(child.pid, signal, child.releaseMaestroStartIdentity)
+                } else {
+                    child.kill(signal)
+                }
             }
         }
         process.on(signal, listener)

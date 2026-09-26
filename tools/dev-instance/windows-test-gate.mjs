@@ -7,12 +7,14 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
+if (process.platform !== 'win32') throw new Error('Windows workflow checks must run on Windows')
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const jestBin = join(dirname(require.resolve('jest/package.json')), 'bin', 'jest.js')
 const expected = [
     'Windows workflow keeps its claim until an orphaned grandchild exits',
     'Windows workflow cancellation kills an orphaned grandchild before releasing its claim',
     'Windows workflow cancellation kills a running command before releasing its claim',
+    'Windows workflow prefers pnpm.cmd over an extensionless pnpm shim',
     'run-workflow passes separators and shell metacharacters as literal child arguments',
 ]
 const result = spawnSync(
