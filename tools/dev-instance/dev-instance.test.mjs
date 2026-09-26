@@ -1264,7 +1264,7 @@ test('Claude WorktreeRemove releases only after the directory is gone', async ()
     assert.equal(hookResult.status, 0, hookResult.stderr)
     let registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
     assert.ok(registry.allocations[allocation.worktreeId])
-    assert.equal(registry.allocations[allocation.worktreeId].releaseWhenRemoved, true)
+    assert.equal(Object.hasOwn(registry.allocations[allocation.worktreeId], 'releaseWhenRemoved'), false)
     await rm(fixture.main, { recursive: true, force: true })
     registry = await waitFor(
         async () => JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8')),
@@ -1274,25 +1274,9 @@ test('Claude WorktreeRemove releases only after the directory is gone', async ()
     assert.equal(registry.allocations[allocation.worktreeId], undefined)
 })
 
-test('a later registry command completes a delayed worktree removal', async () => {
+test('a later registry command reclaims a delayed worktree removal after grace', async () => {
     const fixture = await createFixture()
     const allocation = runJson(fixture, fixture.main, ['dev-allocate'])
-    const request = spawnSync(
-        process.execPath,
-        [
-            '--input-type=module',
-            '-e',
-            `
-        import { requestRemovedWorktreeRelease } from ${JSON.stringify(coreModule)}
-        await requestRemovedWorktreeRelease(${JSON.stringify(fixture.main)}, ${JSON.stringify(allocation.worktreeId)})
-    `,
-        ],
-        { cwd: fixture.main, env: environmentFor(fixture), encoding: 'utf8' },
-    )
-    assert.equal(request.status, 0, request.stderr)
-    let registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
-    assert.equal(registry.allocations[allocation.worktreeId].releaseWhenRemoved, true)
-
     await rm(fixture.main, { recursive: true, force: true })
     const reconcile = spawnSync(
         process.execPath,
@@ -1304,35 +1288,15 @@ test('a later registry command completes a delayed worktree removal', async () =
         await listInstances()
     `,
         ],
-        { cwd: fixture.base, env: environmentFor(fixture), encoding: 'utf8' },
+        {
+            cwd: fixture.base,
+            env: environmentFor(fixture, { RELEASE_MAESTRO_INSTANCE_GRACE_MS: '0' }),
+            encoding: 'utf8',
+        },
     )
     assert.equal(reconcile.status, 0, reconcile.stderr)
-    registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
-    assert.equal(registry.allocations[allocation.worktreeId], undefined)
-})
-
-test('pending removal releases a checkout replaced at the same path', async () => {
-    const fixture = await createFixture()
-    const original = runJson(fixture, fixture.main, ['dev-allocate'])
-    const request = spawnSync(
-        process.execPath,
-        [
-            '--input-type=module',
-            '-e',
-            `import { requestRemovedWorktreeRelease } from ${JSON.stringify(coreModule)}
-             await requestRemovedWorktreeRelease(${JSON.stringify(fixture.main)}, ${JSON.stringify(original.worktreeId)})`,
-        ],
-        { cwd: fixture.main, env: environmentFor(fixture), encoding: 'utf8' },
-    )
-    assert.equal(request.status, 0, request.stderr)
-    await rename(join(fixture.main, '.git'), join(fixture.base, 'old-git'))
-    git(fixture.main, ['init', '-q'])
-
-    const replacement = runJson(fixture, fixture.main, ['dev-allocate'])
-    assert.notEqual(replacement.worktreeId, original.worktreeId)
-    assert.deepEqual(replacement.bundle, original.bundle)
     const registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
-    assert.equal(registry.allocations[original.worktreeId], undefined)
+    assert.equal(registry.allocations[allocation.worktreeId], undefined)
 })
 
 test('replacement checkout reclaims an abandoned reserved bundle after grace', async () => {
@@ -1369,6 +1333,22 @@ test('a moved checkout keeps its allocation during path-reuse grace', async () =
     assert.equal(recovered.path, await realpath(moved))
     registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
     assert.equal(registry.allocations[original.worktreeId].missingSince, undefined)
+})
+
+test('an unreadable checkout does not block another worktree or lose its allocation', async () => {
+    if (process.platform === 'win32' || process.getuid?.() === 0) return
+    const fixture = await createFixture({ worktrees: 2 })
+    const other = runJson(fixture, fixture.roots[1], ['dev-allocate'])
+    await chmod(fixture.roots[1], 0o000)
+    try {
+        const own = runJson(fixture, fixture.roots[0], ['dev-allocate'])
+        assert.notEqual(own.worktreeId, other.worktreeId)
+        const registry = JSON.parse(await readFile(join(fixture.state, 'registry.json'), 'utf8'))
+        assert.ok(registry.allocations[other.worktreeId])
+        assert.equal(registry.allocations[other.worktreeId].missingSince, undefined)
+    } finally {
+        await chmod(fixture.roots[1], 0o755)
+    }
 })
 
 test('a delayed removal for an old path keeps the allocation at its current path', async () => {
@@ -1842,6 +1822,22 @@ test('an occupied transient port keeps its claim when a wrapper dies before list
     const transient = JSON.parse(allocation.stdout)
     const server = await listen('127.0.0.1', transient.bundle.renderer)
     try {
+        const release = spawnSync(
+            process.execPath,
+            [
+                '--input-type=module',
+                '-e',
+                `import { releaseTransient } from ${JSON.stringify(coreModule)}; console.log(JSON.stringify(await releaseTransient(${JSON.stringify(transient.id)})))`,
+            ],
+            { cwd: fixture.main, env: environmentFor(fixture), encoding: 'utf8' },
+        )
+        assert.equal(release.status, 0, release.stderr)
+        assert.equal(JSON.parse(release.stdout).reason, 'occupied-port')
+        const events = (await readFile(join(fixture.state, 'orchestration.jsonl'), 'utf8'))
+            .trim()
+            .split('\n')
+            .map(JSON.parse)
+        assert.ok(events.some(event => event.event === 'transient-release-deferred'))
         const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
         assert.ok(listed.instances.some(instance => instance.id === transient.id))
         const duplicate = run(fixture, fixture.main, [

@@ -426,7 +426,6 @@ const parseAllocation = value => {
         (value.unverifiedPorts !== undefined &&
             (!Array.isArray(value.unverifiedPorts) ||
                 !value.unverifiedPorts.every(port => Object.values(value.bundle).includes(port)))) ||
-        (value.releaseWhenRemoved !== undefined && typeof value.releaseWhenRemoved !== 'boolean') ||
         !(value.inactiveSince === null || isTimestamp(value.inactiveSince)) ||
         (value.missingSince !== undefined && !isTimestamp(value.missingSince)) ||
         typeof value.releaseWhenIdle !== 'boolean' ||
@@ -837,13 +836,16 @@ const assertClaimsAvailable = (registry, claims, worktreeId, allowedWorkflow = n
 }
 
 const checkoutPathIsStale = async allocation => {
-    if (!existsSync(allocation.path)) return true
-    if (!allocation.worktreeIdentity) return false
     try {
+        if (!allocation.worktreeIdentity) {
+            await stat(allocation.path)
+            return false
+        }
         return (await worktreeIdentityAt(allocation.path)) !== allocation.worktreeIdentity
     } catch (error) {
         if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') return true
-        throw error
+        // An unreadable checkout is not proof that its owner left.
+        return false
     }
 }
 
@@ -858,9 +860,6 @@ const reconcileRegistry = async (registry, at = nowMs(), graceMs = configuredGra
             : holderIsLive(holder)
     for (const allocation of Object.values(registry.allocations)) {
         const locationStale = await checkoutPathIsStale(allocation)
-        if (allocation.releaseWhenRemoved && locationStale) {
-            allocation.releaseWhenIdle = true
-        }
         const hadDevelopmentHolder = allocation.holders.some(isDevelopmentHolder)
         allocation.holders = allocation.holders.filter(isLive)
         const lostDevelopmentHolder = hadDevelopmentHolder && !allocation.holders.some(isDevelopmentHolder)
@@ -1383,7 +1382,6 @@ const allocateDevelopmentWithResult = async ({ reallocate = false } = {}) => {
             updatedAt: iso(nowMs()),
             inactiveSince: null,
             releaseWhenIdle: false,
-            releaseWhenRemoved: false,
             wasActive: false,
         }
         registry.allocations[worktreeId] = allocation
@@ -1888,18 +1886,34 @@ export const registerTransientListenerHolder = async (id, launcherPid, launcherS
 }
 
 export const releaseTransient = async id => {
-    await withRegistry(async (registry, paths) => {
+    return withRegistry(async (registry, paths) => {
         const transient = registry.transients[id]
-        if (!transient) return
-        if (transient.childHolder && holderIsLive(transient.childHolder)) return
-        if (transient.listenerHolder && holderIsLive(transient.listenerHolder)) return
-        if (await portIsOccupied(transient.bundle.renderer)) return
+        if (!transient) return { released: false, reason: 'unallocated' }
+        if (transient.childHolder && holderIsLive(transient.childHolder)) {
+            return { released: false, reason: 'live-holder' }
+        }
+        if (transient.listenerHolder && holderIsLive(transient.listenerHolder)) {
+            return { released: false, reason: 'live-holder' }
+        }
+        if (await portIsOccupied(transient.bundle.renderer)) {
+            const port = transient.bundle.renderer
+            const pids = listenerPids(port)
+            await appendEvent(paths, 'transient-release-deferred', {
+                transientId: id,
+                worktreeId: transient.worktreeId,
+                workflow: transient.workflow,
+                port,
+                pids,
+            })
+            return { released: false, reason: 'occupied-port', port, pids }
+        }
         delete registry.transients[id]
         await appendEvent(paths, 'transient-allocation-released', {
             transientId: id,
             worktreeId: transient.worktreeId,
             workflow: transient.workflow,
         })
+        return { released: true }
     })
 }
 
@@ -2199,16 +2213,6 @@ const allocationAtWorktreePath = async (registry, canonical, worktreeId) => {
         }
     }
     return null
-}
-
-export const requestRemovedWorktreeRelease = async (worktreePath, worktreeId = null) => {
-    const canonical = await canonicalizePath(worktreePath)
-    return withRegistry(async registry => {
-        const match = await allocationAtWorktreePath(registry, canonical, worktreeId)
-        if (!match) return { requested: false, reason: 'unallocated' }
-        match.releaseWhenRemoved = true
-        return { requested: true }
-    })
 }
 
 export const releaseRemovedWorktree = async (worktreePath, worktreeId = null) => {

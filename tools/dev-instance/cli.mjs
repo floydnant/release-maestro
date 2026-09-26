@@ -419,7 +419,14 @@ const runWorkflow = async args => {
         clearTimeout(startupShutdownTimer)
         stopHeartbeat()
         signalListeners.forEach((listener, signal) => process.off(signal, listener))
-        if (transient) await releaseTransient(transient.id)
+        if (transient) {
+            const release = await releaseTransient(transient.id)
+            if (release.reason === 'occupied-port') {
+                process.stderr.write(
+                    `Workflow renderer port ${release.port} remains occupied after ${transient.workflow}; its claim stays active. Stop the listener before retrying.\n`,
+                )
+            }
+        }
     }
 }
 
