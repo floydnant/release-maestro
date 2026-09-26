@@ -263,6 +263,82 @@ describe('LibraryBrowseRepository', () => {
                 MUSICBRAINZ_ARTIST_ID: ['album-id'],
             })
         })
+
+        it('shows references for an artist resolved from a different raw credit', () => {
+            db.update(songsTable)
+                .set({
+                    artistText: 'Aurora Fields alias',
+                    externalRefs: {
+                        MUSICBRAINZ_ARTIST_ID: ['alias-track-id', 'second-track-id'],
+                        MUSICBRAINZ_RECORDING_ID: ['recording-id'],
+                    },
+                })
+                .where(eq(songsTable.id, 's1'))
+                .run()
+            db.update(songsTable)
+                .set({ externalRefs: { MUSICBRAINZ_ARTIST_ID: ['alias-track-id'] } })
+                .where(eq(songsTable.id, 's2'))
+                .run()
+            db.update(albumsTable)
+                .set({ artistText: 'Night Cartel alias' })
+                .where(eq(albumsTable.id, 'guest'))
+                .run()
+            db.update(songsTable)
+                .set({ externalRefs: { MUSICBRAINZ_ALBUM_ARTIST_ID: ['alias-album-id'] } })
+                .where(eq(songsTable.id, 's3'))
+                .run()
+
+            expect(repository.getArtistDetail('a1')?.externalRefs).toEqual({
+                MUSICBRAINZ_ARTIST_ID: ['alias-track-id', 'second-track-id'],
+            })
+            expect(repository.getArtistDetail('a2')?.externalRefs).toEqual({
+                MUSICBRAINZ_ARTIST_ID: ['alias-album-id'],
+            })
+        })
+
+        it('does not assign a shared raw credit reference to every resolved artist', () => {
+            db.update(songsTable)
+                .set({
+                    artistText: 'Night Cartel & Aurora Fields',
+                    externalRefs: { MUSICBRAINZ_ARTIST_ID: ['shared-id'] },
+                })
+                .where(eq(songsTable.id, 's4'))
+                .run()
+            db.insert(songArtistsTable).values({ songId: 's4', artistId: 'a1', position: 1 }).run()
+
+            expect(repository.getArtistDetail('a3')?.externalRefs).toEqual({})
+            expect(repository.getArtistDetail('a1')?.externalRefs).toEqual({})
+        })
+
+        it('does not assign a shared album-artist reference to every resolved artist', () => {
+            db.update(albumsTable)
+                .set({ artistText: 'Aurora Fields & Night Cartel' })
+                .where(eq(albumsTable.id, 'own'))
+                .run()
+            db.update(songsTable)
+                .set({ externalRefs: { MUSICBRAINZ_ALBUM_ARTIST_ID: ['shared-album-id'] } })
+                .where(eq(songsTable.id, 's1'))
+                .run()
+            db.insert(albumArtistsTable).values({ albumId: 'own', artistId: 'a2', position: 1 }).run()
+
+            expect(repository.getArtistDetail('a1')?.externalRefs).toEqual({})
+            expect(repository.getArtistDetail('a2')?.externalRefs).toEqual({})
+        })
+
+        it("uses dated songs on own albums for an album-only artist's years", () => {
+            const result = repository.queryArtists({
+                query: { search: 'Night Cartel', sort: { field: 'name', direction: 'asc' } },
+                window: { offset: 0, limit: 10 },
+            })
+            expect(result.rows[0]).toMatchObject({
+                id: 'a2',
+                songCount: 0,
+                albumCount: 1,
+                firstYear: 2021,
+                lastYear: 2022,
+            })
+            expect(repository.getArtistDetail('a2')).toMatchObject({ firstYear: 2021, lastYear: 2022 })
+        })
     })
 
     describe('genres', () => {

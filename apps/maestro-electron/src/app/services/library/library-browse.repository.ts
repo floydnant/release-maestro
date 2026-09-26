@@ -12,6 +12,7 @@ import type {
 import {
     AlbumSortField,
     BROWSE_WINDOW_MAX_LIMIT,
+    ExternalRefKeys,
     SongPresence,
     SongSortField,
     type AlbumDetailResult,
@@ -62,7 +63,7 @@ import {
     genreSearchCondition,
     songSearchCondition,
 } from './catalog-search'
-import { artistExternalRefs, mergeExternalRefs } from './library-normalization'
+import { mergeExternalRefs, relevantExternalRefsMap } from './library-normalization'
 
 /**
  * The library read side: windowed catalog queries (ADR 0004).
@@ -114,25 +115,16 @@ export class LibraryBrowseRepository {
             .where(eq(artistsTable.id, artistId))
             .get()
         if (!artist) return null
-        // Stored artist refs can contain links copied from a different album artist by older scans.
-        // The song tags retain the source, so build the detail links from the matching credits.
-        const songRefs = this.database.db
-            .select({ externalRefs: songsTable.externalRefs })
-            .from(songArtistsTable)
-            .innerJoin(songsTable, eq(songArtistsTable.songId, songsTable.id))
-            .where(and(eq(songArtistsTable.artistId, artistId), eq(songsTable.artistText, artist.name)))
-            .all()
-        const albumRefs = this.database.db
-            .select({ externalRefs: songsTable.externalRefs })
-            .from(albumArtistsTable)
-            .innerJoin(albumsTable, eq(albumArtistsTable.albumId, albumsTable.id))
-            .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
-            .where(and(eq(albumArtistsTable.artistId, artistId), eq(albumsTable.artistText, artist.name)))
-            .all()
+        // Old scans may have copied a track artist's refs onto a different album artist.
+        // Read from the source songs, and only attribute a tag when its credit resolves
+        // to one artist. A split credit has no per-artist reference mapping yet.
+        const songRefs = this.songArtistRefsQuery(artistId).all()
+        const albumRefs = this.albumArtistRefsQuery(artistId).all()
         const externalRefs = mergeExternalRefs([
-            ...songRefs.map(row => artistExternalRefs(row.externalRefs, 'song')),
-            ...albumRefs.map(row => artistExternalRefs(row.externalRefs, 'album')),
+            ...songRefs.map(row => ({ [row.key]: [row.value] })),
+            ...albumRefs.map(row => ({ [ExternalRefKeys.MusicBrainzArtistId]: [row.value] })),
         ])
+        for (const values of Object.values(externalRefs)) values.sort()
         const stats = this.artistStats([artistId]).get(artistId)!
         const ownAlbums = this.database.db
             .selectDistinct({ albumId: albumArtistsTable.albumId })
@@ -154,6 +146,62 @@ export class LibraryBrowseRepository {
         const labels = this.artistRecordLabelIds(artistId).as('artist_labels')
         const recordLabelCount = this.database.db.select({ value: count() }).from(labels).get()?.value ?? 0
         return { ...artist, ...stats, externalRefs, appearanceCount, recordLabelCount }
+    }
+
+    artistExternalRefSql(artistId: string): { sql: string; params: unknown[] }[] {
+        return [this.songArtistRefsQuery(artistId).toSQL(), this.albumArtistRefsQuery(artistId).toSQL()]
+    }
+
+    private songArtistRefsQuery(artistId: string) {
+        const otherArtist = this.database.db
+            .select({ id: songArtistsTable.artistId })
+            .from(songArtistsTable)
+            .where(
+                and(
+                    eq(songArtistsTable.songId, sql<string>`credited_song.song_id`),
+                    not(eq(songArtistsTable.artistId, artistId)),
+                ),
+            )
+        return this.database.db
+            .selectDistinct({ key: sql<string>`ref_key.key`, value: sql<string>`ref_value.value` })
+            .from(sql`${songArtistsTable} as credited_song`)
+            .innerJoin(songsTable, eq(songsTable.id, sql<string>`credited_song.song_id`))
+            .innerJoin(sql`json_each(${songsTable.externalRefs}) as ref_key`, sql`true`)
+            .innerJoin(sql`json_each(ref_key.value) as ref_value`, sql`true`)
+            .where(
+                and(
+                    eq(sql<string>`credited_song.artist_id`, artistId),
+                    inArray(sql<string>`ref_key.key`, relevantExternalRefsMap.artists),
+                    not(exists(otherArtist)),
+                ),
+            )
+    }
+
+    private albumArtistRefsQuery(artistId: string) {
+        const otherArtist = this.database.db
+            .select({ id: albumArtistsTable.artistId })
+            .from(albumArtistsTable)
+            .where(
+                and(
+                    eq(albumArtistsTable.albumId, sql<string>`credited_album.album_id`),
+                    not(eq(albumArtistsTable.artistId, artistId)),
+                ),
+            )
+        return this.database.db
+            .selectDistinct({ value: sql<string>`ref_value.value` })
+            .from(
+                sql`${albumArtistsTable} as credited_album indexed by ${sql.identifier('album_artists_artist_id_idx')}`,
+            )
+            .innerJoin(songsTable, eq(songsTable.albumId, sql<string>`credited_album.album_id`))
+            .innerJoin(sql`json_each(${songsTable.externalRefs}) as ref_key`, sql`true`)
+            .innerJoin(sql`json_each(ref_key.value) as ref_value`, sql`true`)
+            .where(
+                and(
+                    eq(sql<string>`credited_album.artist_id`, artistId),
+                    eq(sql<string>`ref_key.key`, ExternalRefKeys.MusicBrainzAlbumArtistId),
+                    not(exists(otherArtist)),
+                ),
+            )
     }
 
     private artistStats(ids: string[]) {
@@ -188,8 +236,24 @@ export class LibraryBrowseRepository {
             .where(inArray(albumArtistsTable.artistId, ids))
             .groupBy(albumArtistsTable.artistId)
             .all()
+        const albumYears = this.database.db
+            .select({
+                artistId: albumArtistsTable.artistId,
+                firstYear: sql<number | null>`min(${songsTable.year})`,
+                lastYear: sql<number | null>`max(${songsTable.year})`,
+            })
+            .from(albumArtistsTable)
+            .innerJoin(songsTable, eq(songsTable.albumId, albumArtistsTable.albumId))
+            .where(inArray(albumArtistsTable.artistId, ids))
+            .groupBy(albumArtistsTable.artistId)
+            .all()
         for (const { artistId, ...stats } of songs) Object.assign(result.get(artistId)!, stats)
         for (const { artistId, ...stats } of albums) Object.assign(result.get(artistId)!, stats)
+        for (const { artistId, firstYear, lastYear } of albumYears) {
+            const stats = result.get(artistId)!
+            if (firstYear != null) stats.firstYear = Math.min(stats.firstYear ?? firstYear, firstYear)
+            if (lastYear != null) stats.lastYear = Math.max(stats.lastYear ?? lastYear, lastYear)
+        }
         return result
     }
 

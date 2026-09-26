@@ -264,6 +264,34 @@ describe('LibraryBrowseRepository at library scale', () => {
         ])
     })
 
+    it('deduplicates references in SQLite for a prolific artist', () => {
+        for (const [index, statement] of repository.artistExternalRefSql('artist-scale-1').entries()) {
+            const plan = (
+                sqlite.prepare(`EXPLAIN QUERY PLAN ${statement.sql}`).all(...statement.params) as {
+                    detail: string
+                }[]
+            )
+                .map(row => row.detail)
+                .join('\n')
+            expect(plan).toContain(index === 0 ? 'song_artists_artist_id_idx' : 'album_artists_artist_id_idx')
+            if (index === 1) expect(plan).toContain('songs_album_id_idx')
+            expect(plan).not.toMatch(/SCAN songs\b/i)
+        }
+
+        sqlite.exec('SAVEPOINT prolific_artist')
+        try {
+            db.update(songArtistsTable).set({ artistId: 'artist-scale-1' }).run()
+            db.update(songsTable)
+                .set({ externalRefs: { MUSICBRAINZ_ARTIST_ID: ['one-id'] } })
+                .run()
+            expect(repository.getArtistDetail('artist-scale-1')?.externalRefs).toEqual({
+                MUSICBRAINZ_ARTIST_ID: ['one-id'],
+            })
+        } finally {
+            sqlite.exec('ROLLBACK TO prolific_artist; RELEASE prolific_artist')
+        }
+    })
+
     it.each(['artists', 'recordLabels'] as const)(
         'builds %s membership once while keeping name ordering indexed',
         kind => {
