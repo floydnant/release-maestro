@@ -174,7 +174,7 @@
                         <div
                             class="text-column | relative flex max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] min-w-0 flex-col justify-between"
                         >
-                            <div class="overflow-x-hidden overflow-y-scroll">
+                            <div class="overflow-x-hidden overflow-y-scroll wrap-anywhere">
                                 @if (feedItem.error; as error) {
                                     <div class="error | mb-1.5 flex items-center gap-2">
                                         <p class="text-content-danger">
@@ -191,7 +191,7 @@
                                     </div>
                                 }
 
-                                <h1 class="tralbum-title | type-hero-title wrap-anywhere">
+                                <h1 class="tralbum-title | type-hero-title">
                                     <a
                                         [href]="feedItem.data.releaseUrl"
                                         target="_blank"
@@ -264,7 +264,7 @@
 
                                     <div class="flex rounded-tl-xl text-xl">
                                         <button
-                                            class="-mr-2 flex items-center gap-2 p-2 text-content-muted transition-colors duration-fast hover:text-content-primary"
+                                            class="flex items-center gap-2 p-2 text-content-muted transition-colors duration-fast hover:text-content-primary"
                                             (click)="toggleCurrentFeedItemSnoozedState()"
                                             [title]="
                                                 snoozedFeedItems.has(feedItem.id)
@@ -288,7 +288,7 @@
 
                         @if (feedItem.data.band) {
                             <div
-                                class="label-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto"
+                                class="label-column | max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y))] overflow-y-auto wrap-anywhere"
                             >
                                 @if (feedItem.data.band.imageUrl; as imageUrl) {
                                     <img

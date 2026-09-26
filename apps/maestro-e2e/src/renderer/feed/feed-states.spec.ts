@@ -114,6 +114,75 @@ test.describe('release feed scenario states', () => {
         }
     })
 
+    test('keeps feed content within its columns when metadata is long', async ({ page }) => {
+        const baseRelease = createHydratedRelease()
+        const longWord = 'Puffycon'.repeat(24)
+        const previewTitle = `Preview${longWord}`
+        const release = createHydratedRelease({
+            error: { message: `Error${longWord}` },
+            data: {
+                ...baseRelease.data,
+                artist: `Artist${longWord}`,
+                about: `<p>About${longWord}</p><p><a href="https://example.com">AboutLink${longWord}</a></p>`,
+                links: [
+                    { title: previewTitle, favicon: baseRelease.data.imageUrl, url: 'https://example.com' },
+                ],
+                tracks: baseRelease.data.tracks.map(track => ({ ...track, title: `Track${longWord}` })),
+                band: {
+                    name: `Label${longWord}`,
+                    imageUrl: null,
+                    location: `Location${longWord}`,
+                    bio: `Bio${longWord}`,
+                    links: [{ url: 'https://example.com', text: `LabelLink${longWord}` }],
+                },
+            },
+        })
+        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+
+        const titleLink = page.getByRole('link', { name: release.data.releaseName })
+        const previewLink = page.getByRole('link', { name: previewTitle })
+        await expect(titleLink).toBeVisible()
+        await expect(previewLink).toBeVisible()
+
+        for (const width of [1280, 960]) {
+            await page.setViewportSize({ width, height: 720 })
+            await expect
+                .poll(async () =>
+                    titleLink.evaluate(link => {
+                        const entry = link.closest('.feed-entry')
+                        const selectors = ['.feed-entry', '.text-column > div', '.label-column', '.tracks']
+                        return selectors.flatMap(selector => {
+                            const element =
+                                selector === '.feed-entry' ? entry : entry?.querySelector(selector)
+                            return element && element.scrollWidth > element.clientWidth + 1
+                                ? [`${selector}: ${element.scrollWidth}/${element.clientWidth}`]
+                                : []
+                        })
+                    }),
+                )
+                .toEqual([])
+
+            await expect
+                .poll(async () =>
+                    previewLink.evaluate(link => {
+                        const column = link.closest('.text-column')
+                        return Boolean(
+                            column &&
+                            link.getBoundingClientRect().right <= column.getBoundingClientRect().right,
+                        )
+                    }),
+                )
+                .toBe(true)
+            await expect
+                .poll(async () =>
+                    page
+                        .getByRole('img', { name: `Favicon for ${previewTitle}` })
+                        .evaluate(icon => icon.getBoundingClientRect().width),
+                )
+                .toBe(16)
+        }
+    })
+
     test('updates a failed release feed scenario with a new handler before retrying', async ({ page }) => {
         const release = createHydratedRelease({ id: 'release-after-handler-update' })
         const controller = await createRendererScenario(page, rendererScenarios.feed.loadError())
