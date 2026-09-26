@@ -1195,10 +1195,12 @@ test('Windows workflow keeps its claim until an orphaned grandchild exits', asyn
     liveChildren.push(workflow)
     let workflowStderr = ''
     workflow.stderr.on('data', chunk => (workflowStderr += chunk))
+    const workflowClosed = new Promise(resolve => workflow.once('close', resolve))
     const grandchildPid = Number(
         await waitFor(
-            () => {
+            async () => {
                 if (workflow.exitCode !== null || workflow.signalCode !== null) {
+                    await workflowClosed
                     assert.fail(`workflow exited before grandchild started: ${workflowStderr}`)
                 }
                 return readFile(grandchildPidPath, 'utf8')
@@ -1247,10 +1249,12 @@ test('Windows workflow cancellation kills an orphaned grandchild before releasin
     liveChildren.push(workflow)
     let workflowStderr = ''
     workflow.stderr.on('data', chunk => (workflowStderr += chunk))
+    const workflowClosed = new Promise(resolve => workflow.once('close', resolve))
     const grandchildPid = Number(
         await waitFor(
-            () => {
+            async () => {
                 if (workflow.exitCode !== null || workflow.signalCode !== null) {
+                    await workflowClosed
                     assert.fail(`workflow exited before grandchild started: ${workflowStderr}`)
                 }
                 return readFile(grandchildPidPath, 'utf8')
