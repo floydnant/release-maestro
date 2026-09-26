@@ -169,39 +169,119 @@
         >
             <div class="title-bar__drag-region | flex min-w-0 flex-1 items-center justify-start">
                 @if (scanIndicator(); as scan) {
-                    <p class="type-body-sm flex items-center gap-1 px-2 text-content-secondary">
-                        @if (scan.phase === 'reading') {
-                            <app-progress-ring
-                                mode="progress"
-                                [diameter]="25"
-                                [strokeWidth]="2.5"
-                                color="content.success"
-                                bgColor="background.surface"
-                                [progress]="libraryScanPercent()"
-                            ></app-progress-ring>
-                        } @else {
-                            <app-progress-ring
-                                mode="spinning"
-                                [diameter]="25"
-                                [strokeWidth]="2.5"
-                                color="content.secondary"
-                                bgColor="background.surface"
-                            ></app-progress-ring>
-                        }
-
-                        @if (scan.phase === 'discovering') {
-                            Scanning library…
-                        } @else {
-                            Reading
-                            <span class="font-mono">{{ scan.readDone }}/{{ scan.readTotal }}</span> tracks
-                            @if (scan.failedFiles > 0) {
-                                <span class="text-content-danger"
-                                    >· <span class="font-mono">{{ scan.failedFiles }}</span> Failed</span
-                                >
+                    @if (scan.phase !== 'completed') {
+                        <p
+                            class="scan-indicator | type-body-sm flex items-center gap-1 px-2 text-content-secondary"
+                        >
+                            @if (scan.phase === 'reading') {
+                                <app-progress-ring
+                                    mode="progress"
+                                    [diameter]="25"
+                                    [strokeWidth]="2.5"
+                                    color="content.success"
+                                    bgColor="background.surface"
+                                    [progress]="libraryScanPercent()"
+                                ></app-progress-ring>
+                            } @else {
+                                <app-progress-ring
+                                    mode="spinning"
+                                    [diameter]="25"
+                                    [strokeWidth]="2.5"
+                                    color="content.secondary"
+                                    bgColor="background.surface"
+                                ></app-progress-ring>
                             }
-                        }
-                    </p>
+
+                            @if (scan.phase === 'discovering') {
+                                Scanning library…
+                            } @else {
+                                Reading
+                                <span class="font-mono">{{ scan.readDone }}/{{ scan.readTotal }}</span> tracks
+                                @if (scan.failedFiles > 0) {
+                                    <span class="text-content-danger"
+                                        >· <span class="font-mono">{{ scan.failedFiles }}</span> Failed</span
+                                    >
+                                }
+                            }
+                        </p>
+                    }
                 }
+                <p class="scan-summary | type-body-sm" role="status" aria-live="polite">
+                    @if (scanIndicator(); as scan) {
+                        @if (scan.phase === 'completed') {
+                            <!-- The spinner's 25px box draws an 18px ring. Match both dimensions. -->
+                            <span
+                                class="flex items-center gap-1 px-2"
+                                [class.text-content-success]="
+                                    scan.failedFiles === 0 &&
+                                    scan.missingSongs === 0 &&
+                                    (scan.newSongs > 0 || scan.changedSongs > 0)
+                                "
+                                [class.text-content-secondary]="
+                                    scan.failedFiles === 0 &&
+                                    (scan.missingSongs > 0 ||
+                                        (scan.newSongs === 0 && scan.changedSongs === 0))
+                                "
+                                [class.text-content-danger]="scan.failedFiles > 0"
+                            >
+                                @if (scan.failedFiles > 0) {
+                                    <app-icon
+                                        class="size-[25px] shrink-0"
+                                        name="error"
+                                        color="content.danger"
+                                        size="18"
+                                    ></app-icon>
+                                    Scan finished · {{ scan.failedFiles }}
+                                    {{ scan.failedFiles === 1 ? 'track' : 'tracks' }} failed
+                                } @else if (
+                                    scan.newSongs === 0 && scan.changedSongs === 0 && scan.missingSongs === 0
+                                ) {
+                                    <app-icon
+                                        class="size-[25px] shrink-0"
+                                        name="success"
+                                        color="content.secondary"
+                                        size="18"
+                                    ></app-icon>
+                                    Nothing new
+                                } @else {
+                                    @if (scan.missingSongs === 0) {
+                                        <app-icon
+                                            class="size-[25px] shrink-0"
+                                            name="success"
+                                            color="content.success"
+                                            size="18"
+                                        ></app-icon>
+                                    } @else {
+                                        <app-icon
+                                            class="size-[25px] shrink-0"
+                                            name="missingSong"
+                                            color="content.secondary"
+                                            size="18"
+                                        ></app-icon>
+                                    }
+                                    @if (scan.newSongs > 0) {
+                                        Added {{ scan.newSongs }}
+                                        {{ scan.newSongs === 1 ? 'track' : 'tracks' }}
+                                    }
+                                    @if (scan.changedSongs > 0) {
+                                        @if (scan.newSongs > 0) {
+                                            ·
+                                        }
+                                        Updated {{ scan.changedSongs }}
+                                        {{ scan.changedSongs === 1 ? 'track' : 'tracks' }}
+                                    }
+                                    @if (scan.missingSongs > 0) {
+                                        @if (scan.newSongs > 0 || scan.changedSongs > 0) {
+                                            ·
+                                        }
+                                        {{ scan.missingSongs }}
+                                        {{ scan.missingSongs === 1 ? 'track' : 'tracks' }} missing
+                                    }
+                                }
+                            </span>
+                        }
+                    }
+                </p>
             </div>
 
             @if (isElectron && !isMacos) {
