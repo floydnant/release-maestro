@@ -1,6 +1,12 @@
 import { or, sql, type SQL } from 'drizzle-orm'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
-import { albumsTable, artistsTable, genresTable, recordLabelsTable, songsTable } from '../../database/drizzle.schema'
+import {
+    albumsTable,
+    artistsTable,
+    genresTable,
+    recordLabelsTable,
+    songsTable,
+} from '../../database/drizzle.schema'
 
 /**
  * The seam free-text catalog search lives behind.

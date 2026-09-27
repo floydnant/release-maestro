@@ -15,7 +15,13 @@ import {
 } from '@angular/core'
 import { DecimalPipe } from '@angular/common'
 import { RouterLink, type Params } from '@angular/router'
-import type { BrowseWindow, CatalogEntityRef, GenreRow, ArtistRow, RecordLabelRow } from '@release-maestro/core'
+import type {
+    BrowseWindow,
+    CatalogEntityRef,
+    GenreRow,
+    ArtistRow,
+    RecordLabelRow,
+} from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
 import { LIST_ROW_HEIGHT as ROW_HEIGHT, listWindowAt } from '../../browse/list-window'
 
