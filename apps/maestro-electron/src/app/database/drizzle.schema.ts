@@ -101,6 +101,7 @@ export const artistsTable = sqliteTable(
         id: text('id').primaryKey(),
         name: text('name').notNull(),
         sortName: text('sort_name'),
+        /** Legacy data may contain misattributed refs. Artist detail derives links from song credits. */
         externalRefs: text('external_refs', { mode: 'json' }).$type<ExternalRefs>().notNull().default({}),
     },
     table => [uniqueIndex('artists_name_key').on(table.name)],

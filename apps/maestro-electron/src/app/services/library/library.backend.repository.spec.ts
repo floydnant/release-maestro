@@ -26,6 +26,7 @@ import {
     songsTable,
 } from '../../database/drizzle.schema'
 import { NORMALIZER_VERSION } from './library-normalization'
+import { LibraryBrowseRepository } from './library-browse.repository'
 import { LibraryBackendRepository } from './library.backend.repository'
 
 const fact = {
@@ -250,11 +251,17 @@ describe('LibraryBackendRepository', () => {
         )
 
         const artists = db.select().from(artistsTable).all()
-        expect(artists.find(artist => artist.name === 'Track Artist')?.externalRefs).toEqual({
+        const artistId = (name: string): string => {
+            const artist = artists.find(row => row.name === name)
+            if (!artist) throw new Error(`Missing artist ${name}`)
+            return artist.id
+        }
+        const browse = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
+        expect(browse.getArtistDetail(artistId('Track Artist'))?.externalRefs).toEqual({
             MUSICBRAINZ_ARTIST_ID: ['track-id'],
             DISCOGS_ARTIST_LINK: ['https://www.discogs.com/artist/123'],
         })
-        expect(artists.find(artist => artist.name === 'Album Artist')?.externalRefs).toEqual({
+        expect(browse.getArtistDetail(artistId('Album Artist'))?.externalRefs).toEqual({
             MUSICBRAINZ_ARTIST_ID: ['album-id'],
         })
     })

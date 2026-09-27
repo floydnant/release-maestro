@@ -80,13 +80,14 @@ export class LibraryBrowseRepository {
     constructor(private readonly database: DatabaseClient) {}
 
     queryArtists(request: QueryArtistsRequest): ArtistWindowResult {
-        const { offset, limit } = normalizeWindow(request.window)
+        const { offset } = normalizeWindow(request.window)
         const total =
             this.database.db
                 .select({ value: count() })
                 .from(artistsTable)
                 .where(artistSearchCondition(request.query.search))
                 .get()?.value ?? 0
+        if (offset >= total) return { rows: [], offset, total }
         const rows = this.artistWindowQuery(request).all()
         const stats = this.artistStats(rows.map(row => row.id))
         return { rows: rows.map(row => ({ ...row, ...stats.get(row.id)! })), offset, total }
