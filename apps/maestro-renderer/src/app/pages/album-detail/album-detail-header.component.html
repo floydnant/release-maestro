@@ -20,8 +20,7 @@
             @for (artist of album().albumArtists; track artist.id; let last = $last) {
                 <a
                     class="text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
-                    [routerLink]="['/tracks']"
-                    [queryParams]="{ artist: artist.id }"
+                    [routerLink]="['/artists', artist.id]"
                 >
                     {{ artist.name }}
                 </a>

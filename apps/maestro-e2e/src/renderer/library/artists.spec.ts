@@ -58,7 +58,7 @@ test('artist list filters, sorts and shows derived stats', async ({ page }) => {
     const list = page.getByRole('region', { name: 'Artists', exact: true })
     await expect(list.getByRole('link', { name: /^Aurora Fields/ })).toContainText('3 tracks')
     await expect(list.getByRole('link', { name: /^Aurora Fields/ })).toContainText('1 album')
-    await expect(list.getByRole('link', { name: /^Aurora Fields/ })).toContainText(/2019\s*–2021/)
+    await expect(list.getByRole('link', { name: /^Aurora Fields/ })).toContainText('2019 - 2021')
     await expect(list.getByRole('link', { name: /^Night Cartel & Aurora Fields/ })).toBeVisible()
     await page.getByRole('button', { name: 'Sort artists Z to A' }).click()
     await expect
@@ -88,6 +88,30 @@ test('an empty artist list explains what is missing', async ({ page }) => {
     await expect(page.getByText('No artists yet')).toBeVisible()
 })
 
+test('artist years omit an unknown end year', async ({ page }) => {
+    const partialYears: ArtistDetail = { ...artist, firstYear: 2001, lastYear: null }
+    await createRendererScenario(
+        page,
+        scenario()
+            .handler('library:query-artists', {
+                kind: 'resolve',
+                value: { rows: [partialYears], offset: 0, total: 1 },
+            })
+            .handler('library:get-artist-detail', { kind: 'resolve', value: partialYears })
+            .build(),
+        '/artists',
+    )
+    const artistLink = page.getByRole('region', { name: 'Artists', exact: true }).getByRole('link', {
+        name: /^Aurora Fields/,
+    })
+    await expect(artistLink).toContainText('2001')
+    await expect(artistLink).not.toContainText('null')
+    await artistLink.click()
+    await expect(page.getByRole('heading', { name: 'Aurora Fields' })).toBeVisible()
+    await expect(page.getByText('2001', { exact: false })).toBeVisible()
+    await expect(page.getByText('null', { exact: false })).toHaveCount(0)
+})
+
 test('artist detail shows loading while the artist is requested', async ({ page }) => {
     await createRendererScenario(
         page,
@@ -107,7 +131,7 @@ test('artist detail has four distinct sections', async ({ page }) => {
     const musicBrainz = page.getByRole('link', { name: /MusicBrainz.*opens in new tab/ })
     await expect(musicBrainz).toHaveAttribute('target', '_blank')
     await expect(musicBrainz.locator('app-icon')).toHaveAttribute('name', 'externalLink')
-    await expect(page.locator('.artist-detail__stats')).toContainText('2019 - 2021')
+    await expect(page.getByText('2019 - 2021')).toBeVisible()
     await expect(
         page.getByRole('grid', { name: 'Albums' }).getByRole('link', { name: /^Daybreak/ }),
     ).toBeVisible()

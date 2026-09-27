@@ -913,13 +913,12 @@ test.describe('the album detail page', () => {
         await expect.poll(async () => (await lastSongQuery(controller))?.query.sort.field).toBe('title')
     })
 
-    test('links the album artist to that artist’s tracks', async ({ page }) => {
+    test('links the album artist to that artist’s page', async ({ page }) => {
         await openDetail(page)
 
         await page.locator('app-album-detail-header').getByRole('link', { name: 'Aurora Fields' }).click()
 
-        await expect.poll(() => new URL(page.url()).pathname).toBe('/tracks')
-        expect(new URL(page.url()).searchParams.get('artist')).toBe('artist-1')
+        await expect(page).toHaveURL(/\/artists\/artist-1$/)
     })
 
     test('links the record label to that label’s tracks', async ({ page }) => {

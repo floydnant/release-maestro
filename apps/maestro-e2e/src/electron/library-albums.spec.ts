@@ -282,7 +282,7 @@ test('an album detail page lists its own tracks in album order', async ({}, test
     await expect.poll(trackTitles).toEqual(['Dawn', 'Noon'])
 })
 
-test('an album detail page links out to its artist and record label', async ({}, testInfo) => {
+test('an album detail page opens its artist page', async ({}, testInfo) => {
     const appDataDir = testInfo.outputPath('app-data')
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
@@ -291,15 +291,13 @@ test('an album detail page links out to its artist and record label', async ({},
     await page.getByRole('link', { name: /^Daybreak/ }).click()
     await expect(page.getByRole('heading', { name: 'Daybreak', level: 1 })).toBeVisible()
 
-    // The album header's artist link opens the track list scoped to that artist.
+    // The album header's artist link opens that artist's own page.
     await page.locator('app-album-detail-header').getByRole('link', { name: 'Aurora Fields' }).click()
-
-    await expect(page).toHaveURL(/\/tracks\?.*artist=/)
-    // Sorted rather than compared in order: the track list opens in its own default order
-    // (date added), which comes from filesystem creation times and is not this test's
-    // business. What matters is that the link resolved to exactly this artist's tracks.
-    await expect.poll(async () => (await trackTitles()).sort()).toEqual(['Dawn', 'Noon'])
-    await expect(page.getByRole('button', { name: /^Remove Artist filter Aurora Fields/ })).toBeVisible()
+    await expect(page).toHaveURL(/\/artists\/[^/?]+$/)
+    await expect(page.getByRole('heading', { name: 'Aurora Fields', level: 1 })).toBeVisible()
+    await expect(
+        page.getByRole('grid', { name: 'Albums' }).getByRole('link', { name: /^Daybreak/ }),
+    ).toBeVisible()
 })
 
 test('the track list reaches an album detail page through its album cell', async ({}, testInfo) => {

@@ -48,7 +48,11 @@
                                 <span class="sr-only">Years active </span>
                                 @if (stats.firstYear != null) {
                                     {{ stats.firstYear
-                                    }}{{ stats.lastYear !== stats.firstYear ? '–' + stats.lastYear : '' }}
+                                    }}{{
+                                        stats.lastYear != null && stats.lastYear !== stats.firstYear
+                                            ? ' - ' + stats.lastYear
+                                            : ''
+                                    }}
                                 } @else {
                                     <span aria-label="Years unknown">Unknown</span>
                                 }
