@@ -4,11 +4,18 @@ import { ActivatedRoute, RouterLink } from '@angular/router'
 import { ExternalRefKeys, type ArtistDetail } from '@release-maestro/core'
 import { catchError, defer, map, merge, of, startWith, Subject, switchMap } from 'rxjs'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
+import {
+    bandcampSearchLink,
+    externalLinks,
+    type ExternalLink,
+    type ExternalLinkSpec,
+} from '../../shared/browse/external-links'
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
+import { yearRange } from '../../shared/browse/year-range'
 import { TabBarComponent, type Tab } from '../../shared/components/tab-bar/tab-bar.component'
-import { IconComponent } from '../../shared/components/icon/icon.component'
-import { ArtistAlbumsComponent } from './artist-albums.component'
-import { ArtistSongsComponent } from './artist-songs.component'
+import { EntityAlbumsComponent } from '../../shared/components/entity-albums/entity-albums.component'
+import { EntitySongsComponent } from '../../shared/components/entity-songs/entity-songs.component'
+import { ExternalLinksComponent } from '../../shared/components/external-links/external-links.component'
 import { ArtistRecordLabelsComponent } from './artist-record-labels.component'
 
 type ArtistSection = 'albums' | 'songs' | 'recordLabels' | 'appearsOn'
@@ -19,54 +26,21 @@ const SONGS = { section: 'songs' }
 const LABELS = { section: 'recordLabels' }
 const APPEARS = { section: 'appearsOn' }
 
-const externalLinks = (artist: ArtistDetail): { label: string; url: string }[] => {
-    const refs = artist.externalRefs
-    const links: { label: string; values?: string[]; base?: string; hosts?: string[] }[] = [
-        {
-            label: 'MusicBrainz',
-            values: refs[ExternalRefKeys.MusicBrainzArtistId],
-            base: 'https://musicbrainz.org/artist/',
-        },
-        {
-            label: 'Discogs',
-            values: refs[ExternalRefKeys.DiscogsArtistLink],
-            hosts: ['discogs.com', 'www.discogs.com'],
-        },
-        {
-            label: 'Beatport',
-            values: refs[ExternalRefKeys.BeatportArtistUrl],
-            hosts: ['beatport.com', 'www.beatport.com'],
-        },
-    ]
-    const direct = links.flatMap(link => {
-        const validUrls = (link.values ?? []).flatMap(value => {
-            const normalized = value.trim()
-            if (!normalized) return []
-            const url = link.base ? link.base + encodeURIComponent(normalized) : normalized
-            try {
-                const parsed = new URL(url)
-                if (parsed.protocol !== 'https:' || (link.hosts && !link.hosts.includes(parsed.hostname))) {
-                    return []
-                }
-            } catch {
-                return []
-            }
-            return [url]
-        })
-        const urls = [...new Set(validUrls)].sort()
-        return urls.map((url, index) => ({
-            label: urls.length > 1 ? `${link.label} ${index + 1}` : link.label,
-            url,
-        }))
-    })
-    if (refs[ExternalRefKeys.BandcampArtistId]?.[0]) {
-        direct.push({
-            label: 'Search Bandcamp',
-            url: `https://bandcamp.com/search?q=${encodeURIComponent(artist.name)}`,
-        })
-    }
-    return direct
-}
+const LINKS: ExternalLinkSpec[] = [
+    {
+        key: ExternalRefKeys.MusicBrainzArtistId,
+        label: 'MusicBrainz',
+        base: 'https://musicbrainz.org/artist/',
+    },
+    { key: ExternalRefKeys.DiscogsArtistLink, label: 'Discogs', domain: 'discogs.com' },
+    { key: ExternalRefKeys.BeatportArtistUrl, label: 'Beatport', domain: 'beatport.com' },
+]
+const artistLinks = (artist: ArtistDetail): ExternalLink[] => [
+    ...externalLinks(artist.externalRefs, LINKS),
+    ...(artist.externalRefs[ExternalRefKeys.BandcampArtistId]?.length
+        ? [bandcampSearchLink(artist.name)]
+        : []),
+]
 
 @Component({
     selector: 'app-artist-detail',
@@ -74,10 +48,10 @@ const externalLinks = (artist: ArtistDetail): { label: string; url: string }[] =
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         RouterLink,
-        IconComponent,
         TabBarComponent,
-        ArtistAlbumsComponent,
-        ArtistSongsComponent,
+        EntityAlbumsComponent,
+        EntitySongsComponent,
+        ExternalLinksComponent,
         ArtistRecordLabelsComponent,
     ],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
@@ -133,7 +107,11 @@ export class ArtistDetailComponent {
     })
     protected links = computed(() => {
         const state = this.detail()
-        return state.status == 'ready' ? externalLinks(state.artist) : []
+        return state.status == 'ready' ? artistLinks(state.artist) : []
+    })
+    protected years = computed(() => {
+        const state = this.detail()
+        return state.status == 'ready' ? yearRange(state.artist.firstYear, state.artist.lastYear) : null
     })
     protected sections = computed<Tab<ArtistSection>[]>(() => {
         const state = this.detail()

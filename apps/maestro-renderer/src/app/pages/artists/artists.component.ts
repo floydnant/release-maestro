@@ -16,15 +16,15 @@ import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
 import { listWindowOffsetAt } from '../../shared/browse/list-window'
-import {
-    artistQueryFromParams,
-    artistQueryToParams,
-    sameArtistQuery,
-} from '../../shared/browse/artist-query-params'
+import { nameQueryFromParams, nameQueryToParams, sameNameQuery } from '../../shared/browse/name-query-params'
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { BrowseShellComponent } from '../../shared/components/browse-shell/browse-shell.component'
-import { CatalogListComponent } from '../../shared/components/catalog-list/catalog-list.component'
+import {
+    CatalogListComponent,
+    countColumn,
+    yearsColumn,
+} from '../../shared/components/catalog-list/catalog-list.component'
 
 @Component({
     selector: 'app-artists',
@@ -40,7 +40,7 @@ export class ArtistsComponent {
     private history = inject(HistoryService)
     private list = viewChild(CatalogListComponent)
     private params = toSignal(this.route.queryParams, { initialValue: {} })
-    protected query = computed(() => artistQueryFromParams(this.params()), { equal: sameArtistQuery })
+    protected query = computed(() => nameQueryFromParams(this.params()), { equal: sameNameQuery })
     protected restoreScrollTop = linkedSignal<ArtistQuery, number | null>({
         source: this.query,
         computation: () => untracked(() => this.history.scrollRestore()),
@@ -55,7 +55,7 @@ export class ArtistsComponent {
     private browse = createBrowseQuery({
         query: this.query,
         viewport: this.viewport,
-        sameQuery: sameArtistQuery,
+        sameQuery: sameNameQuery,
         entityLabel: 'artists',
         refresh: libraryBrowseRefresh(),
         fetchWindow: (query, window) => this.service.queryArtists(query, window),
@@ -65,7 +65,11 @@ export class ArtistsComponent {
         rows: this.browse.result().rows.map(row => ({
             ...row,
             link: ['/artists', row.id],
-            artistStats: row,
+            columns: [
+                countColumn(row.songCount, 'track', 'tracks'),
+                countColumn(row.albumCount, 'album', 'albums'),
+                yearsColumn(row),
+            ],
         })),
     }))
     protected shellState = computed(() => ({
@@ -111,7 +115,7 @@ export class ArtistsComponent {
     private patchQuery(query: ArtistQuery): void {
         this.router.navigate([], {
             relativeTo: this.route,
-            queryParams: artistQueryToParams(query),
+            queryParams: nameQueryToParams(query),
             queryParamsHandling: 'merge',
             replaceUrl: true,
         })

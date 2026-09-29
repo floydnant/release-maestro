@@ -29,6 +29,19 @@ import {
 } from '../album-grid/album-grid.component'
 import { AlbumSortBarComponent } from '../album-grid/album-sort-bar.component'
 
+export type EntityAlbumsKind = 'genre' | 'recordLabel' | 'artist' | 'artistAppearances'
+
+/** How each detail page scopes its albums. An artist's appearances are albums it is not an album artist of. */
+const KINDS: Record<
+    EntityAlbumsKind,
+    { name: string; scope: (id: string) => Pick<AlbumQuery, 'filter' | 'appearanceArtistId'> }
+> = {
+    genre: { name: 'genre', scope: id => ({ filter: { genreIds: [id] } }) },
+    recordLabel: { name: 'record label', scope: id => ({ filter: { recordLabelIds: [id] } }) },
+    artist: { name: 'artist', scope: id => ({ filter: { albumArtistIds: [id] } }) },
+    artistAppearances: { name: 'artist', scope: id => ({ filter: {}, appearanceArtistId: id }) },
+}
+
 @Component({
     selector: 'app-entity-albums',
     templateUrl: './entity-albums.component.html',
@@ -38,8 +51,8 @@ import { AlbumSortBarComponent } from '../album-grid/album-sort-bar.component'
 })
 export class EntityAlbumsComponent {
     entityId = input.required<string>()
-    kind = input.required<'genre' | 'recordLabel'>()
-    protected entityName = computed(() => (this.kind() == 'genre' ? 'genre' : 'record label'))
+    kind = input.required<EntityAlbumsKind>()
+    protected entityName = computed(() => KINDS[this.kind()].name)
     private service = inject(LibraryBrowseService)
     private route = inject(ActivatedRoute)
     private router = inject(Router)
@@ -49,11 +62,7 @@ export class EntityAlbumsComponent {
     protected query = computed<AlbumQuery>(
         () => ({
             ...albumQueryFromParams(this.params()),
-            filter: {
-                ...(this.kind() == 'genre'
-                    ? { genreIds: [this.entityId()] }
-                    : { recordLabelIds: [this.entityId()] }),
-            },
+            ...KINDS[this.kind()].scope(this.entityId()),
         }),
         { equal: sameAlbumQuery },
     )

@@ -16,15 +16,15 @@ import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
 import { listWindowOffsetAt } from '../../shared/browse/list-window'
-import {
-    recordLabelQueryFromParams,
-    recordLabelQueryToParams,
-    sameRecordLabelQuery,
-} from '../../shared/browse/record-label-query-params'
+import { nameQueryFromParams, nameQueryToParams, sameNameQuery } from '../../shared/browse/name-query-params'
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { BrowseShellComponent } from '../../shared/components/browse-shell/browse-shell.component'
-import { CatalogListComponent } from '../../shared/components/catalog-list/catalog-list.component'
+import {
+    CatalogListComponent,
+    countColumn,
+    yearsColumn,
+} from '../../shared/components/catalog-list/catalog-list.component'
 
 @Component({
     selector: 'app-record-labels',
@@ -40,9 +40,7 @@ export class RecordLabelsComponent {
     private history = inject(HistoryService)
     private list = viewChild(CatalogListComponent)
     private params = toSignal(this.route.queryParams, { initialValue: {} })
-    protected query = computed(() => recordLabelQueryFromParams(this.params()), {
-        equal: sameRecordLabelQuery,
-    })
+    protected query = computed(() => nameQueryFromParams(this.params()), { equal: sameNameQuery })
     protected restoreScrollTop = linkedSignal<RecordLabelQuery, number | null>({
         source: this.query,
         computation: () => untracked(() => this.history.scrollRestore()),
@@ -57,7 +55,7 @@ export class RecordLabelsComponent {
     private browse = createBrowseQuery({
         query: this.query,
         viewport: this.viewport,
-        sameQuery: sameRecordLabelQuery,
+        sameQuery: sameNameQuery,
         entityLabel: 'record labels',
         refresh: libraryBrowseRefresh(),
         fetchWindow: (query, window) => this.service.queryRecordLabels(query, window),
@@ -67,7 +65,12 @@ export class RecordLabelsComponent {
         rows: this.browse.result().rows.map(row => ({
             ...row,
             link: ['/record-labels', row.id],
-            recordLabelStats: row,
+            columns: [
+                countColumn(row.albumCount, 'album', 'albums'),
+                countColumn(row.songCount, 'track', 'tracks'),
+                countColumn(row.artistCount, 'artist', 'artists'),
+                yearsColumn(row),
+            ],
         })),
     }))
     protected shellState = computed(() => ({
@@ -113,7 +116,7 @@ export class RecordLabelsComponent {
     private patchQuery(query: RecordLabelQuery): void {
         this.router.navigate([], {
             relativeTo: this.route,
-            queryParams: recordLabelQueryToParams(query),
+            queryParams: nameQueryToParams(query),
             queryParamsHandling: 'merge',
             replaceUrl: true,
         })

@@ -11,7 +11,7 @@ import {
 } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
-import { type BrowseWindow, type SongQuery, type SongSortField } from '@release-maestro/core'
+import { type BrowseWindow, type SongFilter, type SongQuery, type SongSortField } from '@release-maestro/core'
 import { HistoryService } from '../../../core/services/history.service'
 import { LibraryBrowseService } from '../../../core/services/library-browse.service'
 import { createBrowseQuery } from '../../browse/browse-query'
@@ -26,6 +26,15 @@ import {
 } from '../../browse/song-selection'
 import { SongTableComponent, type EntityFilterRequest } from '../song-table/song-table.component'
 
+export type EntitySongsKind = 'genre' | 'recordLabel' | 'artist'
+
+/** How each detail page scopes its tracks, and the `/tracks` query param that carries that scope. */
+const KINDS: Record<EntitySongsKind, { name: string; param: string; filter: (id: string) => SongFilter }> = {
+    genre: { name: 'genre', param: 'genre', filter: id => ({ genreIds: [id] }) },
+    recordLabel: { name: 'record label', param: 'recordLabel', filter: id => ({ recordLabelIds: [id] }) },
+    artist: { name: 'artist', param: 'artist', filter: id => ({ artistIds: [id] }) },
+}
+
 @Component({
     selector: 'app-entity-songs',
     templateUrl: './entity-songs.component.html',
@@ -35,8 +44,9 @@ import { SongTableComponent, type EntityFilterRequest } from '../song-table/song
 })
 export class EntitySongsComponent {
     entityId = input.required<string>()
-    kind = input.required<'genre' | 'recordLabel'>()
-    protected entityName = computed(() => (this.kind() == 'genre' ? 'genre' : 'record label'))
+    kind = input.required<EntitySongsKind>()
+    private scope = computed(() => KINDS[this.kind()])
+    protected entityName = computed(() => this.scope().name)
     private route = inject(ActivatedRoute)
     private router = inject(Router)
     private service = inject(LibraryBrowseService)
@@ -46,11 +56,7 @@ export class EntitySongsComponent {
     protected query = computed<SongQuery>(
         () => ({
             ...songQueryFromParams(this.params()),
-            filter: {
-                ...(this.kind() == 'genre'
-                    ? { genreIds: [this.entityId()] }
-                    : { recordLabelIds: [this.entityId()] }),
-            },
+            filter: this.scope().filter(this.entityId()),
         }),
         { equal: sameQuery },
     )
@@ -97,18 +103,12 @@ export class EntitySongsComponent {
     protected onEntity(request: EntityFilterRequest): void {
         const param = { album: 'album', genre: 'genre', recordLabel: 'recordLabel' }[request.kind]
         this.router.navigate(['/tracks'], {
-            queryParams: {
-                [this.kind() == 'genre' ? 'genre' : 'recordLabel']: this.entityId(),
-                [param]: request.id,
-            },
+            queryParams: { [this.scope().param]: this.entityId(), [param]: request.id },
         })
     }
     protected onMissing(): void {
         this.router.navigate(['/tracks'], {
-            queryParams: {
-                [this.kind() == 'genre' ? 'genre' : 'recordLabel']: this.entityId(),
-                presence: 'missing',
-            },
+            queryParams: { [this.scope().param]: this.entityId(), presence: 'missing' },
         })
     }
     protected onRetry(): void {

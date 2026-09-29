@@ -19,20 +19,10 @@
 @for (entry of content(); track entry.recordLabel.id) {
     <header class="record-label-detail__header | flex flex-col gap-3 px-6 pt-5 pb-4">
         <h1 class="type-hero-title wrap-break-word text-content-primary">{{ entry.recordLabel.name }}</h1>
-        <p class="type-body-sm text-content-secondary">{{ years() }}</p>
-        @if (links().length) {
-            <nav class="flex flex-wrap gap-3" aria-label="Record label links">
-                @for (link of links(); track link.url) {
-                    <a
-                        class="type-body-sm text-content-action hover:underline focus-visible:ring"
-                        [href]="link.url"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        >{{ link.name }}</a
-                    >
-                }
-            </nav>
-        }
+        <p class="record-label-detail__years | type-body-sm text-content-secondary">
+            {{ years() ?? 'Years unknown' }}
+        </p>
+        <app-external-links label="Record label links" [links]="links()"></app-external-links>
         <app-tab-bar label="Record label sections" [tabs]="sections()" [active]="section()"></app-tab-bar>
     </header>
     @for (sectionEntry of content(); track sectionEntry.key) {

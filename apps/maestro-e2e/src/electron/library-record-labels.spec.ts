@@ -54,7 +54,7 @@ test('scanned record labels show derived stats and linked albums, tracks and art
     await page.getByRole('link', { name: 'Record labels', exact: true }).click()
     const list = page.getByRole('region', { name: 'Record labels', exact: true })
     await expect(list.getByRole('link', { name: /^Saltmarsh/ })).toContainText('3 albums')
-    await expect(list.getByRole('link', { name: /^Saltmarsh/ })).toContainText('2017–2025')
+    await expect(list.getByRole('link', { name: /^Saltmarsh/ })).toContainText('2017 - 2025')
     await list.getByRole('link', { name: /^Saltmarsh/ }).click()
     await expect(page.getByRole('heading', { name: 'Saltmarsh' })).toBeVisible()
     await expect(page.getByRole('row', { name: /Surge by/ })).toBeVisible()

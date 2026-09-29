@@ -435,6 +435,16 @@ describe('LibraryBrowseRepository', () => {
                     .sort(),
             ).toEqual(['song1', 'song2'])
         })
+
+        it('takes years from song tags when an album has no year of its own', () => {
+            db.insert(recordLabelsTable).values({ id: 'a', name: 'Kosmische' }).run()
+            seedAlbum({ id: 'undated', title: 'Undated', recordLabelId: 'a' })
+            seedAlbum({ id: 'dated', title: 'Dated', recordLabelId: 'a', year: 2015 })
+            seedSong({ id: 'song1', title: 'Early', albumId: 'undated', year: 2011 })
+            seedSong({ id: 'song2', title: 'Late', albumId: 'undated', year: 2013 })
+            seedSong({ id: 'song3', title: 'Untagged', albumId: 'dated' })
+            expect(repository.getRecordLabelDetail('a')).toMatchObject({ firstYear: 2011, lastYear: 2015 })
+        })
     })
 
     describe('genres', () => {

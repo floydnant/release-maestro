@@ -15,25 +15,38 @@ import {
 } from '@angular/core'
 import { DecimalPipe } from '@angular/common'
 import { RouterLink, type Params } from '@angular/router'
-import type {
-    BrowseWindow,
-    CatalogEntityRef,
-    GenreRow,
-    ArtistRow,
-    RecordLabelRow,
-} from '@release-maestro/core'
+import type { BrowseWindow, CatalogEntityRef } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
 import { LIST_ROW_HEIGHT as ROW_HEIGHT, listWindowAt } from '../../browse/list-window'
+import { yearRange } from '../../browse/year-range'
+
+/**
+ * One right-aligned cell after the name. Each is `w-24`, which is the width the page's header row
+ * lays its column captions out on.
+ */
+export type CatalogListColumn =
+    | { kind: 'count'; value: number; singular: string; plural: string }
+    | { kind: 'years'; firstYear: number | null; lastYear: number | null }
+
+export const countColumn = (value: number, singular: string, plural: string): CatalogListColumn => ({
+    kind: 'count',
+    value,
+    singular,
+    plural,
+})
+export const yearsColumn = (row: {
+    firstYear: number | null
+    lastYear: number | null
+}): CatalogListColumn => ({
+    kind: 'years',
+    firstYear: row.firstYear,
+    lastYear: row.lastYear,
+})
 
 export interface CatalogListRow extends CatalogEntityRef {
     link: string[]
     queryParams?: Params
-    counts?: Pick<GenreRow, 'songCount' | 'artistCount' | 'albumCount'>
-    artistStats?: Pick<ArtistRow, 'songCount' | 'albumCount' | 'firstYear' | 'lastYear'>
-    recordLabelStats?: Pick<
-        RecordLabelRow,
-        'songCount' | 'artistCount' | 'albumCount' | 'firstYear' | 'lastYear'
-    >
+    columns?: CatalogListColumn[]
 }
 
 /** A bounded list of entity links. The scroll container stays keyboard reachable at every window. */
@@ -48,7 +61,6 @@ export class CatalogListComponent {
     result = input.required<BrowseResult<CatalogListRow>>()
     label = input.required<string>()
     query = input.required<unknown>()
-    showCounts = input(false)
     minContentWidth = input<number | null>(null)
     restoreScrollTop = input<number | null>(null)
     viewportChange = output<BrowseWindow>()
@@ -63,6 +75,7 @@ export class CatalogListComponent {
         return 0
     })
     protected rowHeight = ROW_HEIGHT
+    protected yearRange = yearRange
     protected height = computed(() => this.result().total * ROW_HEIGHT)
     protected offset = computed(() => this.result().offset * ROW_HEIGHT)
 

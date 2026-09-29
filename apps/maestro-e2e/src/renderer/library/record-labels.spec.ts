@@ -44,7 +44,7 @@ test('record labels list shows stats, search and sort', async ({ page }) => {
     const controller = await createRendererScenario(page, scenario().build(), '/record-labels')
     const list = page.getByRole('region', { name: 'Record labels', exact: true })
     await expect(list.getByRole('link', { name: /^Kosmische/ })).toContainText('2 tracks')
-    await expect(list.getByRole('link', { name: /^Saltmarsh/ })).toContainText('2017–2023')
+    await expect(list.getByRole('link', { name: /^Saltmarsh/ })).toContainText('2017 - 2023')
     await page.getByRole('button', { name: 'Sort record labels Z to A' }).click()
     await expect
         .poll(async () => (await controller.lastCall('library:query-record-labels'))?.payload)
@@ -103,6 +103,23 @@ test('record label detail shows tracks, albums, artists and external links', asy
     await expect(
         page.getByRole('region', { name: 'Artists' }).getByRole('link', { name: 'Aurora Fields' }),
     ).toBeVisible()
+})
+
+test('a stored Bandcamp label ID without a page URL offers a search link', async ({ page }) => {
+    await createRendererScenario(
+        page,
+        scenario()
+            .handler('library:get-record-label-detail', {
+                kind: 'resolve',
+                value: { ...recordLabel, externalRefs: { BANDCAMP_LABEL_ID: ['12345'] } },
+            })
+            .build(),
+        '/record-labels/kosmische',
+    )
+    await expect(page.getByRole('link', { name: 'Search Bandcamp' })).toHaveAttribute(
+        'href',
+        'https://bandcamp.com/search?q=Kosmische',
+    )
 })
 
 test('record label detail has retry and missing states', async ({ page }) => {

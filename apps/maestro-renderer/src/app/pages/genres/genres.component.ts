@@ -16,15 +16,14 @@ import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
 import { listWindowOffsetAt } from '../../shared/browse/list-window'
-import {
-    genreQueryFromParams,
-    genreQueryToParams,
-    sameGenreQuery,
-} from '../../shared/browse/genre-query-params'
+import { nameQueryFromParams, nameQueryToParams, sameNameQuery } from '../../shared/browse/name-query-params'
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { BrowseShellComponent } from '../../shared/components/browse-shell/browse-shell.component'
-import { CatalogListComponent } from '../../shared/components/catalog-list/catalog-list.component'
+import {
+    CatalogListComponent,
+    countColumn,
+} from '../../shared/components/catalog-list/catalog-list.component'
 
 @Component({
     selector: 'app-genres',
@@ -40,7 +39,7 @@ export class GenresComponent {
     private history = inject(HistoryService)
     private list = viewChild(CatalogListComponent)
     private params = toSignal(this.route.queryParams, { initialValue: {} })
-    protected query = computed(() => genreQueryFromParams(this.params()), { equal: sameGenreQuery })
+    protected query = computed(() => nameQueryFromParams(this.params()), { equal: sameNameQuery })
     protected restoreScrollTop = linkedSignal<GenreQuery, number | null>({
         source: this.query,
         computation: () => untracked(() => this.history.scrollRestore()),
@@ -55,7 +54,7 @@ export class GenresComponent {
     private browse = createBrowseQuery({
         query: this.query,
         viewport: this.viewport,
-        sameQuery: sameGenreQuery,
+        sameQuery: sameNameQuery,
         entityLabel: 'genres',
         refresh: libraryBrowseRefresh(),
         fetchWindow: (query, window) => this.service.queryGenres(query, window),
@@ -65,7 +64,11 @@ export class GenresComponent {
         rows: this.browse.result().rows.map(row => ({
             ...row,
             link: ['/genres', row.id],
-            counts: row,
+            columns: [
+                countColumn(row.songCount, 'track', 'tracks'),
+                countColumn(row.artistCount, 'artist', 'artists'),
+                countColumn(row.albumCount, 'album', 'albums'),
+            ],
         })),
     }))
     protected shellState = computed(() => ({
@@ -111,7 +114,7 @@ export class GenresComponent {
     private patchQuery(query: GenreQuery): void {
         this.router.navigate([], {
             relativeTo: this.route,
-            queryParams: genreQueryToParams(query),
+            queryParams: nameQueryToParams(query),
             queryParamsHandling: 'merge',
             replaceUrl: true,
         })

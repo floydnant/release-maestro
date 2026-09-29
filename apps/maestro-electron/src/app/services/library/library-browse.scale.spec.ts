@@ -306,6 +306,20 @@ describe('LibraryBrowseRepository at library scale', () => {
         expect(repository.queryRecordLabels(request)).toMatchObject({ offset: 3, total: 17 })
     })
 
+    it('orders record label artists through the name index', () => {
+        const request = { recordLabelId: 'genre-label-1', window: { offset: 0, limit: 20 } }
+        const statement = repository.recordLabelArtistWindowSql(request)
+        const plan = JSON.stringify(
+            sqlite.prepare(`EXPLAIN QUERY PLAN ${statement.sql}`).all(...statement.params),
+        )
+        expect(plan).toContain('artists_name_key')
+        expect(plan).toContain('LIST SUBQUERY')
+        expect(plan).not.toMatch(/CORRELATED|TEMP B-TREE FOR ORDER BY/i)
+        const result = repository.queryRecordLabelArtists(request)
+        expect(result.rows.length).toBeGreaterThan(0)
+        expect(result.rows.length).toBe(Math.min(result.total, 20))
+    })
+
     it.each(['artists', 'recordLabels'] as const)(
         'builds %s membership once while keeping name ordering indexed',
         kind => {

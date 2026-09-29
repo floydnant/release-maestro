@@ -1,0 +1,16 @@
+@if (links().length) {
+    <nav class="external-links | flex flex-wrap gap-x-5 gap-y-2" [attr.aria-label]="label()">
+        @for (link of links(); track link.url) {
+            <a
+                class="external-links__link | type-body-sm inline-flex items-center gap-1 rounded-sm text-content-action underline underline-offset-2 hover:text-content-primary"
+                [href]="link.url"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                {{ link.label }}
+                <app-icon name="externalLink" size="0.875rem" aria-hidden="true"></app-icon>
+                <span class="sr-only">(opens in new tab)</span>
+            </a>
+        }
+    </nav>
+}

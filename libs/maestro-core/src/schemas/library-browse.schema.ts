@@ -474,11 +474,16 @@ export const emptySongSelection = (query: SongQuery): SongSelection => ({
     included: [],
 })
 
-/** Genres are ordered by their unique, indexed name. Counts are derived after windowing. */
-export interface GenreQuery {
+/**
+ * Genres, artists and record labels are listed by their unique, indexed name. Counts are derived
+ * after windowing.
+ */
+export interface NameSortedQuery {
     search: string
     sort: { field: 'name'; direction: SortDirection }
 }
+
+export type GenreQuery = NameSortedQuery
 
 export interface GenreRow extends CatalogEntityRef {
     songCount: number
@@ -512,11 +517,7 @@ export interface QueryGenreRelatedRequest {
 }
 export type GenreRelatedWindowResult = BrowseWindowResult<CatalogEntityRef>
 
-// Artists are listed by indexed name; counts are computed only for the visible window.
-export interface ArtistQuery {
-    search: string
-    sort: { field: 'name'; direction: SortDirection }
-}
+export type ArtistQuery = NameSortedQuery
 export interface ArtistRow extends CatalogEntityRef {
     songCount: number
     albumCount: number
@@ -543,10 +544,7 @@ export interface QueryArtistRecordLabelsRequest {
 }
 export type ArtistRecordLabelWindowResult = BrowseWindowResult<CatalogEntityRef>
 
-export interface RecordLabelQuery {
-    search: string
-    sort: { field: 'name'; direction: SortDirection }
-}
+export type RecordLabelQuery = NameSortedQuery
 export interface RecordLabelRow extends CatalogEntityRef {
     albumCount: number
     songCount: number
