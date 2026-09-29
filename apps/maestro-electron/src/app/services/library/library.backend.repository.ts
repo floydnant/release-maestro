@@ -36,7 +36,7 @@ import {
 
 /**
  * Change-detection tallies for one prescan batch. The deep-read queue is NOT
- * derived from this — `listSongsNeedingMetadata` (fingerprint mismatch in the DB)
+ * derived from this — `listSongsNeedingMetadata` (fingerprint or revision mismatch in the DB)
  * is the sole source, which also makes interrupted scans resumable.
  */
 export interface PrescanBatchComparison {
@@ -140,8 +140,12 @@ export class LibraryBackendRepository {
             .run().changes
     }
 
-    listSongsNeedingMetadata(afterPath: string | null, limit: number): PrescanFileFact[] {
-        const pendingCondition = songsNeedingMetadata()
+    listSongsNeedingMetadata(
+        afterPath: string | null,
+        limit: number,
+        extractorVersion: number,
+    ): PrescanFileFact[] {
+        const pendingCondition = songsNeedingMetadata(extractorVersion)
         const where = afterPath
             ? and(eq(songsTable.present, true), pendingCondition, gt(songsTable.path, afterPath))
             : and(eq(songsTable.present, true), pendingCondition)
@@ -168,18 +172,44 @@ export class LibraryBackendRepository {
             }))
     }
 
-    countSongsNeedingMetadata(): number {
+    countSongsNeedingMetadata(extractorVersion: number): number {
         return (
             this.database.db
                 .select({ count: count(songsTable.id) })
                 .from(songsTable)
-                .where(and(eq(songsTable.present, true), songsNeedingMetadata()))
+                .where(and(eq(songsTable.present, true), songsNeedingMetadata(extractorVersion)))
+                .get()?.count ?? 0
+        )
+    }
+
+    countSongsNeedingVersionRefresh(extractorVersion: number): number {
+        return (
+            this.database.db
+                .select({ count: count(songsTable.id) })
+                .from(songsTable)
+                .where(
+                    and(
+                        eq(songsTable.present, true),
+                        eq(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
+                        or(
+                            isNull(songsTable.normalizerVersion),
+                            ne(songsTable.normalizerVersion, NORMALIZER_VERSION),
+                            isNull(songsTable.extractorVersion),
+                            ne(songsTable.extractorVersion, extractorVersion),
+                        ),
+                    ),
+                )
                 .get()?.count ?? 0
         )
     }
 
     /** @returns the number of normalization issues left OPEN on the song after ingest. */
-    ingestMetadata(metadata: SongMetadata, fact: PrescanFileFact, scannedAt: Date): number {
+    ingestMetadata(
+        metadata: SongMetadata,
+        fact: PrescanFileFact,
+        scannedAt: Date,
+        extractorVersion: number,
+    ): number {
         const db = this.database.db
         const rawArtist = metadata.artist
         const rawAlbumArtist = metadata.albumArtist
@@ -488,6 +518,7 @@ export class LibraryBackendRepository {
                 codec: metadata.fileInfo?.codec ?? null,
                 metadataHash: metadataHash(metadata),
                 normalizerVersion: NORMALIZER_VERSION,
+                extractorVersion,
                 externalRefs,
                 albumId,
             } satisfies Omit<typeof songsTable.$inferInsert, 'id'>
@@ -636,14 +667,16 @@ export class LibraryBackendRepository {
  * reach the other.
  *
  * A file qualifies when it has never been read, when the file itself changed, or when
- * it was last read by an older revision of the normalizer. That last clause is what
- * lets a change in how a column is derived reach rows already in the database: nothing
+ * it was last read by an older revision of the normalizer or Rust extractor. Those clauses
+ * let a changed rule reach rows already in the database: nothing
  * happens on disk, so the fingerprint alone would skip them forever.
  */
-const songsNeedingMetadata = () =>
+const songsNeedingMetadata = (extractorVersion: number) =>
     or(
         isNull(songsTable.scannedFileFingerprint),
         ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
         isNull(songsTable.normalizerVersion),
         ne(songsTable.normalizerVersion, NORMALIZER_VERSION),
+        isNull(songsTable.extractorVersion),
+        ne(songsTable.extractorVersion, extractorVersion),
     )

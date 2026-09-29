@@ -36,6 +36,8 @@ use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
+// Bump when tag extraction changes. Package releases need not coincide with extractor changes.
+const EXTRACTOR_VERSION: u32 = 1;
 const DEFAULT_PRESCAN_BATCH_SIZE: usize = 200;
 
 fn main() {
@@ -256,7 +258,7 @@ fn run_loop() {
 fn handle_ping(emitter: &Emitter, request: &Request) {
     emitter.response(Response::ok(
         request.id.clone(),
-        json!({ "protocolVersion": PROTOCOL_VERSION, "engineVersion": ENGINE_VERSION }),
+        json!({ "protocolVersion": PROTOCOL_VERSION, "engineVersion": ENGINE_VERSION, "extractorVersion": EXTRACTOR_VERSION }),
     ));
 }
 

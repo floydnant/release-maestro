@@ -144,6 +144,8 @@ export interface LibraryScanStatus {
     // deep-read phase
     readDone: number
     readTotal: number
+    /** Tracks selected because the normalizer or extractor revision changed. */
+    refreshTotal?: number
     imported: number
     /** Files that failed so far (all stages). Details land in `terminal.failures`. */
     failedFiles: number
@@ -185,7 +187,8 @@ export interface StartLibraryScanRequest {
  * library-level phases (prescan discovery tallies, normalization issue totals).
  */
 export type LibraryScanUpdate =
-    | MetadataScanUpdate
+    | Exclude<MetadataScanUpdate, { phase: 'started' }>
+    | { phase: 'started'; total: number; refreshTotal: number }
     | { phase: 'discovery'; discovered: number; new: number; changed: number; unchanged: number }
     /** Cumulative count of distinct tracks with open normalization issues so far in this scan. */
     | { phase: 'normalization'; normalizationIssues: number }

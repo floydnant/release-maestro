@@ -71,6 +71,13 @@
       "when": 1790896264879,
       "tag": "0009_mae-9-email-import-checkpoints",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791037483564,
+      "tag": "0010_mae-103-extractor-version",
+      "breakpoints": true
     }
   ]
 }
