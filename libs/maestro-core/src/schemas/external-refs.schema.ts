@@ -13,6 +13,23 @@ export enum ExternalRefKeys {
     MusicBrainzAlbumId = 'MUSICBRAINZ_ALBUM_ID',
     MusicBrainzAlbumArtistId = 'MUSICBRAINZ_ALBUM_ARTIST_ID',
 
+    AcoustIdId = 'ACOUSTID_ID',
+    Isrc = 'ISRC',
+    Barcode = 'BARCODE',
+    Asin = 'ASIN',
+
+    SpotifyTrackId = 'SPOTIFY_TRACK_ID',
+    SpotifyReleaseId = 'SPOTIFY_RELEASE_ID',
+    DeezerTrackId = 'DEEZER_TRACK_ID',
+    DeezerReleaseId = 'DEEZER_RELEASE_ID',
+    TraxsourceTrackId = 'TRAXSOURCE_TRACK_ID',
+    TraxsourceReleaseId = 'TRAXSOURCE_RELEASE_ID',
+    BeatsourceTrackId = 'BEATSOURCE_TRACK_ID',
+    BeatsourceReleaseId = 'BEATSOURCE_RELEASE_ID',
+    ItunesTrackId = 'ITUNES_TRACK_ID',
+    ItunesReleaseId = 'ITUNES_RELEASE_ID',
+    JunodownloadReleaseId = 'JUNODOWNLOAD_RELEASE_ID',
+
     BandcampUrl = 'BANDCAMP_URL',
     BandcampTrackId = 'BANDCAMP_TRACK_ID',
     BandcampReleaseId = 'BANDCAMP_RELEASE_ID',
@@ -22,6 +39,9 @@ export enum ExternalRefKeys {
     BandcampArtistId = 'BANDCAMP_ARTIST_ID',
 
     DiscogsReleaseId = 'DISCOGS_RELEASE_ID',
+    DiscogsMasterReleaseId = 'DISCOGS_MASTER_RELEASE_ID',
+    DiscogsArtistId = 'DISCOGS_ARTIST_ID',
+    DiscogsLabelId = 'DISCOGS_LABEL_ID',
     DiscogsArtistLink = 'DISCOGS_ARTIST_LINK',
     DiscogsLabelLink = 'DISCOGS_LABEL_LINK',
 
@@ -32,3 +52,4 @@ export enum ExternalRefKeys {
     BeatportArtistUrl = 'BEATPORT_ARTIST_URL',
 }
 export type ExternalRefs = Prettify<Partial<Record<ExternalRefKeys, string[]>>>
+

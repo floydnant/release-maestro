@@ -110,6 +110,12 @@ album, not a song. Do not "correct" it to `songNumber`.
 It is **always the tag and never a position in a list**. A file with no track number is `null`, and
 stays `null`.
 
+**External reference**:
+An identifier or link from an audio tag that refers to a recording, album, artist, or record label
+in an external catalog. A song retains every recognized reference found on its file; albums,
+artists, and record labels also retain references relevant to their entity type.
+_Avoid_: fingerprint, external match, verified identity
+
 **Album**:
 A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,
 `albumArtists`, an "Albums" tab, "12 albums". It is what music players call this, and it is what
