@@ -1,5 +1,9 @@
 mod support;
 
+use lofty::{
+    config::WriteOptions,
+    tag::{ItemKey, Tag, TagExt, TagType},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -76,6 +80,23 @@ impl AliasField {
 
 fn cases() -> Vec<Fixture> {
     serde_json::from_slice(&std::fs::read(fixtures().join("cases.json")).unwrap()).unwrap()
+}
+
+#[test]
+fn reads_disc_and_track_totals_from_tags() {
+    let library = Library::new();
+    let path = library.copy("vardae-invocacion-del-cielo.flac");
+    let mut tag = Tag::new(TagType::VorbisComments);
+    tag.insert_text(ItemKey::DiscNumber, "2".to_string());
+    tag.insert_text(ItemKey::DiscTotal, "3".to_string());
+    tag.insert_text(ItemKey::TrackTotal, "8".to_string());
+    tag.save_to_path(&path, WriteOptions::new().remove_others(false))
+        .unwrap();
+
+    let metadata = Engine::new().request("read_file", library.params(&path));
+    assert_eq!(metadata["discNumber"], 2);
+    assert_eq!(metadata["discTotal"], 3);
+    assert_eq!(metadata["trackTotal"], 8);
 }
 
 fn assert_fields(actual: &Value, expected: &Value, context: &str) {
