@@ -830,6 +830,34 @@ test.describe('the album detail page', () => {
         await expect(page.getByRole('row', { name: 'Disc 1, Second' })).toBeVisible()
     })
 
+    test('keeps disc sections when tracks sort in descending order', async ({ page }) => {
+        const controller = await createRendererScenario(
+            page,
+            scenarioBuilder()
+                .albumDetail(
+                    createAlbumDetail({
+                        songCount: 3,
+                        discGroups: [
+                            { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 0 },
+                            { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 2 },
+                        ],
+                    }),
+                )
+                .songs([
+                    createSongRow({ id: 'disc-2-first', title: 'Third', trackNumber: 1, discNumber: 2 }),
+                    createSongRow({ id: 'disc-1-second', title: 'Second', trackNumber: 2, discNumber: 1 }),
+                    createSongRow({ id: 'disc-1-first', title: 'First', trackNumber: 1, discNumber: 1 }),
+                ])
+                .build(),
+            '/albums/album-1?sort=trackNumber&dir=desc',
+        )
+
+        await expect.poll(async () => (await lastSongQuery(controller))?.query.sort.direction).toBe('desc')
+        await expect(page.getByText('Disc 2')).toBeVisible()
+        await expect(page.getByText('Disc 1')).toBeVisible()
+        await expect(page.getByRole('row', { name: 'Disc 1, First' })).toBeVisible()
+    })
+
     test('does not show the previous album’s tracks during same-route navigation', async ({ page }) => {
         const firstTrack = createSongRow({
             id: 'song-first',
