@@ -35,9 +35,12 @@ repository. Preserve unrelated work and start branch changes with a clean workin
    it rebases and pushes but never opens PRs. Inspect its result.
 
 Confirm GitHub checks pass on each PR's current SHA and resolve actionable review threads.
-Reverify affected layers after rebasing; a green top layer does not prove the rest. Native stacks
-use trunk protection rules and CI branch filters for every layer. Native merge includes the
-selected PR and its unmerged ancestors atomically.
+Reverify affected layers after rebasing; a green top layer does not prove the rest. For a native
+stack, GitHub evaluates Actions branch filters and protection rules against the stack trunk. A
+`pull_request` filter for `main` covers higher layers when the trunk is `main`, even though their
+displayed base is the predecessor branch. See
+[GitHub's stacked PR rules](https://docs.github.com/en/pull-requests/reference/stacked-pull-requests).
+Native merge includes the selected PR and its unmerged ancestors atomically.
 
 Use the commands above for routine work. For an error, uncertainty, or an operation not covered
 here, consult `gh stack <command> --help`, then the
