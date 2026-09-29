@@ -23,6 +23,7 @@ The binary-level tests in `apps/metadata-engine/tests/metadata.rs` cover:
 - Every legacy energy, BPM, key, comment, catalog number, and lyrics alias recognized by the engine.
 - Fractional and invalid BPM, track totals and overflow, dates, Unicode, and multiline text.
 - Arbitrary custom fields, repeated values, MP4 namespaces, and opaque energy strings.
+- External references in MP3, FLAC and M4A, including ISRC, barcode, AcoustID, ASIN and service IDs.
 - Embedded artwork, folder artwork, edits, null clears, omitted fields, renames, and rejected writes.
 - Tag creation on untagged files and streamed reads containing both valid and truncated audio.
 

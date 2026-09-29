@@ -1,3 +1,4 @@
+import { fromPartial } from '@total-typescript/shoehorn'
 import Database from 'better-sqlite3'
 import { asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
@@ -141,6 +142,34 @@ describe('LibraryBackendRepository', () => {
         expect(repository.countSongsNeedingMetadata()).toBe(1)
     })
 
+    it('keeps performer references separate from compilation album artists', () => {
+        const metadata = newSongFixture({
+            artist: 'Performer',
+            albumArtist: 'Various Artists',
+            albumTitle: 'Compilation',
+            extraMetadata: [
+                ['Custom: DISCOGS_ARTIST_ID', '456'],
+                ['MusicBrainzArtistId', 'performer-id'],
+                ['MusicBrainzReleaseArtistId', 'album-artist-id'],
+            ],
+        })
+        const seenAt = new Date('2026-06-15T10:00:00Z')
+        repository.ingestMetadata(metadata, fact, seenAt)
+        repository.ingestMetadata(metadata, fact, seenAt)
+
+        const artists = db.select().from(artistsTable).all()
+        const browse = new LibraryBrowseRepository(fromPartial<DatabaseClient>({ db }))
+        const performer = artists.find(artist => artist.name == 'Performer')!
+        const albumArtist = artists.find(artist => artist.name == 'Various Artists')!
+        expect(browse.getArtistDetail(performer.id)?.externalRefs).toEqual({
+            DISCOGS_ARTIST_ID: ['456'],
+            MUSICBRAINZ_ARTIST_ID: ['performer-id'],
+        })
+        expect(browse.getArtistDetail(albumArtist.id)?.externalRefs).toEqual({
+            MUSICBRAINZ_ARTIST_ID: ['album-artist-id'],
+        })
+    })
+
     it('keeps recording references on songs and shares product references with albums', () => {
         const metadata = newSongFixture({
             artist: 'Artist',
@@ -181,7 +210,7 @@ describe('LibraryBackendRepository', () => {
             DISCOGS_MASTER_RELEASE_ID: ['123'],
         })
         const artist = db.select().from(artistsTable).get()!
-        const browse = new LibraryBrowseRepository({ db })
+        const browse = new LibraryBrowseRepository(fromPartial<DatabaseClient>({ db }))
         expect(browse.getArtistDetail(artist.id)?.externalRefs).toEqual({ DISCOGS_ARTIST_ID: ['456'] })
         expect(db.select().from(recordLabelsTable).get()?.externalRefs).toEqual({
             DISCOGS_LABEL_ID: ['789'],

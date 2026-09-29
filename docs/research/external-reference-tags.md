@@ -52,8 +52,10 @@ Release Maestro receives known Lofty fields as semantic names and custom fields 
 
 MP4 freeform names include their namespace. Strip only `----:com.apple.iTunes:` before conventional alias matching. An identically named field in another namespace has no established meaning here. ID3 `TXXX:` in documentation describes the storage frame, not necessarily the name emitted by the reader.
 
+Performer references and album-artist references follow separate artist credits. A compilation performer's Discogs ID must not identify its album artist.
+
 Keep unrecognized custom metadata available. Defer fingerprints, generic URL guessing and speculative provider IDs until a concrete source or file fixture establishes their meaning.
 
 ## Rescanning existing libraries
 
-The importer stores references in existing JSON columns. No database migration is needed. Normalizer version 2 schedules previously imported files for a new deep read on the next scan.
+The importer stores references in existing JSON columns. No database migration is needed. Normalizer version 3 schedules previously imported files for a new deep read on the next scan.

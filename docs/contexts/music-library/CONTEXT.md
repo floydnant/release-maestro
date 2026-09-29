@@ -112,8 +112,9 @@ stays `null`.
 
 **External reference**:
 An identifier or link from an audio tag that refers to a recording, album, artist, or record label
-in an external catalog. A song retains every recognized reference found on its file; albums,
-artists, and record labels also retain references relevant to their entity type.
+in an external catalog. A song retains every recognized reference found on its file. Albums and record labels
+also retain references relevant to their entity type. Artist references come from the song
+and album credits that resolve to that artist.
 _Avoid_: fingerprint, external match, verified identity
 
 **Album**:
