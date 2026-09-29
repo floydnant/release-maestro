@@ -90,6 +90,7 @@ test.describe('library settings scenarios', () => {
         await expect(page.getByRole('button', { name: 'Rescan now' })).toBeEnabled()
 
         await page.getByRole('button', { name: 'Remove folder' }).click()
+        await expect(page.getByText('Saving without folders stops scans.')).toBeVisible()
         await page.getByRole('button', { name: 'Save changes' }).click()
         await expect
             .poll(async () => (await controller.calls('patch-settings')).at(-1)?.payload)
