@@ -1,6 +1,6 @@
 import { PrescanFileFact, SongMetadata } from '@release-maestro/core'
 import { randomUUID } from 'crypto'
-import { and, asc, count, eq, gt, inArray, isNull, lt, max, ne, or } from 'drizzle-orm'
+import { and, asc, count, eq, gt, inArray, isNull, lt, max, ne, or, sql } from 'drizzle-orm'
 import { DatabaseClient } from '../../database/database.client'
 import {
     albumArtistsTable,
@@ -655,6 +655,41 @@ export class LibraryBackendRepository {
             }
 
             return openIssues
+        })
+    }
+
+    reconcileUnusedMetadata(): void {
+        this.database.db.transaction(tx => {
+            // A re-read can move the last song off an album. Drop empty albums first
+            // so their artist and label links do not keep obsolete entities alive.
+            tx.run(sql`DELETE FROM albums WHERE NOT EXISTS (
+                SELECT 1 FROM songs WHERE songs.album_id = albums.id
+            )`)
+            // Keep user-confirmed resolutions even if the tag no longer appears.
+            tx.run(sql`DELETE FROM artist_raw_names WHERE confirmed_by_user = 0 AND raw_text NOT IN (
+                SELECT raw_artist FROM songs WHERE raw_artist IS NOT NULL
+                UNION SELECT raw_album_artist FROM songs WHERE raw_album_artist IS NOT NULL
+            )`)
+            tx.run(sql`DELETE FROM genre_raw_names WHERE confirmed_by_user = 0 AND raw_text NOT IN (
+                SELECT raw_genre FROM songs WHERE raw_genre IS NOT NULL
+            )`)
+            tx.run(sql`DELETE FROM artists WHERE NOT EXISTS (
+                SELECT 1 FROM song_artists WHERE song_artists.artist_id = artists.id
+            ) AND NOT EXISTS (
+                SELECT 1 FROM album_artists WHERE album_artists.artist_id = artists.id
+            ) AND NOT EXISTS (
+                SELECT 1 FROM artist_raw_name_artists WHERE artist_raw_name_artists.artist_id = artists.id
+            )`)
+            tx.run(sql`DELETE FROM genres WHERE NOT EXISTS (
+                SELECT 1 FROM song_genres WHERE song_genres.genre_id = genres.id
+            ) AND NOT EXISTS (
+                SELECT 1 FROM genre_raw_name_genres WHERE genre_raw_name_genres.genre_id = genres.id
+            )`)
+            tx.run(sql`DELETE FROM record_labels WHERE NOT EXISTS (
+                SELECT 1 FROM albums WHERE albums.record_label_id = record_labels.id
+            ) AND NOT EXISTS (
+                SELECT 1 FROM songs WHERE songs.record_label_text = record_labels.name
+            )`)
         })
     }
 }

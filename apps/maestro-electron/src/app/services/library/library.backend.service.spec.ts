@@ -21,6 +21,7 @@ const newRepositoryMock = () => ({
     countSongsNeedingVersionRefresh: jest.fn(() => 0),
     listSongsNeedingMetadata: jest.fn().mockReturnValueOnce([fact]).mockReturnValueOnce([]),
     ingestMetadata: jest.fn(() => 0),
+    reconcileUnusedMetadata: jest.fn(),
 })
 
 describe('LibraryBackendService', () => {
@@ -65,6 +66,7 @@ describe('LibraryBackendService', () => {
             expect.any(Date),
             EXTRACTOR_VERSION,
         )
+        expect(repository.reconcileUnusedMetadata).toHaveBeenCalledTimes(1)
         expect(updates).toEqual([
             { phase: 'discovery', discovered: 1, new: 1, changed: 0, unchanged: 0 },
             { phase: 'started', total: 1, refreshTotal: 0 },
