@@ -555,6 +555,15 @@ export class SongTableComponent {
         return `${group ? `${group}, ` : ''}${row.title}${artist}${row.present ? '' : ' — missing'}`
     }
 
+    protected groupLabelAt(index: number): string | undefined {
+        const groups = this.groups()
+        for (let position = groups.length - 1; position >= 0; position--) {
+            const group = groups[position]
+            if (group && group.startIndex <= index) return group.label
+        }
+        return undefined
+    }
+
     // -----------------------------------------------------------------------
 
     private applyGesture(event: MouseEvent, index: number, row: SongRow): void {

@@ -187,7 +187,7 @@
                     [style.height.px]="rowHeight()"
                     [attr.aria-rowindex]="index + 2"
                     [attr.aria-selected]="selected"
-                    [attr.aria-label]="rowLabel(row, groupAt().get(index)?.label)"
+                    [attr.aria-label]="rowLabel(row, groupLabelAt(index))"
                     (mousedown)="onRowPointerDown($event, index, row)"
                 >
                     @if (groupAt().get(index); as group) {

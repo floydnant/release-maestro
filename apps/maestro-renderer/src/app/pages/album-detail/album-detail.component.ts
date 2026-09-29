@@ -34,7 +34,7 @@ import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
-import { listWindowOffsetAt } from '../../shared/browse/list-window'
+import { GROUPED_SONG_ROW_HEIGHT, LIST_ROW_HEIGHT, listWindowOffsetAt } from '../../shared/browse/list-window'
 import { SongQueryParam, nextSort, songSortFromParams } from '../../shared/browse/song-query-params'
 import {
     emptySelection,
@@ -212,10 +212,23 @@ export class AlbumDetailComponent {
      * The slice the table wants, seeded from that position so the first window fetched
      * is the right one — see `TracksComponent.viewport`.
      */
-    protected viewport = linkedSignal<SongQuery, BrowseWindow>({
-        source: () => this.query(),
-        computation: (_query, previous) => ({
-            offset: untracked(() => offsetForRestore(this.restoreScrollTop())),
+    private viewportSource = computed(
+        () => ({
+            query: this.query(),
+            rowHeight:
+                this.sort().field == SongSortField.trackNumber &&
+                this.sort().direction == 'asc' &&
+                this.album()?.discGroups.length
+                    ? GROUPED_SONG_ROW_HEIGHT
+                    : LIST_ROW_HEIGHT,
+        }),
+        { equal: (a, b) => sameQuery(a.query, b.query) && a.rowHeight == b.rowHeight },
+    )
+
+    protected viewport = linkedSignal<{ query: SongQuery; rowHeight: number }, BrowseWindow>({
+        source: () => this.viewportSource(),
+        computation: ({ rowHeight }, previous) => ({
+            offset: untracked(() => offsetForRestore(this.restoreScrollTop(), rowHeight)),
             limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
         }),
     })
@@ -371,5 +384,5 @@ export class AlbumDetailComponent {
 }
 
 /** Where a window has to start for a remembered scroll position to be inside it. */
-const offsetForRestore = (scrollTop: number | null): number =>
-    scrollTop == null ? 0 : listWindowOffsetAt(scrollTop)
+const offsetForRestore = (scrollTop: number | null, rowHeight: number): number =>
+    scrollTop == null ? 0 : listWindowOffsetAt(scrollTop, rowHeight)
