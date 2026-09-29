@@ -221,7 +221,7 @@ export const songsTable = sqliteTable(
          */
         normalizerVersion: integer('normalizer_version'),
         /** Revision of the Rust tag extractor that produced this row. Null means re-read. */
-        extractorVersion: integer('extractor_version'),
+        extractorVersion: text('extractor_version'),
         externalRefs: text('external_refs', { mode: 'json' }).$type<ExternalRefs>().notNull().default({}),
         albumId: text('album_id').references(() => albumsTable.id, {
             onDelete: 'set null',

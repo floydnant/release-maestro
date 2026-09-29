@@ -70,7 +70,7 @@ export class LibraryBackendService {
                 if (abortSignal?.aborted) return
                 const missing = prescanErrors == 0 ? this.repository.markNotSeenPresent(scanStartedAt) : 0
                 const { extractorVersion } = await this.metadata.ping()
-                if (!Number.isSafeInteger(extractorVersion) || extractorVersion < 1) {
+                if (typeof extractorVersion !== 'string' || !/^[0-9a-f]{16}$/.test(extractorVersion)) {
                     throw new Error('metadata-engine returned an invalid extractor version')
                 }
                 if (abortSignal?.aborted) return

@@ -109,7 +109,11 @@ fn ping_reports_protocol_and_engine_version() {
     let ping = find_by_id(&responses, "p1");
     assert_eq!(ping["ok"], true);
     assert_eq!(ping["result"]["protocolVersion"], 1);
-    assert_eq!(ping["result"]["extractorVersion"], 1);
+    let extractor_version = ping["result"]["extractorVersion"].as_str().unwrap();
+    assert_eq!(extractor_version.len(), 16);
+    assert!(extractor_version
+        .bytes()
+        .all(|byte| byte.is_ascii_hexdigit()));
     assert!(
         ping["result"]["engineVersion"].is_string(),
         "engineVersion should be a string, got {ping:?}"

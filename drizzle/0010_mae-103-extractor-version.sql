@@ -1,1 +1,1 @@
-ALTER TABLE `songs` ADD `extractor_version` integer;
+ALTER TABLE `songs` ADD `extractor_version` text;

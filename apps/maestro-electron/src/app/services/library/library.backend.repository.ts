@@ -143,7 +143,7 @@ export class LibraryBackendRepository {
     listSongsNeedingMetadata(
         afterPath: string | null,
         limit: number,
-        extractorVersion: number,
+        extractorVersion: string,
     ): PrescanFileFact[] {
         const pendingCondition = songsNeedingMetadata(extractorVersion)
         const where = afterPath
@@ -172,7 +172,7 @@ export class LibraryBackendRepository {
             }))
     }
 
-    countSongsNeedingMetadata(extractorVersion: number): number {
+    countSongsNeedingMetadata(extractorVersion: string): number {
         return (
             this.database.db
                 .select({ count: count(songsTable.id) })
@@ -182,7 +182,7 @@ export class LibraryBackendRepository {
         )
     }
 
-    countSongsNeedingVersionRefresh(extractorVersion: number): number {
+    countSongsNeedingVersionRefresh(extractorVersion: string): number {
         return (
             this.database.db
                 .select({ count: count(songsTable.id) })
@@ -208,7 +208,7 @@ export class LibraryBackendRepository {
         metadata: SongMetadata,
         fact: PrescanFileFact,
         scannedAt: Date,
-        extractorVersion: number,
+        extractorVersion: string,
     ): number {
         const db = this.database.db
         const rawArtist = metadata.artist
@@ -671,7 +671,7 @@ export class LibraryBackendRepository {
  * let a changed rule reach rows already in the database: nothing
  * happens on disk, so the fingerprint alone would skip them forever.
  */
-const songsNeedingMetadata = (extractorVersion: number) =>
+const songsNeedingMetadata = (extractorVersion: string) =>
     or(
         isNull(songsTable.scannedFileFingerprint),
         ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
