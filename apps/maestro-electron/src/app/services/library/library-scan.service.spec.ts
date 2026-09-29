@@ -159,7 +159,7 @@ describe('LibraryScanService', () => {
         updates$.next({ phase: 'discovery', discovered: 3, new: 2, changed: 0, unchanged: 1 })
         // Failure during discovery…
         updates$.next({ phase: 'itemError', path: '/music/locked.flac', error: 'EACCES' })
-        updates$.next({ phase: 'started', total: 2 })
+        updates$.next({ phase: 'started', total: 2, refreshTotal: 0 })
         // …and a failure during the read phase stay separately counted.
         updates$.next({
             phase: 'itemError',
@@ -232,7 +232,7 @@ describe('LibraryScanService', () => {
 
         updates$.next({ phase: 'discovery', discovered: 1, new: 1, changed: 0, unchanged: 0 })
         const afterDiscovery = status.revision
-        updates$.next({ phase: 'started', total: 1 })
+        updates$.next({ phase: 'started', total: 1, refreshTotal: 0 })
 
         expect(afterDiscovery).toBeGreaterThan(initial)
         expect(status.revision).toBeGreaterThan(afterDiscovery)

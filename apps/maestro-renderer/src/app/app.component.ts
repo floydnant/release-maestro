@@ -32,6 +32,7 @@ type ScanIndicatorView =
           discovered: number
           readDone: number
           readTotal: number
+          refreshingMetadata: boolean
           failedFiles: number
       }
     | {
@@ -266,7 +267,7 @@ export class AppComponent {
                     // A resumed deep read can update an unchanged file's metadata.
                     changedSongs: Math.max(
                         status.terminal.changed,
-                        status.terminal.imported - status.terminal.new,
+                        status.terminal.imported - status.terminal.new - (status.refreshTotal ?? 0),
                     ),
                     missingSongs: status.terminal.missing,
                     successfulReads: status.terminal.imported,
@@ -284,6 +285,7 @@ export class AppComponent {
             discovered: status.discovered,
             readDone: status.readDone,
             readTotal: status.readTotal,
+            refreshingMetadata: (status.refreshTotal ?? 0) > 0,
             failedFiles: status.failedFiles,
         }
         return {

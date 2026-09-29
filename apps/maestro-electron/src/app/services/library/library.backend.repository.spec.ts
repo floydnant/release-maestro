@@ -84,7 +84,7 @@ describe('LibraryBackendRepository', () => {
 
     it('dates a song inserted directly during metadata ingest', () => {
         const scannedAt = new Date('2026-07-15T10:00:00Z')
-        repository.ingestMetadata(newSongFixture(), fact, scannedAt)
+        repository.ingestMetadata(newSongFixture(), fact, scannedAt, 1)
 
         expect(db.select().from(songsTable).get()?.addedAt).toEqual(scannedAt)
     })
@@ -101,7 +101,8 @@ describe('LibraryBackendRepository', () => {
         const first = repository.processPrescanBatch([fact], firstSeenAt)
 
         expect(first).toMatchObject({ new: 1, changed: 0, unchanged: 0 })
-        expect(repository.countSongsNeedingMetadata()).toBe(1)
+        expect(repository.countSongsNeedingMetadata(1)).toBe(1)
+        expect(repository.countSongsNeedingVersionRefresh(1)).toBe(0)
 
         const secondSeenAt = new Date('2026-06-15T11:00:00Z')
         const second = repository.processPrescanBatch([fact], secondSeenAt)
@@ -115,11 +116,11 @@ describe('LibraryBackendRepository', () => {
     it('re-reads an untouched file when the normalizer revision has moved on', () => {
         const seenAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], seenAt)
-        repository.ingestMetadata(newSongFixture({ artist: 'Alpha' }), fact, seenAt)
+        repository.ingestMetadata(newSongFixture({ artist: 'Alpha' }), fact, seenAt, 1)
 
         // Ingested at the current revision, so nothing is pending: the file has not
         // changed and neither have the rules that were applied to it.
-        expect(repository.countSongsNeedingMetadata()).toBe(0)
+        expect(repository.countSongsNeedingMetadata(1)).toBe(0)
 
         // Exactly what an older build left behind. The file on disk is untouched, so
         // the fingerprint gate alone would skip this row forever and it would keep
@@ -128,17 +129,42 @@ describe('LibraryBackendRepository', () => {
             .set({ normalizerVersion: NORMALIZER_VERSION - 1 })
             .run()
 
-        expect(repository.countSongsNeedingMetadata()).toBe(1)
-        expect(repository.listSongsNeedingMetadata(null, 10)).toMatchObject([{ path: fact.path }])
+        expect(repository.countSongsNeedingMetadata(1)).toBe(1)
+        expect(repository.listSongsNeedingMetadata(null, 10, 1)).toMatchObject([{ path: fact.path }])
     })
 
     it('treats a row that predates the normalizer version column as pending', () => {
         const seenAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], seenAt)
-        repository.ingestMetadata(newSongFixture({ artist: 'Alpha' }), fact, seenAt)
+        repository.ingestMetadata(newSongFixture({ artist: 'Alpha' }), fact, seenAt, 1)
         db.update(songsTable).set({ normalizerVersion: null }).run()
 
-        expect(repository.countSongsNeedingMetadata()).toBe(1)
+        expect(repository.countSongsNeedingMetadata(1)).toBe(1)
+    })
+
+    it('re-reads an untouched file after the extractor revision changes', () => {
+        const seenAt = new Date('2026-06-15T10:00:00Z')
+        repository.processPrescanBatch([fact], seenAt)
+        repository.ingestMetadata(newSongFixture(), fact, seenAt, 1)
+
+        expect(repository.countSongsNeedingMetadata(1)).toBe(0)
+        expect(repository.countSongsNeedingVersionRefresh(1)).toBe(0)
+        expect(repository.countSongsNeedingMetadata(2)).toBe(1)
+        expect(repository.countSongsNeedingVersionRefresh(2)).toBe(1)
+        expect(repository.listSongsNeedingMetadata(null, 10, 2)).toMatchObject([{ path: fact.path }])
+
+        repository.ingestMetadata(newSongFixture(), fact, seenAt, 2)
+        expect(repository.countSongsNeedingMetadata(2)).toBe(0)
+    })
+
+    it('re-reads rows from before extractor revisions were stored', () => {
+        const seenAt = new Date('2026-06-15T10:00:00Z')
+        repository.processPrescanBatch([fact], seenAt)
+        repository.ingestMetadata(newSongFixture(), fact, seenAt, 1)
+        db.update(songsTable).set({ extractorVersion: null }).run()
+
+        expect(repository.countSongsNeedingMetadata(1)).toBe(1)
+        expect(repository.countSongsNeedingVersionRefresh(1)).toBe(1)
     })
 
     it('keeps performer references separate from compilation album artists', () => {
@@ -238,6 +264,7 @@ describe('LibraryBackendRepository', () => {
             }),
             fact,
             new Date('2026-06-15T10:05:00Z'),
+            1,
         )
 
         const song = db.select().from(songsTable).get()
@@ -312,7 +339,7 @@ describe('LibraryBackendRepository', () => {
                 .where(eq(genreRawNameGenresTable.genreRawNameId, rawGenreName?.id ?? ''))
                 .all(),
         ).toHaveLength(1)
-        expect(repository.countSongsNeedingMetadata()).toBe(0)
+        expect(repository.countSongsNeedingMetadata(1)).toBe(0)
     })
 
     it('attributes artist references to the credit named by the tag', () => {
@@ -375,7 +402,7 @@ describe('LibraryBackendRepository', () => {
         const scannedAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], scannedAt)
         const metadata = newSongFixture({ artist: 'Alpha & Beta' })
-        repository.ingestMetadata(metadata, fact, scannedAt)
+        repository.ingestMetadata(metadata, fact, scannedAt, 1)
 
         const rawName = db
             .select()
@@ -410,7 +437,7 @@ describe('LibraryBackendRepository', () => {
             ])
             .run()
 
-        repository.ingestMetadata(metadata, fact, new Date('2026-06-15T11:00:00Z'))
+        repository.ingestMetadata(metadata, fact, new Date('2026-06-15T11:00:00Z'), 1)
 
         const song = db.select().from(songsTable).get()
         if (!song) throw new Error('expected ingested song')
@@ -429,7 +456,7 @@ describe('LibraryBackendRepository', () => {
         const scannedAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], scannedAt)
         const metadata = newSongFixture({ genre: 'Psytrance / Goa' })
-        repository.ingestMetadata(metadata, fact, scannedAt)
+        repository.ingestMetadata(metadata, fact, scannedAt, 1)
 
         const rawName = db
             .select()
@@ -463,7 +490,7 @@ describe('LibraryBackendRepository', () => {
             ])
             .run()
 
-        repository.ingestMetadata(metadata, fact, new Date('2026-06-15T11:00:00Z'))
+        repository.ingestMetadata(metadata, fact, new Date('2026-06-15T11:00:00Z'), 1)
 
         const song = db.select().from(songsTable).get()
         if (!song) throw new Error('expected ingested song')
@@ -489,7 +516,7 @@ describe('LibraryBackendRepository', () => {
         const scannedAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], scannedAt)
         const metadata = newSongFixture({ artist: 'Alpha & Beta' })
-        repository.ingestMetadata(metadata, fact, scannedAt)
+        repository.ingestMetadata(metadata, fact, scannedAt, 1)
 
         const issue = db
             .select()
@@ -504,7 +531,7 @@ describe('LibraryBackendRepository', () => {
             .where(eq(normalizationIssuesTable.id, issue.id))
             .run()
 
-        repository.ingestMetadata(metadata, fact, new Date('2026-06-15T11:00:00Z'))
+        repository.ingestMetadata(metadata, fact, new Date('2026-06-15T11:00:00Z'), 1)
 
         expect(
             db.select().from(normalizationIssuesTable).where(eq(normalizationIssuesTable.id, issue.id)).get(),
@@ -517,7 +544,7 @@ describe('LibraryBackendRepository', () => {
     it('marks open normalization issues as disappeared when the detector no longer emits them', () => {
         const scannedAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], scannedAt)
-        repository.ingestMetadata(newSongFixture({ artist: 'Alpha & Beta' }), fact, scannedAt)
+        repository.ingestMetadata(newSongFixture({ artist: 'Alpha & Beta' }), fact, scannedAt, 1)
 
         const issue = db
             .select()
@@ -527,7 +554,7 @@ describe('LibraryBackendRepository', () => {
         if (!issue) throw new Error('expected normalization issue')
 
         const rescannedAt = new Date('2026-06-15T11:00:00Z')
-        repository.ingestMetadata(newSongFixture({ artist: 'Alpha' }), fact, rescannedAt)
+        repository.ingestMetadata(newSongFixture({ artist: 'Alpha' }), fact, rescannedAt, 1)
 
         expect(
             db.select().from(normalizationIssuesTable).where(eq(normalizationIssuesTable.id, issue.id)).get(),

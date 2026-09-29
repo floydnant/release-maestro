@@ -163,6 +163,9 @@
                             @if (scan.phase === 'discovering') {
                                 Scanning library…
                             } @else {
+                                @if (scan.refreshingMetadata) {
+                                    Refreshing metadata after app update.
+                                }
                                 Reading
                                 <span class="font-mono">{{ scan.readDone }}/{{ scan.readTotal }}</span> tracks
                                 @if (scan.failedFiles > 0) {

@@ -54,7 +54,7 @@ _Avoid_: crawl, walk, indexing
 
 **Deep read**:
 The second scan phase. Reads full tags and cover art for the files that need it. Its queue comes from
-a fingerprint mismatch in the database, not from the discovery tallies — which is what makes an
+a fingerprint or extractor/normalizer revision mismatch in the database, not from the discovery tallies — which is what makes an
 interrupted scan resumable.
 _Avoid_: full scan, tag scan
 
