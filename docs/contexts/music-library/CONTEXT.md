@@ -131,6 +131,15 @@ also retain references relevant to their entity type. Artist references come fro
 and album credits that resolve to that artist.
 _Avoid_: fingerprint, external match, verified identity
 
+**Disc number**:
+The tagged disc position of a song within an album. Album track lists order by disc number, then
+track number. A missing disc number stays `null`; the app does not infer one from file order.
+
+**Disc total** / **track total**:
+The tagged number of discs in an album and tracks on one disc. Album detail uses the sum of known
+per-disc track totals when every disc has one. If the loaded song count differs from that sum, the
+header shows a fraction such as "5/8 tracks". Disc sections use the same count format.
+
 **Album**:
 A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,
 `albumArtists`, an "Albums" tab, "12 albums". It is what music players call this, and it is what
