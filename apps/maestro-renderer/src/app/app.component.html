@@ -203,12 +203,12 @@
                                     (scan.failedFiles > 0 && scan.successfulReads > 0) ||
                                     (scan.failedFiles === 0 &&
                                         scan.missingSongs === 0 &&
-                                        (scan.newSongs > 0 || scan.changedSongs > 0))
+                                        (scan.newSongs > 0 || scan.changedSongs > 0 || scan.refreshedMetadata))
                                 "
                                 [class.text-content-secondary]="
                                     (scan.failedFiles === 0 &&
                                         (scan.missingSongs > 0 ||
-                                            (scan.newSongs === 0 && scan.changedSongs === 0))) ||
+                                            (scan.newSongs === 0 && scan.changedSongs === 0 && !scan.refreshedMetadata))) ||
                                     (scan.failedFiles > 0 &&
                                         scan.successfulReads === 0 &&
                                         scan.readableFiles > 0)
@@ -256,7 +256,10 @@
                                         }
                                     </span>
                                 } @else if (
-                                    scan.newSongs === 0 && scan.changedSongs === 0 && scan.missingSongs === 0
+                                    scan.newSongs === 0 &&
+                                    scan.changedSongs === 0 &&
+                                    scan.missingSongs === 0 &&
+                                    !scan.refreshedMetadata
                                 ) {
                                     <app-icon
                                         class="size-[25px] shrink-0"
@@ -292,8 +295,18 @@
                                         Updated {{ scan.changedSongs }}
                                         {{ scan.changedSongs === 1 ? 'track' : 'tracks' }}
                                     }
-                                    @if (scan.missingSongs > 0) {
+                                    @if (scan.refreshedMetadata) {
                                         @if (scan.newSongs > 0 || scan.changedSongs > 0) {
+                                            ·
+                                        }
+                                        Metadata refreshed
+                                    }
+                                    @if (scan.missingSongs > 0) {
+                                        @if (
+                                            scan.newSongs > 0 ||
+                                            scan.changedSongs > 0 ||
+                                            scan.refreshedMetadata
+                                        ) {
                                             ·
                                         }
                                         {{ scan.missingSongs }}

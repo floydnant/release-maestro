@@ -40,6 +40,7 @@ type ScanIndicatorView =
           scanId: number
           newSongs: number
           changedSongs: number
+          refreshedMetadata: boolean
           successfulReads: number
           /**
            * Files the library holds that read fine, now or in an earlier scan. A file that fails is
@@ -269,6 +270,7 @@ export class AppComponent {
                         status.terminal.changed,
                         status.terminal.imported - status.terminal.new - (status.refreshTotal ?? 0),
                     ),
+                    refreshedMetadata: (status.refreshTotal ?? 0) > 0,
                     missingSongs: status.terminal.missing,
                     successfulReads: status.terminal.imported,
                     readableFiles: status.terminal.discovered - status.terminal.readFailureCount,

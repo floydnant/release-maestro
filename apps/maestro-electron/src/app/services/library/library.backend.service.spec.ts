@@ -4,6 +4,8 @@ import { MetadataPrescanUpdate, MetadataScanUpdate, PrescanFileFact } from '@rel
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
 import { LibraryBackendService } from './library.backend.service'
 
+const EXTRACTOR_VERSION = '1111111111111111'
+
 const fact: PrescanFileFact = {
     path: '/music/song.flac',
     fileName: 'song.flac',
@@ -27,7 +29,11 @@ describe('LibraryBackendService', () => {
         const repository = newRepositoryMock()
         const scanSeenAt = repository.nextScanSeenAt()
         const metadataService = {
-            ping: jest.fn(async () => ({ protocolVersion: 1, engineVersion: '0.1.0', extractorVersion: 1 })),
+            ping: jest.fn(async () => ({
+                protocolVersion: 1,
+                engineVersion: '0.1.0',
+                extractorVersion: EXTRACTOR_VERSION,
+            })),
             prescan: jest.fn((): Observable<MetadataPrescanUpdate> =>
                 from<MetadataPrescanUpdate[]>([
                     { phase: 'started' },
@@ -49,11 +55,16 @@ describe('LibraryBackendService', () => {
 
         expect(repository.processPrescanBatch).toHaveBeenCalledWith([fact], scanSeenAt, false)
         expect(repository.markNotSeenPresent).toHaveBeenCalledWith(scanSeenAt)
-        expect(repository.countSongsNeedingMetadata).toHaveBeenCalledWith(1)
-        expect(repository.countSongsNeedingVersionRefresh).toHaveBeenCalledWith(1)
-        expect(repository.listSongsNeedingMetadata).toHaveBeenCalledWith(null, 100, 1)
+        expect(repository.countSongsNeedingMetadata).toHaveBeenCalledWith(EXTRACTOR_VERSION)
+        expect(repository.countSongsNeedingVersionRefresh).toHaveBeenCalledWith(EXTRACTOR_VERSION)
+        expect(repository.listSongsNeedingMetadata).toHaveBeenCalledWith(null, 100, EXTRACTOR_VERSION)
         expect(metadataService.readFiles).toHaveBeenCalledWith([fact.path], undefined)
-        expect(repository.ingestMetadata).toHaveBeenCalledWith(metadata, fact, expect.any(Date), 1)
+        expect(repository.ingestMetadata).toHaveBeenCalledWith(
+            metadata,
+            fact,
+            expect.any(Date),
+            EXTRACTOR_VERSION,
+        )
         expect(updates).toEqual([
             { phase: 'discovery', discovered: 1, new: 1, changed: 0, unchanged: 0 },
             { phase: 'started', total: 1, refreshTotal: 0 },
@@ -77,7 +88,11 @@ describe('LibraryBackendService', () => {
         repository.countSongsNeedingMetadata.mockReturnValue(0)
         repository.listSongsNeedingMetadata.mockReset().mockReturnValue([])
         const metadataService = {
-            ping: jest.fn(async () => ({ protocolVersion: 1, engineVersion: '0.1.0', extractorVersion: 1 })),
+            ping: jest.fn(async () => ({
+                protocolVersion: 1,
+                engineVersion: '0.1.0',
+                extractorVersion: EXTRACTOR_VERSION,
+            })),
             prescan: jest.fn((): Observable<MetadataPrescanUpdate> =>
                 from<MetadataPrescanUpdate[]>([
                     { phase: 'started' },
@@ -103,7 +118,11 @@ describe('LibraryBackendService', () => {
         const abortController = new AbortController()
         const prescan$ = new Subject<MetadataPrescanUpdate>()
         const metadataService = {
-            ping: jest.fn(async () => ({ protocolVersion: 1, engineVersion: '0.1.0', extractorVersion: 1 })),
+            ping: jest.fn(async () => ({
+                protocolVersion: 1,
+                engineVersion: '0.1.0',
+                extractorVersion: EXTRACTOR_VERSION,
+            })),
             prescan: jest.fn(() => prescan$.asObservable()),
             readFiles: jest.fn(),
         }

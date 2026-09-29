@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "60f1055f-f6fd-4547-adaf-4972dfa1c1a8",
+  "id": "9bed4514-f7d3-4b8e-82a3-2bf6e592bc1d",
   "prevId": "72e00009-8d15-42c4-802e-60079a68ae77",
   "tables": {
     "album_artists": {
@@ -1462,7 +1462,7 @@
         },
         "extractor_version": {
           "name": "extractor_version",
-          "type": "integer",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

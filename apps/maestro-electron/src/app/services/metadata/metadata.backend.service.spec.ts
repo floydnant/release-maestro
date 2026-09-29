@@ -71,13 +71,13 @@ describe('MetadataBackendService', () => {
                 type: 'response',
                 id: 'fake',
                 ok: true,
-                result: { protocolVersion: 1, engineVersion: '0.1.0', extractorVersion: 1 },
+                result: { protocolVersion: 1, engineVersion: '0.1.0', extractorVersion: '1111111111111111' },
             })
 
             await expect(service.ping()).resolves.toEqual({
                 protocolVersion: 1,
                 engineVersion: '0.1.0',
-                extractorVersion: 1,
+                extractorVersion: '1111111111111111',
             })
             expect(sidecar.sendCalls[0]).toEqual({ method: 'ping', params: {} })
         })
