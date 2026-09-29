@@ -45,6 +45,35 @@ const completedStatus = (
 }
 
 test.describe('startup scan summary', () => {
+    test('a startup scan can be cancelled from the title bar', async ({ page }) => {
+        const reading: LibraryScanStatus = {
+            ...completedStatus(0, 1),
+            revision: 1,
+            phase: 'reading',
+            finishedAt: null,
+            readDone: 0,
+            terminal: null,
+        }
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: reading, albums: [], lastScan: null },
+            })
+            .build()
+        const controller = await createRendererScenario(page, scenario, '/home')
+
+        const cancel = page.getByRole('button', { name: 'Cancel scan' })
+        await expect(cancel).toBeVisible()
+        await cancel.click()
+        await expect.poll(async () => (await controller.calls('library:cancel-scan')).length).toBe(1)
+
+        await controller.emit('library:scan-status', {
+            status: { ...reading, revision: 2, phase: 'cancelled' },
+            newAlbums: [],
+        })
+        await expect(cancel).toBeHidden()
+    })
+
     test('hides the completed summary after four seconds', async ({ page }) => {
         const scenario = scenarioBuilder()
             .handler('library:get-scan-status', {

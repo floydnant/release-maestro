@@ -164,7 +164,7 @@ export class LibrarySettingsComponent {
                 await this.library.saveFolders(this.folders())
                 this.savedFolders.set(this.folders())
             }
-            await this.library.startScan('manual')
+            if (this.folders().length > 0) await this.library.startScan('manual')
         } finally {
             this.saveInFlight.set(false)
         }

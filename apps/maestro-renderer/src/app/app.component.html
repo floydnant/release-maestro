@@ -204,6 +204,15 @@
                                 }
                             }
                         </p>
+                        @if (libraryService.isScanning()) {
+                            <button
+                                class="scan-cancel | type-body-sm self-center rounded-sm px-2 py-1 text-content-muted [-webkit-app-region:no-drag] hover:bg-action-quiet-hover hover:text-content-primary focus-visible:outline-2 focus-visible:outline-border-focus"
+                                type="button"
+                                (click)="libraryService.cancelScan()"
+                            >
+                                Cancel scan
+                            </button>
+                        }
                     }
                 }
                 <p class="scan-summary | type-body-sm" role="status" aria-live="polite">

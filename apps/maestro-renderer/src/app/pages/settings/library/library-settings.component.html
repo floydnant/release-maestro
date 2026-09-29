@@ -20,24 +20,29 @@
         <button
             class="btn-primary"
             type="button"
-            [disabled]="saveInFlight() || library.isScanning() || folders().length === 0"
+            [disabled]="saveInFlight() || library.isScanning() || (!isDirty() && folders().length === 0)"
             (click)="saveAndRescan()"
         >
-            {{ isDirty() ? 'Save and rescan' : 'Rescan now' }}
+            {{ folders().length === 0 ? 'Save changes' : isDirty() ? 'Save and rescan' : 'Rescan now' }}
         </button>
     </div>
 
     <h2 class="type-section-title mt-8 text-content-primary">Scan status</h2>
     @if (library.isScanning()) {
         @if (library.scanStatus(); as scanStatus) {
-            <p class="type-body-sm mt-2 flex items-center gap-2 text-content-secondary">
-                <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
-                @if (scanStatus.phase === 'discovering') {
-                    Discovering files… {{ scanStatus.discovered }} found
-                } @else {
-                    Reading tracks… {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
-                }
-            </p>
+            <div class="scan-status-actions | mt-2 flex flex-wrap items-center gap-3">
+                <p class="type-body-sm flex items-center gap-2 text-content-secondary">
+                    <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
+                    @if (scanStatus.phase === 'discovering') {
+                        Discovering files… {{ scanStatus.discovered }} found
+                    } @else {
+                        Reading tracks… {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
+                    }
+                </p>
+                <button class="btn-nkd-neutral" type="button" (click)="library.cancelScan()">
+                    Cancel scan
+                </button>
+            </div>
         }
     } @else if (terminalSummaryText(); as summaryText) {
         <p class="type-body-sm mt-2 text-content-secondary" aria-label="Latest scan result">
