@@ -46,6 +46,7 @@ import {
     exists,
     inArray,
     isNotNull,
+    max,
     not,
     sql,
     sum,
@@ -684,6 +685,9 @@ export class LibraryBrowseRepository {
                 albumId: row.albumId,
                 albumTitle: row.albumTitle,
                 trackNumber: row.trackNumber,
+                discNumber: row.discNumber,
+                discTotal: row.discTotal,
+                trackTotal: row.trackTotal,
                 genreText: row.genreText,
                 genres: genresBySong.get(row.id) ?? [],
                 recordLabelId: row.recordLabelId,
@@ -733,6 +737,9 @@ export class LibraryBrowseRepository {
                 albumId: songsTable.albumId,
                 albumTitle: songsTable.albumTitle,
                 trackNumber: songsTable.trackNumber,
+                discNumber: songsTable.discNumber,
+                discTotal: songsTable.discTotal,
+                trackTotal: songsTable.trackTotal,
                 genreText: songsTable.genreText,
                 recordLabelId: albumsTable.recordLabelId,
                 recordLabelText: songsTable.recordLabelText,
@@ -1163,6 +1170,36 @@ export class LibraryBrowseRepository {
             .where(eq(songsTable.albumId, albumId))
             .get()
 
+        const discRows = this.database.db
+            .select({
+                discNumber: songsTable.discNumber,
+                songCount: count(),
+                trackTotal: max(songsTable.trackTotal),
+                discTotal: max(songsTable.discTotal),
+            })
+            .from(songsTable)
+            .where(eq(songsTable.albumId, albumId))
+            .groupBy(songsTable.discNumber)
+            .orderBy(asc(songsTable.discNumber))
+            .all()
+        let startIndex = 0
+        const discGroups = discRows.map(row => {
+            const group = {
+                discNumber: row.discNumber,
+                songCount: row.songCount,
+                trackTotal: row.trackTotal,
+                startIndex,
+            }
+            startIndex += row.songCount
+            return group
+        })
+        const multiDisc =
+            discRows.length > 1 || discRows.some(row => (row.discTotal ?? 0) > 1 || (row.discNumber ?? 0) > 1)
+        const trackTotal =
+            discGroups.length > 0 && discGroups.every(group => group.trackTotal != null)
+                ? discGroups.reduce((total, group) => total + (group.trackTotal ?? 0), 0)
+                : null
+
         const genres = this.database.db
             .selectDistinct({ id: genresTable.id, name: genresTable.name })
             .from(songsTable)
@@ -1184,6 +1221,8 @@ export class LibraryBrowseRepository {
             recordLabelId: album.recordLabelId,
             recordLabelText: album.recordLabelText,
             songCount: totals?.songCount ?? 0,
+            trackTotal,
+            discGroups: multiDisc ? discGroups : [],
             // `sum` returns a string from SQLite's numeric affinity, and null when no
             // song on the album carries a duration at all.
             totalDuration: totals?.totalDuration == null ? null : Number(totals.totalDuration),
@@ -1260,6 +1299,9 @@ type CatalogEntityTable =
  */
 export const songOrdering = (sort: SongQuery['sort']): SQL[] => {
     const direction = sort.direction == 'desc' ? desc : asc
+    if (sort.field == SongSortField.trackNumber) {
+        return [direction(songsTable.discNumber), direction(songsTable.trackNumber), direction(songsTable.id)]
+    }
     return [direction(sortColumns[sort.field]), direction(songsTable.id)]
 }
 

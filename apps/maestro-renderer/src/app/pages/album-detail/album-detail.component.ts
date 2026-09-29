@@ -46,6 +46,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component'
 import {
     SongTableComponent,
     type SongTableColumn,
+    type SongTableGroup,
 } from '../../shared/components/song-table/song-table.component'
 import { AlbumDetailHeaderComponent } from './album-detail-header.component'
 
@@ -53,17 +54,13 @@ import { AlbumDetailHeaderComponent } from './album-detail-header.component'
  * One album: its own attributes, and its tracks.
  *
  * **The tracks are an ordinary browse surface**, not an inline list — a windowed
- * `SongQuery` filtered to this album and sorted by `trackNumber`, rendered by the same
+ * `SongQuery` filtered to this album and sorted by disc then track number, rendered by the same
  * `SongTable` the track list uses. A detail page that loaded its tracks whole would be
  * the one surface that ignores ADR 0004, and a 200-track compilation is exactly where
  * that stops being free.
  *
- * **Track order is `trackNumber` and cannot be better than that yet.** There is no disc
- * number anywhere in the system (MAE-123), so a multi-disc album renders `1, 1, 2, 2, 3,
- * 3…`. That is accepted rather than worked around: every workaround available here —
- * inferring discs from a gap in the numbering, from the file path, from the tag order —
- * guesses, and a guess that is usually right is worse than an ordering that is honestly
- * limited.
+ * Disc sections use boundaries from the album detail aggregate, so a window can start
+ * in the middle of a disc without creating a false section heading.
  */
 
 /** How often a running scan is allowed to refetch the visible window. */
@@ -81,8 +78,7 @@ export const ALBUM_ID_PARAM = 'albumId'
 /**
  * Album order, and what the URL means by carrying no sort at all.
  *
- * A multi-disc album renders `1, 1, 2, 2, 3, 3…` under this and cannot do better —
- * there is no disc number anywhere in the system until MAE-123 lands one.
+ * The read model orders by disc number before track number for this sort.
  */
 const DEFAULT_TRACK_SORT: SongSort = { field: SongSortField.trackNumber, direction: 'asc' }
 
@@ -268,6 +264,15 @@ export class AlbumDetailComponent {
     )
 
     protected songCountLabel = computed(() => (this.headerSongCount() == 1 ? TRACK_LABEL : TRACKS_LABEL))
+
+    protected discGroups = computed<readonly SongTableGroup[]>(() => {
+        if (this.sort().field != SongSortField.trackNumber || this.sort().direction != 'asc') return []
+        return (this.album()?.discGroups ?? []).map(group => ({
+            startIndex: group.startIndex,
+            label: group.discNumber == null ? 'Disc unknown' : `Disc ${group.discNumber}`,
+            summary: `${group.songCount}${group.trackTotal != null && group.trackTotal != group.songCount ? `/${group.trackTotal}` : ''} ${group.songCount == 1 && (group.trackTotal == null || group.trackTotal == group.songCount) ? 'track' : 'tracks'}`,
+        }))
+    })
 
     /**
      * This page's columns, which differ from the default in both directions.
