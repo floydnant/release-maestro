@@ -139,7 +139,9 @@ export class LibraryBackendService {
                 }
 
                 if (abortSignal?.aborted) return
-                if (ingested > 0) this.repository.reconcileUnusedMetadata()
+                // A cancelled scan may have ingested a song before it stopped. A later
+                // scan must collect entities left behind even when it reads no files.
+                this.repository.removeUnusedCatalogEntities()
 
                 subscriber.next({
                     phase: 'completed',

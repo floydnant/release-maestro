@@ -658,10 +658,10 @@ export class LibraryBackendRepository {
         })
     }
 
-    reconcileUnusedMetadata(): void {
+    removeUnusedCatalogEntities(): void {
         this.database.db.transaction(tx => {
             // A re-read can move the last song off an album. Drop empty albums first
-            // so their artist and label links do not keep obsolete entities alive.
+            // so their artist and record label links do not keep obsolete entities alive.
             tx.run(sql`DELETE FROM albums WHERE NOT EXISTS (
                 SELECT 1 FROM songs WHERE songs.album_id = albums.id
             )`)

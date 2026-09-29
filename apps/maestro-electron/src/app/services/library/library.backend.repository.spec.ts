@@ -613,7 +613,7 @@ describe('LibraryBackendRepository', () => {
             new Date('2026-06-15T11:00:00Z'),
             NEXT_EXTRACTOR_VERSION,
         )
-        repository.reconcileUnusedMetadata()
+        repository.removeUnusedCatalogEntities()
 
         expect(
             db
