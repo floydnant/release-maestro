@@ -216,9 +216,7 @@ export class AlbumDetailComponent {
         () => ({
             query: this.query(),
             rowHeight:
-                this.sort().field == SongSortField.trackNumber &&
-                this.sort().direction == 'asc' &&
-                this.album()?.discGroups.length
+                this.sort().field == SongSortField.trackNumber && this.album()?.discGroups.length
                     ? GROUPED_SONG_ROW_HEIGHT
                     : LIST_ROW_HEIGHT,
         }),
@@ -279,12 +277,32 @@ export class AlbumDetailComponent {
     protected songCountLabel = computed(() => (this.headerSongCount() == 1 ? TRACK_LABEL : TRACKS_LABEL))
 
     protected discGroups = computed<readonly SongTableGroup[]>(() => {
-        if (this.sort().field != SongSortField.trackNumber || this.sort().direction != 'asc') return []
-        return (this.album()?.discGroups ?? []).map(group => ({
-            startIndex: group.startIndex,
-            label: group.discNumber == null ? 'Disc unknown' : `Disc ${group.discNumber}`,
-            summary: `${group.songCount}${group.trackTotal != null && group.trackTotal != group.songCount ? `/${group.trackTotal}` : ''} ${group.songCount == 1 && (group.trackTotal == null || group.trackTotal == group.songCount) ? 'track' : 'tracks'}`,
-        }))
+        if (this.sort().field != SongSortField.trackNumber) return []
+        const album = this.album()
+        if (!album) return []
+        const ordered = this.sort().direction == 'desc' ? [...album.discGroups].reverse() : album.discGroups
+        let startIndex = 0
+        const groups = ordered.map(group => {
+            const section = {
+                discNumber: group.discNumber,
+                startIndex: startIndex,
+                label: group.discNumber == null ? 'Disc unknown' : `Disc ${group.discNumber}`,
+                summary: `${group.songCount}${group.trackTotal != null && group.trackTotal != group.songCount ? `/${group.trackTotal}` : ''} ${group.songCount == 1 && (group.trackTotal == null || group.trackTotal == group.songCount) ? 'track' : 'tracks'}`,
+            }
+            startIndex += group.songCount
+            return section
+        })
+        const result = this.result()
+        if (result.rows.some(song => song.albumId != album.id)) return []
+        return groups.every((group, position) =>
+            result.rows.every((song, rowIndex) => {
+                const index = result.offset + rowIndex
+                const nextStart = groups[position + 1]?.startIndex ?? Number.POSITIVE_INFINITY
+                return index < group.startIndex || index >= nextStart || song.discNumber == group.discNumber
+            }),
+        )
+            ? groups
+            : []
     })
 
     /**
