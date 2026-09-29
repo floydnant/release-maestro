@@ -20,7 +20,9 @@
     ></app-folder-list>
 
     <div class="mt-4 flex items-center gap-3">
-        <button class="btn-neutral" type="button" (click)="addFolders()">Add folders…</button>
+        <button #addFoldersButton class="btn-neutral" type="button" (click)="addFolders()">
+            Add folders…
+        </button>
         <button
             class="btn-primary"
             type="button"
@@ -43,7 +45,7 @@
                         Reading tracks… {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
                     }
                 </p>
-                <button class="btn-nkd-neutral" type="button" (click)="library.cancelScan()">
+                <button class="btn-nkd-neutral" type="button" (click)="cancelScan($event)">
                     Cancel scan
                 </button>
             </div>

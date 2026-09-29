@@ -209,4 +209,28 @@ describe('LibraryService snapshot/event ordering', () => {
             library: { folders: ['/music', '/offline'] },
         })
     })
+
+    it('keeps the library accessible when the last folder is removed', async () => {
+        ipcRenderer.invoke.mockImplementation((channel: string) => {
+            if (channel === LibraryIpcChannel.getScanStatus) {
+                return new Promise<LibraryScanSnapshot>(resolve => {
+                    resolveSnapshot = resolve
+                })
+            }
+            if (channel === LibraryIpcChannel.validateFolders) return Promise.resolve([])
+            if (channel === 'patch-settings') {
+                return Promise.resolve({ library: { folders: [], onboardingSkipped: true } })
+            }
+            return Promise.resolve(undefined)
+        })
+        const service = setup()
+        resolveSnapshot({ status: null, albums: [], lastScan: null })
+        await service.synced
+
+        await service.saveFolders([])
+
+        expect(ipcRenderer.invoke).toHaveBeenCalledWith('patch-settings', {
+            library: { folders: [], onboardingSkipped: true },
+        })
+    })
 })

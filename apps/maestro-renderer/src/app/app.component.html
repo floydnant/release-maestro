@@ -160,7 +160,9 @@
 
     <div class="app-shell__content | flex min-w-0 flex-1 flex-col">
         <header
-            class="title-bar | flex h-[2.25rem] flex-none items-stretch text-content-secondary select-none [-webkit-app-region:drag]"
+            #titleBar
+            class="title-bar | flex h-[2.25rem] flex-none items-stretch text-content-secondary select-none [-webkit-app-region:drag] focus-visible:outline-2 focus-visible:outline-border-focus"
+            tabindex="-1"
             [class]="
                 isImportRoute()
                     ? 'title-bar--overlay | absolute inset-x-0 top-0 z-50 [border-bottom-style:none] border-b-current bg-transparent'
@@ -208,7 +210,7 @@
                             <button
                                 class="scan-cancel | type-body-sm self-center rounded-sm px-2 py-1 text-content-muted [-webkit-app-region:no-drag] hover:bg-action-quiet-hover hover:text-content-primary focus-visible:outline-2 focus-visible:outline-border-focus"
                                 type="button"
-                                (click)="libraryService.cancelScan()"
+                                (click)="cancelScan($event)"
                             >
                                 Cancel scan
                             </button>

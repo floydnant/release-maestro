@@ -64,7 +64,8 @@ test.describe('startup scan summary', () => {
 
         const cancel = page.getByRole('button', { name: 'Cancel scan' })
         await expect(cancel).toBeVisible()
-        await cancel.click()
+        await cancel.focus()
+        await cancel.press('Enter')
         await expect.poll(async () => (await controller.calls('library:cancel-scan')).length).toBe(1)
 
         await controller.emit('library:scan-status', {
@@ -72,6 +73,7 @@ test.describe('startup scan summary', () => {
             newAlbums: [],
         })
         await expect(cancel).toBeHidden()
+        await expect(page.locator('header.title-bar')).toBeFocused()
     })
 
     test('hides the completed summary after four seconds', async ({ page }) => {

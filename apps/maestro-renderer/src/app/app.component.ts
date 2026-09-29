@@ -4,9 +4,11 @@ import {
     computed,
     DestroyRef,
     effect,
+    ElementRef,
     inject,
     linkedSignal,
     signal,
+    viewChild,
 } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
@@ -76,6 +78,7 @@ export class AppComponent {
     history = inject(HistoryService)
     private settingsService = inject(SettingsService)
     private router = inject(Router)
+    private readonly titleBar = viewChild.required<ElementRef<HTMLElement>>('titleBar')
 
     readonly isElectron = this.electronService.isElectron
     readonly isMacos = this.isElectron && this.electronService.platform === 'darwin'
@@ -124,6 +127,13 @@ export class AppComponent {
     }
     cancelEmailImport() {
         this.feedService.cancelEmailImport()
+    }
+
+    cancelScan(event: MouseEvent): void {
+        if (event.currentTarget === document.activeElement) {
+            this.titleBar().nativeElement.focus({ preventScroll: true })
+        }
+        this.libraryService.cancelScan()
     }
 
     minimizeWindow() {

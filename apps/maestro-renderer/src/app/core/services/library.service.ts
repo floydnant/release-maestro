@@ -136,7 +136,13 @@ export class LibraryService {
     async saveFolders(folders: string[]): Promise<void> {
         const validations = await this.validateFolders(folders)
         const canonicalFolders = [...new Set(validations.map(validation => validation.canonicalPath))]
-        await this.settingsService.patchSettings({ library: { folders: canonicalFolders } })
+        // Clearing an established library must not send the user back through onboarding.
+        await this.settingsService.patchSettings({
+            library: {
+                folders: canonicalFolders,
+                ...(canonicalFolders.length === 0 ? { onboardingSkipped: true } : {}),
+            },
+        })
     }
 
     /** Remember that the user skipped library onboarding (keeps the nudge CTA instead). */

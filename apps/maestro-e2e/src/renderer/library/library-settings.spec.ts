@@ -78,7 +78,9 @@ test.describe('library settings scenarios', () => {
 
         await expect(page.getByText('Reading tracks… 1/2')).toBeVisible()
         await expect(page.getByRole('button', { name: 'Rescan now' })).toBeDisabled()
-        await page.getByRole('button', { name: 'Cancel scan' }).last().click()
+        const cancel = page.getByRole('button', { name: 'Cancel scan' }).last()
+        await cancel.focus()
+        await cancel.press('Enter')
         await expect.poll(async () => (await controller.calls('library:cancel-scan')).length).toBe(1)
 
         const cancelled = terminalResult({ outcome: 'cancelled', trigger: 'manual' })
@@ -87,6 +89,7 @@ test.describe('library settings scenarios', () => {
             newAlbums: [],
         })
         await expect(page.getByLabel('Latest scan result')).toContainText('Cancelled')
+        await expect(page.getByRole('button', { name: 'Add folders…' })).toBeFocused()
         await expect(page.getByRole('button', { name: 'Rescan now' })).toBeEnabled()
 
         await page.getByRole('button', { name: 'Remove folder' }).click()
@@ -95,9 +98,16 @@ test.describe('library settings scenarios', () => {
         await expect
             .poll(async () => (await controller.calls('patch-settings')).at(-1)?.payload)
             .toEqual({
-                library: { folders: [] },
+                library: { folders: [], onboardingSkipped: true },
             })
         expect(await controller.calls('library:start-scan')).toHaveLength(0)
+
+        await controller.setHandler('get-settings', {
+            kind: 'resolve',
+            value: { library: { folders: [], onboardingSkipped: true }, emailPluginConfig: {} },
+        })
+        await page.getByRole('link', { name: 'Home' }).click()
+        await expect(page).toHaveURL(/\/home$/)
     })
 
     // Rescanning with a drive unplugged is how its tracks get marked missing, so an
