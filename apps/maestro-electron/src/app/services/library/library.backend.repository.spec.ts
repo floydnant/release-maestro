@@ -575,4 +575,89 @@ describe('LibraryBackendRepository', () => {
             closedAt: rescannedAt,
         })
     })
+
+    it('collects entities left behind by a re-read while retaining confirmed resolutions', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        repository.ingestMetadata(
+            newSongFixture({
+                artist: 'Old Artist',
+                albumArtist: 'Old Artist',
+                albumTitle: 'Old Album',
+                genre: 'Old Genre',
+                label: 'Old Label',
+            }),
+            fact,
+            scannedAt,
+            EXTRACTOR_VERSION,
+        )
+        const confirmedArtist = db
+            .select()
+            .from(artistRawNamesTable)
+            .where(eq(artistRawNamesTable.rawText, 'Old Artist'))
+            .get()
+        if (!confirmedArtist) throw new Error('expected raw artist name')
+        db.update(artistRawNamesTable)
+            .set({ confirmedByUser: true })
+            .where(eq(artistRawNamesTable.id, confirmedArtist.id))
+            .run()
+
+        repository.ingestMetadata(
+            newSongFixture({
+                artist: 'New Artist',
+                albumArtist: 'New Artist',
+                albumTitle: 'New Album',
+                genre: 'New Genre',
+                label: 'New Label',
+            }),
+            fact,
+            new Date('2026-06-15T11:00:00Z'),
+            NEXT_EXTRACTOR_VERSION,
+        )
+        repository.reconcileUnusedMetadata()
+
+        expect(
+            db
+                .select()
+                .from(albumsTable)
+                .all()
+                .map(album => album.title),
+        ).toEqual(['New Album'])
+        expect(
+            db
+                .select()
+                .from(artistsTable)
+                .all()
+                .map(artist => artist.name)
+                .sort(),
+        ).toEqual(['New Artist', 'Old Artist'])
+        expect(
+            db
+                .select()
+                .from(genresTable)
+                .all()
+                .map(genre => genre.name),
+        ).toEqual(['New Genre'])
+        expect(
+            db
+                .select()
+                .from(recordLabelsTable)
+                .all()
+                .map(label => label.name),
+        ).toEqual(['New Label'])
+        expect(
+            db
+                .select()
+                .from(artistRawNamesTable)
+                .all()
+                .map(name => name.rawText)
+                .sort(),
+        ).toEqual(['New Artist', 'Old Artist'])
+        expect(
+            db
+                .select()
+                .from(genreRawNamesTable)
+                .all()
+                .map(name => name.rawText),
+        ).toEqual(['New Genre'])
+    })
 })

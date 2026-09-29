@@ -67,7 +67,11 @@ export class MetadataBackendService {
     ) {}
 
     async ping(): Promise<PingResult> {
-        return unwrap(await this.sidecar.send<PingResult>('ping', {}))
+        const result = unwrap(await this.sidecar.send<PingResult>('ping', {}))
+        if (typeof result.extractorVersion !== 'string' || !/^[0-9a-f]{16}$/.test(result.extractorVersion)) {
+            throw new Error('metadata-engine returned an invalid extractor version')
+        }
+        return result
     }
 
     async readFile(path: string): Promise<SongMetadata | null> {
