@@ -827,6 +827,7 @@ test.describe('the album detail page', () => {
         await expect(page.getByText('Disc 1')).toBeVisible()
         await expect(page.getByText('Disc 2')).toBeVisible()
         await expect(page.getByText('1/3 tracks')).toBeVisible()
+        await expect(page.getByRole('row', { name: 'Disc 1, Second' })).toBeVisible()
     })
 
     test('does not show the previous album’s tracks during same-route navigation', async ({ page }) => {
