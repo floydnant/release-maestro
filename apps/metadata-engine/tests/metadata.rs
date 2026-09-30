@@ -632,6 +632,8 @@ fn growing_and_shrinking_iff_tags_keeps_container_sizes_valid() {
         ("spunoff-el-sueno-untagged.aiff", true),
     ] {
         let path = library.copy(name);
+        #[cfg(unix)]
+        let original = std::fs::metadata(&path).unwrap();
         for update in [
             json!({"title": "Gökotta"}),
             json!({"artist": "SpunOff", "bpm": 130.5, "lyrics": "Words".repeat(10_000)}),
@@ -640,6 +642,13 @@ fn growing_and_shrinking_iff_tags_keeps_container_sizes_valid() {
             let mut params = library.params(&path);
             params["update"] = update.clone();
             Engine::new().request("write_tags", params);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                let current = std::fs::metadata(&path).unwrap();
+                assert_eq!(current.dev(), original.dev(), "{name}: device");
+                assert_eq!(current.ino(), original.ino(), "{name}: inode");
+            }
             let bytes = std::fs::read(&path).unwrap();
             let size_bytes = bytes[4..8].try_into().unwrap();
             let size = if big {

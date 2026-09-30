@@ -44,10 +44,7 @@ secondary RIFF aliases do not reappear.
 The fixture manifest uses typed fields and rejects unknown keys, invalid flags, and unknown aliases.
 
 `recording-date.wv` checks full APE recording dates alongside the year-only fixture. WAV and AIFF
-edit tests also check their container sizes after tags grow and shrink. Lofty 0.25.2 subtracts tag
-growth from the size of a container with a trailing ID3 chunk, and can panic on large growth in
-debug builds. The engine streams the file into a temporary file in the same directory, rewrites the
-copy, and replaces the original only after the complete write succeeds. Other chunks and trailing
-data are retained. This adds I/O for large WAV/AIFF files, while Lofty's append path still buffers
-the full container in memory. Replacing the file can also discard inode metadata such as ACLs and
-extended attributes.
+edit tests check their container sizes after tags grow and shrink. On Unix, they also check that
+edits preserve the original inode. Lofty 0.25.4 fixes the trailing ID3 chunk size calculation, so
+WAV and AIFF use the same regular save path as MP3. The engine no longer replaces these files with
+a temporary copy, preserving their inode metadata, including ACLs and extended attributes.

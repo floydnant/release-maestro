@@ -199,51 +199,10 @@ impl NativeTags {
                 merged.save_to_path(path, options)?;
             }
             Some(PreservedTag::Mp4(native)) => native.merge(tag).save_to_path(path, options)?,
-            None if tag.tag_type() == TagType::Id3v2 => save_id3(tag, path, options)?,
             None => tag.save_to_path(path, options)?,
         }
         Ok(())
     }
-}
-
-// Lofty 0.25.2 subtracts growth when replacing a trailing RIFF/FORM ID3
-// chunk, corrupting its size or panicking on large growth in debug builds.
-// Remove the old chunk first so the writer uses its append path instead.
-fn save_id3(tag: &Tag, path: &Path, options: WriteOptions) -> Result<(), FileEncodingError> {
-    use std::io::{Read, Seek};
-    let write_path = std::fs::canonicalize(path)?;
-    let mut file = std::fs::File::open(&write_path)?;
-    let mut header = [0; 12];
-    file.read_exact(&mut header)?;
-    let chunk_file = matches!(
-        (&header[..4], &header[8..]),
-        (b"RIFF", b"WAVE") | (b"FORM", b"AIFF" | b"AIFC")
-    );
-    file.rewind()?;
-    if chunk_file {
-        // Check encoding before deleting the existing tag.
-        tag.dump_to(&mut std::io::sink(), options)?;
-        let permissions = std::fs::metadata(&write_path)?.permissions();
-        let parent = write_path.parent().unwrap_or_else(|| Path::new("."));
-        let mut replacement = tempfile::NamedTempFile::new_in(parent)?;
-        std::io::copy(&mut file, replacement.as_file_mut())?;
-        replacement.as_file_mut().rewind()?;
-        TagType::Id3v2.remove_from(replacement.as_file_mut(), options)?;
-        replacement.as_file_mut().rewind()?;
-        tag.save_to(replacement.as_file_mut(), options)?;
-        replacement.as_file().set_permissions(permissions)?;
-        replacement.as_file().sync_all()?;
-        replacement
-            .persist(&write_path)
-            .map_err(|error| error.error)?;
-        return Ok(());
-    }
-
-    let mut file = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(write_path)?;
-    tag.save_to(&mut file, options)
 }
 
 #[cfg(test)]
