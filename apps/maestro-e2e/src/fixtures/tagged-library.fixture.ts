@@ -56,6 +56,7 @@ export interface TaggedTrackSpec {
      * whole thing the detail page's ordering test has to distinguish.
      */
     trackNumber?: number
+    customTags?: [name: string, value: string][]
     cover?: keyof typeof coverPngs
     /**
      * Bytes appended after the PNG's IEND chunk (invisible to decoders) so covers
@@ -230,6 +231,7 @@ const buildId3Tag = (spec: TaggedTrackSpec): Buffer => {
         ...optionalTextFrame('TBPM', spec.bpm),
         ...optionalTextFrame('TKEY', spec.musicalKey),
         ...optionalTextFrame('TRCK', spec.trackNumber),
+        ...(spec.customTags ?? []).map(([name, value]) => textFrame('TXXX', `${name}\0${value}`)),
         ...(spec.cover ? [coverFrame(coverPngs[spec.cover], spec.coverSalt ?? spec.album)] : []),
     ])
     return Buffer.concat([Buffer.from('ID3\x03\x00\x00', 'latin1'), syncsafe(frames.length), frames])
