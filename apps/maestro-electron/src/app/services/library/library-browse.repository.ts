@@ -77,7 +77,7 @@ import { mergeExternalRefs, relevantExternalRefsMap } from './library-normalizat
  * the write side ingests, this side reads, and they share only tables.
  */
 export class LibraryBrowseRepository {
-    constructor(private readonly database: DatabaseClient) {}
+    constructor(private readonly database: Pick<DatabaseClient, 'db'>) {}
 
     queryArtists(request: QueryArtistsRequest): ArtistWindowResult {
         const { offset } = normalizeWindow(request.window)

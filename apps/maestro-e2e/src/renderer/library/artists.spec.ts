@@ -318,3 +318,30 @@ test('a co-artist credit opens that artist', async ({ page }) => {
     await page.getByRole('link', { name: 'Night Cartel & Aurora Fields' }).click()
     await expect(page).toHaveURL(/\/artists\/compound$/)
 })
+
+test('artist headings scroll with their rows on a narrow window', async ({ page }) => {
+    await page.setViewportSize({ width: 600, height: 700 })
+    await createRendererScenario(page, scenario().build(), '/artists')
+    const columns = page.getByRole('region', { name: 'Artist columns' })
+    const heading = page.getByRole('button', { name: 'Sort artists Z to A' })
+    const row = page.getByRole('region', { name: 'Artists', exact: true }).getByRole('link', {
+        name: /^Aurora Fields/,
+    })
+    await expect(row).toBeVisible()
+    const headingBefore = await heading.evaluate(element => element.getBoundingClientRect().x)
+    const rowBefore = await row.evaluate(element => element.getBoundingClientRect().x)
+    await columns.evaluate(element => {
+        element.scrollLeft = 100
+    })
+    await expect.poll(() => columns.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    await expect
+        .poll(async () => {
+            const headingAfter = await heading.evaluate(element => element.getBoundingClientRect().x)
+            const rowAfter = await row.evaluate(element => element.getBoundingClientRect().x)
+            return Math.abs(headingBefore - headingAfter - (rowBefore - rowAfter))
+        })
+        .toBeLessThan(1)
+    await expect
+        .poll(() => heading.evaluate(element => element.getBoundingClientRect().x))
+        .toBeLessThan(headingBefore)
+})

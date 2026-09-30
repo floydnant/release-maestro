@@ -439,7 +439,6 @@ export class LibraryBackendRepository {
                 .select({
                     id: songsTable.id,
                     lastSeenAt: songsTable.lastSeenAt,
-                    externalRefs: songsTable.externalRefs,
                     albumId: songsTable.albumId,
                 })
                 .from(songsTable)
@@ -489,7 +488,7 @@ export class LibraryBackendRepository {
                 codec: metadata.fileInfo?.codec ?? null,
                 metadataHash: metadataHash(metadata),
                 normalizerVersion: NORMALIZER_VERSION,
-                externalRefs: mergeExternalRefs([existingSong?.externalRefs, externalRefs]),
+                externalRefs,
                 albumId,
             } satisfies Omit<typeof songsTable.$inferInsert, 'id'>
 

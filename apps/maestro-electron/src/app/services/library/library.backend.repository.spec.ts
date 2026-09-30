@@ -266,6 +266,27 @@ describe('LibraryBackendRepository', () => {
         })
     })
 
+    it('replaces corrected artist references and removes deleted tags on a deep read', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        const original = newSongFixture({
+            artist: 'Original Artist',
+            extraMetadata: [['MUSICBRAINZ_ARTIST_ID', 'original-id']],
+        })
+        const corrected = newSongFixture({
+            artist: 'Correct Artist',
+            extraMetadata: [['MUSICBRAINZ_ARTIST_ID', 'correct-id']],
+        })
+        repository.ingestMetadata(original, fact, scannedAt)
+        repository.ingestMetadata(corrected, fact, scannedAt)
+        const artist = db.select().from(artistsTable).where(eq(artistsTable.name, 'Correct Artist')).get()!
+        const browse = new LibraryBrowseRepository({ db })
+        expect(browse.getArtistDetail(artist.id)?.externalRefs).toEqual({
+            MUSICBRAINZ_ARTIST_ID: ['correct-id'],
+        })
+        repository.ingestMetadata({ ...corrected, extraMetadata: [] }, fact, scannedAt)
+        expect(browse.getArtistDetail(artist.id)?.externalRefs).toEqual({})
+    })
+
     it('reapplies a user-confirmed raw-name resolution in order', () => {
         const scannedAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], scannedAt)
