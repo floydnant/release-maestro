@@ -1,0 +1,6 @@
+interface:
+    display_name: 'GitHub stacks'
+    short_description: 'Split dependent work into reviewable native GitHub stacks'
+    default_prompt: 'Use $github-stack to split this work into reviewable PRs and manage the native GitHub stack.'
+policy:
+    allow_implicit_invocation: true
