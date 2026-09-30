@@ -26,7 +26,7 @@ for (const [key, value] of Object.entries(ExternalRefKeys)) {
  * stamped with an older version are re-read on the next scan; that is the only thing
  * that makes a normaliser change reach data already in the database.
  */
-export const NORMALIZER_VERSION = 3
+export const NORMALIZER_VERSION = 4
 
 export const normalizeDisplayText = (value: string | null | undefined): string | null => {
     const normalized = value?.trim().replace(/\s+/g, ' ')

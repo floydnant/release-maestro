@@ -345,3 +345,20 @@ test('artist headings scroll with their rows on a narrow window', async ({ page 
         .poll(() => heading.evaluate(element => element.getBoundingClientRect().x))
         .toBeLessThan(headingBefore)
 })
+
+test('Discogs IDs become artist detail links', async ({ page }) => {
+    await createRendererScenario(
+        page,
+        scenario()
+            .handler('library:get-artist-detail', {
+                kind: 'resolve',
+                value: { ...artist, externalRefs: { DISCOGS_ARTIST_ID: ['456'] } },
+            })
+            .build(),
+        '/artists/aurora',
+    )
+    await expect(page.getByRole('link', { name: 'Discogs' })).toHaveAttribute(
+        'href',
+        'https://www.discogs.com/artist/456',
+    )
+})

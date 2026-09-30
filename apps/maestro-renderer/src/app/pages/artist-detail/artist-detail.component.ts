@@ -33,6 +33,7 @@ const LINKS: ExternalLinkSpec[] = [
         base: 'https://musicbrainz.org/artist/',
     },
     { key: ExternalRefKeys.DiscogsArtistLink, label: 'Discogs', domain: 'discogs.com' },
+    { key: ExternalRefKeys.DiscogsArtistId, label: 'Discogs', base: 'https://www.discogs.com/artist/' },
     { key: ExternalRefKeys.BeatportArtistUrl, label: 'Beatport', domain: 'beatport.com' },
 ]
 const artistLinks = (artist: ArtistDetail): ExternalLink[] => [

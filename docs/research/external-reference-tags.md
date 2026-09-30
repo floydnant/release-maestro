@@ -58,4 +58,4 @@ Keep unrecognized custom metadata available. Defer fingerprints, generic URL gue
 
 ## Rescanning existing libraries
 
-The importer stores references in existing JSON columns. No database migration is needed. Normalizer version 3 schedules previously imported files for a new deep read on the next scan.
+The importer stores references in existing JSON columns. No database migration is needed. Normalizer version 4 schedules previously imported files for a new deep read on the next scan.

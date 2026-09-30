@@ -52,4 +52,3 @@ export enum ExternalRefKeys {
     BeatportArtistUrl = 'BEATPORT_ARTIST_URL',
 }
 export type ExternalRefs = Prettify<Partial<Record<ExternalRefKeys, string[]>>>
-

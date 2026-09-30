@@ -28,6 +28,7 @@ const ARTISTS = { section: 'artists' }
 const LINKS: ExternalLinkSpec[] = [
     { key: ExternalRefKeys.MusicBrainzLabelId, label: 'MusicBrainz', base: 'https://musicbrainz.org/label/' },
     { key: ExternalRefKeys.DiscogsLabelLink, label: 'Discogs', domain: 'discogs.com' },
+    { key: ExternalRefKeys.DiscogsLabelId, label: 'Discogs', base: 'https://www.discogs.com/label/' },
     { key: ExternalRefKeys.BeatportLabelUrl, label: 'Beatport', domain: 'beatport.com' },
     { key: ExternalRefKeys.BandcampLabelUrl, label: 'Bandcamp', domain: 'bandcamp.com' },
 ]
