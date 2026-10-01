@@ -16,7 +16,7 @@ import subprocess
 
 import mutagen
 from mutagen import id3
-from mutagen.apev2 import APEExtValue
+from mutagen.apev2 import APEv2, APEExtValue, APEBinaryValue
 from mutagen.flac import Picture
 from mutagen.mp4 import MP4Cover, MP4FreeForm
 
@@ -315,6 +315,125 @@ content += b"LIST" + len(info).to_bytes(4, "little") + info
 content[4:8] = (len(content) - 8).to_bytes(4, "little")
 path.write_bytes(content)
 case(path.name, {"bpm": 127.5, "musicalKey": "Am"}, extras=[["Custom: XTRA", "keep me"]])
+
+path = ROOT / "secondary-ape.mp3"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.mp3", path)
+ape = APEv2()
+ape["X-URL"] = APEExtValue("https://example.com/secondary")
+ape["X-BLOB"] = APEBinaryValue(b"maestro-opaque-ape-payload")
+ape.save(path)
+case(path.name, FIELDS, extras=[["Custom: X-URL", "https://example.com/secondary"],
+                               ["Custom: X-BLOB", ""]], writable=True,
+     binaryMarker="maestro-opaque-ape-payload")
+
+path = ROOT / "secondary-riff.wav"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wav", path)
+content = bytearray(path.read_bytes())
+value = b"keep the RIFF field\0"
+extra = b"XTRA" + len(value).to_bytes(4, "little") + value
+if len(value) % 2:
+    extra += b"\0"
+offset = 12
+while offset < len(content):
+    size = int.from_bytes(content[offset + 4:offset + 8], "little")
+    if content[offset:offset + 4] == b"LIST" and content[offset + 8:offset + 12] == b"INFO":
+        end = offset + 8 + size
+        content[end:end] = extra
+        content[offset + 4:offset + 8] = (size + len(extra)).to_bytes(4, "little")
+        break
+    offset += 8 + size + size % 2
+else:
+    raise AssertionError("WAV fixture must contain an INFO list")
+content[4:8] = (len(content) - 8).to_bytes(4, "little")
+path.write_bytes(content)
+case(path.name, FIELDS, extras=[["Custom: XTRA", "keep the RIFF field"]], writable=True)
+
+path = ROOT / "year.wv"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wv", path)
+file = mutagen.File(path)
+file["Year"] = "2024"
+file.save()
+case(path.name, {**FIELDS, "year": 2024, "date": None}, writable=True)
+
+path = ROOT / "recording-date.wv"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wv", path)
+file = mutagen.File(path)
+file["Year"] = "2026-02-03"
+file.save()
+case(path.name, {**FIELDS, "year": None, "date": "2026-02-03"}, writable=True)
+
+# Native values that Lofty 0.25 generic conversion cannot round-trip unchanged.
+for ext in ["flac", "ogg", "opus"]:
+    path = ROOT / f"ratings.{ext}"
+    shutil.copyfile(ROOT / f"vardae-invocacion-del-cielo.{ext}", path)
+    file = mutagen.File(path)
+    file["RATING"] = ["80", "60"]
+    file["RATING:listener@example.com"] = ["100"]
+    file.save()
+    case(path.name, FIELDS, writable=True)
+
+path = ROOT / "multiple-artists.wv"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wv", path)
+file = mutagen.File(path)
+file["Artist"] = ["Alice", "Bob"]
+del file["ALBUMARTIST"]
+file["Album Artist"] = ["Carol", "Dave"]
+file["Genre"] = ["Techno", "Ambient"]
+file["Title"] = ["First title", "Second title"]
+file["Album"] = ["First album", "Second album"]
+file.save()
+case(path.name, {**FIELDS, "artist": "Alice\0Bob", "albumArtist": "Carol\0Dave",
+                 "genre": "Techno\0Ambient", "title": "First title\0Second title",
+                 "albumTitle": "First album\0Second album"}, writable=True)
+
+# Preserve native ID3 ratings without five-star conversion.
+for ext in ["mp3", "wav", "aiff"]:
+    path = ROOT / f"id3-ratings.{ext}"
+    shutil.copyfile(ROOT / f"vardae-invocacion-del-cielo.{ext}", path)
+    file = mutagen.File(path)
+    for email, rating, count in [("listener@example.com", 80, 7),
+                                 ("unknown@example.com", 0, 0),
+                                 ("best@example.com", 255, 4294967297)]:
+        file.tags.add(id3.POPM(email=email, rating=rating, count=count))
+    file.save()
+    case(path.name, FIELDS, writable=True)
+
+path = ROOT / "secondary-publisher.mp3"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.mp3", path)
+ape = APEv2()
+ape["Publisher"] = "Secondary label"
+ape.save(path)
+case(path.name, FIELDS, writable=True)
+
+# The same Publisher remains a fallback when no primary ID3 tag exists.
+path = ROOT / "publisher-only.mp3"
+shutil.copyfile(ROOT / "spunoff-el-sueno-untagged.mp3", path)
+ape = APEv2()
+ape["Publisher"] = "Secondary label"
+ape.save(path)
+case(path.name, {"title": path.name, "label": "Secondary label"})
+
+# Four-character custom descriptions must not become standard frame identifiers.
+path = ROOT / "custom-frame-names.mp3"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.mp3", path)
+file = mutagen.File(path)
+file.tags.add(id3.TXXX(encoding=3, desc="TIT2", text=["Private title", "Second private title"]))
+file.tags.add(id3.TXXX(encoding=3, desc="TKEY", text=["Private key"]))
+file.tags.add(id3.WXXX(encoding=3, desc="TIT2", url="https://example.com/private-title"))
+file.save()
+case(path.name, FIELDS, extras=[["Custom: TIT2", "Private title"],
+                              ["Custom: TIT2", "Second private title"],
+                              ["Custom: TIT2", "https://example.com/private-title"]], writable=True)
+
+# Four-character legacy aliases retain precedence over longer custom descriptions.
+path = ROOT / "ordered-key-aliases.mp3"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.mp3", path)
+file = mutagen.File(path)
+file.tags.delall("TKEY")
+file.tags.add(id3.TXXX(encoding=3, desc="TKEY", text=["Am"]))
+file.tags.add(id3.TXXX(encoding=3, desc="INITIALKEY", text=["Dm"]))
+file.save()
+case(path.name, FIELDS, writable=True)
 
 (ROOT / "cover.png").write_bytes(PNG)
 (ROOT / "cases.json").write_text(json.dumps(CASES, indent=4, ensure_ascii=False) + "\n")
