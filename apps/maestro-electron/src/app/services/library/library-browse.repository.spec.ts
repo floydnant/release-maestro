@@ -149,7 +149,7 @@ describe('LibraryBrowseRepository', () => {
         sqlite.pragma('foreign_keys = ON')
         db = drizzle(sqlite, { schema })
         migrate(db, { migrationsFolder })
-        repository = new LibraryBrowseRepository(fromPartial({ db }))
+        repository = new LibraryBrowseRepository({ db })
     })
 
     afterEach(() => sqlite.close())
@@ -743,7 +743,7 @@ describe('LibraryBrowseRepository', () => {
                 })
                 .run()
 
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
             seedSong({ id: 'b', title: 'Moth' })
             seedSong({ id: 'c', title: 'Wolf Cub' })
 
@@ -774,13 +774,38 @@ describe('LibraryBrowseRepository', () => {
             expect(result.rows).toHaveLength(2)
         })
 
-        it('reaches a record label through the album', () => {
+        it('resolves the song record label from its own tag', () => {
             const result = repository.querySongs({
                 query: query({ filter: { recordLabelIds: ['label-hyperdub'] } }),
                 window: { offset: 0, limit: 10 },
             })
 
             expect(titlesOf(result)).toEqual(['Archangel'])
+        })
+
+        it('displays, sorts and filters the same record label despite album drift or no album', () => {
+            db.insert(recordLabelsTable).values({ id: 'label-warp', name: 'Warp' }).run()
+            seedSong({ id: 'd', title: 'Drift', albumId: 'album-untrue', recordLabelText: 'Warp' })
+            seedSong({ id: 'e', title: 'No album', recordLabelText: 'Warp' })
+            seedSong({ id: 'f', title: 'No record label', albumId: 'album-untrue' })
+            const result = repository.querySongs({
+                query: query({ sort: { field: SongSortField.recordLabel, direction: 'asc' } }),
+                window: { offset: 0, limit: 10 },
+            })
+            expect(
+                result.rows.filter(row => row.recordLabelText != null).map(row => row.recordLabelText),
+            ).toEqual(['Hyperdub', 'Warp', 'Warp'])
+            expect(result.rows.find(row => row.id == 'f')?.recordLabelId).toBeNull()
+            expect(result.rows.find(row => row.id == 'd')).toMatchObject({
+                recordLabelId: 'label-warp',
+                recordLabelText: 'Warp',
+            })
+            const filtered = repository.querySongs({
+                query: query({ filter: { recordLabelIds: ['label-warp', 'label-warp'] } }),
+                window: { offset: 0, limit: 10 },
+            })
+            expect(filtered.total).toBe(2)
+            expect(titlesOf(filtered).sort()).toEqual(['Drift', 'No album'])
         })
 
         it('filters by genre entity', () => {
@@ -1067,7 +1092,7 @@ describe('LibraryBrowseRepository', () => {
         })
 
         it('counts each tile’s tracks over the window rather than reading a stored column', () => {
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
             seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue' })
             seedSong({ id: 'c', title: 'Xtal', albumId: 'album-selected' })
 
@@ -1134,7 +1159,7 @@ describe('LibraryBrowseRepository', () => {
         })
 
         it('reaches a genre through the album’s songs', () => {
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
             db.insert(songGenresTable).values({ songId: 'a', genreId: 'genre-garage' }).run()
 
             const result = repository.queryAlbums({
@@ -1146,7 +1171,7 @@ describe('LibraryBrowseRepository', () => {
         })
 
         it('counts an album once when several of its songs carry the selected genre', () => {
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
             seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue' })
             db.insert(songGenresTable).values({ songId: 'a', genreId: 'genre-garage' }).run()
             db.insert(songGenresTable).values({ songId: 'b', genreId: 'genre-garage' }).run()
@@ -1199,7 +1224,7 @@ describe('LibraryBrowseRepository', () => {
         })
 
         it('does not search the titles of the album’s songs', () => {
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
 
             expect(repository.queryAlbums(albumSearch('archangel')).total).toBe(0)
         })
