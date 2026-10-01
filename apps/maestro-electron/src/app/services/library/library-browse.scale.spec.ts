@@ -369,6 +369,16 @@ describe('LibraryBrowseRepository at library scale', () => {
         expect(plan).toMatch(/USING (COVERING )?INDEX songs_/)
     })
 
+    it.each(sorts)('keeps indexed $field $direction ordering with a record-label filter', sort => {
+        const plan = queryPlan({
+            ...emptySongQuery(),
+            filter: { recordLabelIds: ['genre-label-1', 'genre-label-2'] },
+            sort,
+        })
+        expect(plan).not.toMatch(/TEMP B-TREE/i)
+        expect(plan).toMatch(/USING (COVERING )?INDEX songs_/)
+    })
+
     it.each(sorts)('serves a full deep window sorted by $field $direction', sort => {
         const query: SongQuery = { ...emptySongQuery(), sort }
 
