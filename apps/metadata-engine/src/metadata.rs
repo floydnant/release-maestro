@@ -448,7 +448,7 @@ pub fn update_song_metadata(
 ) -> Result<SongMetadata, String> {
     let file_path = Path::new(path);
     let (mut tagged_file, mut native) = native_tags::read_file(file_path)
-        .map_err(|error| format!("Failed to read file: {}", error))?;
+        .map_err(|error| format!("Failed to read file: {}", format_error_chain(&error)))?;
     let edited_fields: Vec<_> = [
         (LegacyField::Energy, song.energy.is_some()),
         (LegacyField::Bpm, song.bpm.is_some()),

@@ -682,5 +682,77 @@
             "date": "2026-02-03"
         },
         "writable": true
+    },
+    {
+        "file": "ratings.flac",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
+    },
+    {
+        "file": "ratings.ogg",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
+    },
+    {
+        "file": "ratings.opus",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
+    },
+    {
+        "file": "multiple-artists.wv",
+        "expected": {
+            "title": "First title\u0000Second title",
+            "artist": "Alice\u0000Bob",
+            "albumTitle": "First album\u0000Second album",
+            "albumArtist": "Carol\u0000Dave",
+            "genre": "Techno\u0000Ambient",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
     }
 ]

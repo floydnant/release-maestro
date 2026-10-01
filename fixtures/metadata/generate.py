@@ -362,5 +362,29 @@ file["Year"] = "2026-02-03"
 file.save()
 case(path.name, {**FIELDS, "year": None, "date": "2026-02-03"}, writable=True)
 
+# Native values that Lofty 0.25 generic conversion cannot round-trip unchanged.
+for ext in ["flac", "ogg", "opus"]:
+    path = ROOT / f"ratings.{ext}"
+    shutil.copyfile(ROOT / f"vardae-invocacion-del-cielo.{ext}", path)
+    file = mutagen.File(path)
+    file["RATING"] = ["80", "60"]
+    file["RATING:listener@example.com"] = ["100"]
+    file.save()
+    case(path.name, FIELDS, writable=True)
+
+path = ROOT / "multiple-artists.wv"
+shutil.copyfile(ROOT / "vardae-invocacion-del-cielo.wv", path)
+file = mutagen.File(path)
+file["Artist"] = ["Alice", "Bob"]
+del file["ALBUMARTIST"]
+file["Album Artist"] = ["Carol", "Dave"]
+file["Genre"] = ["Techno", "Ambient"]
+file["Title"] = ["First title", "Second title"]
+file["Album"] = ["First album", "Second album"]
+file.save()
+case(path.name, {**FIELDS, "artist": "Alice\0Bob", "albumArtist": "Carol\0Dave",
+                 "genre": "Techno\0Ambient", "title": "First title\0Second title",
+                 "albumTitle": "First album\0Second album"}, writable=True)
+
 (ROOT / "cover.png").write_bytes(PNG)
 (ROOT / "cases.json").write_text(json.dumps(CASES, indent=4, ensure_ascii=False) + "\n")

@@ -275,7 +275,7 @@ fn streams_successes_and_parse_errors_then_accepts_another_request() {
     let mut engine = Engine::new();
     let messages = engine.exchange(
         "read_files",
-        json!({"paths": [good, bad], "coverArtCacheDir": library.0.join("cache")}),
+        json!({"paths": [good, &bad], "coverArtCacheDir": library.0.join("cache")}),
     );
     assert_eq!(messages[0]["event"], "started");
     let items: Vec<_> = messages.iter().filter(|m| m["event"] == "item").collect();
@@ -295,6 +295,16 @@ fn streams_successes_and_parse_errors_then_accepts_another_request() {
     assert_eq!(
         messages.last().unwrap()["result"],
         json!({"count": 1, "total": 2})
+    );
+    let mut params = library.params(&bad);
+    params["update"] = json!({"title": "Unrelated title edit"});
+    let responses = engine.exchange("write_tags", params);
+    let response = responses.last().unwrap();
+    assert_eq!(response["ok"], false);
+    let message = response["error"]["message"].as_str().unwrap();
+    assert!(
+        message.starts_with("Failed to read file: failed to parse Flac file: "),
+        "missing write-time parse-error detail: {message}"
     );
     assert_eq!(engine.request("ping", json!({}))["protocolVersion"], 1);
 }
@@ -703,4 +713,93 @@ fn writes_iff_tags_through_a_symlink_without_replacing_it() {
         .is_symlink());
     let actual = Engine::new().request("read_file", library.params(&target));
     assert_eq!(actual["title"], "Gökotta");
+}
+
+#[test]
+fn unrelated_edits_preserve_native_vorbis_ratings() {
+    use lofty::{
+        config::ParseOptions,
+        file::AudioFile,
+        flac::FlacFile,
+        ogg::{OpusFile, VorbisFile},
+    };
+    fn ratings(path: &std::path::Path) -> Vec<(String, String)> {
+        let mut file = std::fs::File::open(path).unwrap();
+        let options = ParseOptions::new();
+        let native = match path.extension().unwrap().to_str().unwrap() {
+            "flac" => FlacFile::read_from(&mut file, options)
+                .unwrap()
+                .vorbis_comments()
+                .unwrap()
+                .clone(),
+            "ogg" => VorbisFile::read_from(&mut file, options)
+                .unwrap()
+                .vorbis_comments()
+                .clone(),
+            "opus" => OpusFile::read_from(&mut file, options)
+                .unwrap()
+                .vorbis_comments()
+                .clone(),
+            _ => unreachable!(),
+        };
+        native
+            .items()
+            .filter(|(name, _)| {
+                name.split(':')
+                    .next()
+                    .unwrap()
+                    .eq_ignore_ascii_case("RATING")
+            })
+            .map(|(name, value)| (name.to_owned(), value.to_owned()))
+            .collect()
+    }
+    let library = Library::new();
+    for name in ["ratings.flac", "ratings.ogg", "ratings.opus"] {
+        let path = library.copy(name);
+        let original = ratings(&path);
+        assert_eq!(original.len(), 3, "{name}: fixture ratings");
+        for update in [
+            json!({"title": "Unrelated title edit"}),
+            json!({"energy": "9"}),
+            json!({"comment": null}),
+        ] {
+            let mut params = library.params(&path);
+            params["update"] = update.clone();
+            Engine::new().request("write_tags", params);
+            assert_eq!(ratings(&path), original, "{name}: ratings after {update}");
+            let actual = Engine::new().request("read_file", library.params(&path));
+            assert_fields(&actual, &update, name);
+        }
+    }
+}
+
+#[test]
+fn ape_text_values_survive_reads_unrelated_edits_and_replacement() {
+    let library = Library::new();
+    let path = library.copy("multiple-artists.wv");
+    let expected = json!({
+        "artist": "Alice\u{0}Bob", "albumArtist": "Carol\u{0}Dave",
+        "genre": "Techno\u{0}Ambient", "title": "First title\u{0}Second title",
+        "albumTitle": "First album\u{0}Second album"
+    });
+    let original = Engine::new().request("read_file", library.params(&path));
+    assert_fields(&original, &expected, "APE text before editing");
+    for update in [json!({"energy": "9"}), json!({"comment": null})] {
+        let mut params = library.params(&path);
+        params["update"] = update;
+        Engine::new().request("write_tags", params);
+        let actual = Engine::new().request("read_file", library.params(&path));
+        assert_fields(&actual, &expected, "APE text after unrelated edit");
+    }
+    for update in [
+        json!({"artist": "Eve", "albumArtist": "Frank", "genre": "House",
+               "title": "Replacement title", "albumTitle": "Replacement album"}),
+        json!({"artist": null, "albumArtist": null, "genre": null, "albumTitle": null}),
+    ] {
+        let mut params = library.params(&path);
+        params["update"] = update.clone();
+        Engine::new().request("write_tags", params);
+        let actual = Engine::new().request("read_file", library.params(&path));
+        assert_fields(&actual, &update, "APE text replacement or clear");
+    }
 }

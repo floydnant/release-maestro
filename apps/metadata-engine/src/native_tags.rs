@@ -7,7 +7,7 @@ use lofty::{
     ape::{ApeFile, ApeItem, ApeTag},
     config::{ParseOptions, WriteOptions},
     error::{FileEncodingError, FileParseError},
-    file::{AudioFile, FileType, TaggedFile},
+    file::{AudioFile, FileType, TaggedFile, TaggedFileExt},
     flac::FlacFile,
     iff::wav::{RiffInfoList, WavFile},
     mp4::Mp4File,
@@ -15,7 +15,7 @@ use lofty::{
     musepack::MpcFile,
     ogg::{tag::VorbisComments, OpusFile, SpeexFile, VorbisFile},
     probe::Probe,
-    tag::{ItemValue, MergeTag, SplitTag, Tag, TagExt, TagType},
+    tag::{ItemKey, ItemValue, MergeTag, SplitTag, Tag, TagExt, TagItem, TagType},
     wavpack::WavPackFile,
 };
 use std::path::Path;
@@ -61,7 +61,7 @@ pub fn read_file(path: &Path) -> Result<(TaggedFile, NativeTags), FileParseError
             (file.into(), NativeTags(Some(native)))
         }};
     }
-    Ok(match file_type {
+    let (mut file, native): (TaggedFile, NativeTags) = match file_type {
         Some(FileType::Mp4) => {
             let file = Mp4File::read_from(&mut reader, options)?;
             let original = file.ilst().cloned().unwrap_or_default();
@@ -82,7 +82,34 @@ pub fn read_file(path: &Path) -> Result<(TaggedFile, NativeTags), FileParseError
             Probe::new(reader).guess_file_type()?.read()?,
             NativeTags::default(),
         ),
-    })
+    };
+    if let Some(tag) = file.tag_mut(TagType::Ape) {
+        join_ape_text_values(tag);
+    }
+    Ok((file, native))
+}
+
+fn join_ape_text_values(tag: &mut Tag) {
+    // Lofty now splits APE lists; retain the existing NUL-delimited scalar contract.
+    // Each native list becomes consecutive generic items. Keep their position,
+    // and copy binary/locator items unchanged.
+    let mut joined: Vec<TagItem> = Vec::new();
+    for item in tag.items() {
+        if let Some(previous) = joined
+            .last_mut()
+            .filter(|previous| previous.key() == item.key())
+        {
+            if let (Some(left), Some(right)) = (previous.value().text(), item.value().text()) {
+                *previous = TagItem::new(item.key(), ItemValue::Text(format!("{left}\0{right}")));
+                continue;
+            }
+        }
+        joined.push(item.clone());
+    }
+    tag.retain(|_| false);
+    for item in joined {
+        tag.push_unchecked(item);
+    }
 }
 
 impl NativeTags {
@@ -176,12 +203,28 @@ impl NativeTags {
             .as_ref()
             .filter(|native| native.tag_type() == tag.tag_type())
         {
-            Some(PreservedTag::Vorbis(native)) => native
-                .clone()
-                .split_tag()
-                .0
-                .merge_tag(tag.clone())
-                .save_to_path(path, options)?,
+            Some(PreservedTag::Vorbis(native)) => {
+                // Ratings are not editable here. Lofty consumes numeric RATING values on
+                // split but expects a different representation on merge, so restore them.
+                let mut edited = tag.clone();
+                edited.remove_key(ItemKey::Popularimeter);
+                let mut merged = native.clone().split_tag().0.merge_tag(edited);
+                let ratings: Vec<_> = native
+                    .items()
+                    .filter(|(name, _)| {
+                        name.split(':')
+                            .next()
+                            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("RATING"))
+                    })
+                    .collect();
+                for (name, _) in &ratings {
+                    merged.remove(name).for_each(drop);
+                }
+                for (name, value) in ratings {
+                    merged.push(name.to_owned(), value.to_owned());
+                }
+                merged.save_to_path(path, options)?;
+            }
             Some(PreservedTag::Ape(native)) => native
                 .clone()
                 .split_tag()
@@ -208,6 +251,63 @@ impl NativeTags {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn joining_ape_lists_preserves_precedence_between_lyric_fields() {
+        for second in [vec!["last"], vec!["last", "also last"]] {
+            let mut tag = Tag::new(TagType::Ape);
+            for (key, values) in [
+                (ItemKey::Lyrics, vec!["first", "also first"]),
+                (ItemKey::UnsyncLyrics, second.clone()),
+            ] {
+                for value in values {
+                    tag.push(TagItem::new(key, ItemValue::Text(value.into())));
+                }
+            }
+
+            join_ape_text_values(&mut tag);
+
+            let actual: Vec<_> = tag
+                .items()
+                .map(|item| (item.key(), item.value().text().unwrap().to_owned()))
+                .collect();
+            assert_eq!(
+                actual,
+                vec![
+                    (ItemKey::Lyrics, "first\0also first".into()),
+                    (ItemKey::UnsyncLyrics, second.join("\0")),
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn joining_ape_lists_preserves_binary_and_locator_values() {
+        let items = [
+            TagItem::new(ItemKey::TrackTitle, ItemValue::Binary(vec![0, 1, 255])),
+            TagItem::new(
+                ItemKey::TrackArtist,
+                ItemValue::Locator("https://example.com/artist".into()),
+            ),
+            TagItem::new(ItemKey::Genre, ItemValue::Text("Techno".into())),
+            TagItem::new(ItemKey::Genre, ItemValue::Text("Ambient".into())),
+        ];
+        let mut tag = Tag::new(TagType::Ape);
+        for item in &items {
+            tag.push(item.clone());
+        }
+
+        join_ape_text_values(&mut tag);
+
+        assert_eq!(
+            tag.items().cloned().collect::<Vec<_>>(),
+            vec![
+                items[0].clone(),
+                items[1].clone(),
+                TagItem::new(ItemKey::Genre, ItemValue::Text("Techno\0Ambient".into()))
+            ]
+        );
+    }
 
     #[test]
     fn invalid_ape_replacement_leaves_existing_metadata_intact() {

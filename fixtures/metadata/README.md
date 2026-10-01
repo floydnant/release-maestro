@@ -40,6 +40,10 @@ conversion discards their custom fields.
 retain opaque siblings across alias canonicalization and that clears remove the entire atom.
 `repeated-ape.wv` checks NUL-separated custom values; `riff-aliases.wav` checks that cleared
 secondary RIFF aliases do not reappear.
+`multiple-artists.wv` checks NUL-separated artist, album artist, genre, title, and album values through
+reads, unrelated edits, and replacements. It also checks clears for the four nullable fields.
+`ratings.flac`, `ratings.ogg`, and `ratings.opus` check that unrelated edits retain repeated numeric
+ratings and listener-specific ratings.
 
 The fixture manifest uses typed fields and rejects unknown keys, invalid flags, and unknown aliases.
 
