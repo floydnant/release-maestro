@@ -13,11 +13,20 @@ on run argv
 		return
 	end if
 
+	-- Optional: only export messages received at or after this local time (YYYY-MM-DDTHH:MM:SS)
+	set receivedSince to missing value
+	if (count of argv) ≥ 3 then set receivedSince to my parseISOToDate(item 3 of argv)
+
 	do shell script "mkdir -p " & quoted form of exportPath
 
 	tell application "Mail"
 		set targetMailbox to mailbox mailboxName
-		set theMessages to messages of targetMailbox
+		if receivedSince is missing value then
+			set theMessages to messages of targetMailbox
+		else
+			-- Mail evaluates the filter itself, so older messages are never walked
+			set theMessages to (messages of targetMailbox whose date received ≥ receivedSince)
+		end if
 		set msgCount to count of theMessages
 		
 		repeat with i from 1 to msgCount
@@ -110,6 +119,18 @@ on formatDateToISO(theDate)
 	
 	return y & "-" & m & "-" & d & "T" & h & ":" & min & ":" & s
 end formatDateToISO
+
+-- Inverse of formatDateToISO. Built from components because `date "..."` parsing depends on the locale.
+on parseISOToDate(isoString)
+	set theDate to current date
+	-- Day 1 first, so setting the year or month can never overflow into the next month
+	set day of theDate to 1
+	set year of theDate to (text 1 thru 4 of isoString) as integer
+	set month of theDate to (text 6 thru 7 of isoString) as integer
+	set day of theDate to (text 9 thru 10 of isoString) as integer
+	set time of theDate to ((text 12 thru 13 of isoString) as integer) * hours + ((text 15 thru 16 of isoString) as integer) * minutes + ((text 18 thru 19 of isoString) as integer)
+	return theDate
+end parseISOToDate
 
 on sanitizeString(inputString)
 	set allowedChars to "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"

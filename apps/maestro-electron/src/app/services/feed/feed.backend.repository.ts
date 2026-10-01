@@ -1,7 +1,11 @@
-import { and, count, desc, eq, gte, isNull, lt, or } from 'drizzle-orm'
-import { FeedItemMaster } from '@release-maestro/core'
+import { and, count, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm'
+import { EmailVendor, FeedItemMaster } from '@release-maestro/core'
 import { DatabaseClient } from '../../database/database.client'
-import { feedItemHistoryEntriesTable, feedItemsTable } from '../../database/drizzle.schema'
+import {
+    feedEmailImportCheckpointsTable,
+    feedItemHistoryEntriesTable,
+    feedItemsTable,
+} from '../../database/drizzle.schema'
 
 /**
  * The time after which a feed item should be shown again if it was marked as snoozed.
@@ -59,6 +63,37 @@ export class FeedBackendRepository {
             .where(gte(feedItemsTable.ingestedAt, date))
 
         return count_[0]?.count ?? 0
+    }
+
+    async getEmailImportCheckpoint(vendor: EmailVendor, mailboxName: string): Promise<Date | null> {
+        const [checkpoint] = await this.db.db
+            .select({ newestReceivedAt: feedEmailImportCheckpointsTable.newestReceivedAt })
+            .from(feedEmailImportCheckpointsTable)
+            .where(
+                and(
+                    eq(feedEmailImportCheckpointsTable.vendor, vendor),
+                    eq(feedEmailImportCheckpointsTable.mailboxName, mailboxName),
+                ),
+            )
+
+        return checkpoint?.newestReceivedAt ?? null
+    }
+
+    /** Never moves a checkpoint backwards, e.g. when the newest message was deleted from the mailbox. */
+    async advanceEmailImportCheckpoint(
+        vendor: EmailVendor,
+        mailboxName: string,
+        newestReceivedAt: Date,
+    ): Promise<void> {
+        await this.db.db
+            .insert(feedEmailImportCheckpointsTable)
+            .values({ vendor, mailboxName, newestReceivedAt })
+            .onConflictDoUpdate({
+                target: [feedEmailImportCheckpointsTable.vendor, feedEmailImportCheckpointsTable.mailboxName],
+                set: {
+                    newestReceivedAt: sql`max(${feedEmailImportCheckpointsTable.newestReceivedAt}, excluded.newest_received_at)`,
+                },
+            })
     }
 
     async markFeedItemViewed(id: string, type: FeedItemMaster['type'], isSnoozed: boolean): Promise<void> {

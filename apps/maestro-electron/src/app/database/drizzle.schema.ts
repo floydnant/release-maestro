@@ -1,4 +1,4 @@
-import { Prettify } from '@release-maestro/core'
+import { EmailVendor, Prettify } from '@release-maestro/core'
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export enum ExternalRefKeys {
@@ -100,6 +100,20 @@ export const feedItemHistoryEntriesTable = sqliteTable('feed_item_history_entrie
         .notNull()
         .references(() => feedItemsTable.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
 })
+
+/**
+ * How far each mailbox has been imported: the newest "date received" a completed import covered.
+ * The next import of that mailbox only exports mail received from around then on.
+ */
+export const feedEmailImportCheckpointsTable = sqliteTable(
+    'feed_email_import_checkpoints',
+    {
+        vendor: text('vendor').$type<EmailVendor>().notNull(),
+        mailboxName: text('mailbox_name').notNull(),
+        newestReceivedAt: integer('newest_received_at', { mode: 'timestamp' }).notNull(),
+    },
+    table => [primaryKey({ columns: [table.vendor, table.mailboxName] })],
+)
 
 export const recordLabelsTable = sqliteTable(
     'record_labels',

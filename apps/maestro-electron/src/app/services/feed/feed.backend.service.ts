@@ -20,6 +20,14 @@ import { EmailBackendRepository } from '../email/email.backend.repository'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
 import { FeedBackendRepository } from './feed.backend.repository'
 
+/**
+ * How far before the import checkpoint the next import starts reading. A message can land in the
+ * mailbox after a newer one already has (sync lag, a Mac that was offline), and its date received is
+ * then older than the checkpoint. Re-reading this window catches it; dedupe keeps the re-read from
+ * creating duplicate feed items.
+ */
+const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
+
 const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): BandcampFeedItem | null => {
     if (email.type == 'EMAIL.BANDCAMP_NEW_RELEASE') {
         if (!email.releaseUrl) return null
@@ -62,7 +70,16 @@ export class FeedBackendService {
         let totalProcessed = 0
         let totalImported = 0
 
-        const emails$ = await this.emailRepo.loadEmails('APPLE_MAIL', abortSignal)
+        const vendor = 'APPLE_MAIL'
+        const mailboxName = this.emailRepo.getMailboxName(vendor)
+        const checkpoint =
+            mailboxName && (await this.feedBackendRepository.getEmailImportCheckpoint(vendor, mailboxName))
+        const receivedSince = checkpoint
+            ? new Date(checkpoint.getTime() - EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS)
+            : null
+        let newestReceivedAt: Date | null = null
+
+        const emails$ = await this.emailRepo.loadEmails(vendor, abortSignal, receivedSince)
 
         return merge(
             emails$.pipe(
@@ -91,6 +108,13 @@ export class FeedBackendService {
                     totalProcessed += emailPackets.length
                     console.log('Processing batch of emails:', emailPackets.length)
 
+                    for (const { email } of emailPackets) {
+                        const receivedAt = new Date(email.dateReceived)
+                        if (receivedAt.getTime() > (newestReceivedAt?.getTime() ?? -Infinity)) {
+                            newestReceivedAt = receivedAt
+                        }
+                    }
+
                     const emailFeedSourceItems = emailPackets
                         // @TODO: figure out strategised email parsing (i.e. plugins for different email types)
                         .map(packet => parseBandcampEmail(packet.email))
@@ -104,6 +128,15 @@ export class FeedBackendService {
                 materialize(),
                 switchMap(async notification => {
                     if (notification.kind == 'C') {
+                        // A cancelled export completes too, but only a full pass covers the mailbox
+                        if (!abortSignal.aborted && mailboxName && newestReceivedAt) {
+                            await this.feedBackendRepository.advanceEmailImportCheckpoint(
+                                vendor,
+                                mailboxName,
+                                newestReceivedAt,
+                            )
+                        }
+
                         const newlyImported =
                             await this.feedBackendRepository.countItemsIngestedAfterDate(importStartedAt)
 

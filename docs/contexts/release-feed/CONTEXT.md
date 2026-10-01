@@ -25,15 +25,26 @@ today. Multiple mailboxes are a noted future possibility, but are not represente
 
 **Export**:
 The AppleScript pass that pulls messages out of Apple Mail (`apple-scripts/export-emails.applescript`).
-It leaves the mail app and produces raw emails. Everything downstream is import.
+It leaves the mail app and produces raw emails. Everything downstream is import. Given an _import
+checkpoint_, it exports only the messages received from shortly before it, and Mail does the filtering.
 _Avoid_: sync, fetch, download
 
 **Import**:
 One pass that turns exported emails into feed items. It streams progress to the renderer as
 `processing`, then exactly one `completed` or `error`, and reports both `totalImported` (how many the
 pass covered) and `newlyImported` (how many were not already in the feed) — a user re-running an
-import legitimately sees a large total and a zero new count.
+import legitimately sees a nonzero total and a zero new count, because it re-reads the overlap before
+its _import checkpoint_.
 _Avoid_: scan (that is a music-library word), refresh
+
+**Import checkpoint**:
+How far a mailbox has been imported: the newest date received that a completed import covered, kept
+per vendor and mailbox (`feed_email_import_checkpoints`). The next import exports only mail received
+from a day before it, so a message that synced in late is still read. A cancelled or failed import
+does not advance it, and it never moves backwards. Without one, the export reads the whole mailbox.
+A message moved into the mailbox long after it was received is older than the checkpoint and is not
+picked up.
+_Avoid_: watermark, cursor, last sync
 
 ### Notifications and sources
 
