@@ -714,8 +714,8 @@ export class LibraryBrowseRepository {
     }
 
     /**
-     * The window's rows: 17 columns, the album left-join behind cover art and the
-     * record label, and the filter's `WHERE`.
+     * The window's rows, with album cover fallback and the song's record label.
+     * Resolve the record label from the same text used for display and ordering.
      *
      * The album join is `LEFT` on purpose — a song need not belong to one, and an
      * inner join would silently drop every album-less song out of the library.
@@ -737,7 +737,7 @@ export class LibraryBrowseRepository {
                 trackNumber: songsTable.trackNumber,
                 discNumber: songsTable.discNumber,
                 genreText: songsTable.genreText,
-                recordLabelId: albumsTable.recordLabelId,
+                recordLabelId: recordLabelsTable.id,
                 recordLabelText: songsTable.recordLabelText,
                 year: songsTable.year,
                 bpm: songsTable.bpm,
@@ -747,6 +747,7 @@ export class LibraryBrowseRepository {
             })
             .from(songsTable)
             .leftJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
+            .leftJoin(recordLabelsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
             .where(this.songConditions(query))
             .orderBy(...this.songOrdering(query.sort))
             .limit(limit)
@@ -817,22 +818,17 @@ export class LibraryBrowseRepository {
         const albumIds = nonEmpty(query.filter.albumIds)
         if (albumIds) conditions.push(inArray(songsTable.albumId, albumIds))
 
-        // A song reaches its record label through its album — `songs` carries the
-        // record label only as denormalized text, and text is never what a filter
-        // addresses.
+        // Entity IDs still address the filter, but membership follows the song's
+        // own tag, including album-less songs and older rows with album drift.
         const recordLabelIds = nonEmpty(query.filter.recordLabelIds)
         if (recordLabelIds) {
             conditions.push(
-                exists(
+                inArray(
+                    songsTable.recordLabelText,
                     this.database.db
-                        .select({ value: albumsTable.id })
-                        .from(albumsTable)
-                        .where(
-                            and(
-                                eq(albumsTable.id, songsTable.albumId),
-                                inArray(albumsTable.recordLabelId, recordLabelIds),
-                            ),
-                        ),
+                        .select({ name: recordLabelsTable.name })
+                        .from(recordLabelsTable)
+                        .where(inArray(recordLabelsTable.id, recordLabelIds)),
                 ),
             )
         }

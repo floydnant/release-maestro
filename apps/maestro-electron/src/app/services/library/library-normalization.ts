@@ -85,8 +85,8 @@ export const fileFingerprint = (fact: PrescanFileFact): string =>
  * Deliberately hashes the *raw* year, and must keep doing so.
  *
  * This key is stored under a unique index and is how an album is found again on the
- * next scan. Changing what goes into it re-keys every album already in the database,
- * orphaning their songs instead of updating them. Swapping in the derived year would
+ * next scan. Changing what goes into it moves songs between album identities and
+ * invalidates links to albums left empty by those moves. Swapping in the derived year would
  * also gain nothing: `date` is already part of the key and the derived year is read
  * out of `date`, so it adds no way to tell two albums apart.
  */

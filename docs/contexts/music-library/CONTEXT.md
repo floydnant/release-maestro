@@ -162,6 +162,23 @@ be an EP, a single or a compilation, and "release" covered those where "album" s
 does not distinguish them yet; when a `releaseType` attribute lands, the copy can say _EP_ or _single_
 where it knows, which is a better answer than a vaguer word everywhere.
 
+Album fields come from the songs' normalized tags. The identity key groups songs by album title,
+album artist, record label, catalog number, date, and the explicit year tag. The displayed year falls
+back to the leading year in the date. Different identity values mean different albums, even when
+only one song was retagged. A rescan moves that song alone, keeps its song ID, and deletes its old
+album only after the last member leaves. Missing songs remain members. Links to deleted albums
+resolve to no album; the scanner does not guess that similarly named albums should merge.
+
+Cover art is per song. An album uses the lexically smallest non-null content-addressed cover path
+among its members, including missing songs. This makes the choice independent of read order and
+prevents a song without artwork from clearing another song's cover. Both albums' covers and dates
+added are recomputed when a song moves. These differences are resolved silently, without a new
+normalization issue: different artwork is valid, and identity differences already separate albums.
+
+Track browsing displays, sorts, and filters the song's record label. Its linked record-label entity
+is resolved from that same text, including for songs without an album. Album browsing uses the
+album's record label. Neither view replaces the stored song tags with a majority or last-read value.
+
 **Release** now belongs to the [release feed](../release-feed/CONTEXT.md) and to nothing here. The two
 were the same real-world concept modelled twice — the library's _inferred_ from tags on files the user
 owns, the feed's _announced_ by Bandcamp and not necessarily owned — and the word no longer has to be
