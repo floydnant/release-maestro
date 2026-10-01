@@ -58,9 +58,6 @@ minimumReleaseAgeExclude:
     - '@jest/transform@30.5.2'
     - '@playwright/mcp@0.0.82'
     - babel-jest@30.5.2
-    - dotenv@18.0.0
-    - electron@44.4.3
-    - eslint-plugin-jsdoc@64.5.3
     - eslint@10.11.0
     - expect@30.5.2
     - jest-circus@30.5.2
@@ -79,7 +76,6 @@ minimumReleaseAgeExclude:
     - jest-watcher@30.5.2
     - jest@30.5.2
     - jsdoc-type-pratt-parser@9.2.2
-    - prettier@3.9.8
     - playwright@1.64.0-alpha-1789764292000
     - playwright-core@1.64.0-alpha-1789764292000
 minimumReleaseAgeExcludePrune: true

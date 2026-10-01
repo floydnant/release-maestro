@@ -2098,6 +2098,24 @@ test('run-workflow launches pnpm from npm_execpath with Node', async () => {
     assert.equal(result.status, 0, result.stderr)
 })
 
+test('run-workflow launches executable pnpm from npm_execpath directly', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture()
+    const pnpmExecutable = join(fixture.base, 'pnpm')
+    await writeFile(pnpmExecutable, '#!/bin/sh\n[ "$*" = "exec playwright --version" ]\n')
+    await chmod(pnpmExecutable, 0o755)
+    const result = run(
+        fixture,
+        fixture.main,
+        ['run-workflow', 'renderer-e2e', '--', 'playwright', '--version'],
+        {
+            npm_execpath: pnpmExecutable,
+            RELEASE_MAESTRO_PNPM_COMMAND: '',
+        },
+    )
+    assert.equal(result.status, 0, result.stderr)
+})
+
 test('MCP wrapper exits when its child ignores termination', async () => {
     const fixture = await createFixture()
     const bin = await createFakePnpm(fixture)
