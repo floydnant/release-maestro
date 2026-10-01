@@ -13,6 +13,7 @@
 
 mod constants;
 mod custom_tags;
+mod id3_tags;
 mod image_format;
 mod metadata;
 mod mp4_tags;

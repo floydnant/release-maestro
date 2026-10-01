@@ -716,6 +716,189 @@ fn writes_iff_tags_through_a_symlink_without_replacing_it() {
 }
 
 #[test]
+fn id3_custom_key_alias_precedence_survives_unrelated_edits() {
+    let library = Library::new();
+    let path = library.copy("ordered-key-aliases.mp3");
+    let original = Engine::new().request("read_file", library.params(&path));
+    assert_eq!(original["musicalKey"], "Am");
+    for update in [
+        json!({"artist": "Changed artist"}),
+        json!({"energy": "9"}),
+        json!({"comment": null}),
+    ] {
+        let mut params = library.params(&path);
+        params["update"] = update;
+        let actual = Engine::new().request("write_tags", params);
+        assert_eq!(actual["musicalKey"], "Am");
+        let reread = Engine::new().request("read_file", library.params(&path));
+        assert_eq!(reread["musicalKey"], "Am");
+    }
+}
+
+#[test]
+fn id3_custom_frame_names_stay_independent_of_standard_fields() {
+    use lofty::{config::ParseOptions, file::AudioFile, id3::v2::Frame, mpeg::MpegFile};
+    fn custom(path: &std::path::Path) -> Vec<(String, String, String)> {
+        let mut file = std::fs::File::open(path).unwrap();
+        let native = MpegFile::read_from(&mut file, ParseOptions::new()).unwrap();
+        let mut fields: Vec<_> = native
+            .id3v2()
+            .unwrap()
+            .into_iter()
+            .filter_map(|frame| match frame {
+                Frame::UserText(text) if text.description.len() == 4 => Some((
+                    "TXXX".into(),
+                    text.description.to_string(),
+                    text.content.to_string(),
+                )),
+                Frame::UserUrl(url) if url.description.len() == 4 => Some((
+                    "WXXX".into(),
+                    url.description.to_string(),
+                    url.content.to_string(),
+                )),
+                _ => None,
+            })
+            .collect();
+        fields.sort();
+        fields
+    }
+    let library = Library::new();
+    let path = library.copy("custom-frame-names.mp3");
+    let original = custom(&path);
+    assert_eq!(original.len(), 3);
+    for update in [
+        json!({"artist": "Changed artist"}),
+        json!({"energy": "9"}),
+        json!({"comment": null}),
+        json!({"title": "Changed title"}),
+    ] {
+        let mut params = library.params(&path);
+        params["update"] = update.clone();
+        let actual = Engine::new().request("write_tags", params);
+        assert_fields(&actual, &update, "custom frame names");
+        assert_eq!(
+            &actual["title"],
+            update
+                .get("title")
+                .unwrap_or(&json!("Invocación Del Cielo"))
+        );
+        assert_eq!(actual["musicalKey"], "Am");
+        assert_eq!(custom(&path), original);
+    }
+    for value in [json!("Dm"), Value::Null] {
+        let mut params = library.params(&path);
+        params["update"] = json!({"musicalKey": value});
+        Engine::new().request("write_tags", params);
+        let actual = Engine::new().request("read_file", library.params(&path));
+        assert_eq!(actual["musicalKey"], value);
+        let expected: Vec<_> = original
+            .iter()
+            .filter(|(_, name, _)| name != "TKEY")
+            .cloned()
+            .collect();
+        assert_eq!(custom(&path), expected);
+    }
+}
+
+#[test]
+fn unrelated_edits_preserve_native_id3_ratings() {
+    use lofty::{
+        config::ParseOptions,
+        file::AudioFile,
+        id3::v2::Frame,
+        iff::{aiff::AiffFile, wav::WavFile},
+        mpeg::MpegFile,
+    };
+    fn ratings(path: &std::path::Path) -> Vec<(String, u8, u64)> {
+        let mut file = std::fs::File::open(path).unwrap();
+        let options = ParseOptions::new();
+        let native = match path.extension().unwrap().to_str().unwrap() {
+            "mp3" => MpegFile::read_from(&mut file, options)
+                .unwrap()
+                .id3v2()
+                .unwrap()
+                .clone(),
+            "wav" => WavFile::read_from(&mut file, options)
+                .unwrap()
+                .id3v2()
+                .unwrap()
+                .clone(),
+            "aiff" => AiffFile::read_from(&mut file, options)
+                .unwrap()
+                .id3v2()
+                .unwrap()
+                .clone(),
+            _ => unreachable!(),
+        };
+        let mut values: Vec<_> = native
+            .into_iter()
+            .filter_map(|frame| match frame {
+                Frame::Popularimeter(rating) => {
+                    Some((rating.email.into_owned(), rating.rating, rating.counter))
+                }
+                _ => None,
+            })
+            .collect();
+        values.sort();
+        values
+    }
+    let library = Library::new();
+    for name in ["id3-ratings.mp3", "id3-ratings.wav", "id3-ratings.aiff"] {
+        let path = library.copy(name);
+        let original = ratings(&path);
+        assert_eq!(
+            original,
+            vec![
+                ("best@example.com".into(), 255, 4294967297),
+                ("listener@example.com".into(), 80, 7),
+                ("unknown@example.com".into(), 0, 0),
+            ]
+        );
+        for update in [
+            json!({"title": "Unrelated title edit"}),
+            json!({"energy": "9"}),
+            json!({"comment": null}),
+        ] {
+            let mut params = library.params(&path);
+            params["update"] = update.clone();
+            Engine::new().request("write_tags", params);
+            assert_eq!(ratings(&path), original, "{name}: ratings after {update}");
+            let actual = Engine::new().request("read_file", library.params(&path));
+            assert_fields(&actual, &update, name);
+        }
+    }
+}
+
+#[test]
+fn secondary_ape_publisher_does_not_override_a_cleared_primary_label() {
+    use lofty::{config::ParseOptions, file::AudioFile, mpeg::MpegFile};
+    let library = Library::new();
+    let path = library.copy("secondary-publisher.mp3");
+    let original = Engine::new().request("read_file", library.params(&path));
+    assert_eq!(original["label"], "Blue Night Jungle");
+    for value in [Value::Null, json!("Replacement label"), Value::Null] {
+        let mut params = library.params(&path);
+        params["update"] = json!({"label": value});
+        let saved = Engine::new().request("write_tags", params);
+        assert_eq!(saved["label"], value);
+        let actual = Engine::new().request("read_file", library.params(&path));
+        assert_eq!(actual["label"], value);
+        let mut file = std::fs::File::open(&path).unwrap();
+        let native = MpegFile::read_from(&mut file, ParseOptions::new()).unwrap();
+        assert_eq!(
+            native
+                .ape()
+                .unwrap()
+                .get("Publisher")
+                .unwrap()
+                .value()
+                .text(),
+            Some("Secondary label")
+        );
+    }
+}
+
+#[test]
 fn unrelated_edits_preserve_native_vorbis_ratings() {
     use lofty::{
         config::ParseOptions,

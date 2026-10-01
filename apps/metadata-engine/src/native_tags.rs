@@ -1,15 +1,19 @@
 //! Retain native tags that Lofty cannot keep inside a generic Tag.
-//! MP4 keeps a native snapshot. Vorbis and APE use split/merge;
+//! ID3 and MP4 keep native snapshots. Vorbis and APE use split/merge;
 //! RIFF requires explicitly restoring unmapped entries.
 
-use crate::{custom_tags, mp4_tags::Mp4Snapshot};
+use crate::{custom_tags, id3_tags::Id3Snapshot, mp4_tags::Mp4Snapshot};
 use lofty::{
+    aac::AacFile,
     ape::{ApeFile, ApeItem, ApeTag},
     config::{ParseOptions, WriteOptions},
     error::{FileEncodingError, FileParseError},
     file::{AudioFile, FileType, TaggedFile, TaggedFileExt},
     flac::FlacFile,
-    iff::wav::{RiffInfoList, WavFile},
+    iff::{
+        aiff::AiffFile,
+        wav::{RiffInfoList, WavFile},
+    },
     mp4::Mp4File,
     mpeg::MpegFile,
     musepack::MpcFile,
@@ -39,26 +43,50 @@ impl PreservedTag {
 }
 
 #[derive(Default)]
-pub struct NativeTags(Option<PreservedTag>);
+pub struct NativeTags {
+    preserved: Option<PreservedTag>,
+    id3: Id3Snapshot,
+}
 
 pub fn read_file(path: &Path) -> Result<(TaggedFile, NativeTags), FileParseError> {
     let probe = Probe::open(path)?.guess_file_type()?;
     let file_type = probe.file_type();
     let mut reader = probe.into_inner();
     let options = ParseOptions::new();
-    // Each supported format needs at most one separately retained native tag.
+    // Preserve native ID3 ratings and custom frame identities before generic conversion.
     macro_rules! optional_tag {
         ($file:ty, $getter:ident, $variant:ident) => {{
-            let file = <$file as AudioFile>::read_from(&mut reader, options)?;
-            let native = PreservedTag::$variant(file.$getter().cloned().unwrap_or_default());
-            (file.into(), NativeTags(Some(native)))
+            let mut file = <$file as AudioFile>::read_from(&mut reader, options)?;
+            let native = NativeTags {
+                preserved: Some(PreservedTag::$variant(
+                    file.$getter().cloned().unwrap_or_default(),
+                )),
+                id3: Id3Snapshot::take(file.id3v2_mut()),
+            };
+            (file.into(), native)
         }};
     }
     macro_rules! required_tag {
         ($file:ty) => {{
             let file = <$file as AudioFile>::read_from(&mut reader, options)?;
             let native = PreservedTag::Vorbis(file.vorbis_comments().clone());
-            (file.into(), NativeTags(Some(native)))
+            (
+                file.into(),
+                NativeTags {
+                    preserved: Some(native),
+                    ..NativeTags::default()
+                },
+            )
+        }};
+    }
+    macro_rules! id3_tag {
+        ($file:ty) => {{
+            let mut file = <$file as AudioFile>::read_from(&mut reader, options)?;
+            let native = NativeTags {
+                id3: Id3Snapshot::take(file.id3v2_mut()),
+                ..NativeTags::default()
+            };
+            (file.into(), native)
         }};
     }
     let (mut file, native): (TaggedFile, NativeTags) = match file_type {
@@ -67,7 +95,13 @@ pub fn read_file(path: &Path) -> Result<(TaggedFile, NativeTags), FileParseError
             let original = file.ilst().cloned().unwrap_or_default();
             let tag = Tag::from(original.clone());
             let native = Mp4Snapshot::new(original, &tag);
-            (file.into(), NativeTags(Some(PreservedTag::Mp4(native))))
+            (
+                file.into(),
+                NativeTags {
+                    preserved: Some(PreservedTag::Mp4(native)),
+                    ..NativeTags::default()
+                },
+            )
         }
         Some(FileType::Flac) => optional_tag!(FlacFile, vorbis_comments, Vorbis),
         Some(FileType::Vorbis) => required_tag!(VorbisFile),
@@ -75,9 +109,18 @@ pub fn read_file(path: &Path) -> Result<(TaggedFile, NativeTags), FileParseError
         Some(FileType::Speex) => required_tag!(SpeexFile),
         Some(FileType::Ape) => optional_tag!(ApeFile, ape, Ape),
         Some(FileType::Mpc) => optional_tag!(MpcFile, ape, Ape),
-        Some(FileType::WavPack) => optional_tag!(WavPackFile, ape, Ape),
+        Some(FileType::WavPack) => {
+            let file = WavPackFile::read_from(&mut reader, options)?;
+            let native = NativeTags {
+                preserved: Some(PreservedTag::Ape(file.ape().cloned().unwrap_or_default())),
+                ..NativeTags::default()
+            };
+            (file.into(), native)
+        }
         Some(FileType::Mpeg) => optional_tag!(MpegFile, ape, Ape),
         Some(FileType::Wav) => optional_tag!(WavFile, riff_info, Riff),
+        Some(FileType::Aiff) => id3_tag!(AiffFile),
+        Some(FileType::Aac) => id3_tag!(AacFile),
         _ => (
             Probe::new(reader).guess_file_type()?.read()?,
             NativeTags::default(),
@@ -114,7 +157,7 @@ fn join_ape_text_values(tag: &mut Tag) {
 
 impl NativeTags {
     pub fn riff_alias_update(&self, fields: &[custom_tags::LegacyField]) -> Option<RiffInfoList> {
-        match &self.0 {
+        match &self.preserved {
             Some(PreservedTag::Riff(native)) => {
                 custom_tags::remove_riff_aliases(native.clone(), fields)
             }
@@ -123,8 +166,15 @@ impl NativeTags {
     }
 
     pub fn read(&self, tag: &Tag) -> Vec<(String, String)> {
+        if tag.tag_type() == TagType::Id3v2 {
+            // Older Lofty kept four-character descriptions in the companion tag,
+            // ahead of longer custom descriptions rebuilt from generic items.
+            let mut fields = self.id3.read_custom();
+            fields.extend(custom_tags::read(tag, None));
+            return fields;
+        }
         let Some(native) = self
-            .0
+            .preserved
             .as_ref()
             .filter(|native| native.tag_type() == tag.tag_type())
         else {
@@ -164,8 +214,11 @@ impl NativeTags {
         aliases: &[&str],
         value: Option<String>,
     ) -> Result<(), String> {
+        if tag.tag_type() == TagType::Id3v2 {
+            self.id3.remove_aliases(canonical, aliases);
+        }
         match self
-            .0
+            .preserved
             .as_mut()
             .filter(|native| native.tag_type() == tag.tag_type())
         {
@@ -198,8 +251,11 @@ impl NativeTags {
 
     pub fn save(&self, tag: &Tag, path: &Path) -> Result<(), FileEncodingError> {
         let options = WriteOptions::new().remove_others(false);
+        if tag.tag_type() == TagType::Id3v2 {
+            return self.id3.merge(tag).save_to_path(path, options);
+        }
         match self
-            .0
+            .preserved
             .as_ref()
             .filter(|native| native.tag_type() == tag.tag_type())
         {
@@ -313,7 +369,10 @@ mod tests {
     fn invalid_ape_replacement_leaves_existing_metadata_intact() {
         let mut original = ApeTag::new();
         original.insert(ApeItem::new("ENERGY".into(), ItemValue::Text("7".into())).unwrap());
-        let mut native = NativeTags(Some(PreservedTag::Ape(original)));
+        let mut native = NativeTags {
+            preserved: Some(PreservedTag::Ape(original)),
+            ..NativeTags::default()
+        };
         let mut tag = Tag::new(TagType::Ape);
         assert!(native
             .replace_text(&mut tag, "x", &["ENERGY"], Some("value".into()))

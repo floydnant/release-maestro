@@ -44,6 +44,16 @@ secondary RIFF aliases do not reappear.
 reads, unrelated edits, and replacements. It also checks clears for the four nullable fields.
 `ratings.flac`, `ratings.ogg`, and `ratings.opus` check that unrelated edits retain repeated numeric
 ratings and listener-specific ratings.
+`id3-ratings.mp3`, `id3-ratings.wav`, and `id3-ratings.aiff` check native ID3 rating values and play
+counters through unrelated edits. They include an unknown rating, a non-star-aligned rating, and a
+counter larger than 32 bits. Native rating frames are retained before generic conversion and restored
+on save. `secondary-publisher.mp3` checks that clearing the primary label does not expose a secondary
+APE Publisher; `publisher-only.mp3` checks the fallback when there is no primary tag.
+`custom-frame-names.mp3` keeps custom text and URL fields named like standard ID3 frames independent
+through edits. The native snapshot also keeps those fields out of generic conversion; explicit edits
+still remove matching legacy aliases such as a custom `TKEY`.
+`ordered-key-aliases.mp3` checks that four-character custom aliases retain their legacy precedence
+over longer custom descriptions after repeated edits and fresh-worker reads.
 
 The fixture manifest uses typed fields and rejects unknown keys, invalid flags, and unknown aliases.
 

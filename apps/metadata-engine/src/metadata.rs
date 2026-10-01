@@ -812,7 +812,7 @@ pub fn read_song_metadata_v2(
                 .strip_prefix("----:com.apple.iTunes:")
                 .unwrap_or(&field_name);
             if tag.tag_type() == TagType::Ape && alias.eq_ignore_ascii_case("Publisher") {
-                if label.is_none() {
+                if label.is_none() && (allow_overwrite || !has_primary_tag) {
                     label = Some(value);
                 }
                 continue;

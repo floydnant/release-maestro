@@ -754,5 +754,125 @@
             "label": "Blue Night Jungle"
         },
         "writable": true
+    },
+    {
+        "file": "id3-ratings.mp3",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
+    },
+    {
+        "file": "id3-ratings.wav",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
+    },
+    {
+        "file": "id3-ratings.aiff",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
+    },
+    {
+        "file": "secondary-publisher.mp3",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
+    },
+    {
+        "file": "publisher-only.mp3",
+        "expected": {
+            "title": "publisher-only.mp3",
+            "label": "Secondary label"
+        }
+    },
+    {
+        "file": "custom-frame-names.mp3",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [
+            ["Custom: TIT2", "Private title"],
+            ["Custom: TIT2", "Second private title"],
+            ["Custom: TIT2", "https://example.com/private-title"]
+        ],
+        "writable": true
+    },
+    {
+        "file": "ordered-key-aliases.mp3",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "writable": true
     }
 ]
