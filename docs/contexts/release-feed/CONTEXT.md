@@ -42,9 +42,9 @@ _Avoid_: scan (that is a music-library word), refresh
 How far a mailbox has been imported: the newest date received that a completed import covered, kept
 per vendor and mailbox (`feed_email_import_checkpoints`). The next import exports only mail received
 from a day before it, so a message that synced in late is still read. A cancelled or failed import
-does not advance it, and neither does an import where an exported email could not be read. It never
-moves backwards or past the start of the import. Without one, the export reads the whole mailbox. An
-email that cannot be parsed is skipped, because a retry would fail the same way.
+does not advance it, and neither does an import where an exported email could not be read or parsed.
+It never moves backwards or past the start of the import. Without one, the export reads the whole
+mailbox.
 A message moved into the mailbox long after it was received is older than the checkpoint and is not
 picked up.
 _Avoid_: watermark, cursor, last sync

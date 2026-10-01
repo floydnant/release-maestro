@@ -80,7 +80,7 @@ export class FeedBackendService {
             : null
         let newestReceivedAt: Date | null = null
 
-        const emails$ = await this.emailRepo.loadEmails(vendor, abortSignal, receivedSince)
+        const emails$ = await this.emailRepo.loadEmails(vendor, abortSignal, mailboxName, receivedSince)
 
         return merge(
             emails$.pipe(

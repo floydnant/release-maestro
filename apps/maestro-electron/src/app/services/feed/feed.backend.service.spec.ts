@@ -58,7 +58,7 @@ describe('FeedBackendService email import', () => {
     it('reads the whole mailbox on the first import and checkpoints the newest email', async () => {
         const { updates } = await runImport()
 
-        expect(loadEmails).toHaveBeenCalledWith('APPLE_MAIL', expect.any(AbortSignal), null)
+        expect(loadEmails).toHaveBeenCalledWith('APPLE_MAIL', expect.any(AbortSignal), 'Bandcamp', null)
         emails$.next(packet('2026-09-30T08:15:00', 1, 3))
         emails$.next(packet('2026-10-01T21:40:12', 2, 3))
         emails$.next(packet('2026-09-12T10:00:00', 3, 3))
@@ -83,6 +83,7 @@ describe('FeedBackendService email import', () => {
         expect(loadEmails).toHaveBeenCalledWith(
             'APPLE_MAIL',
             expect.any(AbortSignal),
+            'Bandcamp',
             new Date(checkpoint.getTime() - DAY_MS),
         )
     })
@@ -146,6 +147,6 @@ describe('FeedBackendService email import', () => {
         emails$.complete()
         await updates
 
-        expect(loadEmails).toHaveBeenCalledWith('APPLE_MAIL', expect.any(AbortSignal), null)
+        expect(loadEmails).toHaveBeenCalledWith('APPLE_MAIL', expect.any(AbortSignal), 'Releases', null)
     })
 })

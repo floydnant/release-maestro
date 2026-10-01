@@ -6,9 +6,6 @@ import { tmpdir } from 'os'
 import { basename, join } from 'path'
 import { PassThrough } from 'stream'
 import { lastValueFrom, toArray } from 'rxjs'
-import { AppSettings } from '@release-maestro/core'
-import { InMemoryStore } from '../../utils/persistent-store.util'
-import { SettingsBackendService } from '../settings.backend.service'
 import { AppleMailRepository, formatAppleScriptDate } from './apple-mail.repository'
 
 const mockSpawn = jest.fn<ChildProcess, [string, string[], { signal: AbortSignal }]>()
@@ -59,13 +56,10 @@ const fakeExport = () => {
 
 describe('AppleMailRepository', () => {
     let tempPath: string
-    let settings: SettingsBackendService
 
     beforeEach(async () => {
         tempPath = await fs.mkdtemp(join(tmpdir(), 'maestro-mail-test-'))
         jest.mocked(app.getPath).mockReturnValue(tempPath)
-        settings = new SettingsBackendService(new InMemoryStore<AppSettings>())
-        settings.patchSettings({ emailPluginConfig: { APPLE_MAIL: { mailboxName: 'Releases' } } })
     })
 
     afterEach(async () => {
@@ -75,7 +69,7 @@ describe('AppleMailRepository', () => {
 
     const loadAll = (receivedSince: Date | null = null, abortSignal = new AbortController().signal) =>
         lastValueFrom(
-            new AppleMailRepository(settings).loadEmails(abortSignal, receivedSince).pipe(toArray()),
+            new AppleMailRepository().loadEmails(abortSignal, 'Releases', receivedSince).pipe(toArray()),
         )
 
     it('exports into a fresh directory', async () => {
@@ -171,7 +165,7 @@ describe('AppleMailRepository', () => {
         const osascript = fakeExport()
         const emitted: string[] = []
         const result = new Promise<unknown>((resolve, reject) => {
-            new AppleMailRepository(settings).loadEmails(new AbortController().signal, null).subscribe({
+            new AppleMailRepository().loadEmails(new AbortController().signal, 'Releases', null).subscribe({
                 next: ({ email }) => emitted.push(email.subject),
                 error: reject,
                 complete: () => resolve(undefined),
@@ -188,6 +182,29 @@ describe('AppleMailRepository', () => {
 
         await expect(result).rejects.toThrow(`[AppleMailImporter] Could not read exported email ${missing}`)
         expect(emitted).toEqual(['Second'])
+    })
+
+    it('fails the export when an exported email does not parse', async () => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const truncated = join(exportPath, 'email-1.txt')
+        await fs.writeFile(truncated, 'messageId: <cut-off@example.com>\nsen')
+
+        osascript.log(`Processed email 1/1: ${truncated}\n`)
+        await osascript.exit(0)
+
+        await expect(result).rejects.toThrow(
+            `[AppleMailImporter] Could not parse exported email ${truncated}`,
+        )
+    })
+
+    it('fails without exporting when no mailbox is configured', async () => {
+        await expect(
+            lastValueFrom(new AppleMailRepository().loadEmails(new AbortController().signal, null, null)),
+        ).rejects.toThrow('[AppleMailImporter] Mailbox name is not set in settings')
+        expect(mockSpawn).not.toHaveBeenCalled()
     })
 
     it('completes rather than fails when the import is cancelled', async () => {

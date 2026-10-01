@@ -7,7 +7,6 @@ import { Observable, Subject } from 'rxjs'
 import { Email, EmailImportStreamPacket, emailSchema } from '@release-maestro/core'
 import { appPaths } from '../../app-env'
 import type { EmailImporterPlugin } from './email.backend.repository'
-import { SettingsBackendService } from '../settings.backend.service'
 
 const validateEmail = (data: unknown): Email | null => {
     const result = emailSchema.safeParse(data)
@@ -62,12 +61,13 @@ const toExportError = (exitCode: number | null, unhandledOutput: string[]): Erro
 }
 
 export class AppleMailRepository implements EmailImporterPlugin {
-    constructor(private settings: SettingsBackendService) {}
-
-    loadEmails(abortSignal: AbortSignal, receivedSince: Date | null): Observable<EmailImportStreamPacket> {
+    loadEmails(
+        abortSignal: AbortSignal,
+        mailboxName: string | null,
+        receivedSince: Date | null,
+    ): Observable<EmailImportStreamPacket> {
         const result$ = new Subject<EmailImportStreamPacket>()
 
-        const mailboxName = this.settings.getSettings().emailPluginConfig?.APPLE_MAIL?.mailboxName
         if (!mailboxName) {
             result$.error(new Error('[AppleMailImporter] Mailbox name is not set in settings'))
             return result$
@@ -178,11 +178,11 @@ export class AppleMailRepository implements EmailImporterPlugin {
             }),
         ])
         const email = parseAppleMailFile(dataFileContents, htmlFileContents)
-        if (email) {
-            result$.next({ current: Number(current), total: Number(total), email })
-        } else {
-            // Skipped rather than failed: the same file would fail the same way on every retry
-            console.error('[AppleMailImporter] Failed to parse email from', filePath)
+        if (!email) {
+            // The script reports an email even when writing its file failed, so treat a file that
+            // does not parse as an incomplete export
+            throw new Error(`[AppleMailImporter] Could not parse exported email ${filePath}`)
         }
+        result$.next({ current: Number(current), total: Number(total), email })
     }
 }
