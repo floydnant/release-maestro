@@ -152,6 +152,44 @@ describe('AppleMailRepository', () => {
         await expect(result).rejects.toThrow('[AppleMailImporter] Can’t get mailbox "Releases". (-1728)')
     })
 
+    it("reports Mail's error even when it arrives behind emails still being read", async () => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const first = join(exportPath, 'email-1.txt')
+        await fs.writeFile(first, dataFile('First', '2026-10-01T08:00:00'))
+
+        osascript.log(`Processed email 1/2: ${first}\n`)
+        osascript.log('execution error: Mail got an error: AppleEvent timed out. (-1712)\n')
+        await osascript.exit(1)
+
+        await expect(result).rejects.toThrow('[AppleMailImporter] AppleEvent timed out. (-1712)')
+    })
+
+    it('fails the export when an exported email cannot be read, after emitting the rest', async () => {
+        const osascript = fakeExport()
+        const emitted: string[] = []
+        const result = new Promise<unknown>((resolve, reject) => {
+            new AppleMailRepository(settings).loadEmails(new AbortController().signal, null).subscribe({
+                next: ({ email }) => emitted.push(email.subject),
+                error: reject,
+                complete: () => resolve(undefined),
+            })
+        })
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const missing = join(exportPath, 'email-1.txt')
+        const second = join(exportPath, 'email-2.txt')
+        await fs.writeFile(second, dataFile('Second', '2026-10-01T09:00:00'))
+
+        osascript.log(`Processed email 1/2: ${missing}\nProcessed email 2/2: ${second}\n`)
+        await osascript.exit(0)
+
+        await expect(result).rejects.toThrow(`[AppleMailImporter] Could not read exported email ${missing}`)
+        expect(emitted).toEqual(['Second'])
+    })
+
     it('completes rather than fails when the import is cancelled', async () => {
         const osascript = fakeExport()
         const abortController = new AbortController()

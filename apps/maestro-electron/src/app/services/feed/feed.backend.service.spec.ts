@@ -101,6 +101,17 @@ describe('FeedBackendService email import', () => {
         )
     })
 
+    it('never checkpoints past the start of the import', async () => {
+        const { updates } = await runImport()
+
+        emails$.next(packet('2099-01-01T00:00:00'))
+        emails$.complete()
+        await updates
+
+        const checkpoint = await feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')
+        expect(checkpoint?.getTime()).toBeLessThanOrEqual(Date.now())
+    })
+
     it('does not checkpoint a cancelled import', async () => {
         const { updates, abortController } = await runImport()
 

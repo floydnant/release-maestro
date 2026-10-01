@@ -85,23 +85,30 @@ export class AppleMailRepository implements EmailImporterPlugin {
 
                 // An import may only be marked as covered once every exported email reached the
                 // stream, so lines are handled in order and the stream settles only after the last one.
+                // A line that fails does not stop the export, but fails it once the rest is handled.
                 let handledLines = Promise.resolve()
+                let lineFailure: Error | null = null
                 const unhandledOutput: string[] = []
                 createInterface({ input: childProcess.stderr }).on('line', line => {
-                    handledLines = handledLines.then(() =>
-                        this.handleExportLine(line, result$, unhandledOutput),
-                    )
+                    handledLines = handledLines
+                        .then(() => this.handleExportLine(line, result$, unhandledOutput))
+                        .catch((error: unknown) => {
+                            console.error('[AppleMailImporter] ', error)
+                            lineFailure ??= error instanceof Error ? error : new Error(String(error))
+                        })
                 })
                 childProcess.stdout.on('data', data => {
                     console.log('[AppleMailImporter] ', String(data).replace(/\n$/, ''))
                 })
 
                 let isSettled = false
-                const settle = (error: Error | null) => {
+                /** `getError` runs once every line is handled, so it sees all of the script's output. */
+                const settle = (getError: () => Error | null) => {
                     if (isSettled) return
                     isSettled = true
 
                     void handledLines.then(() => {
+                        const error = getError() ?? lineFailure
                         // An aborted export completes rather than errors: the user asked it to stop
                         if (error && !abortSignal.aborted) {
                             console.error('[AppleMailImporter] ', error.message)
@@ -125,10 +132,13 @@ export class AppleMailRepository implements EmailImporterPlugin {
                 childProcess.on('error', error => {
                     spawnError = error
                     // A process that never started emits no 'close' to wait for
-                    if (childProcess.pid === undefined) settle(error)
+                    if (childProcess.pid === undefined) settle(() => error)
                 })
                 childProcess.on('close', exitCode => {
-                    settle(spawnError ?? (exitCode === 0 ? null : toExportError(exitCode, unhandledOutput)))
+                    settle(
+                        () =>
+                            spawnError ?? (exitCode === 0 ? null : toExportError(exitCode, unhandledOutput)),
+                    )
                 })
             },
             error => {
@@ -158,23 +168,20 @@ export class AppleMailRepository implements EmailImporterPlugin {
         }
 
         const [dataFileContents, htmlFileContents] = await Promise.all([
-            fs.readFile(filePath, 'utf-8').catch(err => {
-                console.error('[AppleMailImporter] Error reading data file', filePath, ':', err)
-                return null
+            fs.readFile(filePath, 'utf-8').catch((error: unknown) => {
+                console.error('[AppleMailImporter] Error reading data file', filePath, ':', error)
+                throw new Error(`[AppleMailImporter] Could not read exported email ${filePath}`)
             }),
             fs.readFile(filePath.replace(/\.txt$/, '.html'), 'utf-8').catch(() => {
                 // HTML file may not exist if the email had no HTML body
                 return ''
             }),
         ])
-        if (!dataFileContents) {
-            return
-        }
-
         const email = parseAppleMailFile(dataFileContents, htmlFileContents)
         if (email) {
             result$.next({ current: Number(current), total: Number(total), email })
         } else {
+            // Skipped rather than failed: the same file would fail the same way on every retry
             console.error('[AppleMailImporter] Failed to parse email from', filePath)
         }
     }

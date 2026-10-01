@@ -21,7 +21,8 @@ _Avoid_: mail provider, email client, plugin
 
 **Mailbox**:
 The one named Apple Mail mailbox the export reads from (`mailboxName`). Exactly one is configured
-today. Multiple mailboxes are a noted future possibility, but are not represented in the schema.
+today. Multiple mailboxes are a noted future possibility, but are not represented in the settings.
+Each mailbox has its own _import checkpoint_, so switching to another one starts with a full export.
 
 **Export**:
 The AppleScript pass that pulls messages out of Apple Mail (`apple-scripts/export-emails.applescript`).
@@ -33,15 +34,17 @@ _Avoid_: sync, fetch, download
 One pass that turns exported emails into feed items. It streams progress to the renderer as
 `processing`, then exactly one `completed` or `error`, and reports both `totalImported` (how many the
 pass covered) and `newlyImported` (how many were not already in the feed) — a user re-running an
-import legitimately sees a nonzero total and a zero new count, because it re-reads the overlap before
-its _import checkpoint_.
+import may legitimately see a nonzero total and a zero new count, because it re-reads the overlap
+before its _import checkpoint_.
 _Avoid_: scan (that is a music-library word), refresh
 
 **Import checkpoint**:
 How far a mailbox has been imported: the newest date received that a completed import covered, kept
 per vendor and mailbox (`feed_email_import_checkpoints`). The next import exports only mail received
 from a day before it, so a message that synced in late is still read. A cancelled or failed import
-does not advance it, and it never moves backwards. Without one, the export reads the whole mailbox.
+does not advance it, and neither does an import where an exported email could not be read. It never
+moves backwards or past the start of the import. Without one, the export reads the whole mailbox. An
+email that cannot be parsed is skipped, because a retry would fail the same way.
 A message moved into the mailbox long after it was received is older than the checkpoint and is not
 picked up.
 _Avoid_: watermark, cursor, last sync

@@ -72,8 +72,9 @@ export class FeedBackendService {
 
         const vendor = 'APPLE_MAIL'
         const mailboxName = this.emailRepo.getMailboxName(vendor)
-        const checkpoint =
-            mailboxName && (await this.feedBackendRepository.getEmailImportCheckpoint(vendor, mailboxName))
+        const checkpoint = mailboxName
+            ? await this.feedBackendRepository.getEmailImportCheckpoint(vendor, mailboxName)
+            : null
         const receivedSince = checkpoint
             ? new Date(checkpoint.getTime() - EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS)
             : null
@@ -130,11 +131,17 @@ export class FeedBackendService {
                     if (notification.kind == 'C') {
                         // A cancelled export completes too, but only a full pass covers the mailbox
                         if (!abortSignal.aborted && mailboxName && newestReceivedAt) {
-                            await this.feedBackendRepository.advanceEmailImportCheckpoint(
-                                vendor,
-                                mailboxName,
-                                newestReceivedAt,
+                            // A message dated in the future (a bad server clock) must not hide the
+                            // mail that really arrives before then
+                            const coveredUntil = new Date(
+                                Math.min(newestReceivedAt.getTime(), importStartedAt.getTime()),
                             )
+                            // The import itself succeeded; without a checkpoint the next one is just slower
+                            await this.feedBackendRepository
+                                .advanceEmailImportCheckpoint(vendor, mailboxName, coveredUntil)
+                                .catch(error =>
+                                    console.error('Failed to save the email import checkpoint:', error),
+                                )
                         }
 
                         const newlyImported =
