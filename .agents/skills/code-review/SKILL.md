@@ -83,12 +83,11 @@ with the failure.
 Issues and PRDs live in **Linear**, not GitHub Issues — `#123`-style refs in this repo's commit
 subjects are pull requests; Linear issues are `MAE-123`. Look for the originating spec in this order:
 
-1. Issue references in the commit messages or branch name — fetch via the workflow in
+1. Issue references in the commit messages, branch name or PR description/title — fetch via the workflow in
    `docs/agents/issue-tracker.md`.
 2. A path the user passed as an argument.
 3. A PRD or spec file under `docs/` or `.scratch/` matching the branch name or feature.
-4. If nothing is found, ask the user where the spec is. If they say there isn't one, skip the Spec
-   sub-agent and report "no spec available".
+4. If nothing is found, assume there is no spec and skip the Spec sub-agent, reporting "no spec available".
 
 ### 5. Identify the standards sources
 
