@@ -44,6 +44,7 @@ type ScanIndicatorView =
           scanId: number
           newSongs: number
           changedSongs: number
+          successfulReads: number
           missingSongs: number
           failedFiles: number
       }
@@ -275,6 +276,7 @@ export class AppComponent {
                         status.terminal.imported - status.terminal.new,
                     ),
                     missingSongs: status.terminal.missing,
+                    successfulReads: status.terminal.imported,
                     failedFiles: status.terminal.discoveryFailureCount + status.terminal.readFailureCount,
                 },
                 minDwellMs: 0,
