@@ -538,8 +538,20 @@ describe('LibraryBrowseRepository', () => {
                 .run()
             seedAlbum({ id: 'album1', title: 'Album one', recordLabelId: 'r1' })
             seedAlbum({ id: 'album2', title: 'Album two' })
-            seedSong({ id: 's1', title: 'First', albumId: 'album1', genreText: 'Techno; Ambient' })
-            seedSong({ id: 's2', title: 'Missing', albumId: 'album1', present: false })
+            seedSong({
+                id: 's1',
+                title: 'First',
+                albumId: 'album1',
+                genreText: 'Techno; Ambient',
+                recordLabelText: 'Record label',
+            })
+            seedSong({
+                id: 's2',
+                title: 'Missing',
+                albumId: 'album1',
+                present: false,
+                recordLabelText: 'Record label',
+            })
             seedSong({ id: 's3', title: 'Unsplit', albumId: 'album2', genreText: 'Techno; Ambient' })
             db.insert(songGenresTable)
                 .values([
@@ -576,6 +588,59 @@ describe('LibraryBrowseRepository', () => {
                 recordLabelCount: 0,
             })
             expect(repository.getGenreDetail('gone')).toBeNull()
+        })
+
+        it('lists and counts song record labels that lead to matching genre tracks despite album drift', () => {
+            db.insert(recordLabelsTable)
+                .values([
+                    { id: 'song-label', name: 'Song record label' },
+                    { id: 'albumless-label', name: 'Albumless record label' },
+                ])
+                .run()
+            seedSong({ id: 'drift', title: 'Drift', albumId: 'album1', recordLabelText: 'Song record label' })
+            seedSong({
+                id: 'albumless',
+                title: 'Albumless',
+                recordLabelText: 'Albumless record label',
+                present: false,
+            })
+            seedSong({ id: 'no-label', title: 'No record label', albumId: 'album1' })
+            db.insert(songGenresTable)
+                .values([
+                    { songId: 'drift', genreId: 'compound' },
+                    { songId: 'albumless', genreId: 'compound' },
+                    { songId: 'no-label', genreId: 'compound' },
+                ])
+                .run()
+
+            const related = repository.queryGenreRelated({
+                query: { genreId: 'compound', kind: 'recordLabels' },
+                window: { offset: 0, limit: 10 },
+            })
+            expect(related).toEqual({
+                offset: 0,
+                total: 2,
+                rows: [
+                    { id: 'albumless-label', name: 'Albumless record label' },
+                    { id: 'song-label', name: 'Song record label' },
+                ],
+            })
+            expect(repository.getGenreDetail('compound')).toMatchObject({
+                songCount: 4,
+                albumCount: 2,
+                recordLabelCount: 2,
+            })
+            for (const recordLabel of related.rows) {
+                const songs = repository.querySongs({
+                    query: query({ filter: { genreIds: ['compound'], recordLabelIds: [recordLabel.id] } }),
+                    window: { offset: 0, limit: 10 },
+                })
+                expect(songs.total).toBe(1)
+                expect(songs.rows[0]).toMatchObject({
+                    recordLabelId: recordLabel.id,
+                    recordLabelText: recordLabel.name,
+                })
+            }
         })
 
         it('windows genres in both name directions and searches literal wildcards', () => {

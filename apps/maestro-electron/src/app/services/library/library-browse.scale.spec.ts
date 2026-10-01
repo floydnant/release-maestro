@@ -106,10 +106,10 @@ describe('LibraryBrowseRepository at library scale', () => {
      * or a predicate that defeated the ordering index would explain clean and the
      * check would pass while the real query fell back to a temp B-tree.
      */
-    const queryPlan = (query: SongQuery): string => {
+    const queryPlan = (query: SongQuery, offset = DEEP_OFFSET): string => {
         const { sql, params } = repository.songWindowSql({
             query,
-            window: { offset: DEEP_OFFSET, limit: 100 },
+            window: { offset, limit: 100 },
         })
 
         const rows = sqlite.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as { detail: string }[]
@@ -154,6 +154,14 @@ describe('LibraryBrowseRepository at library scale', () => {
         })
 
         db.transaction(tx => {
+            tx.insert(recordLabelsTable)
+                .values(
+                    LABELS.map((name, index) => ({
+                        id: `song-label-${index}`,
+                        name,
+                    })),
+                )
+                .run()
             for (let index = 0; index < 17; index++) {
                 tx.insert(recordLabelsTable)
                     .values({ id: `genre-label-${index}`, name: `Record label ${index}` })
@@ -336,8 +344,8 @@ describe('LibraryBrowseRepository at library scale', () => {
             expect(plan).toContain('LIST SUBQUERY')
             expect(plan).not.toMatch(/CORRELATED|TEMP B-TREE FOR ORDER BY/i)
             const result = repository.queryGenreRelated(request)
-            expect(result.total).toBe(kind === 'artists' ? 50 : 17)
-            expect(result.rows).toHaveLength(kind === 'artists' ? 20 : 17)
+            expect(result.total).toBe(kind === 'artists' ? 50 : 1)
+            expect(result.rows).toHaveLength(kind === 'artists' ? 20 : 1)
         },
     )
 
@@ -369,14 +377,25 @@ describe('LibraryBrowseRepository at library scale', () => {
         expect(plan).toMatch(/USING (COVERING )?INDEX songs_/)
     })
 
-    it.each(sorts)('keeps indexed $field $direction ordering with a record-label filter', sort => {
-        const plan = queryPlan({
+    it.each(sorts)('keeps indexed $field $direction ordering with a populated record-label filter', sort => {
+        const query: SongQuery = {
             ...emptySongQuery(),
-            filter: { recordLabelIds: ['genre-label-1', 'genre-label-2'] },
+            filter: { recordLabelIds: ['song-label-1', 'song-label-2'] },
             sort,
-        })
+        }
+        const total = (SONG_COUNT * 2) / LABELS.length
+        const window = { offset: total - 200, limit: 100 }
+        const plan = queryPlan(query, window.offset)
         expect(plan).not.toMatch(/TEMP B-TREE/i)
         expect(plan).toMatch(/USING (COVERING )?INDEX songs_/)
+        const result = repository.querySongs({ query, window })
+        expect(result.total).toBe(total)
+        expect(result.rows).toHaveLength(window.limit)
+        expect(
+            result.rows.every(
+                row => row.recordLabelId != null && query.filter.recordLabelIds?.includes(row.recordLabelId),
+            ),
+        ).toBe(true)
     })
 
     it.each(sorts)('serves a full deep window sorted by $field $direction', sort => {

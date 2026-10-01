@@ -259,7 +259,8 @@ _Avoid_: genre substring, genre tag match
 
 **Related to a genre**:
 Artists credited on songs with that genre membership, albums containing those songs, and record labels
-of those albums. Each entity is counted once, including relationships through missing songs.
+resolved from those songs' record-label tags. Each entity is counted once, including relationships
+through missing songs and record labels on songs without an album.
 _Avoid_: similar genres, recommendations, album-artist membership
 
 ## Browsing
