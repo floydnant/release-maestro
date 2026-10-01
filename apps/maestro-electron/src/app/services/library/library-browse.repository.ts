@@ -575,11 +575,11 @@ export class LibraryBrowseRepository {
                 genreId: songGenresTable.genreId,
                 songCount: count(),
                 albumCount: countDistinct(songsTable.albumId),
-                recordLabelCount: countDistinct(albumsTable.recordLabelId),
+                recordLabelCount: countDistinct(recordLabelsTable.id),
             })
             .from(songGenresTable)
             .innerJoin(songsTable, eq(songGenresTable.songId, songsTable.id))
-            .leftJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
+            .leftJoin(recordLabelsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
             .where(inArray(songGenresTable.genreId, genreIds))
             .groupBy(songGenresTable.genreId)
             .all()
@@ -645,8 +645,7 @@ export class LibraryBrowseRepository {
                     .selectDistinct({ id: recordLabelsTable.id })
                     .from(songGenresTable)
                     .innerJoin(songsTable, eq(songGenresTable.songId, songsTable.id))
-                    .innerJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
-                    .innerJoin(recordLabelsTable, eq(albumsTable.recordLabelId, recordLabelsTable.id))
+                    .innerJoin(recordLabelsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
                     .where(eq(songGenresTable.genreId, query.genreId))
             default: {
                 const unhandled: never = query.kind
