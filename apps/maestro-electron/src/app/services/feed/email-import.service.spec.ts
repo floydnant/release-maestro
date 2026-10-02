@@ -103,7 +103,21 @@ describe('EmailImportService', () => {
         await Promise.all([auto, manual])
 
         expect(triggerEmailImport).toHaveBeenCalledTimes(1)
-        expect(updates.map(update => update.trigger)).toEqual(['auto', 'auto', 'manual'])
+        expect(updates).toEqual([
+            { phase: 'started', trigger: 'auto' },
+            { phase: 'processing', current: 1, total: 2, message: 'one', trigger: 'auto' },
+            // The takeover re-sends the latest update, so the renderer moves it without waiting
+            { phase: 'processing', current: 1, total: 2, message: 'one', trigger: 'manual' },
+            { phase: 'processing', current: 2, total: 2, message: 'two', trigger: 'manual' },
+        ])
+    })
+
+    it('runs an auto import when the clock moved back past the last start', () => {
+        stateStore.set('lastStartedAt', NOW + EMAIL_AUTO_IMPORT_INTERVAL_MS)
+
+        void createService().start('auto')
+
+        expect(triggerEmailImport).toHaveBeenCalledTimes(1)
     })
 
     it('starts a new import once the running one has settled', async () => {

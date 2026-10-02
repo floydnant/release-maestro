@@ -8,6 +8,7 @@ import { diContainer } from '../di'
 // import { DatabaseClient } from '../database/database.client' // TODO: Use when needed
 import {
     asAppIpcMain,
+    emailImportTriggerSchema,
     FeedLoadError,
     LibraryBrowseIpcChannel,
     LibraryIpcChannel,
@@ -56,7 +57,8 @@ ipc.handle('patch-settings', async (_event, patch) => {
 
 // Email imports (lifecycle owned by EmailImportService; progress is streamed to all windows on
 // `email-import-progress`)
-ipc.handle('trigger-email-import', async (_event, { trigger }) => {
+ipc.handle('trigger-email-import', async (_event, request) => {
+    const trigger = emailImportTriggerSchema.parse(request?.trigger)
     const { EmailImportService } = await import('../services/feed/email-import.service')
     const importService = await diContainer.get(EmailImportService)
     await importService.start(trigger)

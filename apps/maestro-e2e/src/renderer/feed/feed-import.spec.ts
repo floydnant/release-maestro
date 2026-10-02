@@ -79,7 +79,7 @@ test.describe('auto import', () => {
 
     test('shows auto import progress in the title bar and cancels it from there', async ({ page }) => {
         const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
-        const titleBar = page.locator('header.title-bar')
+        const titleBar = page.getByRole('banner')
 
         await controller.emit('email-import-progress', { phase: 'started', trigger: 'auto' })
         await expect(titleBar.getByText('Checking mail…')).toBeVisible()
@@ -104,7 +104,7 @@ test.describe('auto import', () => {
         await controller.emit('email-import-progress', { phase: 'cancelled', trigger: 'auto' })
         await expect(cancel).toBeHidden()
         await expect(titleBar).toBeFocused()
-        await expect(page.getByRole('status', { name: 'Email import' })).toBeEmpty()
+        await expect(page.getByRole('status', { name: 'Email import' })).toHaveText(/^\s*$/)
     })
 
     for (const { newlyImported, summary } of [
@@ -128,6 +128,7 @@ test.describe('auto import', () => {
     }
 
     test('hides the auto import summary after four seconds', async ({ page }) => {
+        await page.clock.install()
         const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
 
         await controller.emit('email-import-progress', {
@@ -138,9 +139,36 @@ test.describe('auto import', () => {
 
         const summary = page.getByRole('status', { name: 'Email import' })
         await expect(summary).toHaveText('Email import failed')
-        await page.waitForTimeout(3000)
+        await page.clock.runFor(3900)
         await expect(summary).toHaveText('Email import failed')
-        await expect(summary).toBeEmpty({ timeout: 2500 })
+        await page.clock.runFor(200)
+        await expect(summary).toHaveText(/^\s*$/)
+    })
+
+    test('drops a summary that arrives on the import route', async ({ page }) => {
+        await page.clock.install()
+        const controller = await createRendererScenario(
+            page,
+            rendererScenarios.feed.emptyNoSetup(),
+            '/import',
+        )
+
+        await controller.emit('email-import-progress', {
+            phase: 'completed',
+            totalProcessed: 8,
+            totalImported: 5,
+            newlyImported: 3,
+            trigger: 'auto',
+        })
+        const summary = page.getByRole('status', { name: 'Email import' })
+        await expect(summary).toHaveText(/^\s*$/)
+
+        // Leaving onboarding must not surface the stale summary
+        await page.getByRole('button', { name: 'Skip for now' }).click()
+        await expect(page.getByRole('link', { name: 'Feed' })).toBeVisible()
+        await page.clock.runFor(1000)
+        // Read once: a retrying assertion would pass when the summary hides itself after four seconds
+        expect((await summary.textContent())?.trim()).toBe('')
     })
 
     test('moves an import to the sidebar once a manual request takes it over', async ({ page }) => {

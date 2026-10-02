@@ -37,6 +37,8 @@ const SUMMARY_VISIBLE_MS = 4000
 export class EmailImportIndicatorComponent {
     /** The latest import update. Each one is a new object, which is how a summary is told apart. */
     readonly update = input.required<EmailImportProgressUpdate | null>()
+    /** Where the title bar shows nothing, such as onboarding. A summary that arrives here is dropped. */
+    readonly hidden = input(false)
     readonly cancelImport = output<MouseEvent>()
 
     /** Paced view of {@link update}; written by {@link pacer}. */
@@ -80,6 +82,8 @@ export class EmailImportIndicatorComponent {
     })
 
     private readonly dismissedSummary = signal<EmailImportProgressUpdate | null>(null)
+    /** A summary that arrived while hidden; it would be stale by the time the indicator shows. */
+    private skippedSummary: EmailImportProgressUpdate | null = null
     private visibleSummary: EmailImportIndicatorView | null = null
     private summaryTimer: ReturnType<typeof setTimeout> | null = null
     private readonly pacer = new MinDwellPacer<EmailImportIndicatorView>(view => this.show(view))
@@ -87,14 +91,18 @@ export class EmailImportIndicatorComponent {
     constructor() {
         effect(() => {
             const update = this.update()
+            const isSummary = update?.phase === 'completed' || update?.phase === 'error'
+            if (this.hidden() && isSummary) this.skippedSummary = update
             if (
                 !update ||
+                this.hidden() ||
                 update.trigger !== 'auto' ||
                 update.phase === 'cancelled' ||
+                update === this.skippedSummary ||
                 update === this.dismissedSummary()
             ) {
                 this.pacer.set(null)
-            } else if (update.phase === 'completed' || update.phase === 'error') {
+            } else if (isSummary) {
                 this.pacer.set({ key: 'summary', value: update, minDwellMs: 0 })
             } else {
                 this.pacer.set({ key: update.phase, value: update, minDwellMs: PHASE_MIN_DWELL_MS })

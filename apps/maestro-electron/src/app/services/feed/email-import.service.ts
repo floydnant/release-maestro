@@ -30,6 +30,8 @@ interface RunningImport {
     /** Mutable: a manual request takes over the reporting of a running auto import. */
     trigger: EmailImportTrigger
     abortController: AbortController
+    /** Re-sent on a takeover, so the renderer moves the progress without waiting for the next email. */
+    latest: EmailImportProgress
 }
 
 /**
@@ -55,20 +57,29 @@ export class EmailImportService {
         private readonly platform: NodeJS.Platform = process.platform,
     ) {}
 
-    /** Starts an import, or joins the one running. Resolves when it settles; never rejects. */
+    /** Starts an import, or joins the one running. Resolves when it settles, and never rejects. */
     start(trigger: EmailImportTrigger): Promise<void> {
-        if (this.running) {
-            if (trigger === 'manual') this.running.trigger = 'manual'
+        const running = this.running
+        if (running) {
+            if (trigger === 'manual' && running.trigger === 'auto') {
+                running.trigger = 'manual'
+                this.report(running, running.latest)
+            }
             return this.settled
         }
         if (trigger === 'auto' && !this.isAutoImportDue()) return Promise.resolve()
 
-        const running: RunningImport = { trigger, abortController: new AbortController() }
-        this.running = running
-        this.stateStore.set('lastStartedAt', this.now())
-        this.settled = this.run(running).finally(() => {
-            this.running = null
-        })
+        const started: RunningImport = {
+            trigger,
+            abortController: new AbortController(),
+            latest: { phase: 'started' },
+        }
+        this.running = started
+        this.settled = this.run(started)
+            .catch(error => console.error('Email import failed to report:', error))
+            .finally(() => {
+                this.running = null
+            })
         return this.settled
     }
 
@@ -81,13 +92,21 @@ export class EmailImportService {
         if (this.platform !== 'darwin' || !this.email.getMailboxName('APPLE_MAIL')) return false
 
         const lastStartedAt = this.stateStore.get('lastStartedAt')
-        return lastStartedAt == null || this.now() - lastStartedAt >= EMAIL_AUTO_IMPORT_INTERVAL_MS
+        if (lastStartedAt == null) return true
+        const elapsed = this.now() - lastStartedAt
+        // A negative elapsed time is a clock that moved back, which must not block imports until it catches up
+        return elapsed < 0 || elapsed >= EMAIL_AUTO_IMPORT_INTERVAL_MS
+    }
+
+    private report(running: RunningImport, progress: EmailImportProgress): void {
+        running.latest = progress
+        this.broadcast({ ...progress, trigger: running.trigger })
     }
 
     private async run(running: RunningImport): Promise<void> {
-        const report = (progress: EmailImportProgress) =>
-            this.broadcast({ ...progress, trigger: running.trigger })
+        const report = (progress: EmailImportProgress) => this.report(running, progress)
 
+        this.stateStore.set('lastStartedAt', this.now())
         report({ phase: 'started' })
         try {
             const progress$ = await this.feed.triggerEmailImport(running.abortController.signal)

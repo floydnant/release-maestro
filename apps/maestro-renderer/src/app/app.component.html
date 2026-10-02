@@ -336,7 +336,8 @@
                     }
                 </p>
                 <app-email-import-indicator
-                    [update]="isImportRoute() ? null : importUpdate()"
+                    [update]="importUpdate()"
+                    [hidden]="isImportRoute()"
                     (cancelImport)="cancelAutoEmailImport($event)"
                 ></app-email-import-indicator>
             </div>
