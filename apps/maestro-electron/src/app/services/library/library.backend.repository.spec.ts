@@ -242,7 +242,7 @@ describe('LibraryBackendRepository', () => {
                 albumTitle: 'Shared record',
                 extraMetadata: [
                     ['MUSICBRAINZ_ARTIST_ID', 'track-id'],
-                    ['MUSICBRAINZ_ALBUM_ARTIST_ID', 'album-id'],
+                    ['MusicBrainzReleaseArtistId', 'album-id'],
                     ['DISCOGS_ARTIST_LINK', 'https://www.discogs.com/artist/123'],
                 ],
             }),
@@ -256,7 +256,7 @@ describe('LibraryBackendRepository', () => {
             if (!artist) throw new Error(`Missing artist ${name}`)
             return artist.id
         }
-        const browse = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
+        const browse = new LibraryBrowseRepository({ db })
         expect(browse.getArtistDetail(artistId('Track Artist'))?.externalRefs).toEqual({
             MUSICBRAINZ_ARTIST_ID: ['track-id'],
             DISCOGS_ARTIST_LINK: ['https://www.discogs.com/artist/123'],
@@ -264,6 +264,7 @@ describe('LibraryBackendRepository', () => {
         expect(browse.getArtistDetail(artistId('Album Artist'))?.externalRefs).toEqual({
             MUSICBRAINZ_ARTIST_ID: ['album-id'],
         })
+        expect(browse.getArtistDetail(artistId('Album Artist'))?.songCount).toBe(0)
     })
 
     it('replaces corrected artist references and removes deleted tags on a deep read', () => {

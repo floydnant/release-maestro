@@ -178,6 +178,7 @@ export const relevantExternalRefsMap = {
         ExternalRefKeys.BeatportArtistUrl,
         ExternalRefKeys.BandcampArtistId,
     ],
+    albumArtists: [ExternalRefKeys.MusicBrainzReleaseArtistId, ExternalRefKeys.MusicBrainzAlbumArtistId],
     albums: [
         ExternalRefKeys.MusicBrainzReleaseId,
         ExternalRefKeys.MusicBrainzReleaseGroupId,

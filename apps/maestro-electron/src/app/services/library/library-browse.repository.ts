@@ -199,7 +199,7 @@ export class LibraryBrowseRepository {
             .where(
                 and(
                     eq(sql<string>`credited_album.artist_id`, artistId),
-                    eq(sql<string>`ref_key.key`, ExternalRefKeys.MusicBrainzAlbumArtistId),
+                    inArray(sql<string>`ref_key.key`, relevantExternalRefsMap.albumArtists),
                     not(exists(otherArtist)),
                 ),
             )

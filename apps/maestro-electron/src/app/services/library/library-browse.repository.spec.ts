@@ -2,6 +2,7 @@ import {
     AlbumSortField,
     emptyAlbumQuery,
     emptySongQuery,
+    ExternalRefKeys,
     SongPresence,
     SongSortField,
     type AlbumQuery,
@@ -238,31 +239,39 @@ describe('LibraryBrowseRepository', () => {
             expect(repository.getArtistDetail('a1')?.appearanceCount).toBe(1)
         })
 
-        it('does not expose stored track-artist refs on a different album artist', () => {
-            db.update(albumsTable)
-                .set({ artistText: 'Night Cartel' })
-                .where(eq(albumsTable.id, 'guest'))
-                .run()
-            db.update(songsTable)
-                .set({
-                    artistText: 'Aurora Fields',
-                    externalRefs: {
-                        MUSICBRAINZ_ARTIST_ID: ['track-id'],
-                        MUSICBRAINZ_ALBUM_ARTIST_ID: ['album-id'],
-                        DISCOGS_ARTIST_LINK: ['https://www.discogs.com/artist/123'],
-                    },
-                })
-                .where(eq(songsTable.id, 's3'))
-                .run()
-            db.update(artistsTable)
-                .set({ externalRefs: { MUSICBRAINZ_ARTIST_ID: ['stale-track-id'] } })
-                .where(eq(artistsTable.id, 'a2'))
-                .run()
+        it.each([ExternalRefKeys.MusicBrainzAlbumArtistId, ExternalRefKeys.MusicBrainzReleaseArtistId])(
+            'does not expose stored track-artist refs on a different album artist with %s',
+            albumArtistRefKey => {
+                db.update(albumsTable)
+                    .set({ artistText: 'Night Cartel' })
+                    .where(eq(albumsTable.id, 'guest'))
+                    .run()
+                db.update(songsTable)
+                    .set({
+                        artistText: 'Aurora Fields',
+                        externalRefs: {
+                            MUSICBRAINZ_ARTIST_ID: ['track-id'],
+                            [albumArtistRefKey]: ['album-id'],
+                            DISCOGS_ARTIST_LINK: ['https://www.discogs.com/artist/123'],
+                        },
+                    })
+                    .where(eq(songsTable.id, 's3'))
+                    .run()
+                db.update(artistsTable)
+                    .set({ externalRefs: { MUSICBRAINZ_ARTIST_ID: ['stale-track-id'] } })
+                    .where(eq(artistsTable.id, 'a2'))
+                    .run()
 
-            expect(repository.getArtistDetail('a2')?.externalRefs).toEqual({
-                MUSICBRAINZ_ARTIST_ID: ['album-id'],
-            })
-        })
+                const detail = repository.getArtistDetail('a2')
+                expect(detail).toMatchObject({
+                    songCount: 0,
+                    albumCount: 1,
+                })
+                expect(detail?.externalRefs).toEqual({
+                    MUSICBRAINZ_ARTIST_ID: ['album-id'],
+                })
+            },
+        )
 
         it('shows references for an artist resolved from a different raw credit', () => {
             db.update(songsTable)
@@ -310,20 +319,23 @@ describe('LibraryBrowseRepository', () => {
             expect(repository.getArtistDetail('a1')?.externalRefs).toEqual({})
         })
 
-        it('does not assign a shared album-artist reference to every resolved artist', () => {
-            db.update(albumsTable)
-                .set({ artistText: 'Aurora Fields & Night Cartel' })
-                .where(eq(albumsTable.id, 'own'))
-                .run()
-            db.update(songsTable)
-                .set({ externalRefs: { MUSICBRAINZ_ALBUM_ARTIST_ID: ['shared-album-id'] } })
-                .where(eq(songsTable.id, 's1'))
-                .run()
-            db.insert(albumArtistsTable).values({ albumId: 'own', artistId: 'a2', position: 1 }).run()
+        it.each([ExternalRefKeys.MusicBrainzAlbumArtistId, ExternalRefKeys.MusicBrainzReleaseArtistId])(
+            'does not assign a shared album-artist reference to every resolved artist with %s',
+            albumArtistRefKey => {
+                db.update(albumsTable)
+                    .set({ artistText: 'Aurora Fields & Night Cartel' })
+                    .where(eq(albumsTable.id, 'own'))
+                    .run()
+                db.update(songsTable)
+                    .set({ externalRefs: { [albumArtistRefKey]: ['shared-album-id'] } })
+                    .where(eq(songsTable.id, 's1'))
+                    .run()
+                db.insert(albumArtistsTable).values({ albumId: 'own', artistId: 'a2', position: 1 }).run()
 
-            expect(repository.getArtistDetail('a1')?.externalRefs).toEqual({})
-            expect(repository.getArtistDetail('a2')?.externalRefs).toEqual({})
-        })
+                expect(repository.getArtistDetail('a1')?.externalRefs).toEqual({})
+                expect(repository.getArtistDetail('a2')?.externalRefs).toEqual({})
+            },
+        )
 
         it("uses dated songs on own albums for an album-only artist's years", () => {
             const result = repository.queryArtists({
