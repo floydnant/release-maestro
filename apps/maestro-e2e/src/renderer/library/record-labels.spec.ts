@@ -30,7 +30,7 @@ const scenario = () =>
         .handler('library:query-record-label-artists', {
             kind: 'resolve',
             value: {
-                rows: [{ id: 'aurora', name: 'Aurora Fields', hasSongCredits: true }],
+                rows: [{ id: 'aurora', name: 'Aurora Fields', hasSongCredits: true, hasAlbumCredits: false }],
                 offset: 0,
                 total: 1,
             },
@@ -103,6 +103,41 @@ test('record label detail shows tracks, albums, artists and external links', asy
     await expect(
         page.getByRole('region', { name: 'Artists' }).getByRole('link', { name: 'Aurora Fields' }),
     ).toBeVisible()
+})
+
+test('record label artist links preserve both album and track relationships', async ({ page }) => {
+    await createRendererScenario(
+        page,
+        scenario()
+            .handler('library:get-record-label-detail', {
+                kind: 'resolve',
+                value: { ...recordLabel, artistCount: 3 },
+            })
+            .handler('library:query-record-label-artists', {
+                kind: 'resolve',
+                value: {
+                    rows: [
+                        { id: 'both', name: 'Both credits', hasSongCredits: true, hasAlbumCredits: true },
+                        { id: 'songs', name: 'Track artist', hasSongCredits: true, hasAlbumCredits: false },
+                        { id: 'albums', name: 'Album artist', hasSongCredits: false, hasAlbumCredits: true },
+                    ],
+                    offset: 0,
+                    total: 3,
+                },
+            })
+            .build(),
+        '/record-labels/kosmische?section=artists',
+    )
+    const artists = page.getByRole('region', { name: 'Artists' })
+    await expect(artists.getByRole('link', { name: 'Both credits' })).toHaveAttribute('href', '/artists/both')
+    await expect(artists.getByRole('link', { name: 'Track artist' })).toHaveAttribute(
+        'href',
+        /\/tracks\?recordLabel=kosmische&artist=songs/,
+    )
+    await expect(artists.getByRole('link', { name: 'Album artist' })).toHaveAttribute(
+        'href',
+        /\/albums\?recordLabel=kosmische&albumArtist=albums/,
+    )
 })
 
 test('a stored Bandcamp label ID without a page URL offers a search link', async ({ page }) => {

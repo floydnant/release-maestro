@@ -5,6 +5,7 @@ import {
     ExternalRefKeys,
     SongPresence,
     SongSortField,
+    type ExternalRefs,
     type AlbumQuery,
     type QueryAlbumsRequest,
     type SongQuery,
@@ -48,6 +49,7 @@ type SongSeed = {
     albumId?: string | null
     genreText?: string | null
     recordLabelText?: string | null
+    externalRefs?: ExternalRefs
     year?: number | null
     bpm?: number | null
     musicalKey?: string | null
@@ -95,6 +97,7 @@ describe('LibraryBrowseRepository', () => {
                 albumId: seed.albumId ?? null,
                 genreText: seed.genreText ?? null,
                 recordLabelText: seed.recordLabelText ?? null,
+                externalRefs: seed.externalRefs ?? {},
                 year: seed.year ?? null,
                 bpm: seed.bpm ?? null,
                 musicalKey: seed.musicalKey ?? null,
@@ -374,7 +377,14 @@ describe('LibraryBrowseRepository', () => {
                 .values({ albumId: 'album2', artistId: 'album-artist', position: 0 })
                 .run()
             seedSong({ id: 'song1', title: 'First', albumId: 'album1', recordLabelText: 'Wrong text' })
-            seedSong({ id: 'song2', title: 'Second', albumId: 'album2', present: false })
+            seedSong({
+                id: 'song2',
+                title: 'Second',
+                albumId: 'album2',
+                recordLabelText: '100% Records',
+                externalRefs: { MUSICBRAINZ_LABEL_ID: ['mb-1'] },
+                present: false,
+            })
             db.insert(songArtistsTable)
                 .values([
                     { songId: 'song1', artistId: 'artist', position: 0 },
@@ -421,8 +431,13 @@ describe('LibraryBrowseRepository', () => {
                 offset: 0,
                 total: 2,
                 rows: [
-                    { id: 'album-artist', name: 'Album artist', hasSongCredits: false },
-                    { id: 'artist', name: 'Artist', hasSongCredits: true },
+                    {
+                        id: 'album-artist',
+                        name: 'Album artist',
+                        hasSongCredits: false,
+                        hasAlbumCredits: true,
+                    },
+                    { id: 'artist', name: 'Artist', hasSongCredits: true, hasAlbumCredits: false },
                 ],
             })
             expect(
@@ -434,6 +449,53 @@ describe('LibraryBrowseRepository', () => {
                     .rows.map(row => row.id)
                     .sort(),
             ).toEqual(['song1', 'song2'])
+        })
+
+        it('uses current song tags for record label links after references change or disappear', () => {
+            db.insert(recordLabelsTable)
+                .values({
+                    id: 'label',
+                    name: 'Kosmische',
+                    externalRefs: { BANDCAMP_LABEL_URL: ['https://old.bandcamp.com'] },
+                })
+                .run()
+            seedSong({
+                id: 'song',
+                title: 'Track',
+                recordLabelText: 'Kosmische',
+                externalRefs: { BANDCAMP_LABEL_URL: ['https://new.bandcamp.com'] },
+            })
+            expect(repository.getRecordLabelDetail('label')?.externalRefs).toEqual({
+                BANDCAMP_LABEL_URL: ['https://new.bandcamp.com'],
+            })
+
+            db.update(songsTable)
+                .set({ externalRefs: { BEATPORT_LABEL_URL: ['https://www.beatport.com/label/kosmische'] } })
+                .where(eq(songsTable.id, 'song'))
+                .run()
+            expect(repository.getRecordLabelDetail('label')?.externalRefs).toEqual({
+                BEATPORT_LABEL_URL: ['https://www.beatport.com/label/kosmische'],
+            })
+
+            db.update(songsTable).set({ externalRefs: {} }).where(eq(songsTable.id, 'song')).run()
+            expect(repository.getRecordLabelDetail('label')?.externalRefs).toEqual({})
+        })
+
+        it('marks artists with both album and song credits on a record label', () => {
+            db.insert(recordLabelsTable).values({ id: 'label', name: 'Kosmische' }).run()
+            db.insert(artistsTable).values({ id: 'artist', name: 'Both credits' }).run()
+            seedAlbum({ id: 'album1', title: 'Own album', recordLabelId: 'label' })
+            seedAlbum({ id: 'album2', title: 'Appearance', recordLabelId: 'label' })
+            db.insert(albumArtistsTable).values({ albumId: 'album1', artistId: 'artist', position: 0 }).run()
+            seedSong({ id: 'song', title: 'Track', albumId: 'album2' })
+            db.insert(songArtistsTable).values({ songId: 'song', artistId: 'artist', position: 0 }).run()
+
+            expect(
+                repository.queryRecordLabelArtists({
+                    recordLabelId: 'label',
+                    window: { offset: 0, limit: 10 },
+                }).rows,
+            ).toEqual([{ id: 'artist', name: 'Both credits', hasSongCredits: true, hasAlbumCredits: true }])
         })
 
         it('takes years from song tags when an album has no year of its own', () => {

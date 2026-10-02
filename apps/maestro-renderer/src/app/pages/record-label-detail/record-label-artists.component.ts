@@ -50,10 +50,18 @@ export class RecordLabelArtistsComponent {
         ...this.browse.result(),
         rows: this.browse.result().rows.map(row => ({
             ...row,
-            link: row.hasSongCredits ? ['/tracks'] : ['/albums'],
-            queryParams: row.hasSongCredits
-                ? { recordLabel: this.recordLabelId(), artist: row.id }
-                : { recordLabel: this.recordLabelId(), albumArtist: row.id },
+            link:
+                row.hasSongCredits && row.hasAlbumCredits
+                    ? ['/artists', row.id]
+                    : row.hasSongCredits
+                      ? ['/tracks']
+                      : ['/albums'],
+            queryParams:
+                row.hasSongCredits && row.hasAlbumCredits
+                    ? undefined
+                    : row.hasSongCredits
+                      ? { recordLabel: this.recordLabelId(), artist: row.id }
+                      : { recordLabel: this.recordLabelId(), albumArtist: row.id },
         })),
     }))
     constructor() {

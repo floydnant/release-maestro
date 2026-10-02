@@ -20,6 +20,7 @@ import {
     ExternalRefKeys,
     SongPresence,
     SongSortField,
+    type ExternalRefs,
     type AlbumDetailResult,
     type AlbumFilter,
     type AlbumFilterDescription,
@@ -334,14 +335,33 @@ export class LibraryBrowseRepository {
             .select({
                 id: recordLabelsTable.id,
                 name: recordLabelsTable.name,
-                externalRefs: recordLabelsTable.externalRefs,
             })
             .from(recordLabelsTable)
             .where(eq(recordLabelsTable.id, recordLabelId))
             .get()
-        return recordLabel
-            ? { ...recordLabel, ...this.recordLabelStats([recordLabelId])(recordLabelId) }
-            : null
+        if (!recordLabel) return null
+        const refs = this.database.db
+            .selectDistinct({
+                key: sql<keyof ExternalRefs>`ref_key.key`,
+                value: sql<string>`ref_value.value`,
+            })
+            .from(sql`${songsTable} indexed by ${sql.identifier('songs_record_label_text_idx')}`)
+            .innerJoin(sql`json_each(${songsTable.externalRefs}) as ref_key`, sql`true`)
+            .innerJoin(sql`json_each(ref_key.value) as ref_value`, sql`true`)
+            .where(
+                and(
+                    eq(songsTable.recordLabelText, recordLabel.name),
+                    inArray(sql<string>`ref_key.key`, relevantExternalRefsMap.recordLabels),
+                ),
+            )
+            .all()
+        const externalRefs: ExternalRefs = {}
+        for (const { key, value } of refs) {
+            externalRefs[key] ??= []
+            externalRefs[key].push(value)
+        }
+        for (const values of Object.values(externalRefs)) values.sort()
+        return { ...recordLabel, externalRefs, ...this.recordLabelStats([recordLabelId])(recordLabelId) }
     }
 
     private recordLabelStats(ids: string[]) {
@@ -470,7 +490,33 @@ export class LibraryBrowseRepository {
                       )
                       .all()
         const creditedIds = new Set(credited.map(row => row.artistId))
-        return { rows: rows.map(row => ({ ...row, hasSongCredits: creditedIds.has(row.id) })), offset, total }
+        const albumCredited =
+            rows.length == 0
+                ? []
+                : this.database.db
+                      .selectDistinct({ artistId: albumArtistsTable.artistId })
+                      .from(albumsTable)
+                      .innerJoin(albumArtistsTable, eq(albumArtistsTable.albumId, albumsTable.id))
+                      .where(
+                          and(
+                              eq(albumsTable.recordLabelId, recordLabelId),
+                              inArray(
+                                  albumArtistsTable.artistId,
+                                  rows.map(row => row.id),
+                              ),
+                          ),
+                      )
+                      .all()
+        const albumCreditedIds = new Set(albumCredited.map(row => row.artistId))
+        return {
+            rows: rows.map(row => ({
+                ...row,
+                hasSongCredits: creditedIds.has(row.id),
+                hasAlbumCredits: albumCreditedIds.has(row.id),
+            })),
+            offset,
+            total,
+        }
     }
 
     queryGenres(request: QueryGenresRequest): GenreWindowResult {

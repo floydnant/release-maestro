@@ -570,5 +570,6 @@ export interface QueryRecordLabelArtistsRequest {
 }
 export interface RecordLabelArtistRow extends CatalogEntityRef {
     hasSongCredits: boolean
+    hasAlbumCredits: boolean
 }
 export type RecordLabelArtistsWindowResult = BrowseWindowResult<RecordLabelArtistRow>
