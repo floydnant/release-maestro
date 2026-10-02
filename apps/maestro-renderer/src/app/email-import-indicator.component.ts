@@ -19,13 +19,13 @@ type EmailImportIndicatorView = Extract<
     { phase: 'started' | 'processing' | 'completed' | 'error' }
 >
 
-/** Same pacing as the startup library scan, so a quick import does not flash in the title bar. */
+/** Same pacing as the startup library scan, so a quick auto import does not flash in the title bar. */
 const PHASE_MIN_DWELL_MS = 1000
 const SUMMARY_VISIBLE_MS = 4000
 
 /**
- * Title bar progress for an auto import, followed by a summary that hides after four seconds. Manual
- * imports report in the sidebar instead, so it ignores them.
+ * Title bar progress for any import, as for library scans: an auto import is paced and then summarized
+ * for four seconds, a manual one is shown live and summarized on the Apple Mail settings page instead.
  */
 @Component({
     selector: 'app-email-import-indicator',
@@ -46,7 +46,7 @@ export class EmailImportIndicatorComponent {
     /** The paced view can trail the import by a second; the cancel button must not. */
     protected readonly isRunning = computed(() => {
         const update = this.update()
-        return update?.trigger === 'auto' && (update.phase === 'started' || update.phase === 'processing')
+        return update?.phase === 'started' || update?.phase === 'processing'
     })
     protected readonly percent = computed(() => {
         const view = this.view()
@@ -96,8 +96,8 @@ export class EmailImportIndicatorComponent {
             if (
                 !update ||
                 this.hidden() ||
-                update.trigger !== 'auto' ||
                 update.phase === 'cancelled' ||
+                (isSummary && update.trigger !== 'auto') ||
                 update === this.skippedSummary ||
                 update === this.dismissedSummary()
             ) {
@@ -105,7 +105,8 @@ export class EmailImportIndicatorComponent {
             } else if (isSummary) {
                 this.pacer.set({ key: 'summary', value: update, minDwellMs: 0 })
             } else {
-                this.pacer.set({ key: update.phase, value: update, minDwellMs: PHASE_MIN_DWELL_MS })
+                const minDwellMs = update.trigger === 'auto' ? PHASE_MIN_DWELL_MS : 0
+                this.pacer.set({ key: update.phase, value: update, minDwellMs })
             }
         })
         inject(DestroyRef).onDestroy(() => {

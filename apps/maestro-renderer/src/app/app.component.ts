@@ -6,14 +6,12 @@ import {
     effect,
     ElementRef,
     inject,
-    linkedSignal,
     signal,
     viewChild,
 } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
 import { TranslateService } from '@ngx-translate/core'
-import { EmailImportProgressUpdate } from '@release-maestro/core'
 import { filter, map } from 'rxjs'
 import { webEnv } from '../environments/environment'
 import { ElectronService } from './core/services'
@@ -24,10 +22,6 @@ import { HistoryService } from './core/services/history.service'
 import { LibraryService } from './core/services/library.service'
 import { SettingsService } from './core/settings/settings.service'
 import { IconComponent } from './shared/components/icon/icon.component'
-import {
-    ProgressBarComponent,
-    ProgressBarSegment,
-} from './shared/components/progress-bar/progress-bar.component'
 import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
 import { MinDwellPacer } from './shared/utils/min-dwell-pacer'
 
@@ -78,13 +72,7 @@ const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contentedit
         '(window:focus)': 'autoImportEmails()',
     },
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
-        RouterModule,
-        ProgressBarComponent,
-        ProgressRingComponent,
-        IconComponent,
-        EmailImportIndicatorComponent,
-    ],
+    imports: [RouterModule, ProgressRingComponent, IconComponent, EmailImportIndicatorComponent],
 })
 export class AppComponent {
     translate = inject(TranslateService)
@@ -137,15 +125,6 @@ export class AppComponent {
         return null
     }
 
-    triggerEmailImport() {
-        this.feedService.triggerEmailImport('manual').catch(err => {
-            console.error('Failed to trigger email import:', err)
-        })
-    }
-    cancelEmailImport() {
-        this.feedService.cancelEmailImport()
-    }
-
     /** On app start and window focus. The main process only runs it when the last import is stale. */
     autoImportEmails() {
         if (!this.isElectron) return
@@ -188,33 +167,6 @@ export class AppComponent {
             console.error('Failed to close window:', err)
         })
     }
-
-    readonly importUpdate = toSignal(this.feedService.emailImportProgress$, { initialValue: null })
-    /**
-     * The sidebar reports manual imports only; the title bar reports auto imports. A cancelled import
-     * returns it to the import action.
-     */
-    importProgress = linkedSignal((): EmailImportProgressUpdate | { phase: 'idle' } => {
-        const update = this.importUpdate()
-        if (!update || update.trigger !== 'manual' || update.phase === 'cancelled') return { phase: 'idle' }
-        return update
-    })
-
-    progressBarSegments = computed((): ProgressBarSegment[] => {
-        const progress = this.importProgress()
-        if (!progress || progress.phase === 'idle') return []
-
-        if (progress.phase === 'error') {
-            return [{ percent: 100, color: 'content.danger' }]
-        }
-        if (progress.phase === 'completed') {
-            return [{ percent: 100, color: 'content.success' }]
-        }
-        if (progress.phase !== 'processing') return []
-
-        const percent = (progress.current / progress.total) * 100
-        return [{ percent, color: 'content.success' }]
-    })
 
     // --- library scan indicator / setup nudge -------------------------------
 

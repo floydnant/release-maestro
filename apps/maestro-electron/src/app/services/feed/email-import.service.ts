@@ -40,7 +40,7 @@ interface RunningImport {
  * Main-process owner of the email import lifecycle.
  *
  * Exactly one import runs at a time. A second request joins the running one, and a manual request
- * takes over an auto import, so its progress moves from the title bar to the sidebar.
+ * takes over an auto import, so the renderer reports it as the user's import from then on.
  *
  * Auto imports are throttled by when the last import *started*, not when it finished, so a
  * cancelled or failing import is not retried on every window focus.

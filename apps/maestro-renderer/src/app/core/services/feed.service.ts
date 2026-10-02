@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core'
+import { toSignal } from '@angular/core/rxjs-interop'
 import {
     EmailImportProgressUpdate,
     EmailImportTrigger,
@@ -24,6 +25,12 @@ export class FeedService {
               share({ resetOnRefCountZero: true }),
           )
         : EMPTY
+
+    /**
+     * The latest update of the running or last import in this session. Held here, for the life of the
+     * app, so a page that opens mid-import shows it at once rather than at the next update.
+     */
+    readonly emailImportUpdate = toSignal(this.emailImportProgress$, { initialValue: null })
 
     /** Resolves when the import settles. An `auto` request is a no-op unless the last import is stale. */
     async triggerEmailImport(trigger: EmailImportTrigger) {

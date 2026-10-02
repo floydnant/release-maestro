@@ -23,7 +23,8 @@ export type EmailImportStreamPacket = {
 
 /**
  * What started an import. An `auto` import runs on app start or window focus when the last one is
- * stale, and reports in the title bar. A `manual` one is the user's, and reports in the sidebar.
+ * stale; the title bar paces and summarizes it. A `manual` one is the user's, started from the Apple
+ * Mail settings page; the title bar shows it live and the settings page reports its result.
  */
 export const emailImportTriggerSchema = z.enum(['manual', 'auto'])
 export type EmailImportTrigger = z.infer<typeof emailImportTriggerSchema>

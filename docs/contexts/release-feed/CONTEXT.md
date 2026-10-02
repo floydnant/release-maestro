@@ -38,8 +38,9 @@ It streams progress to every window as `started`, then `processing` for each ema
 was exported), then exactly one `completed`, `cancelled`, or `error`, and reports both `totalImported` (how many the pass covered) and
 `newlyImported` (how many were not already in the feed) — a user re-running an import may
 legitimately see a nonzero total and a zero new count, because it re-reads the overlap before its
-_import checkpoint_. Each update carries its trigger: `manual` imports report in the sidebar, _auto
-imports_ in the title bar.
+_import checkpoint_. Each update carries its trigger. The title bar shows every import, but paces and
+summarizes only _auto imports_. A `manual` import starts from the Apple Mail settings page, which shows
+the running or last import of the session whatever its trigger.
 _Avoid_: scan (that is a music-library word), refresh
 
 **Auto import**:
@@ -47,7 +48,7 @@ An _import_ the app starts on its own, on app start and on window focus, when th
 trigger started more than an hour ago and a _mailbox_ is configured on macOS. It reports in the title
 bar like the startup library scan, except on the import route. A completed or failed one ends in a
 summary that hides after four seconds; a cancelled one ends in nothing. A manual request while one
-runs takes it over, and its progress moves to the sidebar. If the _mailbox_ changed since it started,
+runs takes it over, and from then on it is shown live, without the summary. If the _mailbox_ changed since it started,
 the manual request cancels it and starts a new import instead.
 _Avoid_: background sync, polling
 
