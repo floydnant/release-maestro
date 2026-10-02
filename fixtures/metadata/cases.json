@@ -883,7 +883,7 @@
         "extras": [
             ["Isrc", "GBABC2600001"],
             ["Barcode", "001234"],
-            ["Custom: Acoustid Id", "acoustid-1"],
+            ["AcoustId", "acoustid-1"],
             ["Custom: ASIN", "B000000001"],
             ["Custom: DISCOGS_ARTIST_ID", "456"],
             ["Custom: DISCOGS_MASTER_RELEASE_ID", "123"],
@@ -898,7 +898,7 @@
         "extras": [
             ["Isrc", "GBABC2600001"],
             ["Barcode", "001234"],
-            ["Custom: ACOUSTID_ID", "acoustid-1"],
+            ["AcoustId", "acoustid-1"],
             ["Custom: ASIN", "B000000001"],
             ["Custom: DISCOGS_ARTIST_ID", "456"],
             ["Custom: DISCOGS_MASTER_RELEASE_ID", "123"],
@@ -914,7 +914,7 @@
         "extras": [
             ["Isrc", "GBABC2600001"],
             ["Barcode", "001234"],
-            ["Custom: ----:com.apple.iTunes:Acoustid Id", "acoustid-1"],
+            ["AcoustId", "acoustid-1"],
             ["Custom: ----:com.apple.iTunes:ASIN", "B000000001"],
             ["Custom: ----:com.apple.iTunes:DISCOGS_ARTIST_ID", "456"],
             ["Custom: ----:com.apple.iTunes:DISCOGS_MASTER_RELEASE_ID", "123"],

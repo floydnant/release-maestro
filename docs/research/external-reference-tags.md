@@ -50,6 +50,8 @@ Mp3tag documents native MP4 `plID`, `atID`, `cnID` and `cmID` as iTunes album, a
 
 Release Maestro receives known Lofty fields as semantic names and custom fields as raw names. Match those representations in tests. Picard's raw Vorbis `MUSICBRAINZ_TRACKID` identifies a recording, while `MUSICBRAINZ_RELEASETRACKID` identifies a release track. Do not reinterpret an existing Lofty semantic key through a raw-name alias. [Picard's mapping](https://picard-docs.musicbrainz.org/en/latest/appendices/tag_mapping.html) specifies the distinction.
 
+Lofty 0.25.4 emits the documented AcoustID fields as the semantic key `AcoustId`. Normalize it to the same `ACOUSTID_ID` reference as the custom field aliases.
+
 MP4 freeform names include their namespace. Strip only `----:com.apple.iTunes:` before conventional alias matching. An identically named field in another namespace has no established meaning here. ID3 `TXXX:` in documentation describes the storage frame, not necessarily the name emitted by the reader.
 
 Performer references and album-artist references follow separate artist credits. A compilation performer's Discogs ID must not identify its album artist.
@@ -58,4 +60,4 @@ Keep unrecognized custom metadata available. Defer fingerprints, generic URL gue
 
 ## Rescanning existing libraries
 
-The importer stores references in existing JSON columns. No database migration is needed. Normalizer version 4 schedules previously imported files for a new deep read on the next scan.
+The importer stores references in existing JSON columns. No database migration is needed. Normalizer version 5 schedules previously imported files for a new deep read on the next scan.

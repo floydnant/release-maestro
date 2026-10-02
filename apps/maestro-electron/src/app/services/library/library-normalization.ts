@@ -4,6 +4,7 @@ import { ExternalRefKeys, ExternalRefs, NormalizationIssue } from '../../databas
 
 const MULTI_VALUE_SEPARATOR = /(?:\s(?:&|feat\.?|ft\.?|vs\.?|x|×)\s|[;/,])/i
 const EXTERNAL_REF_KEYS: Record<string, ExternalRefKeys> = {
+    ACOUSTID: ExternalRefKeys.AcoustIdId,
     UPC: ExternalRefKeys.Barcode,
     EAN: ExternalRefKeys.Barcode,
     EANUPN: ExternalRefKeys.Barcode,
@@ -26,7 +27,7 @@ for (const [key, value] of Object.entries(ExternalRefKeys)) {
  * stamped with an older version are re-read on the next scan; that is the only thing
  * that makes a normaliser change reach data already in the database.
  */
-export const NORMALIZER_VERSION = 4
+export const NORMALIZER_VERSION = 5
 
 export const normalizeDisplayText = (value: string | null | undefined): string | null => {
     const normalized = value?.trim().replace(/\s+/g, ' ')

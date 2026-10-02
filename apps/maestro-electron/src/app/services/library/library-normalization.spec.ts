@@ -73,6 +73,7 @@ describe('library normalization', () => {
     })
 
     it.each([
+        ['AcoustId', 'ACOUSTID_ID'],
         ['Custom: Acoustid Id', 'ACOUSTID_ID'],
         ['Isrc', 'ISRC'],
         ['Barcode', 'BARCODE'],
