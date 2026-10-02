@@ -6,6 +6,7 @@ import AppEvents from './app/events/app.events'
 import { app, BrowserWindow } from 'electron'
 import App from './app/app'
 import { developmentAppName } from './app/constants'
+import { cleanupApplication } from './app/app-shutdown'
 
 if (developmentAppName) app.setName(developmentAppName)
 
@@ -26,19 +27,16 @@ if (!App.isDevelopmentMode()) {
     UpdateEvents.initAutoUpdateService()
 }
 
-// Add cleanup on app exit
-app.on('window-all-closed', async () => {
-    // Cleanup DI container
-    try {
-        const { diContainer } = await import('./app/di')
-        await diContainer.destroyAll()
-    } catch (error) {
-        console.error('Error during cleanup:', error)
-    }
+// Main-process services outlive windows. Electron does not await event handlers, so hold the first
+// quit until the running import drains before destroyAll closes its database and other dependencies.
+let quitCleanup: Promise<void> | null = null
+let cleanupComplete = false
+app.on('before-quit', event => {
+    if (cleanupComplete) return
+    event.preventDefault()
 
-    // On OS X it is common for applications and their menu bar
-    // to stay active until the user quits explicitly with Cmd + Q
-    if (process.platform !== 'darwin') {
+    quitCleanup ??= cleanupApplication().finally(() => {
+        cleanupComplete = true
         app.quit()
-    }
+    })
 })

@@ -30,73 +30,74 @@ on run argv
 		set msgCount to count of theMessages
 		
 		repeat with i from 1 to msgCount
-			set theMessage to item i of theMessages
-			set msgSubject to subject of theMessage
-			set msgSender to sender of theMessage
-			set msgDate to date received of theMessage
-			set isoDate to my formatDateToISO(msgDate)
-			set msgID to message id of theMessage
-			set plainBody to content of theMessage
-			set isRead to read status of theMessage
-			try
-				set htmlBody to source of theMessage
-			on error
-				set htmlBody to ""
-			end try
-			
-			-- Sanitize subject for filename
-			set safeSubject to my sanitizeString(msgSubject)
-			set safeMsgID to my sanitizeString(msgID)
-			if safeSubject is "" then set safeSubject to "no-subject"
-			set baseFilename to "email-" & i & "-" & safeMsgID & safeSubject
-
-			-- File paths
-			set dataFilePath to exportPath & "/" & baseFilename & ".txt"
-			set htmlFilePath to exportPath & "/" & baseFilename & ".html"
-			
-			-- Data contents
-			set dataText to ""
-			set dataText to dataText & "messageId: " & msgID & "\n"
-			set dataText to dataText & "sender: " & msgSender & "\n"
-			set dataText to dataText & "subject: " & msgSubject & "\n"
-			set dataText to dataText & "dateReceived: " & isoDate & "\n"
-			set dataText to dataText & "isRead: " & (isRead as string) & "\n"
-			set dataText to dataText & "==========================================\n==========================================\n"
-			set dataText to dataText & plainBody
-			
-			-- Write data file
-			try
-				set dataFile to open for access POSIX file dataFilePath with write permission
-				set eof of dataFile to 0
-				write dataText to dataFile -- as class utf8
-				close access dataFile
-			on error errMsg
+			set exported to false
+			repeat with attempt from 1 to 3
 				try
-					close access POSIX file dataFilePath
-				end try
-				log "Error writing data file: " & errMsg
-			end try
-			
-			-- Write HTML
-			if htmlBody is not "" then
-				try
-					set htmlFile to open for access POSIX file htmlFilePath with write permission
-					set eof of htmlFile to 0
-					write htmlBody to htmlFile -- as class utf8
-					close access htmlFile
+					set dataFilePath to my exportMessage(item i of theMessages, i, exportPath)
+					set exported to true
+					exit repeat
 				on error errMsg
-					try
-						close access POSIX file htmlFilePath
-					end try
-					log "Error writing HTML file: " & errMsg
+					set lastError to errMsg
 				end try
+			end repeat
+
+			if exported then
+				log "Processed email " & i & "/" & msgCount & ": " & dataFilePath
+			else
+				log "Failed email " & i & "/" & msgCount & ": " & lastError
 			end if
-			
-			log "Processed email " & i & "/" & msgCount & ": " & dataFilePath
-			
 		end repeat
 	end tell
 end run
+
+-- Retry the whole message, including reading its source and writing both files.
+-- A source read failure must not look like a message that simply has no HTML.
+on exportMessage(theMessage, messageIndex, exportPath)
+	tell application "Mail"
+		set msgSubject to subject of theMessage
+		set msgSender to sender of theMessage
+		set msgDate to date received of theMessage
+		set msgID to message id of theMessage
+		set plainBody to content of theMessage
+		set isRead to read status of theMessage
+		set htmlBody to source of theMessage
+	end tell
+	set isoDate to my formatDateToISO(msgDate)
+
+	set safeSubject to my sanitizeString(msgSubject)
+	set safeMsgID to my sanitizeString(msgID)
+	if safeSubject is "" then set safeSubject to "no-subject"
+	set baseFilename to "email-" & messageIndex & "-" & safeMsgID & safeSubject
+	set dataFilePath to exportPath & "/" & baseFilename & ".txt"
+	set htmlFilePath to exportPath & "/" & baseFilename & ".html"
+
+	set dataText to "messageId: " & msgID & "\n"
+	set dataText to dataText & "sender: " & msgSender & "\n"
+	set dataText to dataText & "subject: " & msgSubject & "\n"
+	set dataText to dataText & "dateReceived: " & isoDate & "\n"
+	set dataText to dataText & "isRead: " & (isRead as string) & "\n"
+	set dataText to dataText & "==========================================\n==========================================\n"
+	set dataText to dataText & plainBody
+
+	my writeExportFile(dataFilePath, dataText)
+	-- Empty HTML is still a successful file, distinguishable from a failed write.
+	my writeExportFile(htmlFilePath, htmlBody)
+	return dataFilePath
+end exportMessage
+
+on writeExportFile(filePath, fileContents)
+	try
+		set fileHandle to open for access POSIX file filePath with write permission
+		set eof of fileHandle to 0
+		write fileContents to fileHandle as «class utf8»
+		close access fileHandle
+	on error errMsg number errNumber
+		try
+			close access POSIX file filePath
+		end try
+		error errMsg number errNumber
+	end try
+end writeExportFile
 
 on formatDateToISO(theDate)
 	set y to year of theDate as string

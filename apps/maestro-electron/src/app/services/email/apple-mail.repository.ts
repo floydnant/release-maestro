@@ -14,9 +14,9 @@ const validateEmail = (data: unknown): Email | null => {
 }
 
 const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string): Email | null => {
-    const data = {
+    const data: Record<string, unknown> = {
         vendor: 'APPLE_MAIL',
-    } as Email & Record<string, unknown>
+    }
     const [frontMatter, plainTextBody] = dataFileContents.split(
         '==========================================\n==========================================',
     )
@@ -106,15 +106,14 @@ export class AppleMailRepository implements EmailImporterPlugin {
                 // spawn rather than exec: exec buffers all output and kills the export past 1 MB of it
                 const childProcess = spawn('osascript', args, { signal: abortSignal })
 
-                // An import may only be marked as covered once every exported email reached the
-                // stream, so lines are handled in order and the stream settles only after the last one.
-                // A line that fails does not stop the export, but fails it once the rest is handled.
+                // Handle success and skipped-message packets in order before completing, so the
+                // consumer knows whether this pass covered every message.
                 let handledLines = Promise.resolve()
                 let lineFailure: Error | null = null
                 const unhandledOutput: string[] = []
                 createInterface({ input: childProcess.stderr }).on('line', line => {
                     handledLines = handledLines
-                        .then(() => this.handleExportLine(line, result$, unhandledOutput))
+                        .then(() => this.handleExportLine(line, result$, unhandledOutput, abortSignal))
                         .catch((error: unknown) => {
                             console.error('[AppleMailImporter] ', error)
                             lineFailure ??= error instanceof Error ? error : new Error(String(error))
@@ -180,36 +179,45 @@ export class AppleMailRepository implements EmailImporterPlugin {
         line: string,
         result$: Subject<EmailImportStreamPacket>,
         unhandledOutput: string[],
+        abortSignal: AbortSignal,
     ): Promise<void> {
-        const match = line.match(/Processed email (\d+)\/(\d+): (.+)/)
+        if (abortSignal.aborted) return
+        const match = line.match(/^(Processed|Failed) email (\d+)\/(\d+): (.*)$/)
         if (!match) {
             console.error('[AppleMailImporter] ', line)
             unhandledOutput.push(line)
             return
         }
 
-        const [, current, total, filePath] = match
-        if (!filePath) {
-            console.error('[AppleMailImporter] No file path found in output:', line)
+        const [, outcome, current, total, filePath] = match
+        const progress = { current: Number(current), total: Number(total) }
+        if (outcome === 'Failed' || !filePath) {
+            console.warn('[AppleMailImporter] Message left for the next import:', line)
+            result$.next({ ...progress, email: null })
             return
         }
 
-        const [dataFileContents, htmlFileContents] = await Promise.all([
-            fs.readFile(filePath, 'utf-8').catch((error: unknown) => {
-                console.error('[AppleMailImporter] Error reading data file', filePath, ':', error)
-                throw new Error(`[AppleMailImporter] Could not read exported email ${filePath}`)
-            }),
-            fs.readFile(filePath.replace(/\.txt$/, '.html'), 'utf-8').catch(() => {
-                // HTML file may not exist if the email had no HTML body
-                return ''
-            }),
-        ])
-        const email = parseAppleMailFile(dataFileContents, htmlFileContents)
-        if (!email) {
-            // The script reports an email even when writing its file failed, so treat a file that
-            // does not parse as an incomplete export
-            throw new Error(`[AppleMailImporter] Could not parse exported email ${filePath}`)
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (abortSignal.aborted) return
+            try {
+                // Even a message without HTML has an empty .html file. Missing or unreadable HTML
+                // therefore means an incomplete export, rather than a valid empty body.
+                const [dataFileContents, htmlFileContents] = await Promise.all([
+                    fs.readFile(filePath, 'utf-8'),
+                    fs.readFile(filePath.replace(/\.txt$/, '.html'), 'utf-8'),
+                ])
+                if (abortSignal.aborted) return
+                const email = parseAppleMailFile(dataFileContents, htmlFileContents)
+                if (!email) throw new Error(`Could not parse exported email ${filePath}`)
+                result$.next({ ...progress, email })
+                return
+            } catch (error: unknown) {
+                if (abortSignal.aborted) return
+                if (attempt === 3) {
+                    console.warn('[AppleMailImporter] Message left for the next import:', filePath, error)
+                    result$.next({ ...progress, email: null })
+                }
+            }
         }
-        result$.next({ current: Number(current), total: Number(total), email })
     }
 }

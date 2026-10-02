@@ -18,6 +18,18 @@ export interface EmailImportState extends Record<string, unknown> {
     lastStartedAt?: number | null
 }
 
+/** Parse persisted JSON before it enters the import throttle. Invalid state makes an import due. */
+export function deserializeEmailImportState(json: string): EmailImportState {
+    const state: unknown = JSON.parse(json)
+    const lastStartedAt =
+        state !== null && typeof state === 'object' && 'lastStartedAt' in state ? state.lastStartedAt : null
+
+    return {
+        lastStartedAt:
+            typeof lastStartedAt === 'number' && Number.isFinite(lastStartedAt) ? lastStartedAt : null,
+    }
+}
+
 type BroadcastProgress = (update: EmailImportProgressUpdate) => void
 
 const broadcastToAllWindows: BroadcastProgress = update => {
@@ -48,6 +60,7 @@ interface RunningImport {
 export class EmailImportService {
     private running: RunningImport | null = null
     private settled: Promise<void> = Promise.resolve()
+    private stopping = false
 
     constructor(
         private readonly feed: FeedBackendService,
@@ -61,6 +74,8 @@ export class EmailImportService {
 
     /** Starts an import, or joins the one running. Resolves when it settles, and never rejects. */
     start(trigger: EmailImportTrigger): Promise<void> {
+        if (this.stopping) return this.settled
+
         const running = this.running
         if (running) {
             if (trigger === 'auto') return this.settled
@@ -94,6 +109,13 @@ export class EmailImportService {
 
     cancel(): void {
         this.running?.abortController.abort()
+    }
+
+    /** Abort and drain before the app closes the database. Further starts are ignored. */
+    stop(): Promise<void> {
+        this.stopping = true
+        this.cancel()
+        return this.settled
     }
 
     private isAutoImportDue(): boolean {

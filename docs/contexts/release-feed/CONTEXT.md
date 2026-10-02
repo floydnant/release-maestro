@@ -22,7 +22,8 @@ _Avoid_: mail provider, email client, plugin
 **Mailbox**:
 The one named Apple Mail mailbox the export reads from (`mailboxName`). Exactly one is configured
 today. Multiple mailboxes are a noted future possibility, but are not represented in the settings.
-Each mailbox has its own _import checkpoint_, so switching to another one starts with a full export.
+Each mailbox has its own _import checkpoint_. Switching to a mailbox without a checkpoint starts
+with a full export. Returning to a previously imported mailbox reuses its checkpoint.
 
 **Export**:
 The AppleScript pass that pulls messages out of Apple Mail (`apple-scripts/export-emails.applescript`).
@@ -30,6 +31,8 @@ It leaves the mail app and produces raw emails. Everything downstream is import.
 checkpoint_, it exports only the messages received from shortly before it, and Mail does the filtering.
 The export opens Mail when it is closed. Then it quits Mail again when it finishes, fails, or is
 cancelled. When Mail was already open, the export leaves it open.
+Each message is attempted up to three times. A message that still cannot be exported or read is
+skipped for this pass, so the remaining messages can be imported.
 _Avoid_: sync, fetch, download
 
 **Import**:
@@ -40,7 +43,13 @@ was exported), then exactly one `completed`, `cancelled`, or `error`, and report
 legitimately see a nonzero total and a zero new count, because it re-reads the overlap before its
 _import checkpoint_. Each update carries its trigger. The title bar shows every import, but paces and
 summarizes only _auto imports_. A `manual` import starts from the Apple Mail settings page, which shows
-the running or last import of the session whatever its trigger.
+the running or last import of the session whatever its trigger. A completed import that adds releases
+reloads an open empty or caught-up feed. A feed already displaying releases keeps its current items
+and playback. On macOS, closing the last window keeps the import coordinator and its dependencies
+alive. Quitting the app aborts and drains the import before closing the database.
+An import with skipped emails still completes and keeps its successfully imported releases. Its
+summary reports how many emails will be retried, and its checkpoint stays unchanged so the next
+import includes them again.
 _Avoid_: scan (that is a music-library word), refresh
 
 **Auto import**:

@@ -1,9 +1,13 @@
 import { EmailImportProgress, EmailImportProgressUpdate } from '@release-maestro/core'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { Subject } from 'rxjs'
 import { InMemoryStore } from '../../utils/persistent-store.util'
-import { EmailBackendRepository } from '../email/email.backend.repository'
-import { EMAIL_AUTO_IMPORT_INTERVAL_MS, EmailImportService, EmailImportState } from './email-import.service'
-import { FeedBackendService } from './feed.backend.service'
+import {
+    deserializeEmailImportState,
+    EMAIL_AUTO_IMPORT_INTERVAL_MS,
+    EmailImportService,
+    EmailImportState,
+} from './email-import.service'
 
 jest.mock('electron', () => ({
     BrowserWindow: { getAllWindows: () => [] },
@@ -13,7 +17,7 @@ const NOW = new Date('2026-10-02T12:00:00Z').getTime()
 
 describe('EmailImportService', () => {
     let progress$: Subject<EmailImportProgress>
-    let triggerEmailImport: jest.Mock
+    let triggerEmailImport: jest.Mock<Promise<Subject<EmailImportProgress>>, [AbortSignal]>
     let mailboxName: string | null
     let stateStore: InMemoryStore<EmailImportState>
     let updates: EmailImportProgressUpdate[]
@@ -22,8 +26,8 @@ describe('EmailImportService', () => {
 
     const createService = () =>
         new EmailImportService(
-            { triggerEmailImport } as unknown as FeedBackendService,
-            { getMailboxName: () => mailboxName } as unknown as EmailBackendRepository,
+            fromPartial({ triggerEmailImport }),
+            fromPartial({ getMailboxName: () => mailboxName }),
             stateStore,
             update => updates.push(update),
             () => now,
@@ -32,7 +36,9 @@ describe('EmailImportService', () => {
 
     beforeEach(() => {
         progress$ = new Subject()
-        triggerEmailImport = jest.fn(async () => progress$)
+        triggerEmailImport = jest.fn<Promise<Subject<EmailImportProgress>>, [AbortSignal]>(
+            async () => progress$,
+        )
         mailboxName = 'Bandcamp'
         stateStore = new InMemoryStore()
         updates = []
@@ -120,8 +126,7 @@ describe('EmailImportService', () => {
         mailboxName = 'New Releases'
         const manual = service.start('manual')
 
-        const [firstSignal] = triggerEmailImport.mock.calls[0] as [AbortSignal]
-        expect(firstSignal.aborted).toBe(true)
+        expect(triggerEmailImport.mock.calls[0]?.[0].aborted).toBe(true)
         progress$.next({ phase: 'cancelled' })
         // Completed, so the restarted import also completes as soon as it subscribes
         progress$.complete()
@@ -154,6 +159,33 @@ describe('EmailImportService', () => {
         expect(triggerEmailImport).toHaveBeenCalledTimes(1)
     })
 
+    it.each([
+        '{"lastStartedAt":"broken"}',
+        '{"lastStartedAt":true}',
+        '{"lastStartedAt":{}}',
+        '{"lastStartedAt":1e400}',
+        '{"lastStartedAt":null}',
+        '{}',
+        'null',
+        '[]',
+    ])('runs an auto import when persisted JSON has an invalid or missing last start: %s', json => {
+        stateStore = new InMemoryStore(deserializeEmailImportState(json))
+
+        void createService().start('auto')
+
+        expect(triggerEmailImport).toHaveBeenCalledTimes(1)
+        progress$.complete()
+    })
+
+    it('preserves a valid persisted start time and throttles the auto import', async () => {
+        stateStore = new InMemoryStore(deserializeEmailImportState(JSON.stringify({ lastStartedAt: NOW })))
+
+        await createService().start('auto')
+
+        expect(triggerEmailImport).not.toHaveBeenCalled()
+        expect(stateStore.get('lastStartedAt')).toBe(NOW)
+    })
+
     it('starts a new import once the running one has settled', async () => {
         const service = createService()
 
@@ -172,8 +204,47 @@ describe('EmailImportService', () => {
         void service.start('manual')
         service.cancel()
 
-        const [signal] = triggerEmailImport.mock.calls[0] as [AbortSignal]
-        expect(signal.aborted).toBe(true)
+        expect(triggerEmailImport.mock.calls[0]?.[0].aborted).toBe(true)
+    })
+
+    it('aborts and drains the import on shutdown, and prevents further imports', async () => {
+        const service = createService()
+        const importing = service.start('manual')
+        await Promise.resolve()
+        const drained = jest.fn()
+
+        const stopping = service.stop().then(drained)
+        expect(triggerEmailImport.mock.calls[0]?.[0].aborted).toBe(true)
+        await Promise.resolve()
+        expect(drained).not.toHaveBeenCalled()
+
+        void service.start('manual')
+        void service.start('auto')
+        expect(triggerEmailImport).toHaveBeenCalledTimes(1)
+
+        progress$.next({ phase: 'cancelled' })
+        progress$.complete()
+        await Promise.all([stopping, importing])
+        expect(drained).toHaveBeenCalledTimes(1)
+
+        await service.stop()
+        await service.start('manual')
+        expect(triggerEmailImport).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not restart a queued mailbox takeover during shutdown', async () => {
+        const service = createService()
+        const importing = service.start('auto')
+        await Promise.resolve()
+        mailboxName = 'New Releases'
+        const takeover = service.start('manual')
+
+        const stopping = service.stop()
+        progress$.next({ phase: 'cancelled' })
+        progress$.complete()
+        await Promise.all([importing, takeover, stopping])
+
+        expect(triggerEmailImport).toHaveBeenCalledTimes(1)
     })
 
     it('reports an import that fails to start as an error', async () => {

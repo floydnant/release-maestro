@@ -76,7 +76,15 @@
                 <span class="text-content-secondary">
                     Last import: {{ update.totalProcessed }}
                     {{ update.totalProcessed === 1 ? 'email' : 'emails' }} processed,
-                    {{ update.newlyImported }} new {{ update.newlyImported === 1 ? 'release' : 'releases' }}
+                    {{ update.newlyImported }} new
+                    {{
+                        (update.newlyImported === 1 ? 'release' : 'releases') +
+                            (update.skippedEmails ? '.' : '')
+                    }}
+                    @if (update.skippedEmails; as skippedEmails) {
+                        {{ skippedEmails }} {{ skippedEmails === 1 ? 'email' : 'emails' }} couldn't be read.
+                        We'll try again next time.
+                    }
                 </span>
             } @else if (update.phase === 'cancelled') {
                 <span class="text-content-secondary">Last import was cancelled.</span>

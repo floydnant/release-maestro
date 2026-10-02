@@ -18,7 +18,8 @@ export type Email = z.infer<typeof emailSchema>
 export type EmailImportStreamPacket = {
     current: number
     total: number
-    email: Email
+    /** Null when this message could not be exported or read after retrying. */
+    email: Email | null
 }
 
 /**
@@ -46,6 +47,8 @@ export type EmailImportProgress =
           totalProcessed: number
           totalImported: number
           newlyImported: number
+          /** Messages left for the next import after retries were exhausted. */
+          skippedEmails?: number
       }
     | {
           phase: 'cancelled'

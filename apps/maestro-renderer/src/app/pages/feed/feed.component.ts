@@ -11,7 +11,7 @@ import {
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
 import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
-import { combineLatestWith, fromEvent, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
+import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { FeedService } from '../../core/services/feed.service'
@@ -74,8 +74,29 @@ export class FeedComponent {
             combineLatestWith(
                 this.retryNotifier$.pipe(mergeWith(fromEvent(window, 'online')), startWith(null)),
             ),
+            map(([furthestScrolledIndex]) => ({ furthestScrolledIndex, refreshOnlyWhenEmpty: false })),
+            mergeWith(
+                this.feedService.emailImportProgress$.pipe(
+                    filter(update => update.phase === 'completed' && update.newlyImported > 0),
+                    map(() => ({
+                        furthestScrolledIndex: this.furthestScrolledIndex(),
+                        refreshOnlyWhenEmpty: true,
+                    })),
+                ),
+            ),
             mergeScan(
-                async (previousState, [furthestScrolledIndex]): Promise<FeedState> => {
+                async (
+                    previousState,
+                    { furthestScrolledIndex, refreshOnlyWhenEmpty },
+                ): Promise<FeedState | null> => {
+                    if (
+                        refreshOnlyWhenEmpty &&
+                        previousState?.status !== 'empty' &&
+                        previousState?.status !== 'caught-up'
+                    ) {
+                        return previousState
+                    }
+
                     const previousItems = previousState?.items ?? []
                     const lastLoadedItemIndex = previousItems.length - 1
                     const itemCountToFetch =

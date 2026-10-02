@@ -75,7 +75,7 @@ test.describe('startup scan summary', () => {
             newAlbums: [],
         })
         await expect(cancel).toBeHidden()
-        await expect(page.locator('header.title-bar')).toBeFocused()
+        await expect(page.getByRole('banner')).toBeFocused()
     })
 
     test('hides the completed summary after four seconds', async ({ page }) => {

@@ -67,6 +67,17 @@ export class EmailImportIndicatorComponent {
         if (view?.phase !== 'completed') return null
 
         const count = view.newlyImported
+        const skippedEmails = view.skippedEmails ?? 0
+        if (skippedEmails > 0) {
+            const added = count > 0 ? `Added ${count} ${count === 1 ? 'release' : 'releases'}. ` : ''
+            return {
+                icon: 'success',
+                color: 'content.secondary',
+                text: `${added}${skippedEmails} ${skippedEmails === 1 ? 'email' : 'emails'} will be retried.`,
+                title: '',
+            } as const
+        }
+
         return {
             icon: 'success',
             color: count > 0 ? 'content.success' : 'content.secondary',

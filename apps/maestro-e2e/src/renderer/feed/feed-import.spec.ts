@@ -1,7 +1,9 @@
 // Covers Bandcamp notification import progress and cancellation from the title bar and the Apple Mail
 // settings page.
 import { expect, test } from '@playwright/test'
+import { installAudioFixtureRoute } from '../../fixtures/audio.fixture'
 import {
+    createHydratedRelease,
     createRendererScenario,
     rendererScenarios,
     RendererScenarioController,
@@ -10,7 +12,11 @@ import {
 
 const triggerCalls = async (controller: RendererScenarioController, trigger: 'manual' | 'auto') =>
     (await controller.calls('trigger-email-import')).filter(
-        call => (call.payload as { trigger?: string } | undefined)?.trigger === trigger,
+        ({ payload }) =>
+            typeof payload === 'object' &&
+            payload !== null &&
+            'trigger' in payload &&
+            payload.trigger === trigger,
     )
 
 const appleMailSettings = (mailboxName?: string) =>
@@ -21,6 +27,117 @@ const appleMailSettings = (mailboxName?: string) =>
         })
         .feed([], { hasFeed: false })
         .build()
+
+test.describe('completed import feed refresh', () => {
+    test.beforeEach(async ({ page }) => {
+        await installAudioFixtureRoute(page)
+    })
+
+    for (const hasFeed of [false, true]) {
+        for (const trigger of ['auto', 'manual'] as const) {
+            test(`shows new releases after ${trigger} import while ${hasFeed ? 'caught up' : 'empty'}`, async ({
+                page,
+            }) => {
+                const controller = await createRendererScenario(
+                    page,
+                    scenarioBuilder().feed([], { hasFeed }).build(),
+                )
+                await expect(page.getByText('No new releases')).toBeVisible()
+                const release = createHydratedRelease()
+                await controller.setHandler('load-feed', { kind: 'resolve', value: [release] })
+
+                await controller.emit('email-import-progress', {
+                    phase: 'completed',
+                    totalProcessed: 1,
+                    totalImported: 1,
+                    newlyImported: 1,
+                    trigger,
+                })
+
+                await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
+                await expect(page.getByText('No new releases')).toBeHidden()
+                await expect.poll(async () => controller.calls('load-feed')).toHaveLength(2)
+            })
+        }
+    }
+
+    test('refreshes when an import finishes during the initial empty feed load', async ({ page }) => {
+        const controller = await createRendererScenario(
+            page,
+            scenarioBuilder().feedLoadPending({ hasFeed: true }).build(),
+        )
+        await expect(page.getByText('Loading releases...')).toBeVisible()
+        const release = createHydratedRelease()
+        await controller.setHandler('load-feed', { kind: 'resolve', value: [release] })
+        await controller.emit('email-import-progress', {
+            phase: 'completed',
+            totalProcessed: 1,
+            totalImported: 1,
+            newlyImported: 1,
+            trigger: 'auto',
+        })
+
+        await controller.resolvePending('load-feed', [])
+
+        await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
+        await expect.poll(async () => controller.calls('load-feed')).toHaveLength(2)
+    })
+
+    test('keeps an empty feed untouched when the import adds no releases', async ({ page }) => {
+        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyCaughtUp())
+        await expect(page.getByText('No new releases')).toBeVisible()
+        const initialLoads = await controller.calls('load-feed')
+
+        await controller.emit('email-import-progress', {
+            phase: 'completed',
+            totalProcessed: 1,
+            totalImported: 1,
+            newlyImported: 0,
+            trigger: 'auto',
+        })
+
+        await expect(page.getByRole('status', { name: 'Email import' })).toHaveText('No new releases')
+        await expect(page.getByText("You're all caught up! Check back later for new releases.")).toBeVisible()
+        expect(await controller.calls('load-feed')).toHaveLength(initialLoads.length)
+    })
+
+    test('preserves the active release, playback, and focus when an import adds releases', async ({
+        page,
+    }) => {
+        const release = createHydratedRelease()
+        const controller = await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+        await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
+        await page.getByRole('button', { name: 'Play Karasu' }).click()
+        await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
+        const seeker = page.getByRole('button', { name: 'Seek within Karasu' })
+        await seeker.focus()
+        const initialLoads = await controller.calls('load-feed')
+        const newlyAddedRelease = createHydratedRelease({
+            id: 'newly-added-release',
+            data: { ...release.data, releaseName: 'Newly added release' },
+        })
+        await controller.setHandler('load-feed', { kind: 'resolve', value: [newlyAddedRelease] })
+
+        await controller.emit('email-import-progress', {
+            phase: 'completed',
+            totalProcessed: 1,
+            totalImported: 1,
+            newlyImported: 1,
+            trigger: 'auto',
+        })
+
+        await expect(page.getByRole('status', { name: 'Email import' })).toHaveText('Added 1 release')
+        await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
+        await expect(page.getByRole('link', { name: newlyAddedRelease.data.releaseName })).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
+        await expect(seeker).toBeFocused()
+        expect(await controller.calls('load-feed')).toHaveLength(initialLoads.length)
+        await seeker.press('O')
+        await expect
+            .poll(async () => controller.lastCall('open-url'))
+            .toMatchObject({ payload: release.data.releaseUrl })
+    })
+})
 
 test.describe('manual import', () => {
     test('is not offered in the sidebar', async ({ page }) => {
@@ -77,6 +194,16 @@ test.describe('manual import', () => {
         {
             update: { phase: 'completed', totalProcessed: 1, totalImported: 1, newlyImported: 1 },
             text: 'Last import: 1 email processed, 1 new release',
+        },
+        {
+            update: {
+                phase: 'completed',
+                totalProcessed: 3,
+                totalImported: 1,
+                newlyImported: 1,
+                skippedEmails: 2,
+            },
+            text: "Last import: 3 emails processed, 1 new release. 2 emails couldn't be read. We'll try again next time.",
         },
         {
             update: { phase: 'error', errorMessage: 'Apple Mail export failed' },
@@ -182,15 +309,39 @@ test.describe('auto import', () => {
         })
     }
 
+    for (const { newlyImported, skippedEmails, summary } of [
+        { newlyImported: 1, skippedEmails: 1, summary: 'Added 1 release. 1 email will be retried.' },
+        { newlyImported: 0, skippedEmails: 2, summary: '2 emails will be retried.' },
+    ]) {
+        test(`summarizes skipped emails calmly: ${summary}`, async ({ page }) => {
+            const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+
+            await controller.emit('email-import-progress', {
+                phase: 'completed',
+                totalProcessed: 3,
+                totalImported: newlyImported,
+                newlyImported,
+                skippedEmails,
+                trigger: 'auto',
+            })
+
+            await expect(page.getByRole('status', { name: 'Email import' })).toHaveText(summary)
+            await expect(page.getByText('Email import failed')).toBeHidden()
+        })
+    }
+
     test('hides the auto import summary after four seconds', async ({ page }) => {
         await page.clock.install()
         const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+        // Freeze before the summary arrives so assertion time cannot eat into its four seconds.
+        await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000)
 
         await controller.emit('email-import-progress', {
             phase: 'error',
             errorMessage: 'Apple Mail export failed',
             trigger: 'auto',
         })
+        await page.clock.runFor(0)
 
         const summary = page.getByRole('status', { name: 'Email import' })
         await expect(summary).toHaveText('Email import failed')
@@ -202,13 +353,24 @@ test.describe('auto import', () => {
 
     test('hides running progress at once on the import route', async ({ page }) => {
         await page.clock.install()
-        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+        // Load the lazy route before freezing time so its chunk cannot arrive after the render tick.
+        const controller = await createRendererScenario(
+            page,
+            rendererScenarios.feed.emptyNoSetup(),
+            '/import',
+        )
+        const skip = page.getByRole('button', { name: 'Skip for now' })
+        await expect(skip).toBeVisible()
+        await skip.click()
+        await page.getByRole('link', { name: 'Feed', exact: true }).click()
+        await expect(page.getByText('No new releases')).toBeVisible()
+
+        // Freeze before the phase starts; both render ticks stay within its one-second dwell.
+        await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000)
         await controller.emit('email-import-progress', { phase: 'started', trigger: 'auto' })
+        await page.clock.runFor(50)
         const cancel = page.getByRole('button', { name: 'Cancel email import' })
         await expect(cancel).toBeVisible()
-        // Freeze time, so the phase's one-second dwell cannot run out and hide the progress anyway. The
-        // slack keeps the pause target ahead of the page clock on a slow runner.
-        await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 300)
 
         // Navigate in the app, so the indicator keeps the phase it is showing
         await page.evaluate(() => {
@@ -217,7 +379,7 @@ test.describe('auto import', () => {
         })
         await page.clock.runFor(200)
 
-        await expect(page.getByRole('button', { name: 'Skip for now' })).toBeVisible()
+        await expect(skip).toBeVisible()
         await expect(cancel).toBeHidden()
     })
 

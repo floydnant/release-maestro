@@ -30,6 +30,13 @@ const dataFile = (subject: string, dateReceived: string) =>
         'Body',
     ].join('\n')
 
+const writeEmail = async (filePath: string, contents: string, html = '') => {
+    await Promise.all([
+        fs.writeFile(filePath, contents),
+        fs.writeFile(filePath.replace(/\.txt$/, '.html'), html),
+    ])
+}
+
 /** Stands in for osascript: resolves with the spawn args once the export starts. */
 const fakeExport = () => {
     const child = new ChildProcess()
@@ -81,6 +88,7 @@ describe('AppleMailRepository', () => {
     })
 
     afterEach(async () => {
+        jest.restoreAllMocks()
         mockSpawn.mockReset()
         mockExecFile.mockReset()
         await fs.rm(tempPath, { recursive: true, force: true })
@@ -140,15 +148,15 @@ describe('AppleMailRepository', () => {
         if (!exportPath) throw new Error('Export path missing from osascript arguments')
         const first = join(exportPath, 'email-1.txt')
         const second = join(exportPath, 'email-2.txt')
-        await fs.writeFile(first, dataFile('First', '2026-10-01T08:00:00'))
-        await fs.writeFile(second, dataFile('Second', '2026-10-01T09:00:00'))
+        await writeEmail(first, dataFile('First', '2026-10-01T08:00:00'))
+        await writeEmail(second, dataFile('Second', '2026-10-01T09:00:00'))
 
         osascript.log(`Processed email 1/2: ${first}\nProcessed em`)
         osascript.log(`ail 2/2: ${second}\n`)
         await osascript.exit(0)
 
         const packets = await result
-        expect(packets.map(({ current, total, email }) => [current, total, email.subject])).toEqual([
+        expect(packets.map(({ current, total, email }) => [current, total, email?.subject])).toEqual([
             [1, 2, 'First'],
             [2, 2, 'Second'],
         ])
@@ -171,7 +179,7 @@ describe('AppleMailRepository', () => {
         const [, , exportPath] = await osascript.started
         if (!exportPath) throw new Error('Export path missing from osascript arguments')
         const first = join(exportPath, 'email-1.txt')
-        await fs.writeFile(first, dataFile('First', '2026-10-01T08:00:00'))
+        await writeEmail(first, dataFile('First', '2026-10-01T08:00:00'))
 
         osascript.log(`Processed email 1/2: ${first}\n`)
         osascript.log('execution error: Mail got an error: AppleEvent timed out. (-1712)\n')
@@ -180,43 +188,122 @@ describe('AppleMailRepository', () => {
         await expect(result).rejects.toThrow('[AppleMailImporter] AppleEvent timed out. (-1712)')
     })
 
-    it('fails the export when an exported email cannot be read, after emitting the rest', async () => {
+    it('skips an unreadable email and still emits the rest without failing the export', async () => {
         const osascript = fakeExport()
-        const emitted: string[] = []
-        const result = new Promise<unknown>((resolve, reject) => {
-            new AppleMailRepository().loadEmails(new AbortController().signal, 'Releases', null).subscribe({
-                next: ({ email }) => emitted.push(email.subject),
-                error: reject,
-                complete: () => resolve(undefined),
-            })
-        })
+        const result = loadAll()
         const [, , exportPath] = await osascript.started
         if (!exportPath) throw new Error('Export path missing from osascript arguments')
         const missing = join(exportPath, 'email-1.txt')
         const second = join(exportPath, 'email-2.txt')
-        await fs.writeFile(second, dataFile('Second', '2026-10-01T09:00:00'))
+        await writeEmail(second, dataFile('Second', '2026-10-01T09:00:00'))
 
         osascript.log(`Processed email 1/2: ${missing}\nProcessed email 2/2: ${second}\n`)
         await osascript.exit(0)
 
-        await expect(result).rejects.toThrow(`[AppleMailImporter] Could not read exported email ${missing}`)
-        expect(emitted).toEqual(['Second'])
+        await expect(result).resolves.toEqual([
+            { current: 1, total: 2, email: null },
+            { current: 2, total: 2, email: expect.objectContaining({ subject: 'Second' }) },
+        ])
     })
 
-    it('fails the export when an exported email does not parse', async () => {
+    it('skips an email that still does not parse after retrying', async () => {
         const osascript = fakeExport()
         const result = loadAll()
         const [, , exportPath] = await osascript.started
         if (!exportPath) throw new Error('Export path missing from osascript arguments')
         const truncated = join(exportPath, 'email-1.txt')
-        await fs.writeFile(truncated, 'messageId: <cut-off@example.com>\nsen')
+        await writeEmail(truncated, 'messageId: <cut-off@example.com>\nsen')
+        const readFile = jest.spyOn(jest.requireActual<typeof fs>('fs/promises'), 'readFile')
 
         osascript.log(`Processed email 1/1: ${truncated}\n`)
         await osascript.exit(0)
 
-        await expect(result).rejects.toThrow(
-            `[AppleMailImporter] Could not parse exported email ${truncated}`,
-        )
+        await expect(result).resolves.toEqual([{ current: 1, total: 1, email: null }])
+        expect(readFile.mock.calls.filter(([path]) => path === truncated)).toHaveLength(3)
+    })
+
+    it.each(['missing', 'unreadable'])('does not accept %s HTML as an empty body', async failure => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const filePath = join(exportPath, 'email-1.txt')
+        await fs.writeFile(filePath, dataFile('First', '2026-10-01T08:00:00'))
+        if (failure === 'unreadable') await fs.mkdir(filePath.replace(/\.txt$/, '.html'))
+
+        osascript.log(`Processed email 1/1: ${filePath}\n`)
+        await osascript.exit(0)
+
+        await expect(result).resolves.toEqual([{ current: 1, total: 1, email: null }])
+    })
+
+    it('accepts an explicitly exported empty HTML file', async () => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const filePath = join(exportPath, 'email-1.txt')
+        await writeEmail(filePath, dataFile('Plain-text notification', '2026-10-01T08:00:00'))
+
+        osascript.log(`Processed email 1/1: ${filePath}\n`)
+        await osascript.exit(0)
+
+        await expect(result).resolves.toEqual([
+            { current: 1, total: 1, email: expect.objectContaining({ htmlBody: '' }) },
+        ])
+    })
+
+    it('retries a transient read failure within the same export', async () => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const filePath = join(exportPath, 'email-1.txt')
+        await writeEmail(filePath, dataFile('First', '2026-10-01T08:00:00'), '<p>Recovered HTML</p>')
+        const readFile = jest
+            .spyOn(jest.requireActual<typeof fs>('fs/promises'), 'readFile')
+            .mockRejectedValueOnce(new Error('Temporary read failure'))
+
+        osascript.log(`Processed email 1/1: ${filePath}\n`)
+        await osascript.exit(0)
+
+        await expect(result).resolves.toEqual([
+            { current: 1, total: 1, email: expect.objectContaining({ htmlBody: '<p>Recovered HTML</p>' }) },
+        ])
+        expect(readFile.mock.calls.filter(([path]) => path === filePath)).toHaveLength(2)
+    })
+
+    it('reports a message that the script could not export after retrying', async () => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        await osascript.started
+
+        osascript.log('Failed email 1/1: Mail could not read the message source\n')
+        await osascript.exit(0)
+
+        await expect(result).resolves.toEqual([{ current: 1, total: 1, email: null }])
+    })
+
+    it('stops reading retries promptly when cancelled', async () => {
+        const osascript = fakeExport()
+        const abortController = new AbortController()
+        const result = loadAll(null, abortController.signal)
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const filePath = join(exportPath, 'email-1.txt')
+        await writeEmail(filePath, dataFile('First', '2026-10-01T08:00:00'))
+        const readFile = jest
+            .spyOn(jest.requireActual<typeof fs>('fs/promises'), 'readFile')
+            .mockImplementationOnce(async () => {
+                abortController.abort()
+                throw new Error('Cancelled during read')
+            })
+
+        osascript.log(`Processed email 1/1: ${filePath}\n`)
+        await osascript.exit(143)
+
+        await expect(result).resolves.toEqual([])
+        expect(readFile.mock.calls.filter(([path]) => path === filePath)).toHaveLength(1)
     })
 
     it('fails without exporting when no mailbox is configured', async () => {
