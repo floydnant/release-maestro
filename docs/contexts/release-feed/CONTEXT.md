@@ -28,6 +28,8 @@ Each mailbox has its own _import checkpoint_, so switching to another one starts
 The AppleScript pass that pulls messages out of Apple Mail (`apple-scripts/export-emails.applescript`).
 It leaves the mail app and produces raw emails. Everything downstream is import. Given an _import
 checkpoint_, it exports only the messages received from shortly before it, and Mail does the filtering.
+The export opens Mail when it is closed. Then it quits Mail again when it finishes, fails, or is
+cancelled. When Mail was already open, the export leaves it open.
 _Avoid_: sync, fetch, download
 
 **Import**:

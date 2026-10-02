@@ -1,4 +1,4 @@
-import { spawn } from 'child_process'
+import { execFile, spawn } from 'child_process'
 import { app } from 'electron'
 import * as fs from 'fs/promises'
 import { join } from 'path'
@@ -60,6 +60,29 @@ const toExportError = (exitCode: number | null, unhandledOutput: string[]): Erro
     )
 }
 
+const runAppleScript = (source: string): Promise<string> =>
+    new Promise((resolve, reject) => {
+        execFile('osascript', ['-e', source], (error, stdout) =>
+            error ? reject(error) : resolve(stdout.trim()),
+        )
+    })
+
+/** Errs towards "running": quitting a Mail the user opened would be worse than leaving ours open. */
+const isMailRunning = (): Promise<boolean> =>
+    runAppleScript('application "Mail" is running').then(
+        output => output !== 'false',
+        error => {
+            console.error('[AppleMailImporter] Could not tell whether Mail is running:', error)
+            return true
+        },
+    )
+
+const quitMail = (): Promise<void> =>
+    runAppleScript('if application "Mail" is running then tell application "Mail" to quit').then(
+        () => undefined,
+        error => console.error('[AppleMailImporter] Could not quit Mail:', error),
+    )
+
 export class AppleMailRepository implements EmailImporterPlugin {
     loadEmails(
         abortSignal: AbortSignal,
@@ -75,8 +98,8 @@ export class AppleMailRepository implements EmailImporterPlugin {
 
         const appleScriptPath = join(appPaths.resources, 'apple-scripts', 'export-emails.applescript')
 
-        void fs.mkdtemp(join(app.getPath('temp'), 'apple-mail-export-')).then(
-            exportPath => {
+        void Promise.all([fs.mkdtemp(join(app.getPath('temp'), 'apple-mail-export-')), isMailRunning()]).then(
+            ([exportPath, wasMailRunning]) => {
                 const args = [appleScriptPath, mailboxName, exportPath]
                 if (receivedSince) args.push(formatAppleScriptDate(receivedSince))
 
@@ -107,8 +130,12 @@ export class AppleMailRepository implements EmailImporterPlugin {
                     if (isSettled) return
                     isSettled = true
 
-                    void handledLines.then(() => {
+                    void handledLines.then(async () => {
                         const error = getError() ?? lineFailure
+                        // The export opens Mail if it is closed. Close it again before the stream
+                        // settles, so a following import sees Mail as the user left it.
+                        if (!wasMailRunning) await quitMail()
+
                         // An aborted export completes rather than errors: the user asked it to stop
                         if (error && !abortSignal.aborted) {
                             console.error('[AppleMailImporter] ', error.message)

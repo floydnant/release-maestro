@@ -9,9 +9,11 @@ import { lastValueFrom, toArray } from 'rxjs'
 import { AppleMailRepository, formatAppleScriptDate } from './apple-mail.repository'
 
 const mockSpawn = jest.fn<ChildProcess, [string, string[], { signal: AbortSignal }]>()
+const mockExecFile = jest.fn<void, [string, string[], (error: Error | null, stdout: string) => void]>()
 jest.mock('child_process', () => ({
     ...jest.requireActual('child_process'),
     spawn: (...args: Parameters<typeof mockSpawn>) => mockSpawn(...args),
+    execFile: (...args: Parameters<typeof mockExecFile>) => mockExecFile(...args),
 }))
 jest.mock('electron', () => ({ app: { getPath: jest.fn() } }))
 jest.mock('../../app-env', () => ({ appPaths: { resources: '/resources' } }))
@@ -56,14 +58,31 @@ const fakeExport = () => {
 
 describe('AppleMailRepository', () => {
     let tempPath: string
+    /** What happened to Mail and to the stream, in order. */
+    let events: string[]
+    let isMailRunning: boolean
 
     beforeEach(async () => {
         tempPath = await fs.mkdtemp(join(tmpdir(), 'maestro-mail-test-'))
         jest.mocked(app.getPath).mockReturnValue(tempPath)
+        events = []
+        isMailRunning = true
+        mockExecFile.mockImplementation((_command, [, script], callback) => {
+            if (script?.includes('to quit')) {
+                // Quitting takes a while, so only awaiting it can order it before the stream settles
+                setImmediate(() => {
+                    events.push('quit Mail')
+                    callback(null, '')
+                })
+            } else {
+                callback(null, String(isMailRunning))
+            }
+        })
     })
 
     afterEach(async () => {
         mockSpawn.mockReset()
+        mockExecFile.mockReset()
         await fs.rm(tempPath, { recursive: true, force: true })
     })
 
@@ -217,6 +236,43 @@ describe('AppleMailRepository', () => {
         await osascript.exit(143)
 
         await expect(result).resolves.toEqual([])
+    })
+
+    it('leaves Mail open when it was already running', async () => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        await osascript.started
+
+        await osascript.exit(0)
+
+        await result
+        expect(events).toEqual([])
+    })
+
+    it.each([
+        ['completes', 0, false],
+        ['fails', 1, false],
+        ['is cancelled', 143, true],
+    ])('quits Mail it opened before the stream settles when the export %s', async (_, exitCode, abort) => {
+        isMailRunning = false
+        const osascript = fakeExport()
+        const abortController = new AbortController()
+        const result = new Promise<void>(resolve => {
+            const settle = () => {
+                events.push('settled')
+                resolve()
+            }
+            new AppleMailRepository()
+                .loadEmails(abortController.signal, 'Releases', null)
+                .subscribe({ error: settle, complete: settle })
+        })
+        await osascript.started
+
+        if (abort) abortController.abort()
+        await osascript.exit(exitCode)
+
+        await result
+        expect(events).toEqual(['quit Mail', 'settled'])
     })
 
     it('formats dates as zero-padded local time', () => {
