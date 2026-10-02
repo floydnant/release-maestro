@@ -61,14 +61,14 @@
             "size": "{typography.size.4xl}",
             "weight": "{typography.weight.bold}",
             "lineHeight": "{typography.lineHeight.tight}",
-            "letterSpacing": "{typography.letterSpacing.tight}"
+            "letterSpacing": "{typography.letterSpacing.normal}"
         },
         "section-title": {
             "family": "{typography.family.sans}",
             "size": "{typography.size.xl}",
             "weight": "{typography.weight.semibold}",
             "lineHeight": "{typography.lineHeight.snug}",
-            "letterSpacing": "{typography.letterSpacing.tight}"
+            "letterSpacing": "{typography.letterSpacing.normal}"
         },
         "body-md": {
             "family": "{typography.family.sans}",
@@ -89,14 +89,14 @@
             "size": "{typography.size.sm}",
             "weight": "{typography.weight.semibold}",
             "lineHeight": "{typography.lineHeight.snug}",
-            "letterSpacing": "{typography.letterSpacing.wide}"
+            "letterSpacing": "{typography.letterSpacing.normal}"
         },
         "label-sm": {
             "family": "{typography.family.sans}",
             "size": "{typography.size.xs}",
             "weight": "{typography.weight.semibold}",
             "lineHeight": "{typography.lineHeight.snug}",
-            "letterSpacing": "{typography.letterSpacing.caps}"
+            "letterSpacing": "{typography.letterSpacing.normal}"
         },
         "code-sm": {
             "family": "{typography.family.mono}",
