@@ -165,8 +165,9 @@ test.describe('auto import', () => {
         await controller.emit('email-import-progress', { phase: 'started', trigger: 'auto' })
         const cancel = page.getByRole('button', { name: 'Cancel email import' })
         await expect(cancel).toBeVisible()
-        // Freeze time, so the phase's one-second dwell cannot run out and hide the progress anyway
-        await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1)
+        // Freeze time, so the phase's one-second dwell cannot run out and hide the progress anyway. The
+        // slack keeps the pause target ahead of the page clock on a slow runner.
+        await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 300)
 
         // Navigate in the app, so the indicator keeps the phase it is showing
         await page.evaluate(() => {
