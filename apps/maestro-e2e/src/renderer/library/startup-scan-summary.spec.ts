@@ -9,6 +9,7 @@ const completedStatus = (
     failedFiles = 0,
     missingSongs = 0,
     resumedReads = 0,
+    terminalOverrides: Partial<LibraryScanTerminalResult> = {},
 ): LibraryScanStatus => {
     const terminal: LibraryScanTerminalResult = {
         outcome: 'completed',
@@ -32,6 +33,7 @@ const completedStatus = (
         failuresTruncated: false,
         normalizationIssues: 0,
         error: null,
+        ...terminalOverrides,
     }
     return {
         ...terminal,
@@ -209,6 +211,19 @@ test.describe('startup scan summary', () => {
             summary: 'Read 1 track · 1 track failed · 3 tracks missing',
             icon: 'success',
             color: 'content.success',
+        },
+        {
+            label: 'an unchanged rescan where the same files fail again',
+            status: completedStatus(0, 0, 'startup', 34, 0, 0, {
+                discovered: 6408,
+                unchanged: 6408,
+                readTotal: 34,
+                readsAttempted: 34,
+                imported: 0,
+            }),
+            summary: 'Nothing new · 34 tracks failed',
+            icon: 'success',
+            color: 'content.secondary',
         },
         {
             label: 'all reads failed',

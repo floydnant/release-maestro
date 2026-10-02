@@ -232,12 +232,17 @@
                                         (scan.newSongs > 0 || scan.changedSongs > 0))
                                 "
                                 [class.text-content-secondary]="
-                                    scan.failedFiles === 0 &&
-                                    (scan.missingSongs > 0 ||
-                                        (scan.newSongs === 0 && scan.changedSongs === 0))
+                                    (scan.failedFiles === 0 &&
+                                        (scan.missingSongs > 0 ||
+                                            (scan.newSongs === 0 && scan.changedSongs === 0))) ||
+                                    (scan.failedFiles > 0 &&
+                                        scan.successfulReads === 0 &&
+                                        scan.readableFiles > 0)
                                 "
                                 [class.text-content-danger]="
-                                    scan.failedFiles > 0 && scan.successfulReads === 0
+                                    scan.failedFiles > 0 &&
+                                    scan.successfulReads === 0 &&
+                                    scan.readableFiles === 0
                                 "
                             >
                                 @if (scan.failedFiles > 0) {
@@ -250,6 +255,15 @@
                                         ></app-icon>
                                         Read {{ scan.successfulReads }}
                                         {{ scan.successfulReads === 1 ? 'track' : 'tracks' }}
+                                    } @else if (scan.readableFiles > 0) {
+                                        <!-- The same files failed again; the rest of the library is fine -->
+                                        <app-icon
+                                            class="size-[25px] shrink-0"
+                                            name="success"
+                                            color="content.secondary"
+                                            size="18"
+                                        ></app-icon>
+                                        Nothing new
                                     } @else {
                                         <app-icon
                                             class="size-[25px] shrink-0"

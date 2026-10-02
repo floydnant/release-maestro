@@ -45,6 +45,11 @@ type ScanIndicatorView =
           newSongs: number
           changedSongs: number
           successfulReads: number
+          /**
+           * Files the library holds that read fine, now or in an earlier scan. A file that fails is
+           * read again by every scan, so an unchanged rescan can fail without anything being wrong.
+           */
+          readableFiles: number
           missingSongs: number
           failedFiles: number
       }
@@ -277,6 +282,7 @@ export class AppComponent {
                     ),
                     missingSongs: status.terminal.missing,
                     successfulReads: status.terminal.imported,
+                    readableFiles: status.terminal.discovered - status.terminal.readFailureCount,
                     failedFiles: status.terminal.discoveryFailureCount + status.terminal.readFailureCount,
                 },
                 minDwellMs: 0,
