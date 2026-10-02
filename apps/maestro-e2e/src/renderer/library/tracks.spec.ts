@@ -312,46 +312,7 @@ test.describe('search', () => {
     })
 })
 
-test.describe('entity navigation and filtering', () => {
-    test('opens the artist page when an artist credit is clicked', async ({ page }) => {
-        await openTracks(
-            page,
-            scenarioBuilder()
-                .songs(createSongRows())
-                .handler('library:get-artist-detail', {
-                    kind: 'resolve',
-                    value: {
-                        id: 'artist-2',
-                        name: 'Night Cartel',
-                        songCount: 1,
-                        albumCount: 0,
-                        firstYear: null,
-                        lastYear: null,
-                        appearanceCount: 0,
-                        recordLabelCount: 0,
-                        externalRefs: {},
-                    },
-                })
-                .build(),
-        )
-
-        await page.getByRole('link', { name: 'Night Cartel', exact: true }).click()
-
-        await expect(page).toHaveURL(/\/artists\/artist-2$/)
-        await expect(page.getByRole('heading', { name: 'Night Cartel' })).toBeVisible()
-    })
-
-    test('filters by record label from its cell', async ({ page }) => {
-        const controller = await openTracks(page)
-
-        await page.getByRole('button', { name: 'Hardwire', exact: true }).first().click()
-        await expect
-            .poll(() => lastQuery(controller))
-            .toMatchObject({
-                query: { filter: { recordLabelIds: ['label-2'] } },
-            })
-    })
-
+test.describe('filter state', () => {
     test('restores a genre filter from the URL and removes its chip', async ({ page }) => {
         const scenario = scenarioBuilder()
             .songs(createSongRows())
@@ -692,7 +653,11 @@ test.describe('selection', () => {
         await clickRow(page, 'Dawn')
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
 
-        await page.getByRole('button', { name: 'Hardwire', exact: true }).first().click()
+        // Same-route navigation keeps this table instance and its selection alive.
+        await page.evaluate(() => {
+            window.history.pushState(null, '', '/tracks?recordLabel=label-2')
+            window.dispatchEvent(new PopStateEvent('popstate'))
+        })
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
 
         await page.getByRole('button', { name: 'Remove Record label filter Hardwire' }).click()
@@ -716,20 +681,29 @@ test.describe('selection', () => {
         await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'false')
     })
 
-    test('selects the row instead of navigating when a modifier is held over a link', async ({ page }) => {
-        const controller = await openTracks(page)
-        await clickRow(page, 'Dawn')
+    const linkSelectionModifiers: ('ControlOrMeta' | 'Shift')[] = ['ControlOrMeta', 'Shift']
+    for (const modifier of linkSelectionModifiers) {
+        for (const link of [
+            { entity: 'artist', name: 'Night Cartel' },
+            { entity: 'record label', name: 'Hardwire' },
+        ]) {
+            test(`selects rows without navigating on a ${modifier} click of the ${link.entity} link`, async ({
+                page,
+            }) => {
+                const controller = await openTracks(page)
+                await clickRow(page, 'Dawn')
 
-        // A cmd-click on the artist link adds this row without leaving the track list.
-        await rowByTitle(page, 'Dusk')
-            .getByRole('link', { name: 'Night Cartel', exact: true })
-            .click({ modifiers: ['ControlOrMeta'] })
+                await rowByTitle(page, 'Dusk')
+                    .getByRole('link', { name: link.name, exact: true })
+                    .click({ modifiers: [modifier] })
 
-        await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
-        await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
-        await expect(page).toHaveURL(/\/tracks$/)
-        expect((await lastQuery(controller))?.query.filter.artistIds).toBeUndefined()
-    })
+                await expect(rowByTitle(page, 'Dusk')).toHaveAttribute('aria-selected', 'true')
+                await expect(rowByTitle(page, 'Dawn')).toHaveAttribute('aria-selected', 'true')
+                await expect(page).toHaveURL(/\/tracks$/)
+                expect((await lastQuery(controller))?.query.filter).toEqual({})
+            })
+        }
+    }
 
     test('deselects a span with the same cmd-shift pattern that selects one', async ({ page }) => {
         const rows = Array.from({ length: 8 }, (_value, index) =>
@@ -1095,6 +1069,16 @@ test.describe('the grid for keyboard and assistive tech', () => {
 
         await page.keyboard.press('ArrowLeft')
         await expect(page.getByRole('grid', { name: 'Tracks' })).toBeFocused()
+
+        await page.getByRole('grid', { name: 'Tracks' }).press('ArrowRight')
+        const row = rowByTitle(page, 'Dawn')
+        await row.getByRole('link', { name: 'Aurora Fields' }).press('ArrowRight')
+        await row.getByRole('link', { name: 'Daybreak' }).press('ArrowRight')
+        await row.getByRole('link', { name: 'Ambient' }).press('ArrowRight')
+        const recordLabel = row.getByRole('link', { name: 'Kosmische' })
+        await expect(recordLabel).toBeFocused()
+        await expect(recordLabel).toHaveAttribute('tabindex', '-1')
+        await expect(recordLabel).toHaveAttribute('href', '/record-labels/label-1')
     })
 })
 

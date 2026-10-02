@@ -210,6 +210,10 @@ _Avoid_: similar genres, recommendations, album-artist membership
 
 ## Browsing
 
+Artist, album, genre, and record label links on tracks and album headers open the corresponding
+detail page using resolved entity IDs. A record label name without an entity ID remains plain text.
+Browse filters and missing-track badges explicitly narrow a track list.
+
 The architecture is [ADR 0004](../../adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md),
 and the terms it defines are not repeated here. One word is worth pinning because the
 obvious synonym is wrong:

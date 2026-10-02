@@ -114,7 +114,7 @@ test('a scanned library is browsable, sortable and filterable end to end', async
     await expect.poll(rowTitles).toEqual(['Dawn', 'Dusk', 'Gleam', 'Noon', 'Tide', 'Void'])
 })
 
-test('search and entity filters narrow a real library', async ({}, testInfo) => {
+test('search and entity navigation work across a real library', async ({}, testInfo) => {
     const appDataDir = testInfo.outputPath('app-data')
     await mkdir(appDataDir, { recursive: true })
     const libraryDir = await buildTaggedLibrary(testInfo)
@@ -146,13 +146,82 @@ test('search and entity filters narrow a real library', async ({}, testInfo) => 
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '6 tracks' }),
     ).toBeVisible()
 
-    // A record label reaches songs through their album — songs carry no record
-    // label of their own.
-    await page.getByRole('button', { name: 'Saltmarsh', exact: true }).first().click()
+    await page.getByRole('link', { name: 'Saltmarsh', exact: true }).first().click()
+    await expect(page).toHaveURL(/\/record-labels\/[^/?]+$/)
+    await expect(page.getByRole('heading', { name: 'Saltmarsh', exact: true })).toBeVisible()
     await expect.poll(rowTitles).toEqual(expect.arrayContaining(['Tide', 'Gleam']))
+
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await expect(page).toHaveURL(/\/tracks$/)
     await expect(
-        page.getByRole('status', { name: 'Result count' }).filter({ hasText: '2 tracks' }),
+        page.getByRole('status', { name: 'Result count' }).filter({ hasText: '6 tracks' }),
     ).toBeVisible()
+
+    const dawn = page.getByRole('row', { name: 'Dawn by Aurora Fields', exact: true })
+    await dawn.getByRole('link', { name: 'Aurora Fields', exact: true }).click()
+    await expect(page).toHaveURL(/\/artists\/[^/?]+$/)
+    await expect(page.getByRole('heading', { name: 'Aurora Fields', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'All tracks 2', exact: true }).click()
+    await expect(dawn).toBeVisible()
+    const artistTracksUrl = page.url()
+
+    // The same cell opens the label from an artist's tracks, including with Enter.
+    await dawn.getByRole('link', { name: 'Kosmische', exact: true }).press('Enter')
+    await expect(page).toHaveURL(/\/record-labels\/[^/?]+$/)
+    await expect(page.getByRole('heading', { name: 'Kosmische', exact: true })).toBeVisible()
+    await expect.poll(rowTitles).toEqual(expect.arrayContaining(['Dawn', 'Noon']))
+    const recordLabelUrl = page.url()
+
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await expect(page).toHaveURL(artistTracksUrl)
+    await expect(page.getByRole('heading', { name: 'Aurora Fields', exact: true })).toBeVisible()
+    await expect(dawn).toBeVisible()
+
+    await page.getByRole('link', { name: 'Tracks', exact: true }).click()
+    await expect(page).toHaveURL(/\/tracks$/)
+    await dawn.getByRole('link', { name: 'Ambient', exact: true }).click()
+    await expect(page).toHaveURL(/\/genres\/[^/?]+$/)
+    await expect(page.getByRole('heading', { name: 'Ambient', exact: true })).toBeVisible()
+    await expect(dawn).toBeVisible()
+    const genreUrl = page.url()
+
+    await dawn.getByRole('link', { name: 'Kosmische', exact: true }).click()
+    await expect(page).toHaveURL(recordLabelUrl)
+    await expect(page.getByRole('heading', { name: 'Kosmische', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await expect(page).toHaveURL(genreUrl)
+    await expect(page.getByRole('heading', { name: 'Ambient', exact: true })).toBeVisible()
+    await expect(dawn).toBeVisible()
+
+    await page.getByRole('link', { name: 'Tracks', exact: true }).click()
+    await expect(page).toHaveURL(/\/tracks$/)
+    await dawn.getByRole('link', { name: 'Daybreak', exact: true }).click()
+    await expect(page).toHaveURL(/\/albums\/[^/?]+$/)
+    await expect(page.getByRole('heading', { name: 'Daybreak', exact: true })).toBeVisible()
+    await expect.poll(rowTitles).toEqual(['Noon', 'Dawn'])
+    const albumUrl = page.url()
+
+    await dawn.getByRole('link', { name: 'Kosmische', exact: true }).click()
+    await expect(page).toHaveURL(recordLabelUrl)
+    await expect(page.getByRole('heading', { name: 'Kosmische', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await expect(page).toHaveURL(albumUrl)
+    await expect(page.getByRole('heading', { name: 'Daybreak', exact: true })).toBeVisible()
+    await expect(dawn).toBeVisible()
+
+    // The header adds one label link ahead of the two track-row links.
+    const albumRecordLabels = page.getByRole('link', { name: 'Kosmische', exact: true })
+    await expect(albumRecordLabels).toHaveCount(3)
+    await albumRecordLabels.first().click()
+    await expect(page).toHaveURL(recordLabelUrl)
+    await expect(page.getByRole('heading', { name: 'Kosmische', exact: true })).toBeVisible()
+    await expect(dawn).toBeVisible()
+
+    // A label link inside that label's own tracks stays on its detail page.
+    await dawn.getByRole('link', { name: 'Kosmische', exact: true }).click()
+    await expect(page).toHaveURL(recordLabelUrl)
+    await expect(page.getByRole('heading', { name: 'Kosmische', exact: true })).toBeVisible()
+    await expect(dawn).toBeVisible()
 })
 
 test('a filter that matches nothing says so instead of looking empty', async ({}, testInfo) => {

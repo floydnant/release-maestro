@@ -24,7 +24,7 @@ import {
     selectionAfterRefetch,
     type SongSelectionState,
 } from '../../browse/song-selection'
-import { SongTableComponent, type EntityFilterRequest } from '../song-table/song-table.component'
+import { SongTableComponent } from '../song-table/song-table.component'
 
 export type EntitySongsKind = 'genre' | 'recordLabel' | 'artist'
 
@@ -98,12 +98,6 @@ export class EntitySongsComponent {
             queryParams: songQueryToParams({ ...this.query(), sort, filter: {} }),
             queryParamsHandling: 'merge',
             replaceUrl: true,
-        })
-    }
-    protected onEntity(request: EntityFilterRequest): void {
-        const param = { album: 'album', genre: 'genre', recordLabel: 'recordLabel' }[request.kind]
-        this.router.navigate(['/tracks'], {
-            queryParams: { [this.scope().param]: this.entityId(), [param]: request.id },
         })
     }
     protected onMissing(): void {
