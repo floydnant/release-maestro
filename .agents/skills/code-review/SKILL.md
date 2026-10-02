@@ -1,95 +1,74 @@
 ---
 name: code-review
-description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along three axes — Regression (does existing behavior still work, and is the new logic correct?), Standards (does the code follow this repo's documented standards?), and Spec (does the code match what the originating issue/PRD asked for?). Runs the verification gates, then the three reviews in parallel sub-agents, and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
+description: Review a branch, PR, or working-tree diff against a fixed point for regressions, repository standards, and spec. Use for code review or "review this".
 ---
 
-# Code Review
+# Code review
 
-Three-axis review of the diff between the working tree and a fixed point:
+Review committed and uncommitted changes on three independent axes:
 
-- **Regression** — does behavior that worked before still work, and is the changed logic correct?
-- **Standards** — does the code conform to this repo's documented standards?
-- **Spec** — does the code faithfully implement the originating issue / PRD / spec?
+- **Regression.** Does existing behavior still work, and is the changed logic correct?
+- **Standards.** Does the code follow this repo's documented standards?
+- **Spec.** Does the change implement the originating issue or stated scope?
 
-All three run as **parallel sub-agents** so they don't pollute each other's context. This skill also
-runs the automated verification gates itself and reports them as a fourth section.
+Run the axes in parallel sub-agents. The parent owns verification evidence and any missing checks.
+Leave fixes for a separate request.
 
 ## Process
 
-### 1. Pin the fixed point
+### 1. Pin the fixed point and scope
 
-Whatever the user said is the fixed point — a commit SHA, branch name, tag, `main`, `HEAD~5`. Pass it
-through without being opinionated. If they didn't say, default to the merge base with `main` and
-state that you did.
-
-### 2. Assemble the review corpus
-
-**Review committed and uncommitted work by default**, unless the user scoped it otherwise:
+Use the user's fixed point. Otherwise default to the merge base with `main` and state that choice.
+Confirm the ref resolves before calculating the base. If `main` is unavailable, ask for a fixed point.
 
 ```sh
 BASE=$(git merge-base <fixed-point> HEAD)
-git diff $BASE            # everything: committed + staged + unstaged
-git diff $BASE...HEAD     # committed only
-git diff HEAD             # uncommitted only — use to attribute findings
-git log $BASE..HEAD --oneline
+git diff "$BASE"            # committed, staged, and unstaged work
+git diff "$BASE"...HEAD     # committed work only
+git diff HEAD               # uncommitted work, for attribution
+git log "$BASE"..HEAD --oneline
 git status --short
 ```
 
-Pass the exact commands to the sub-agents rather than pasting a huge diff into their prompts. Tell
-them to attribute each finding to committed or uncommitted work so the user knows what a rebase would
-and wouldn't carry.
+Honor an explicit committed-only scope. Inspect relevant untracked files separately because Git
+diffs omit them. Documentation and skills belong in the corpus when changed. Stop if the ref is
+invalid or the scoped change is empty. Pass the resolved base SHA, exact diff commands, commit list,
+and relevant untracked paths to each sub-agent. Require committed or uncommitted attribution for
+findings.
 
-Documentation changes are part of the review corpus. If `git diff` includes docs (for example
-`AGENTS.md`, `docs/**`, or `.agents/skills/**`), include them in the same review pass — never skip
-them as "non-code".
+### 2. Establish verification evidence
 
-### 3. Run the verification gates
+Reuse verification before running checks:
 
-Review owns the automated checks; the Regression sub-agent does not run them. Follow
-`.agents/skills/verification-loop/SKILL.md`: start with the narrowest relevant target for the
-projects the diff touches, widen only as needed.
+- Session results apply when no relevant code changed afterward.
+- PR CI is authoritative for its current head SHA. It does not cover additional local changes.
+- A clear relevant pass or failure needs no rerun. Report failures and continue static review.
+- Pending, skipped, cancelled, stale, or inaccessible results leave coverage unknown.
 
-**Use non-mutating targets.** Sub-agents are reading the working tree while these run, and the user
-may have uncommitted work in it — so `make format-check`, never `make format` or `make sure`.
+For missing coverage, run the narrowest non-mutating check using
+`.agents/skills/verification-loop/SKILL.md` and `docs/testing.md`. Use Make for repo-wide checks,
+Nx for focused project checks, and `make format-check` for formatting. Run missing checks while
+sub-agents work. Record each result's source and scope; report checks that cannot run as gaps.
+Passing checks do not prove correctness.
 
-Repo-wide gates go through `make`; single-project gates go direct to `nx`.
+### 3. Identify the spec source
 
-| Diff touches                                        | Run                                                     |
-| --------------------------------------------------- | ------------------------------------------------------- |
-| anything                                            | `make format-check`, `make lint`                        |
-| `apps/maestro-renderer`                             | `pnpm exec nx test maestro-renderer`                    |
-| `apps/maestro-electron`                             | `pnpm exec nx test maestro-electron`                    |
-| `libs/maestro-core`                                 | `pnpm exec nx test maestro-core`                        |
-| `apps/metadata-engine`                              | `pnpm exec nx test metadata-engine`                     |
-| `apps/maestro-renderer/design-tokens`               | `pnpm exec nx run maestro-renderer:design-tokens-check` |
-| several projects and full-app coverage is warranted | `make affected`                                         |
-| a user journey (scan/import, feed, playback)        | `make e2e` or `make e2e-renderer`                       |
-| build config, packaging, or deps                    | `make build-prod`                                       |
+Issues and PRDs live in Linear. `MAE-123` names an issue; `#123` in a commit subject names a PR.
+Read a supplied PR's body to establish its claimed scope. An issue in its `Closes` line is meant to
+be implemented in full. Issues merely referenced elsewhere in the description are background.
 
-`make affected` includes both development E2E layers. Do not use it merely as a convenient
-multi-project unit-test command; select the affected Nx project targets directly unless full-app
-coverage is intentional.
+Find the authoritative spec in this order:
 
-There is no repo-wide typecheck target. Type errors in renderer, electron, and core surface through
-`build` — run `pnpm exec nx build <project>` (or `make build`) when the diff changes types or contracts.
-The e2e suites type-check themselves as a task dependency.
+1. The closing Linear issue, or originating issue identified by the user, branch, or commits.
+   Fetch its description and comments through `docs/agents/issue-tracker.md`.
+2. A spec path supplied by the user.
+3. A matching PRD or spec under `docs/` or `.scratch/`.
+4. The scope stated by the user or in the PR description.
 
-Report pass/fail with the command that produced it. Never claim green without having run it. If a
-gate fails, keep going — the sub-agents still produce useful findings — and lead the final report
-with the failure.
+Honor an explicit user scope. If no authoritative spec or stated scope is available, skip the Spec
+sub-agent and report `Spec unavailable`. Treat unavailable ticket access as a gap, not a spec pass.
 
-### 4. Identify the spec source
-
-Issues and PRDs live in **Linear**, not GitHub Issues — `#123`-style refs in this repo's commit
-subjects are pull requests; Linear issues are `MAE-123`. Look for the originating spec in this order:
-
-1. Issue references in the commit messages, branch name or PR description/title — fetch via the workflow in
-   `docs/agents/issue-tracker.md`.
-2. A path the user passed as an argument.
-3. A PRD or spec file under `docs/` or `.scratch/` matching the branch name or feature.
-4. If nothing is found, assume there is no spec and skip the Spec sub-agent, reporting "no spec available".
-
-### 5. Identify the standards sources
+### 4. Identify the standards sources
 
 Pass the sub-agent the files that actually exist here:
 
@@ -106,7 +85,7 @@ Pass the sub-agent the files that actually exist here:
   process: operator choice, cancellation, subscription lifetime.
 - `.agents/skills/verification-loop/SKILL.md`: how changes are meant to be verified.
 - `eslint.config.*`, `tsconfig*.json`, `.prettierrc*`: machine-enforced; note them but don't
-  re-check what step 3 already ran.
+  repeat checks covered by the verification evidence.
 
 **Engineering principles.** The `principle-*` skills are standards too. Each names a property the
 code should have, so pass the ones the diff actually reaches rather than all seven:
@@ -115,71 +94,92 @@ Principles: Include when the diff...
 
 - `.agents/skills/principle-type-system-discipline/SKILL.md`: adds or changes a type, a signature, a cast, or a parse of external data
 - `.agents/skills/principle-boundary-discipline/SKILL.md`: adds validation, error handling, or a framework adapter
-- `.agents/skills/principle-laziness-protocol/SKILL.md`: adds abstraction, layering, or signal threading — or is simply large
+- `.agents/skills/principle-laziness-protocol/SKILL.md`: adds abstraction, layering, or signal threading, or is simply large
 - `.agents/skills/principle-foundational-thinking/SKILL.md`: changes a core data structure, or shares state between actors
 - `.agents/skills/principle-make-operations-idempotent/SKILL.md`: touches a command, a lifecycle step, or a processing loop
 - `.agents/skills/principle-redesign-from-first-principles/SKILL.md`: bolts a new requirement onto an existing design
 - `.agents/skills/principle-exhaust-the-design-space/SKILL.md`: introduces a novel interaction or architecture with no precedent here
 
-A principle finding is usually a judgement call rather than a hard violation, so say which it is.
-`exhaust-the-design-space` is the weakest of the seven to review against: it describes work done
-before the diff existed, so the reviewer can ask whether alternatives were weighed but can never read
-the answer off the diff.
+Cite a principle finding as a judgement call unless it breaks a concrete repository contract.
+Judge the resulting code, not whether an invisible design exercise happened.
 
 When the diff touches documentation, Standards must also check that those docs stay true to the code
 and workflows, per `AGENTS.md` ("Keeping the docs true"). If code changes warrant a doc update but the
 diff doesn't include it, report that as a Standards finding too, for example if a new concept is
 introduced in the code but not documented.
 
-### 6. Spawn the three sub-agents in parallel
+Inspect added files and changed lines for accidentally included secrets, local data, logs, or build artifacts, allowing intentional generated files.
 
-Use the available parallel delegation capability to start three general-purpose sub-agents. If the
-runtime cannot delegate, run the axes sequentially with separate working notes so their findings stay
-independent. Each gets the diff commands from step 2 and the commit list.
+#### Code-smell baseline
 
-**Regression sub-agent** — brief: "Follow `.agents/skills/regression/SKILL.md`. Read-only git
-inspection is expected; do not run verification commands — no builds, tests, linters, or formatters.
-The gates are already being run for you, against the working tree you are reading. Report behavioral
-regressions, correctness defects in the changed logic, bundled/unrelated changes, and intentional
-behavior changes, using that skill's output format. Under 500 words."
+Use these Fowler code smells as heuristics alongside the documented standards. Repository standards
+win when they endorse a pattern. Label smells as judgement calls, cite the hunk, and explain a
+concrete maintenance cost. Skip anything tooling enforces. Suggest extraction only when the shared
+logic has the same meaning and an abstraction would reduce complexity.
 
-**Standards sub-agent** — brief: "Read the standards docs listed. Then read the diff. Report — per
-file and hunk where relevant — every place the diff violates a documented standard. Cite the standard
-(file plus the rule). Distinguish hard violations from judgement calls. Skip anything tooling
-enforces. If docs changed, review those doc hunks for accuracy/completeness against the current code
-and commands. Under 400 words." Include the step 5 file list.
+- **Mysterious Name.** A name hides what a value holds or what a function does. Choose a precise name.
+- **Duplicated Code.** The same logic appears in multiple places. Share it when it represents one rule.
+- **Feature Envy.** A method repeatedly reaches into another object's data. Consider moving the behavior.
+- **Data Clumps.** The same fields or parameters repeatedly travel together. Consider one meaningful type.
+- **Primitive Obsession.** A plain value allows confusion between domain concepts. Add a type where it prevents a real bug.
+- **Repeated Switches.** Multiple branches repeat the same decision. Consider one shared mapping or an appropriate variant model.
+- **Shotgun Surgery.** One logical change requires scattered edits. Consider gathering the owning behavior.
+- **Divergent Change.** One module changes for unrelated reasons. Consider separating those responsibilities.
+- **Speculative Generality.** New options or abstractions have no current requirement. Remove the unused flexibility.
+- **Message Chains.** Callers depend on a long navigation through other objects. Consider an operation that hides that dependency.
+- **Middle Man.** A function or class adds only delegation. Remove it when it protects no useful contract.
+- **Refused Bequest.** An implementation rejects most of its inherited contract. Consider composition or a narrower contract.
 
-If the diff adds or changes an observable, a subscription, or a flattening operator, say so in the
-Regression brief as well — operator choice and subscription lifetime are behavioral, so they belong to
-that axis, not only to Standards.
+### 5. Run the review axes
 
-**Spec sub-agent** — brief: "Read the spec. Then read the diff. Report: (a) requirements the spec
-asked for that are missing or partial; (b) behavior in the diff that wasn't asked for (scope creep);
-(c) requirements that look implemented but where the implementation looks wrong. Quote the spec line
-for each finding. Under 400 words." Include the spec path or fetched contents.
+Use parallel general-purpose sub-agents when available. Otherwise run the axes sequentially with
+separate working notes. Each receives the corpus from step 1 and the writing rules in
+`.github/pull_request_template.md`. Ask for short sentences, active voice, and one name per concept.
+Number findings `R1`, `S1`, or `P1`. Each needs a short title, a code or requirement reference, and
+the concrete effect. Write `None.` when an axis has no findings.
 
-Run the step 3 gates while the sub-agents work.
+**Regression brief.** Follow `.agents/skills/regression/SKILL.md`. Inspect read-only; the parent owns
+verification evidence and checks. Report behavioral regressions, correctness defects, unrelated
+changes, useful intentional-change context, and unproven risks. Require a reachable failing input
+or sequence for each defect. For effects crossing a process, package, persisted data, external
+contract, or async lifecycle, trace indirect consumers using `.agents/skills/blast-radius/SKILL.md`.
+Use the separate subsections defined by the regression skill. Keep the report under 500 words.
 
-### 7. Aggregate
+If observables, subscriptions, or flattening operators changed, call that out in the Regression
+brief. Operator choice and subscription lifetime affect behavior as well as standards.
 
-Present the results under `## Regression`, `## Standards`, and `## Spec`. If the gates failed, include
-`## Gates` as well, otherwise leave it out. Keep the three sub-agent reports verbatim or lightly cleaned.
-Do **not** merge or rerank findings across axes — the separation is the point.
+**Standards brief.** Read the applicable sources from step 4 and the diff. Cite each violated
+standard by file and rule. Distinguish hard violations from judgement calls. Include the code-smell
+baseline in the brief or give its exact path and section. Require a hunk and concrete maintenance
+cost for a smell. Skip tooling-enforced issues. Check changed documentation against the current
+code and commands, and report missing updates required by `AGENTS.md`. Number findings `S1`, `S2`,
+and so on. Keep the report under 400 words.
 
-End with a one-line summary: gate status, total findings per axis, and the worst single issue.
+**Spec brief.** Read the authoritative spec and scope from step 3, then the diff. Report missing or
+partial requirements, scope creep, and incorrect implementations. Quote the requirement or scope
+statement for each finding. Number findings `P1`, `P2`, and so on. Keep the report under 400 words.
 
-Report findings only. Don't fix anything unless the user asks — a review that edits the code under
-review makes the next review meaningless.
+### 6. Aggregate
 
-## Why separate axes
+For consequential safety claims left unproven, follow `.agents/skills/blast-radius/SKILL.md`.
+First reuse relevant session or CI evidence from step 2. Run the smallest decisive check only when
+that claim lacks a clear result and the check is practical. Keep temporary probes out of the
+committed tree. State what the evidence proves and what remains unknown.
 
-A change can pass one axis and fail another:
+Report each numbered finding separately under `## Regression`, `## Standards`, or `## Spec`.
+Keep each axis's order and judgement. Do not merge or rerank findings across axes.
 
-- Green tests and clean standards, but it implements the wrong thing → **Regression and Standards
-  pass, Spec fail.**
-- Exactly what the issue asked for, but it breaks an ADR or a sibling flow → **Spec passes,
-  Regression fails.**
-- Correct and well-specified, but written against the project's conventions → **Regression and Spec
-  pass, Standards fail.**
+Under `## Regression`, preserve separate `### Regressions found` and `### Correctness findings`
+subsections. Keep useful deliberate-change context in `### Seems intentional`, unrelated findings
+in `### Bundled / unrelated changes`, and unresolved risks in `### Unproven risks`.
+Intentional changes and unproven risks do not count as findings.
 
-Reporting them separately stops one axis from masking another.
+Write `None.` for empty finding subsections or axes. Omit empty context and risk subsections.
+If all three axes were reviewed and have no findings, context, or risks, replace them with
+`No findings across regression, standards, and spec.` Write `Spec unavailable` when skipped.
+
+Put `## Gates` first only when verification evidence shows a failure. Number failures `G1`, `G2`,
+and so on. Name the failed check and whether the result comes from the session, CI, or this review.
+Otherwise give one short verification sentence, such as `Verification reused from successful CI
+for <SHA>; no checks rerun.` Name unknown or pending coverage without claiming success. Include
+finding counts per axis when there are findings; skip zero counts in a clean report.

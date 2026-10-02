@@ -1,5 +1,5 @@
 interface:
     display_name: 'Regression'
-    short_description: 'Behavioral regression and correctness review of a diff'
+    short_description: 'Check changed behavior and logic for regressions'
 policy:
     allow_implicit_invocation: true

@@ -1,5 +1,5 @@
 interface:
     display_name: 'Code Review'
-    short_description: 'Three-axis review of a diff'
+    short_description: 'Review a diff for regressions, standards, and spec'
 policy:
     allow_implicit_invocation: true

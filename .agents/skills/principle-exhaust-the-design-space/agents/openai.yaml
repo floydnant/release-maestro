@@ -1,5 +1,5 @@
 interface:
     display_name: 'Principle: Exhaust the Design Space'
-    short_description: 'Build competing prototypes before committing'
+    short_description: 'Compare distinct designs before committing'
 policy:
     allow_implicit_invocation: true
