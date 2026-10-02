@@ -30,6 +30,20 @@ test.describe('release feed import scenarios', () => {
         await expect.poll(async () => controller.calls('email-import-abort')).toHaveLength(1)
     })
 
+    test('shows a cancellable manual import before the first email arrives', async ({ page }) => {
+        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+
+        await controller.emit('email-import-progress', { phase: 'started', trigger: 'manual' })
+
+        await expect(page.getByRole('complementary').getByText('Checking mail…')).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Import Emails' })).toBeHidden()
+        await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+        await expect.poll(async () => controller.calls('email-import-abort')).toHaveLength(1)
+
+        await controller.emit('email-import-progress', { phase: 'cancelled', trigger: 'manual' })
+        await expect(page.getByRole('button', { name: 'Import Emails' })).toBeVisible()
+    })
+
     test('renders completed import results and returns to the idle import action', async ({ page }) => {
         const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
 
@@ -143,6 +157,26 @@ test.describe('auto import', () => {
         await expect(summary).toHaveText('Email import failed')
         await page.clock.runFor(200)
         await expect(summary).toHaveText(/^\s*$/)
+    })
+
+    test('hides running progress at once on the import route', async ({ page }) => {
+        await page.clock.install()
+        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+        await controller.emit('email-import-progress', { phase: 'started', trigger: 'auto' })
+        const cancel = page.getByRole('button', { name: 'Cancel email import' })
+        await expect(cancel).toBeVisible()
+        // Freeze time, so the phase's one-second dwell cannot run out and hide the progress anyway
+        await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1)
+
+        // Navigate in the app, so the indicator keeps the phase it is showing
+        await page.evaluate(() => {
+            history.pushState({}, '', '/import')
+            dispatchEvent(new PopStateEvent('popstate'))
+        })
+        await page.clock.runFor(200)
+
+        await expect(page.getByRole('button', { name: 'Skip for now' })).toBeVisible()
+        await expect(cancel).toBeHidden()
     })
 
     test('drops a summary that arrives on the import route', async ({ page }) => {

@@ -30,6 +30,8 @@ interface RunningImport {
     /** Mutable: a manual request takes over the reporting of a running auto import. */
     trigger: EmailImportTrigger
     abortController: AbortController
+    /** The mailbox when the import started, which is the one it exports. */
+    mailboxName: string | null
     /** Re-sent on a takeover, so the renderer moves the progress without waiting for the next email. */
     latest: EmailImportProgress
 }
@@ -61,7 +63,13 @@ export class EmailImportService {
     start(trigger: EmailImportTrigger): Promise<void> {
         const running = this.running
         if (running) {
-            if (trigger === 'manual' && running.trigger === 'auto') {
+            if (trigger === 'auto') return this.settled
+            if (running.mailboxName !== this.mailboxName()) {
+                // The user switched mailbox since this import started: the export is of the wrong one
+                running.abortController.abort()
+                return this.settled.then(() => this.start(trigger))
+            }
+            if (running.trigger === 'auto') {
                 running.trigger = 'manual'
                 this.report(running, running.latest)
             }
@@ -72,6 +80,7 @@ export class EmailImportService {
         const started: RunningImport = {
             trigger,
             abortController: new AbortController(),
+            mailboxName: this.mailboxName(),
             latest: { phase: 'started' },
         }
         this.running = started
@@ -89,13 +98,17 @@ export class EmailImportService {
 
     private isAutoImportDue(): boolean {
         // Apple Mail is the only vendor, and an unconfigured mailbox would only fail the export
-        if (this.platform !== 'darwin' || !this.email.getMailboxName('APPLE_MAIL')) return false
+        if (this.platform !== 'darwin' || !this.mailboxName()) return false
 
         const lastStartedAt = this.stateStore.get('lastStartedAt')
         if (lastStartedAt == null) return true
         const elapsed = this.now() - lastStartedAt
         // A negative elapsed time is a clock that moved back, which must not block imports until it catches up
         return elapsed < 0 || elapsed >= EMAIL_AUTO_IMPORT_INTERVAL_MS
+    }
+
+    private mailboxName(): string | null {
+        return this.email.getMailboxName('APPLE_MAIL')
     }
 
     private report(running: RunningImport, progress: EmailImportProgress): void {
@@ -106,9 +119,9 @@ export class EmailImportService {
     private async run(running: RunningImport): Promise<void> {
         const report = (progress: EmailImportProgress) => this.report(running, progress)
 
-        this.stateStore.set('lastStartedAt', this.now())
         report({ phase: 'started' })
         try {
+            this.stateStore.set('lastStartedAt', this.now())
             const progress$ = await this.feed.triggerEmailImport(running.abortController.signal)
             await lastValueFrom(progress$.pipe(tap(report)), { defaultValue: undefined })
         } catch (error) {

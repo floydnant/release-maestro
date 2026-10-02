@@ -191,13 +191,12 @@ export class AppComponent {
 
     readonly importUpdate = toSignal(this.feedService.emailImportProgress$, { initialValue: null })
     /**
-     * The sidebar reports manual imports only; the title bar reports auto imports. It shows nothing
-     * until the first email arrives, and a cancelled import returns it to the import action.
+     * The sidebar reports manual imports only; the title bar reports auto imports. A cancelled import
+     * returns it to the import action.
      */
     importProgress = linkedSignal((): EmailImportProgressUpdate | { phase: 'idle' } => {
         const update = this.importUpdate()
-        if (!update || update.trigger !== 'manual') return { phase: 'idle' }
-        if (update.phase === 'started' || update.phase === 'cancelled') return { phase: 'idle' }
+        if (!update || update.trigger !== 'manual' || update.phase === 'cancelled') return { phase: 'idle' }
         return update
     })
 

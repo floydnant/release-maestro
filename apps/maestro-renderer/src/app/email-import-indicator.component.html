@@ -1,4 +1,5 @@
-@if (view(); as import) {
+<!-- Hides at once on the import route, without waiting out the phase's dwell -->
+@if (hidden() ? null : view(); as import) {
     @if (import.phase === 'started' || import.phase === 'processing') {
         <p class="email-import-indicator | type-body-sm flex items-center gap-1 px-2 text-content-secondary">
             <app-progress-ring
@@ -30,7 +31,7 @@
     }
 }
 <p class="email-import-summary | type-body-sm" role="status" aria-label="Email import" aria-live="polite">
-    @if (summary(); as summary) {
+    @if (hidden() ? null : summary(); as summary) {
         <!-- The spinner's 25px box draws an 18px ring. Match both dimensions. -->
         <span class="flex items-center gap-1 px-2" [class]="summaryClass()" [title]="summary.title">
             <app-icon

@@ -47,7 +47,8 @@ An _import_ the app starts on its own, on app start and on window focus, when th
 trigger started more than an hour ago and a _mailbox_ is configured on macOS. It reports in the title
 bar like the startup library scan, except on the import route. A completed or failed one ends in a
 summary that hides after four seconds; a cancelled one ends in nothing. A manual request while one
-runs takes it over, and its progress moves to the sidebar.
+runs takes it over, and its progress moves to the sidebar. If the _mailbox_ changed since it started,
+the manual request cancels it and starts a new import instead.
 _Avoid_: background sync, polling
 
 **Import checkpoint**:

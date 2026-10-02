@@ -112,6 +112,40 @@ describe('EmailImportService', () => {
         ])
     })
 
+    it('restarts the import when a manual request comes after a mailbox switch', async () => {
+        const service = createService()
+
+        const auto = service.start('auto')
+        await Promise.resolve()
+        mailboxName = 'New Releases'
+        const manual = service.start('manual')
+
+        const [firstSignal] = triggerEmailImport.mock.calls[0] as [AbortSignal]
+        expect(firstSignal.aborted).toBe(true)
+        progress$.next({ phase: 'cancelled' })
+        // Completed, so the restarted import also completes as soon as it subscribes
+        progress$.complete()
+        await Promise.all([auto, manual])
+
+        expect(triggerEmailImport).toHaveBeenCalledTimes(2)
+        expect(updates).toEqual([
+            { phase: 'started', trigger: 'auto' },
+            { phase: 'cancelled', trigger: 'auto' },
+            { phase: 'started', trigger: 'manual' },
+        ])
+    })
+
+    it('reports a failure to save the import state as an error', async () => {
+        stateStore.set = () => {
+            throw new Error('disk full')
+        }
+
+        await createService().start('manual')
+
+        expect(triggerEmailImport).not.toHaveBeenCalled()
+        expect(updates.at(-1)).toEqual({ phase: 'error', errorMessage: 'disk full', trigger: 'manual' })
+    })
+
     it('runs an auto import when the clock moved back past the last start', () => {
         stateStore.set('lastStartedAt', NOW + EMAIL_AUTO_IMPORT_INTERVAL_MS)
 
