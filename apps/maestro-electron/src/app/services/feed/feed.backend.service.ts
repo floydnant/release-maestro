@@ -1,8 +1,8 @@
-import { bufferCount, concatMap, materialize, merge, Observable, switchMap } from 'rxjs'
+import { bufferCount, concatMap, filter, materialize, merge, Observable, switchMap } from 'rxjs'
 import {
     BandcampEmailFeedSourceItem,
     BandcampFeedItem,
-    EmailImportProgressUpdate,
+    EmailImportProgress,
     HydratedBandcampReleaseFeedItem,
     HydratedFeedItem,
     isTruthy,
@@ -63,7 +63,7 @@ export class FeedBackendService {
         private feedBackendRepository: FeedBackendRepository,
     ) {}
 
-    async triggerEmailImport(abortSignal: AbortSignal): Promise<Observable<EmailImportProgressUpdate>> {
+    async triggerEmailImport(abortSignal: AbortSignal): Promise<Observable<EmailImportProgress>> {
         console.log('Running email import...')
 
         const importStartedAt = new Date()
@@ -85,7 +85,7 @@ export class FeedBackendService {
         return merge(
             emails$.pipe(
                 materialize(),
-                switchMap(async notification => {
+                switchMap(async (notification): Promise<EmailImportProgress | null> => {
                     if (notification.kind == 'C' || notification.kind == 'E') {
                         // The complete and error values are handled by the buffered stream below
                         return null
@@ -127,10 +127,11 @@ export class FeedBackendService {
                     await this.feedBackendRepository.ingestFeedItems(feedItems)
                 }),
                 materialize(),
-                switchMap(async notification => {
+                switchMap(async (notification): Promise<EmailImportProgress | null> => {
                     if (notification.kind == 'C') {
                         // A cancelled export completes too, but only a full pass covers the mailbox
-                        if (!abortSignal.aborted && mailboxName && newestReceivedAt) {
+                        if (abortSignal.aborted) return { phase: 'cancelled' as const }
+                        if (mailboxName && newestReceivedAt) {
                             // A message dated in the future (a bad server clock) must not hide the
                             // mail that really arrives before then
                             const coveredUntil = new Date(
@@ -173,7 +174,7 @@ export class FeedBackendService {
                     return assertUnreachable(notification, 'Unhandled notification kind:')
                 }),
             ),
-        ) as unknown as Observable<EmailImportProgressUpdate>
+        ).pipe(filter((update): update is EmailImportProgress => update !== null))
     }
 
     // @TODO: error handling

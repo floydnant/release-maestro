@@ -219,7 +219,12 @@
                         }
                     }
                 }
-                <p class="scan-summary | type-body-sm" role="status" aria-live="polite">
+                <p
+                    class="scan-summary | type-body-sm"
+                    role="status"
+                    aria-label="Library scan"
+                    aria-live="polite"
+                >
                     @if (scanIndicator(); as scan) {
                         @if (scan.phase === 'completed') {
                             <!-- The spinner's 25px box draws an 18px ring. Match both dimensions. -->
@@ -330,6 +335,10 @@
                         }
                     }
                 </p>
+                <app-email-import-indicator
+                    [update]="isImportRoute() ? null : importUpdate()"
+                    (cancelImport)="cancelAutoEmailImport($event)"
+                ></app-email-import-indicator>
             </div>
 
             @if (isElectron && !isMacos) {

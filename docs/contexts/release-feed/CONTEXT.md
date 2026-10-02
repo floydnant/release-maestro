@@ -33,12 +33,21 @@ cancelled. When Mail was already open, the export leaves it open.
 _Avoid_: sync, fetch, download
 
 **Import**:
-One pass that turns exported emails into feed items. It streams progress to the renderer as
-`processing`, then exactly one `completed` or `error`, and reports both `totalImported` (how many the
-pass covered) and `newlyImported` (how many were not already in the feed) — a user re-running an
-import may legitimately see a nonzero total and a zero new count, because it re-reads the overlap
-before its _import checkpoint_.
+One pass that turns exported emails into feed items. Only one runs at a time (`EmailImportService`).
+It streams progress to every window as `started`, then `processing`, then exactly one `completed`,
+`cancelled`, or `error`, and reports both `totalImported` (how many the pass covered) and
+`newlyImported` (how many were not already in the feed) — a user re-running an import may
+legitimately see a nonzero total and a zero new count, because it re-reads the overlap before its
+_import checkpoint_. Each update carries its trigger: `manual` imports report in the sidebar, _auto
+imports_ in the title bar.
 _Avoid_: scan (that is a music-library word), refresh
+
+**Auto import**:
+An _import_ the app starts on its own, on app start and on window focus, when the last import of any
+trigger started more than an hour ago and a _mailbox_ is configured on macOS. It reports in the title
+bar like the startup library scan, ending in a summary that hides after four seconds. A manual
+request while one runs takes it over, and its progress moves to the sidebar.
+_Avoid_: background sync, polling
 
 **Import checkpoint**:
 How far a mailbox has been imported: the newest date received that a completed import covered, kept

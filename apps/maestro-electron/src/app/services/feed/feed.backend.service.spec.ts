@@ -113,15 +113,17 @@ describe('FeedBackendService email import', () => {
         expect(checkpoint?.getTime()).toBeLessThanOrEqual(Date.now())
     })
 
-    it('does not checkpoint a cancelled import', async () => {
+    it('reports and does not checkpoint a cancelled import', async () => {
         const { updates, abortController } = await runImport()
 
         emails$.next(packet('2026-10-01T21:40:12'))
         abortController.abort()
         // The exporter completes, rather than errors, when it is aborted
         emails$.complete()
-        await updates
 
+        const reported = await updates
+        expect(reported.at(-1)).toEqual({ phase: 'cancelled' })
+        expect(reported).not.toContainEqual(expect.objectContaining({ phase: 'completed' }))
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
     })
 

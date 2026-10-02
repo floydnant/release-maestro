@@ -14,9 +14,10 @@ import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
 import { TranslateService } from '@ngx-translate/core'
 import { EmailImportProgressUpdate } from '@release-maestro/core'
-import { filter, map, Observable } from 'rxjs'
+import { filter, map } from 'rxjs'
 import { webEnv } from '../environments/environment'
 import { ElectronService } from './core/services'
+import { EmailImportIndicatorComponent } from './email-import-indicator.component'
 import { WebAudioPlayer } from './core/services/audio-player.service'
 import { FeedService } from './core/services/feed.service'
 import { HistoryService } from './core/services/history.service'
@@ -71,9 +72,19 @@ const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contentedit
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.css'],
     standalone: true,
-    host: { class: 'block min-h-full', '(document:keydown)': 'onDocumentKeydown($event)' },
+    host: {
+        class: 'block min-h-full',
+        '(document:keydown)': 'onDocumentKeydown($event)',
+        '(window:focus)': 'autoImportEmails()',
+    },
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterModule, ProgressBarComponent, ProgressRingComponent, IconComponent],
+    imports: [
+        RouterModule,
+        ProgressBarComponent,
+        ProgressRingComponent,
+        IconComponent,
+        EmailImportIndicatorComponent,
+    ],
 })
 export class AppComponent {
     translate = inject(TranslateService)
@@ -127,7 +138,7 @@ export class AppComponent {
     }
 
     triggerEmailImport() {
-        this.feedService.triggerEmailImport().catch(err => {
+        this.feedService.triggerEmailImport('manual').catch(err => {
             console.error('Failed to trigger email import:', err)
         })
     }
@@ -135,11 +146,29 @@ export class AppComponent {
         this.feedService.cancelEmailImport()
     }
 
+    /** On app start and window focus. The main process only runs it when the last import is stale. */
+    autoImportEmails() {
+        if (!this.isElectron) return
+        this.feedService.triggerEmailImport('auto').catch(err => {
+            console.error('Failed to trigger auto email import:', err)
+        })
+    }
+
+    cancelAutoEmailImport(event: MouseEvent): void {
+        this.releaseTitleBarFocus(event)
+        this.feedService.cancelEmailImport()
+    }
+
     cancelScan(event: MouseEvent): void {
+        this.releaseTitleBarFocus(event)
+        this.libraryService.cancelScan()
+    }
+
+    /** A title bar cancel button disappears once it is clicked, so keep focus in the title bar. */
+    private releaseTitleBarFocus(event: MouseEvent): void {
         if (event.currentTarget === document.activeElement) {
             this.titleBar().nativeElement.focus({ preventScroll: true })
         }
-        this.libraryService.cancelScan()
     }
 
     minimizeWindow() {
@@ -160,11 +189,17 @@ export class AppComponent {
         })
     }
 
-    importProgress_ = toSignal(
-        this.feedService.emailImportProgress$ as Observable<EmailImportProgressUpdate | { phase: 'idle' }>,
-        { initialValue: { phase: 'idle' as const } },
-    )
-    importProgress = linkedSignal(() => this.importProgress_())
+    readonly importUpdate = toSignal(this.feedService.emailImportProgress$, { initialValue: null })
+    /**
+     * The sidebar reports manual imports only; the title bar reports auto imports. It shows nothing
+     * until the first email arrives, and a cancelled import returns it to the import action.
+     */
+    importProgress = linkedSignal((): EmailImportProgressUpdate | { phase: 'idle' } => {
+        const update = this.importUpdate()
+        if (!update || update.trigger !== 'manual') return { phase: 'idle' }
+        if (update.phase === 'started' || update.phase === 'cancelled') return { phase: 'idle' }
+        return update
+    })
 
     progressBarSegments = computed((): ProgressBarSegment[] => {
         const progress = this.importProgress()
@@ -176,6 +211,7 @@ export class AppComponent {
         if (progress.phase === 'completed') {
             return [{ percent: 100, color: 'content.success' }]
         }
+        if (progress.phase !== 'processing') return []
 
         const percent = (progress.current / progress.total) * 100
         return [{ percent, color: 'content.success' }]
@@ -237,6 +273,7 @@ export class AppComponent {
         } else {
             console.log('Run in browser')
         }
+        this.autoImportEmails()
 
         // Feed the pacer the desired indicator whenever the scan status or route changes.
         effect(() => {

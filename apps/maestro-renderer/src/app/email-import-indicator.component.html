@@ -1,0 +1,45 @@
+@if (view(); as import) {
+    @if (import.phase === 'started' || import.phase === 'processing') {
+        <p class="email-import-indicator | type-body-sm flex items-center gap-1 px-2 text-content-secondary">
+            <app-progress-ring
+                [mode]="import.phase === 'processing' ? 'progress' : 'spinning'"
+                [diameter]="25"
+                [strokeWidth]="2.5"
+                [color]="import.phase === 'processing' ? 'content.success' : 'content.secondary'"
+                bgColor="background.surface"
+                [progress]="percent()"
+            ></app-progress-ring>
+            @if (import.phase === 'processing') {
+                Importing emails
+                <span class="font-mono">{{ import.current }}/{{ import.total }}</span>
+            } @else {
+                Checking mail…
+            }
+        </p>
+        @if (isRunning()) {
+            <button
+                class="email-import-cancel | btn-nkd-neutral size-6 self-center p-0 [-webkit-app-region:no-drag]"
+                type="button"
+                aria-label="Cancel email import"
+                title="Cancel email import"
+                (click)="cancelImport.emit($event)"
+            >
+                <app-icon name="close" size="14" aria-hidden="true"></app-icon>
+            </button>
+        }
+    }
+}
+<p class="email-import-summary | type-body-sm" role="status" aria-label="Email import" aria-live="polite">
+    @if (summary(); as summary) {
+        <!-- The spinner's 25px box draws an 18px ring. Match both dimensions. -->
+        <span class="flex items-center gap-1 px-2" [class]="summaryClass()" [title]="summary.title">
+            <app-icon
+                class="size-[25px] shrink-0"
+                [name]="summary.icon"
+                [color]="summary.color"
+                size="18"
+            ></app-icon>
+            {{ summary.text }}
+        </span>
+    }
+</p>

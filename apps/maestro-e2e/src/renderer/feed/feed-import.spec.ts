@@ -1,21 +1,25 @@
 // Covers Bandcamp notification import progress and cancellation from the release feed shell.
 import { expect, test } from '@playwright/test'
-import { createRendererScenario, rendererScenarios } from '../scenario-harness'
+import { createRendererScenario, rendererScenarios, RendererScenarioController } from '../scenario-harness'
+
+const triggerCalls = async (controller: RendererScenarioController, trigger: 'manual' | 'auto') =>
+    (await controller.calls('trigger-email-import')).filter(
+        call => (call.payload as { trigger?: string } | undefined)?.trigger === trigger,
+    )
 
 test.describe('release feed import scenarios', () => {
     test('emits import progress events and records cancel IPC calls', async ({ page }) => {
         const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
 
         await page.getByRole('button', { name: 'Import Emails' }).click()
-        await expect
-            .poll(async () => controller.lastCall('trigger-email-import'))
-            .toMatchObject({ channel: 'trigger-email-import' })
+        await expect.poll(async () => (await triggerCalls(controller, 'manual')).length).toBe(1)
 
         await controller.emit('email-import-progress', {
             phase: 'processing',
             current: 2,
             total: 5,
             message: 'Importing Bandcamp notifications',
+            trigger: 'manual',
         })
 
         await expect(page.getByText('Importing Bandcamp notifications')).toBeVisible()
@@ -36,6 +40,7 @@ test.describe('release feed import scenarios', () => {
             totalProcessed: 8,
             totalImported: 5,
             newlyImported: 3,
+            trigger: 'manual',
         })
 
         await expect(page.getByText('Done! Processed 8 emails, imported 3 new ones.')).toBeVisible()
@@ -54,12 +59,111 @@ test.describe('release feed import scenarios', () => {
         await controller.emit('email-import-progress', {
             phase: 'error',
             errorMessage: 'Apple Mail export failed',
+            trigger: 'manual',
         })
 
         await expect(page.getByText('Apple Mail export failed')).toBeVisible()
 
         await page.getByRole('button', { name: 'Retry' }).click()
 
-        await expect.poll(async () => controller.calls('trigger-email-import')).toHaveLength(1)
+        await expect.poll(async () => (await triggerCalls(controller, 'manual')).length).toBe(1)
+    })
+})
+
+test.describe('auto import', () => {
+    test('requests an auto import on startup', async ({ page }) => {
+        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+
+        await expect.poll(async () => (await triggerCalls(controller, 'auto')).length).toBeGreaterThan(0)
+    })
+
+    test('shows auto import progress in the title bar and cancels it from there', async ({ page }) => {
+        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+        const titleBar = page.locator('header.title-bar')
+
+        await controller.emit('email-import-progress', { phase: 'started', trigger: 'auto' })
+        await expect(titleBar.getByText('Checking mail…')).toBeVisible()
+
+        await controller.emit('email-import-progress', {
+            phase: 'processing',
+            current: 2,
+            total: 5,
+            message: 'Importing Bandcamp notifications',
+            trigger: 'auto',
+        })
+        await expect(titleBar.getByText('Importing emails 2/5')).toBeVisible()
+        // The sidebar stays on the import action and does not show the auto import
+        await expect(page.getByRole('button', { name: 'Import Emails' })).toBeVisible()
+        await expect(page.getByText('Importing Bandcamp notifications')).toBeHidden()
+
+        const cancel = page.getByRole('button', { name: 'Cancel email import' })
+        await cancel.focus()
+        await cancel.press('Enter')
+        await expect.poll(async () => controller.calls('email-import-abort')).toHaveLength(1)
+
+        await controller.emit('email-import-progress', { phase: 'cancelled', trigger: 'auto' })
+        await expect(cancel).toBeHidden()
+        await expect(titleBar).toBeFocused()
+        await expect(page.getByRole('status', { name: 'Email import' })).toBeEmpty()
+    })
+
+    for (const { newlyImported, summary } of [
+        { newlyImported: 0, summary: 'No new releases' },
+        { newlyImported: 1, summary: 'Added 1 release' },
+        { newlyImported: 3, summary: 'Added 3 releases' },
+    ]) {
+        test(`summarizes a completed auto import: ${summary}`, async ({ page }) => {
+            const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+
+            await controller.emit('email-import-progress', {
+                phase: 'completed',
+                totalProcessed: 8,
+                totalImported: 5,
+                newlyImported,
+                trigger: 'auto',
+            })
+
+            await expect(page.getByRole('status', { name: 'Email import' })).toHaveText(summary)
+        })
+    }
+
+    test('hides the auto import summary after four seconds', async ({ page }) => {
+        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+
+        await controller.emit('email-import-progress', {
+            phase: 'error',
+            errorMessage: 'Apple Mail export failed',
+            trigger: 'auto',
+        })
+
+        const summary = page.getByRole('status', { name: 'Email import' })
+        await expect(summary).toHaveText('Email import failed')
+        await page.waitForTimeout(3000)
+        await expect(summary).toHaveText('Email import failed')
+        await expect(summary).toBeEmpty({ timeout: 2500 })
+    })
+
+    test('moves an import to the sidebar once a manual request takes it over', async ({ page }) => {
+        const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
+
+        await controller.emit('email-import-progress', {
+            phase: 'processing',
+            current: 1,
+            total: 5,
+            message: 'Importing Bandcamp notifications',
+            trigger: 'auto',
+        })
+        await expect(page.getByRole('button', { name: 'Cancel email import' })).toBeVisible()
+
+        await controller.emit('email-import-progress', {
+            phase: 'processing',
+            current: 2,
+            total: 5,
+            message: 'Importing Bandcamp notifications',
+            trigger: 'manual',
+        })
+
+        await expect(page.getByText('Importing Bandcamp notifications')).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Cancel email import' })).toBeHidden()
     })
 })

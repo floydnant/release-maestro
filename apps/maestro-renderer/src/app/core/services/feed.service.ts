@@ -1,5 +1,10 @@
 import { inject, Injectable } from '@angular/core'
-import { EmailImportProgressUpdate, HydratedFeedItem, USE_SAME_MESSAGE } from '@release-maestro/core'
+import {
+    EmailImportProgressUpdate,
+    EmailImportTrigger,
+    HydratedFeedItem,
+    USE_SAME_MESSAGE,
+} from '@release-maestro/core'
 import { EMPTY, fromEventPattern, map, share } from 'rxjs'
 import { UiSideException } from '../../shared/ui-facing.exceptions'
 import { ElectronService } from './electron/electron.service'
@@ -20,8 +25,9 @@ export class FeedService {
           )
         : EMPTY
 
-    async triggerEmailImport() {
-        await this.electronService.ipcRenderer.invoke('trigger-email-import')
+    /** Resolves when the import settles. An `auto` request is a no-op unless the last import is stale. */
+    async triggerEmailImport(trigger: EmailImportTrigger) {
+        await this.electronService.ipcRenderer.invoke('trigger-email-import', { trigger })
     }
     cancelEmailImport() {
         this.electronService.ipcRenderer.send('email-import-abort')

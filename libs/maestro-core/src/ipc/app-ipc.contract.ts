@@ -17,7 +17,7 @@ import type {
  */
 import type { WebContents } from 'electron'
 import type { AppSettings } from '../schemas/app-settings.schema'
-import type { EmailImportProgressUpdate } from '../schemas/email.schema'
+import type { EmailImportProgressUpdate, EmailImportTrigger } from '../schemas/email.schema'
 import type { HydratedFeedItem } from '../schemas/feed.schema'
 import {
     LibraryBrowseIpcChannel,
@@ -82,7 +82,11 @@ export const MainIpcContract = defineIpcContract({
     'patch-settings': defineIpcRequest<Partial<AppSettings>, AppSettings>(),
 
     // feed
-    'trigger-email-import': defineIpcRequest(),
+    /**
+     * Starts an import, or joins the one running; resolves when it settles. An `auto` request only
+     * starts one when the last import is stale (see EmailImportService).
+     */
+    'trigger-email-import': defineIpcRequest<{ trigger: EmailImportTrigger }>(),
     'email-import-abort': defineIpcEvent(),
     'load-feed': defineIpcRequest<{ index: number; count: number }, HydratedFeedItem[] | FeedLoadError>(),
     'has-feed': defineIpcRequest<void, boolean>(),
