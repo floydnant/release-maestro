@@ -132,6 +132,13 @@ describe('FeedBackendService email import', () => {
             expect(item.data.iframeUrl).toContain(`/${item.data.releaseType}=123/`)
         }
         expect(hydrated.map(item => item.data.releaseType).sort()).toEqual(['album', 'track'])
+        expect(hydrated.find(item => item.data.releaseType === 'album')?.data.fanNames).toEqual([
+            'Adam Pitts',
+        ])
+        expect(hydrated.find(item => item.data.releaseType === 'track')?.data.fanNames).toEqual([
+            'Maya',
+            'River & Rain',
+        ])
         expect(getLinkMetaDataBatch).not.toHaveBeenCalled()
     })
 
@@ -184,6 +191,7 @@ describe('FeedBackendService email import', () => {
             error: { message: 'The Bandcamp track or album could not be found' },
         })
         expect(failed?.data.releaseName).toBe(failed?.data.releaseUrl)
+        expect(failed?.data.fanNames.length).toBeGreaterThan(0)
         expect(hydrated.find(item => !item.error)?.data.tracks).toEqual(scrapedBandcampAlbum.tracks)
     })
 

@@ -322,6 +322,7 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
         emailReceivedAt: new Date('2026-06-20T10:00:00.000Z'),
         isEmailRead: false,
         emailId: 'email-1',
+        fanNames: [],
         releaseName: 'Gecko',
         band: {
             name: 'Shiva Chandra',

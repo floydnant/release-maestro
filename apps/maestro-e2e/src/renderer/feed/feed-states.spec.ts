@@ -85,11 +85,34 @@ test.describe('release feed scenario states', () => {
             .toMatchObject({ channel: 'load-feed', payload: { index: 0, count: 5 } })
     })
 
-    test('labels a release bought by followed fans', async ({ page }) => {
-        const release = createHydratedRelease({ sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' })
+    test('labels a release with the fan who bought it', async ({ page }) => {
+        const base = createHydratedRelease()
+        const release = createHydratedRelease({
+            sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
+            data: { ...base.data, fanNames: ['Adam Pitts'] },
+        })
         await createRendererScenario(page, scenarioBuilder().feed([release]).build())
 
         await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
+        await expect(page.getByText('Bought by Adam Pitts', { exact: true })).toBeVisible()
+        await expect(page.getByText('Bought by fans you follow')).toHaveCount(0)
+    })
+
+    test('shows every buyer of a release', async ({ page }) => {
+        const base = createHydratedRelease()
+        const release = createHydratedRelease({
+            sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
+            data: { ...base.data, fanNames: ['Maya', 'River & Rain'] },
+        })
+        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+
+        await expect(page.getByText('Bought by Maya, River & Rain', { exact: true })).toBeVisible()
+    })
+
+    test('keeps a generic label for older fan purchases without buyer names', async ({ page }) => {
+        const release = createHydratedRelease({ sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' })
+        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
+
         await expect(page.getByText('Bought by fans you follow', { exact: true })).toBeVisible()
     })
 
@@ -100,6 +123,7 @@ test.describe('release feed scenario states', () => {
             error: { message: 'The Bandcamp track or album could not be found' },
             data: {
                 ...base.data,
+                fanNames: ['Adam Pitts'],
                 releaseName: base.data.releaseUrl,
                 tracks: [],
                 iframeUrl: null,
@@ -109,7 +133,7 @@ test.describe('release feed scenario states', () => {
         })
         await createRendererScenario(page, scenarioBuilder().feed([release]).build())
 
-        await expect(page.getByText('Bought by fans you follow', { exact: true })).toBeVisible()
+        await expect(page.getByText('Bought by Adam Pitts', { exact: true })).toBeVisible()
         await expect(page.getByText('The Bandcamp track or album could not be found')).toBeVisible()
         await expect(page.getByRole('link', { name: release.data.releaseUrl, exact: true })).toHaveAttribute(
             'href',

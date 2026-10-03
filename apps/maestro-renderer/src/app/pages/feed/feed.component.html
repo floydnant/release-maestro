@@ -196,7 +196,14 @@
                                 }
 
                                 @if (feedItem.sourceType === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC') {
-                                    <span class="feed-source | mb-2 badge">Bought by fans you follow</span>
+                                    <span class="feed-source | mb-2 badge max-w-full whitespace-normal">
+                                        Bought by
+                                        {{
+                                            feedItem.data.fanNames.length
+                                                ? feedItem.data.fanNames.join(', ')
+                                                : 'fans you follow'
+                                        }}
+                                    </span>
                                 }
 
                                 <h1 class="tralbum-title | type-hero-title">
