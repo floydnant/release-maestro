@@ -102,12 +102,13 @@ match".
 "song" universally names one thing. So code takes the unambiguous word and the UI takes the one users
 actually say. The same register split as _record label_ and as _discovery_, which is _prescan_ at the
 metadata-engine boundary.
-_Avoid_: `track` in any identifier; file, item, entry as synonyms for song
+_Avoid_: `track` in identifiers except the tagged `trackNumber` and `trackTotal`; file, item, entry as synonyms for song
 
-**Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on an
-album, not a song. Do not "correct" it to `songNumber`.
+**Track number** and **track total** are deliberate exceptions: `trackNumber` names a tagged position,
+and `trackTotal` names the tagged total for a disc. Counts of library rows use `songCount`.
+Do not rename the tag fields to `songNumber` or `songTotal`.
 
-It is **always the tag and never a position in a list**. A file with no track number is `null`, and
+The track number is **always the tag and never a position in a list**. A file with no track number is `null`, and
 stays `null`.
 
 **External reference**:
@@ -116,6 +117,15 @@ in an external catalog. A song retains every recognized reference found on its f
 also retain references relevant to their entity type. Artist references come from the song
 and album credits that resolve to that artist.
 _Avoid_: fingerprint, external match, verified identity
+
+**Disc number**:
+The tagged disc position of a song within an album. Album track lists order by disc number, then
+track number. A missing disc number stays `null`; the app does not infer one from file order.
+
+**Disc total** / **track total**:
+The tagged number of discs in an album and tracks on one disc. Album detail uses the sum of known
+per-disc track totals when every disc has one. If the loaded song count differs from that sum, the
+header shows a fraction such as "5/8 tracks". Disc sections use the same count format.
 
 **Album**:
 A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,

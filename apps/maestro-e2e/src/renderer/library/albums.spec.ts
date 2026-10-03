@@ -801,6 +801,73 @@ test.describe('the album detail page', () => {
             .toEqual(['album-1'])
     })
 
+    test('groups a multi-disc album and shows tagged track totals', async ({ page }) => {
+        await openDetail(
+            page,
+            scenarioBuilder()
+                .albumDetail(
+                    createAlbumDetail({
+                        songCount: 3,
+                        trackTotal: 5,
+                        discGroups: [
+                            { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 0 },
+                            { discNumber: 2, songCount: 1, trackTotal: 3, startIndex: 2 },
+                        ],
+                    }),
+                )
+                .songs([
+                    createSongRow({ id: 'disc-1-first', title: 'First', trackNumber: 1, discNumber: 1 }),
+                    createSongRow({ id: 'disc-1-second', title: 'Second', trackNumber: 2, discNumber: 1 }),
+                    createSongRow({ id: 'disc-2-first', title: 'Third', trackNumber: 1, discNumber: 2 }),
+                ])
+                .build(),
+        )
+
+        await expect(page.getByText('3/5 tracks')).toBeVisible()
+        await expect(page.getByText('Disc 1')).toBeVisible()
+        await expect(page.getByText('Disc 2')).toBeVisible()
+        await expect(page.getByText('1/3 tracks')).toBeVisible()
+        await expect(page.getByRole('row', { name: 'Disc 1, Second' })).toBeVisible()
+        await expect
+            .poll(() =>
+                page.getByRole('grid', { name: 'Tracks' }).evaluate(element =>
+                    [...element.querySelectorAll('[role="row"][aria-selected]')].map(row => {
+                        const bounds = row.getBoundingClientRect()
+                        return bounds.height
+                    }),
+                ),
+            )
+            .toEqual([64, 40, 64])
+    })
+
+    test('keeps disc sections when tracks sort in descending order', async ({ page }) => {
+        const controller = await createRendererScenario(
+            page,
+            scenarioBuilder()
+                .albumDetail(
+                    createAlbumDetail({
+                        songCount: 3,
+                        discGroups: [
+                            { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 0 },
+                            { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 2 },
+                        ],
+                    }),
+                )
+                .songs([
+                    createSongRow({ id: 'disc-2-first', title: 'Third', trackNumber: 1, discNumber: 2 }),
+                    createSongRow({ id: 'disc-1-second', title: 'Second', trackNumber: 2, discNumber: 1 }),
+                    createSongRow({ id: 'disc-1-first', title: 'First', trackNumber: 1, discNumber: 1 }),
+                ])
+                .build(),
+            '/albums/album-1?sort=trackNumber&dir=desc',
+        )
+
+        await expect.poll(async () => (await lastSongQuery(controller))?.query.sort.direction).toBe('desc')
+        await expect(page.getByText('Disc 2')).toBeVisible()
+        await expect(page.getByText('Disc 1')).toBeVisible()
+        await expect(page.getByRole('row', { name: 'Disc 1, First' })).toBeVisible()
+    })
+
     test('does not show the previous album’s tracks during same-route navigation', async ({ page }) => {
         const firstTrack = createSongRow({
             id: 'song-first',

@@ -17,7 +17,7 @@ import {
 } from '@angular/core'
 import type { BrowseWindow, SongQuery, SongRow, SongSortField } from '@release-maestro/core'
 import type { BrowseResult } from '../../browse/browse-query'
-import { LIST_ROW_HEIGHT as ROW_HEIGHT, listWindowAt } from '../../browse/list-window'
+import { LIST_GROUP_HEADER_HEIGHT, LIST_ROW_HEIGHT, listRowTop, listWindowAt } from '../../browse/list-window'
 import {
     applySongSelectionGesture,
     clearSelection,
@@ -38,7 +38,7 @@ import { SongTableRowComponent } from './song-table-row.component'
  * **Virtualisation is hand-rolled, deliberately.** The CDK's `*cdkVirtualFor` needs
  * an array as long as the result set to size its scrollbar, and a 500k-entry array
  * in the renderer is exactly what ADR 0004 exists to prevent. Instead a spacer of
- * `total × ROW_HEIGHT` gives the scrollbar its height, and the loaded window is
+ * `total × ROW_HEIGHT` plus group headings gives the scrollbar its height, and the loaded window is
  * translated into place — so the DOM holds a screenful and memory holds one window.
  *
  * The component is presentational: it renders the window it is given and emits the
@@ -129,6 +129,13 @@ const SCROLL_PADDING_ROWS = 4
 
 let nextTableId = 0
 
+/** A section boundary in the current song query's order. */
+export interface SongTableGroup {
+    startIndex: number
+    label: string
+    summary: string
+}
+
 @Component({
     selector: 'app-song-table',
     templateUrl: './song-table.component.html',
@@ -160,6 +167,8 @@ export class SongTableComponent {
      * between them without relearning the table.
      */
     columns = input<readonly SongTableColumn[]>(DEFAULT_SONG_TABLE_COLUMNS)
+    /** Group boundaries are query indexes, so a window can start in the middle of a group. */
+    groups = input<readonly SongTableGroup[]>([])
     /**
      * A scroll position to put back, in pixels, when this window is the one the user
      * left behind — see `HistoryService`. Null on an ordinary navigation.
@@ -179,8 +188,11 @@ export class SongTableComponent {
     /** {@link restoreScrollTop} has been applied, so nothing should offer it again. */
     scrollRestored = output<void>()
 
-    protected readonly rowHeight = ROW_HEIGHT
+    private groupStarts = computed(() => this.groups().map(group => group.startIndex))
+    protected rowHeightAt = (index: number): number =>
+        LIST_ROW_HEIGHT + (this.groupAt().has(index) ? LIST_GROUP_HEADER_HEIGHT : 0)
     protected readonly widths = SONG_TABLE_COLUMN_WIDTHS
+    protected groupAt = computed(() => new Map(this.groups().map(group => [group.startIndex, group])))
 
     /** Asked once per heading, so it is a set rather than a scan. */
     protected shown = computed(() => new Set(this.columns()))
@@ -223,8 +235,8 @@ export class SongTableComponent {
     protected total = computed(() => this.result().total)
     protected offset = computed(() => this.result().offset)
     protected rows = computed(() => this.result().rows)
-    protected canvasHeight = computed(() => this.total() * ROW_HEIGHT)
-    protected windowTop = computed(() => this.offset() * ROW_HEIGHT)
+    protected canvasHeight = computed(() => listRowTop(this.total(), this.groupStarts()))
+    protected windowTop = computed(() => listRowTop(this.offset(), this.groupStarts()))
     protected selectedCount = computed(() => selectionSize(this.selection()))
 
     /** Unique per table instance, so two tables on a page cannot collide on row ids. */
@@ -261,6 +273,11 @@ export class SongTableComponent {
             const observer = new ResizeObserver(() => this.onScroll())
             observer.observe(element)
             this.destroyRef.onDestroy(() => observer.disconnect())
+        })
+
+        afterRenderEffect(() => {
+            this.groupStarts()
+            untracked(() => this.onScroll())
         })
 
         // A new query is a new result set, and the scroll position measured against
@@ -325,7 +342,7 @@ export class SongTableComponent {
      * Overscan on both sides means a slow flick does not outrun the data.
      *
      * **Deliberately not wrapped in `requestAnimationFrame`.** Scrolling here is native:
-     * a spacer of `total × ROW_HEIGHT` gives the scrollbar its range and the loaded
+     * a spacer of `total × ROW_HEIGHT` plus group headings gives the scrollbar its range and the loaded
      * window is translated into place, so the browser composites the scroll and nothing
      * repositions per frame in JS. There is no animation loop to align to, and browsers
      * already dispatch `scroll` at most once per frame — a rAF would defer this work
@@ -347,7 +364,7 @@ export class SongTableComponent {
         // round trip seeding the page's window exists to avoid.
         const scrollTop = this.restoreScrollTop() ?? element.scrollTop
 
-        const { offset, limit } = listWindowAt(scrollTop, element.clientHeight)
+        const { offset, limit } = listWindowAt(scrollTop, element.clientHeight, this.groupStarts())
 
         if (offset == this.lastWindow?.offset && limit == this.lastWindow.limit) return
 
@@ -533,9 +550,18 @@ export class SongTableComponent {
         this.emitGesture({ index, id: row?.id ?? null, shiftKey: extend, toggleKey: false })
     }
 
-    protected rowLabel(row: SongRow): string {
+    protected rowLabel(row: SongRow, group?: string): string {
         const artist = row.artistText ? ` by ${row.artistText}` : ''
-        return `${row.title}${artist}${row.present ? '' : ' — missing'}`
+        return `${group ? `${group}, ` : ''}${row.title}${artist}${row.present ? '' : ' — missing'}`
+    }
+
+    protected groupLabelAt(index: number): string | undefined {
+        const groups = this.groups()
+        for (let position = groups.length - 1; position >= 0; position--) {
+            const group = groups[position]
+            if (group && group.startIndex <= index) return group.label
+        }
+        return undefined
     }
 
     // -----------------------------------------------------------------------
@@ -562,7 +588,7 @@ export class SongTableComponent {
         const current = this.cursorIndex()
         const pageRows = Math.max(
             1,
-            Math.floor((this.scroller()?.nativeElement.clientHeight ?? 0) / ROW_HEIGHT) - 1,
+            Math.floor((this.scroller()?.nativeElement.clientHeight ?? 0) / LIST_ROW_HEIGHT) - 1,
         )
 
         switch (event.key) {
@@ -601,7 +627,7 @@ export class SongTableComponent {
         const element = this.scroller()?.nativeElement
         if (!element) return
 
-        const padding = SCROLL_PADDING_ROWS * ROW_HEIGHT
+        const padding = SCROLL_PADDING_ROWS * LIST_ROW_HEIGHT
         // The header floats over the top of the scroller, so the space behind it is
         // not viewport the cursor can be seen in.
         const header = this.header()?.nativeElement.clientHeight ?? 0
@@ -609,8 +635,8 @@ export class SongTableComponent {
         const rendered = document.getElementById(this.rowElementId(index))
         const top = rendered
             ? rendered.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop
-            : index * ROW_HEIGHT
-        const bottom = top + ROW_HEIGHT
+            : listRowTop(index, this.groupStarts())
+        const bottom = top + this.rowHeightAt(index)
 
         if (top - padding - header < element.scrollTop) {
             element.scrollTop = Math.max(0, top - padding - header)

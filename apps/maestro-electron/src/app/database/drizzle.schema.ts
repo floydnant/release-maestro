@@ -196,6 +196,9 @@ export const songsTable = sqliteTable(
         catalogNumber: text('catalog_number'),
         year: integer('year'),
         trackNumber: integer('track_number'),
+        discNumber: integer('disc_number'),
+        discTotal: integer('disc_total'),
+        trackTotal: integer('track_total'),
         comment: text('comment'),
         musicalKey: text('musical_key'),
         bpm: real('bpm'),
@@ -256,10 +259,11 @@ export const songsTable = sqliteTable(
         index('songs_track_number_idx').on(table.trackNumber, table.id),
 
         // The album detail page's track list: `WHERE album_id = ? ORDER BY
-        // track_number, id`. `songs_track_number_idx` alone cannot serve it — the
+        // disc_number, track_number, id`. `songs_disc_track_idx` alone cannot serve it — the
         // equality on `album_id` has to be the index's leading column, or SQLite
         // filters by album and then sorts what is left in a temp B-tree.
-        index('songs_album_id_track_number_idx').on(table.albumId, table.trackNumber, table.id),
+        index('songs_album_disc_track_idx').on(table.albumId, table.discNumber, table.trackNumber, table.id),
+        index('songs_disc_track_idx').on(table.discNumber, table.trackNumber, table.id),
     ],
 )
 
