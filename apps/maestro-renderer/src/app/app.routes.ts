@@ -106,6 +106,13 @@ export const appRoutes: Route[] = [
             { path: '', redirectTo: 'library-folders', pathMatch: 'full' },
             { path: 'library', redirectTo: 'library-folders', pathMatch: 'full' },
             {
+                path: 'feed',
+                loadComponent: () =>
+                    import('./pages/settings/feed/feed-settings.component').then(
+                        m => m.FeedSettingsComponent,
+                    ),
+            },
+            {
                 path: 'library-folders',
                 loadComponent: () =>
                     import('./pages/settings/library/library-settings.component').then(

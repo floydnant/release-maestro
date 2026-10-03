@@ -71,11 +71,11 @@ ipc.on('email-import-abort', async () => {
 })
 
 // Handle feed loading
-ipc.handle('load-feed', async (_event, { index, count }) => {
+ipc.handle('load-feed', async (_event, { index, count, excludedIds }) => {
     const { FeedBackendService } = await import('../services/feed/feed.backend.service')
     const feedService = await diContainer.get(FeedBackendService)
 
-    return await feedService.loadFeed(index, count).catch(err => {
+    return await feedService.loadFeed(index, count, excludedIds).catch(err => {
         console.error('Error loading feed:', err)
 
         if (err instanceof Error) {
