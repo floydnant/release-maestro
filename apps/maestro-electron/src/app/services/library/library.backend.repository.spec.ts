@@ -575,7 +575,7 @@ describe('LibraryBackendRepository', () => {
         if (!artist) throw new Error('expected artist')
         db.insert(albumArtistsTable).values({ albumId: 'empty', artistId: artist.id }).run()
 
-        const migration = readFileSync(join(migrationsFolder, '0009_reconcile-album-fields.sql'), 'utf8')
+        const migration = readFileSync(join(migrationsFolder, '0012_reconcile-album-fields.sql'), 'utf8')
         sqlite.exec(migration)
         sqlite.exec(migration)
         expect(db.select().from(albumsTable).all()).toEqual([
