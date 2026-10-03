@@ -577,6 +577,56 @@ describe('LibraryBackendRepository', () => {
         })
     })
 
+    it('retains referenced entities and confirmed genres even when songs are missing or have null tags', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        repository.ingestMetadata(
+            newSongFixture({
+                artist: 'Performer',
+                albumArtist: 'Album Artist',
+                albumTitle: 'Album',
+                genre: 'Confirmed Genre',
+                label: 'Album Label',
+            }),
+            fact,
+            scannedAt,
+            EXTRACTOR_VERSION,
+        )
+        db.update(genreRawNamesTable).set({ confirmedByUser: true }).run()
+        repository.ingestMetadata(
+            newSongFixture({
+                artist: 'Performer',
+                albumArtist: 'Album Artist',
+                albumTitle: 'Album',
+                genre: 'Current Genre',
+                label: 'Album Label',
+            }),
+            fact,
+            scannedAt,
+            NEXT_EXTRACTOR_VERSION,
+        )
+        db.update(songsTable).set({ present: false }).run()
+        repository.ingestMetadata(
+            newSongFixture({ path: '/music/single.flac', genre: null, label: 'Song Label' }),
+            { ...fact, path: '/music/single.flac' },
+            scannedAt,
+            EXTRACTOR_VERSION,
+        )
+        const catalog = () => ({
+            albums: db.select().from(albumsTable).orderBy(asc(albumsTable.id)).all(),
+            artists: db.select().from(artistsTable).orderBy(asc(artistsTable.id)).all(),
+            artistNames: db.select().from(artistRawNamesTable).orderBy(asc(artistRawNamesTable.id)).all(),
+            genres: db.select().from(genresTable).orderBy(asc(genresTable.id)).all(),
+            genreNames: db.select().from(genreRawNamesTable).orderBy(asc(genreRawNamesTable.id)).all(),
+            labels: db.select().from(recordLabelsTable).orderBy(asc(recordLabelsTable.id)).all(),
+        })
+        const before = catalog()
+
+        repository.removeUnusedCatalogEntities()
+        repository.removeUnusedCatalogEntities()
+
+        expect(catalog()).toEqual(before)
+    })
+
     it('collects entities left behind by a re-read while retaining confirmed resolutions', () => {
         const scannedAt = new Date('2026-06-15T10:00:00Z')
         repository.ingestMetadata(
