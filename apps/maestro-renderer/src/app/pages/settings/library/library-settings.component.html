@@ -1,6 +1,6 @@
 <div class="max-w-2xl">
     <h2 class="type-section-title text-content-primary">Library folders</h2>
-    <p class="type-body-sm mt-1 text-content-muted">
+    <p class="mt-1 type-body-sm text-content-muted">
         @if (folders().length === 0) {
             Saving without folders stops scans. Existing tracks stay in the library until the next scan.
         } @else {
@@ -33,11 +33,11 @@
         </button>
     </div>
 
-    <h2 class="type-section-title mt-8 text-content-primary">Scan status</h2>
+    <h2 class="mt-8 type-section-title text-content-primary">Scan status</h2>
     @if (library.isScanning()) {
         @if (library.scanStatus(); as scanStatus) {
             <div class="scan-status-actions | mt-2 flex flex-wrap items-center gap-3">
-                <p class="type-body-sm flex items-center gap-2 text-content-secondary">
+                <p class="flex items-center gap-2 type-body-sm text-content-secondary">
                     <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
                     @if (scanStatus.phase === 'discovering') {
                         Discovering files… {{ scanStatus.discovered }} found
@@ -49,7 +49,7 @@
             </div>
         }
     } @else if (terminalSummaryText(); as summaryText) {
-        <p class="type-body-sm mt-2 text-content-secondary" aria-label="Latest scan result">
+        <p class="mt-2 type-body-sm text-content-secondary" aria-label="Latest scan result">
             {{ summaryText }}
         </p>
         @if (terminal()?.error; as terminalError) {
@@ -58,23 +58,23 @@
             </div>
         }
         @if (unavailableFoldersText(); as unavailableText) {
-            <p class="type-body-sm mt-1 text-content-warning" aria-label="Unavailable folders">
+            <p class="mt-1 type-body-sm text-content-warning" aria-label="Unavailable folders">
                 {{ unavailableText }}
             </p>
         }
     } @else if (lastScanText(); as lastScan) {
-        <p class="type-body-sm mt-2 text-content-secondary">Last scan: {{ lastScan }}</p>
+        <p class="mt-2 type-body-sm text-content-secondary">Last scan: {{ lastScan }}</p>
     } @else {
-        <p class="type-body-sm mt-2 text-content-muted">No scan has completed yet.</p>
+        <p class="mt-2 type-body-sm text-content-muted">No scan has completed yet.</p>
     }
     @if (terminalSummaryText() && lastScanText(); as lastScan) {
-        <p class="type-body-sm mt-1 text-content-muted">Last completed scan: {{ lastScan }}</p>
+        <p class="mt-1 type-body-sm text-content-muted">Last completed scan: {{ lastScan }}</p>
     }
 
     @if (terminal(); as terminalResult) {
         @if (terminalResult.failures.length > 0) {
-            <h2 class="type-section-title mt-8 text-content-primary">Failed files</h2>
-            <p class="type-body-sm mt-1 text-content-muted">
+            <h2 class="mt-8 type-section-title text-content-primary">Failed files</h2>
+            <p class="mt-1 type-body-sm text-content-muted">
                 {{ terminalResult.discoveryFailureCount + terminalResult.readFailureCount }} file{{
                     terminalResult.discoveryFailureCount + terminalResult.readFailureCount === 1 ? '' : 's'
                 }}
@@ -84,10 +84,10 @@
                 @for (failure of terminalResult.failures; track failure.path) {
                     <div class="group flex items-center gap-3 px-3 py-2">
                         <div class="min-w-0 grow select-text">
-                            <p class="type-body-sm mt-0.5 text-content-danger">
+                            <p class="mt-0.5 type-body-sm text-content-danger">
                                 {{ failure.message }}
                             </p>
-                            <p class="type-body-sm flex min-w-0" [hlmTooltip]="failure.path">
+                            <p class="flex min-w-0 type-body-sm" [hlmTooltip]="failure.path">
                                 <span class="truncate text-content-muted">{{
                                     folderParent(failure.path)
                                 }}</span
@@ -111,7 +111,7 @@
                     </div>
                 }
                 @if (terminalResult.failuresTruncated) {
-                    <p class="type-body-sm px-3 py-2 text-content-muted">
+                    <p class="px-3 py-2 type-body-sm text-content-muted">
                         Only the first {{ terminalResult.failures.length }} failures are listed.
                     </p>
                 }
