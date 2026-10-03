@@ -142,6 +142,23 @@ be an EP, a single or a compilation, and "release" covered those where "album" s
 does not distinguish them yet; when a `releaseType` attribute lands, the copy can say _EP_ or _single_
 where it knows, which is a better answer than a vaguer word everywhere.
 
+Album fields come from the songs' normalized tags. The identity key groups songs by album title,
+album artist, record label, catalog number, date, and the explicit year tag. The displayed year falls
+back to the leading year in the date. Different identity values mean different albums, even when
+only one song was retagged. A rescan moves that song alone, keeps its song ID, and deletes its old
+album only after the last member leaves. Missing songs remain members. Links to deleted albums
+resolve to no album; the scanner does not guess that similarly named albums should merge.
+
+Cover art is per song. An album uses the lexically smallest non-null content-addressed cover path
+among its members, including missing songs. This makes the choice independent of read order and
+prevents a song without artwork from clearing another song's cover. Both albums' covers and dates
+added are recomputed when a song moves. These differences are resolved silently, without a new
+normalization issue: different artwork is valid, and identity differences already separate albums.
+
+Track browsing displays, sorts, and filters the song's record label. Its linked record-label entity
+is resolved from that same text, including for songs without an album. Album browsing uses the
+album's record label. Neither view replaces the stored song tags with a majority or last-read value.
+
 **Release** now belongs to the [release feed](../release-feed/CONTEXT.md) and to nothing here. The two
 were the same real-world concept modelled twice — the library's _inferred_ from tags on files the user
 owns, the feed's _announced_ by Bandcamp and not necessarily owned — and the word no longer has to be
@@ -178,8 +195,8 @@ songs on albums credited to the artist through `album_artists`. Track and album 
 separate credit rules. A range does not claim the artist worked in every intervening year. With no
 tagged year, the UI says "Years unknown".
 
-A record label's years active are the earliest and latest non-null year among its albums and the
-songs on them.
+A record label's years active are the earliest and latest non-null year among its albums and songs
+carrying its record-label tag.
 
 **Released on record labels**:
 The distinct record labels of albums credited to an artist through `album_artists`. An album where
@@ -201,9 +218,11 @@ Nothing in the triage or Linear sense of "label" belongs to this context.
 
 **Record label membership**:
 An album belongs to a record label through `albums.recordLabelId`, never through `recordLabelText`.
-A song belongs through its album. The record label's artists are the album artists of its albums
-plus the artists credited on songs of those albums, each counted once, including through missing
-songs. An album artist with no song credit there opens their albums on that record label rather than
+A song belongs through its own `recordLabelText`, matched to the record label's name. This includes
+songs without albums and songs whose tags disagree with their album. Song counts and song years
+use that same membership. The record label's artists are the album artists of its albums plus the
+artists credited on its songs, each counted once, including through missing songs.
+An album artist with no song credit there opens their albums on that record label rather than
 its tracks.
 _Avoid_: label roster, signed artists
 
@@ -222,7 +241,8 @@ _Avoid_: genre substring, genre tag match
 
 **Related to a genre**:
 Artists credited on songs with that genre membership, albums containing those songs, and record labels
-of those albums. Each entity is counted once, including relationships through missing songs.
+resolved from those songs' record-label tags. Each entity is counted once, including relationships
+through missing songs and record labels on songs without an album.
 _Avoid_: similar genres, recommendations, album-artist membership
 
 ## Browsing
