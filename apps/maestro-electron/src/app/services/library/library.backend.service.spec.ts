@@ -5,7 +5,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MetadataPrescanUpdate, MetadataScanUpdate, PrescanFileFact } from '@release-maestro/core'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
-import { MovedSongCandidate, PrescanBatchComparison } from './library.backend.repository'
+import {
+    LibraryBackendRepository,
+    MovedSongCandidate,
+    PrescanBatchComparison,
+} from './library.backend.repository'
+import { MetadataBackendService } from '../metadata/metadata.backend.service'
 import { LibraryBackendService } from './library.backend.service'
 
 const EXTRACTOR_VERSION = '1111111111111111'
@@ -26,6 +31,8 @@ const newRepositoryMock = () => ({
         changedPaths: [],
     })),
     findAvailabilityProbes: jest.fn(() => []),
+    invalidateCoexistingMoves: jest.fn(),
+    recordPendingMove: jest.fn(),
     findMovedSongCandidates: jest.fn((): MovedSongCandidate[] => []),
     reconcileMovedSong: jest.fn(),
     recordSongAvailable: jest.fn(),
@@ -176,21 +183,35 @@ describe('LibraryBackendService', () => {
         outcome => {
             const repository = newRepositoryMock()
             const read$ = new Subject<MetadataScanUpdate>()
+            let started = () => {
+                /* assigned by the promise below */
+            }
+            const reading = new Promise<void>(resolve => {
+                started = resolve
+            })
             const abort = new AbortController()
             const metadataService = fromPartial<MetadataBackendService>({
+                ping: async () => ({
+                    protocolVersion: 1,
+                    engineVersion: '0.1.0',
+                    extractorVersion: 'test-extractor',
+                }),
                 prescan: () =>
                     from<MetadataPrescanUpdate[]>([
                         { phase: 'batch', items: [fact] },
                         { phase: 'completed', count: 1, errors: 0 },
                     ]),
-                readFiles: () => read$,
+                readFiles: () => {
+                    started()
+                    return read$
+                },
             })
             const service = new LibraryBackendService(
                 fromPartial<LibraryBackendRepository>(repository),
                 metadataService,
             )
             const result = firstValueFrom(service.scan(['/music'], abort.signal).pipe(toArray()))
-            return Promise.resolve().then(async () => {
+            return reading.then(async () => {
                 expect(repository.reconcileMovedSong).not.toHaveBeenCalled()
                 expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
                 if (outcome === 'failed')
@@ -222,6 +243,11 @@ describe('LibraryBackendService', () => {
                 })
                 repository.findMovedSongCandidates.mockReturnValue([candidate])
                 const metadataService = fromPartial<MetadataBackendService>({
+                    ping: async () => ({
+                        protocolVersion: 1,
+                        engineVersion: '0.1.0',
+                        extractorVersion: 'test-extractor',
+                    }),
                     prescan: () =>
                         from<MetadataPrescanUpdate[]>([
                             { phase: 'batch', items: [fact] },
@@ -277,6 +303,11 @@ describe('LibraryBackendService', () => {
                     }),
                 ])
                 const metadataService = fromPartial<MetadataBackendService>({
+                    ping: async () => ({
+                        protocolVersion: 1,
+                        engineVersion: '0.1.0',
+                        extractorVersion: 'test-extractor',
+                    }),
                     prescan: () =>
                         from<MetadataPrescanUpdate[]>([
                             { phase: 'batch', items: [fact] },
