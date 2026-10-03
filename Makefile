@@ -8,7 +8,7 @@ PNPM := pnpm
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
-	RELEASE_MAESTRO_PNPM_COMMAND='$(PNPM)' $(PNPM) exec nx serve maestro-electron
+	RELEASE_MAESTRO_PNPM_COMMAND='$(PNPM)' node tools/dev-instance/cli.mjs run-dev
 
 dev-allocate: ## Reserve this worktree's stable development ports
 	node tools/dev-instance/cli.mjs dev-allocate

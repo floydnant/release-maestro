@@ -46,6 +46,9 @@ requires an OS supported by the installed Playwright version.
 `make dev` builds the host metadata-engine binary and starts the Angular dev server and Electron
 main process with hot reload. The host binary lives in `apps/metadata-engine/target-dev/release`,
 separate from the packaging binary in `target/release`. Development always uses this host path.
+The instance supervisor starts before Nx and tracks dependency builds as part of startup, so
+`make dev-stop` remains available during startup. `make dev-list` also reports unregistered worktree
+listeners and direct Nx dev servers on macOS and Linux with `lsof`.
 If the host binary is missing, rebuild it with the command below; old release or debug builds are not used.
 
 Each Git worktree gets stable debug ports and its own `.app-data.dev`. The Electron window title shows
