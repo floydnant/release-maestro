@@ -9,8 +9,7 @@ A desktop app for your music. Scan your local collection into a searchable libra
 
 ## Download
 
-Installers are attached to [GitHub releases](https://github.com/floydnant/release-maestro/releases).
-These links become available after the first release finishes building:
+Download the latest installer from [GitHub releases](https://github.com/floydnant/release-maestro/releases):
 
 - [macOS, Apple Silicon and Intel](https://github.com/floydnant/release-maestro/releases/latest/download/Release-Maestro-macOS-universal.dmg)
 - [Windows, x64](https://github.com/floydnant/release-maestro/releases/latest/download/Release-Maestro-Windows-x64.exe)
@@ -153,8 +152,8 @@ Produces platform-specific distributables in `dist/executables/`:
 
 Merge the release-please PR to publish a version. The release workflow tests and
 builds this commit on all three platforms, then attaches the installers to its
-GitHub release. The first release is `0.1.0`; dependency changes produce patch
-bumps. See [the release guide](docs/releasing.md) for App setup, commit types,
+GitHub release. Dependency changes produce patch bumps.
+See [the release guide](docs/releasing.md) for App setup, commit types,
 and retrying a failed publication.
 
 ## Database
