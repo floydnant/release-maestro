@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, join, win32 } from 'node:path'
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 
@@ -37,7 +37,16 @@ export const installTool = async (name, root) => {
     // Extract the verified archive afresh so a cached, modified executable cannot run.
     const directory = mkdtempSync(join(tmpdir(), 'maestro-security-tool-'))
     try {
-        execFileSync('tar', ['-xf', archive, '-C', directory, executable], { stdio: 'pipe' })
+        // Git's GNU tar can precede Windows' bsdtar on PATH. It treats drive letters as
+        // remote hosts and cannot read ZIP files. Use the system extractor on Windows.
+        const tarCommand =
+            process.platform === 'win32'
+                ? win32.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
+                : 'tar'
+        execFileSync(tarCommand, ['-xf', asset.asset, '-C', directory, executable], {
+            cwd: cache,
+            stdio: 'pipe',
+        })
         const path = join(directory, basename(executable))
         chmodSync(path, 0o755)
         return { path, cleanup: () => rmSync(directory, { recursive: true, force: true }) }

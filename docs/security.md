@@ -22,7 +22,8 @@ make security-policy-check # Validate exception records without network access
 `make security-tools` downloads the scanners without running a scan. Other commands download their
 required scanner on first use. Versions and SHA-256 digests are committed in
 `tools/security/tools.json`. The downloader checks cached and downloaded bytes before execution.
-It supports macOS, Linux, and Windows on x64 and arm64. Node and `tar` are required. Rust metadata
+It supports macOS, Linux, and Windows on x64 and arm64. Node and `tar` are required. Windows uses
+the system `tar.exe` because Git's GNU tar does not support the ZIP release archive. Rust metadata
 requires the locked crates fetched by `make install`. A corrupted tool cache fails verification;
 remove `.cache/security-tools` to download it again. Review versions and digests together when
 updating tools. No dependency lifecycle scripts or Rust call-analysis builds run during scanning.
