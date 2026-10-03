@@ -10,11 +10,11 @@ import {
     type SongSort,
 } from '@release-maestro/core'
 import Database from 'better-sqlite3'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
 import {
     albumArtistsTable,
@@ -208,7 +208,7 @@ describe('LibraryBrowseRepository at library scale', () => {
             .run()
         sqlite.exec('ANALYZE')
 
-        repository = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
+        repository = new LibraryBrowseRepository(fromPartial({ db }))
     })
 
     it.each(['asc', 'desc'] as const)('windows a large genre catalog by indexed name %s', direction => {
@@ -496,7 +496,7 @@ describe('LibraryBrowseRepository albums at library scale', () => {
         })
         sqlite.exec('ANALYZE')
 
-        repository = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
+        repository = new LibraryBrowseRepository(fromPartial({ db }))
     })
 
     afterAll(() => sqlite.close())

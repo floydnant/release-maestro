@@ -1,11 +1,11 @@
 import Database from 'better-sqlite3'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
-import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
 import {
     albumsTable,
@@ -57,7 +57,7 @@ describe('LibraryBackendRepository', () => {
         sqlite.pragma('foreign_keys = ON')
         db = drizzle(sqlite, { schema })
         migrate(db, { migrationsFolder })
-        repository = new LibraryBackendRepository({ db } as unknown as DatabaseClient)
+        repository = new LibraryBackendRepository(fromPartial({ db }))
     })
 
     afterEach(() => sqlite.close())

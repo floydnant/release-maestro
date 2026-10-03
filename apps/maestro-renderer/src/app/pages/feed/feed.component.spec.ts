@@ -1,9 +1,8 @@
-import { WritableSignal } from '@angular/core'
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing'
 import { provideRouter } from '@angular/router'
 import { provideTranslateService } from '@ngx-translate/core'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { EMPTY } from 'rxjs'
-import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { FeedService } from '../../core/services/feed.service'
 import { provideWebAudioPlayerMock } from '../../../test/mocks'
 import { FeedComponent } from './feed.component'
@@ -11,23 +10,18 @@ import { FeedComponent } from './feed.component'
 describe(FeedComponent.name, () => {
     let component: FeedComponent
     let fixture: ComponentFixture<FeedComponent>
-    let audioPlayer: {
-        currentUrl: WritableSignal<string | null>
-        duration: WritableSignal<number>
-        playSource: jest.Mock
-        playerTime: WritableSignal<number>
-        seekTo: jest.Mock
-        togglePlay: jest.Mock
-    }
+    let audioPlayer: ReturnType<typeof provideWebAudioPlayerMock>['useValue']
 
     beforeEach(waitForAsync(() => {
+        const audioPlayerProvider = provideWebAudioPlayerMock()
+        audioPlayer = audioPlayerProvider.useValue
         void TestBed.configureTestingModule({
             declarations: [],
             imports: [FeedComponent],
             providers: [
                 provideTranslateService(),
                 provideRouter([]),
-                provideWebAudioPlayerMock(),
+                audioPlayerProvider,
                 {
                     provide: FeedService,
                     useValue: {
@@ -42,7 +36,6 @@ describe(FeedComponent.name, () => {
 
         fixture = TestBed.createComponent(FeedComponent)
         component = fixture.componentInstance
-        audioPlayer = TestBed.inject(WebAudioPlayer) as unknown as typeof audioPlayer
         fixture.detectChanges()
     }))
 
@@ -52,13 +45,15 @@ describe(FeedComponent.name, () => {
 
     it('starts a new track at the point selected on its seeker', () => {
         const trackSeeker = document.createElement('button')
-        jest.spyOn(trackSeeker, 'getBoundingClientRect').mockReturnValue({
-            left: 100,
-            width: 200,
-        } as DOMRect)
+        jest.spyOn(trackSeeker, 'getBoundingClientRect').mockReturnValue(
+            fromPartial({
+                left: 100,
+                width: 200,
+            }),
+        )
 
         component.seekTrack(
-            { currentTarget: trackSeeker, clientX: 150 } as unknown as MouseEvent,
+            fromPartial({ currentTarget: trackSeeker, clientX: 150 }),
             'https://example.com/preview.mp3',
         )
 
@@ -67,14 +62,16 @@ describe(FeedComponent.name, () => {
 
     it('seeks an active track without restarting it', () => {
         const trackSeeker = document.createElement('button')
-        jest.spyOn(trackSeeker, 'getBoundingClientRect').mockReturnValue({
-            left: 40,
-            width: 160,
-        } as DOMRect)
+        jest.spyOn(trackSeeker, 'getBoundingClientRect').mockReturnValue(
+            fromPartial({
+                left: 40,
+                width: 160,
+            }),
+        )
         audioPlayer.currentUrl.set('https://example.com/preview.mp3')
 
         component.seekTrack(
-            { currentTarget: trackSeeker, clientX: 160 } as unknown as MouseEvent,
+            fromPartial({ currentTarget: trackSeeker, clientX: 160 }),
             'https://example.com/preview.mp3',
         )
 

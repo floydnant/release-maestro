@@ -1,3 +1,4 @@
+import { fromAny } from '@total-typescript/shoehorn'
 import { MinDwellPacer, PacedPhase } from './min-dwell-pacer'
 
 describe('MinDwellPacer', () => {
@@ -30,10 +31,11 @@ describe('MinDwellPacer', () => {
             (ms, cb) => {
                 const handle = { at: now + ms, cb }
                 scheduled.push(handle)
-                return handle as unknown as ReturnType<typeof setTimeout>
+                return fromAny(handle)
             },
             handle => {
-                scheduled = scheduled.filter(timer => timer !== (handle as unknown as (typeof scheduled)[0]))
+                const scheduledHandle: (typeof scheduled)[number] = fromAny(handle)
+                scheduled = scheduled.filter(timer => timer !== scheduledHandle)
             },
         )
     })
