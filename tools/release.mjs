@@ -4,7 +4,7 @@ import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const installerNames = {
-    linux: ['Release-Maestro-Linux-x64.AppImage'],
+    linux: ['Release-Maestro-Linux-x86_64.AppImage'],
     macos: ['Release-Maestro-macOS-universal.dmg', 'Release-Maestro-macOS-universal.zip'],
     windows: ['Release-Maestro-Windows-x64.exe'],
 }

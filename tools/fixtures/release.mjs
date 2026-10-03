@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 export const releaseInstallers = [
-    'Release-Maestro-Linux-x64.AppImage',
+    'Release-Maestro-Linux-x86_64.AppImage',
     'Release-Maestro-macOS-universal.dmg',
     'Release-Maestro-macOS-universal.zip',
     'Release-Maestro-Windows-x64.exe',
