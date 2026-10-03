@@ -37,8 +37,9 @@ PRs, pushes to main, daily, and on demand. It retains reports even when the gate
 Every security advisory blocks the gate unless an exact exception applies. Missing severity does
 not make a finding safe. Unscored RustSec maintenance notices are informational; unsoundness is
 blocking. Scanner errors, incomplete ecosystem coverage, invalid exceptions, and expired exceptions
-fail the command. Configure `Security / dependencies` as a required PR check in repository rules
-to enforce this gate before merge. The required check context is `Dependency vulnerabilities`.
+fail the command. The active
+[Dependency security ruleset](https://github.com/floydnant/release-maestro/rules/24417605) requires
+the `Dependency vulnerabilities` check before a PR can merge into the default branch.
 
 The initial baseline contains 28 existing findings accepted until November 2, 2026. These affect Nx,
 Electron download tooling, the webpack pipeline, drizzle-kit, and Bandcamp/Puppeteer dependencies.
