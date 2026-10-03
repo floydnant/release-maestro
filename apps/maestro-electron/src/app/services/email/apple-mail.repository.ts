@@ -1,15 +1,12 @@
-import { exec } from 'child_process'
+import { execFile, spawn } from 'child_process'
 import { app } from 'electron'
 import * as fs from 'fs/promises'
 import { join } from 'path'
+import { createInterface } from 'readline'
 import { Observable, Subject } from 'rxjs'
 import { Email, EmailImportStreamPacket, emailSchema } from '@release-maestro/core'
 import { appPaths } from '../../app-env'
-import { SettingsBackendService } from '../settings.backend.service'
-// Import will be fixed after creating email.backend.repository.ts
-export interface EmailImporterPlugin {
-    loadEmails(signal: AbortSignal): Observable<EmailImportStreamPacket>
-}
+import type { EmailImporterPlugin } from './email.backend.repository'
 
 const validateEmail = (data: unknown): Email | null => {
     const result = emailSchema.safeParse(data)
@@ -46,13 +43,54 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
     return validateEmail(data)
 }
 
-export class AppleMailRepository implements EmailImporterPlugin {
-    constructor(private settings: SettingsBackendService) {}
+const padTwoDigits = (value: number) => String(value).padStart(2, '0')
 
-    loadEmails(abortSignal: AbortSignal): Observable<EmailImportStreamPacket> {
+/** The local `YYYY-MM-DDTHH:MM:SS` form the export script writes `dateReceived` in and reads back. */
+export const formatAppleScriptDate = (date: Date): string =>
+    `${date.getFullYear()}-${padTwoDigits(date.getMonth() + 1)}-${padTwoDigits(date.getDate())}` +
+    `T${padTwoDigits(date.getHours())}:${padTwoDigits(date.getMinutes())}:${padTwoDigits(date.getSeconds())}`
+
+const toExportError = (exitCode: number | null, unhandledOutput: string[]): Error => {
+    const mailError = unhandledOutput
+        .map(line => line.match(/Mail got an error: (.+)/)?.[1])
+        .find(message => message !== undefined)
+
+    return new Error(
+        `[AppleMailImporter] ${mailError ?? unhandledOutput.at(-1) ?? `osascript exited with code ${exitCode}`}`,
+    )
+}
+
+const runAppleScript = (source: string): Promise<string> =>
+    new Promise((resolve, reject) => {
+        execFile('osascript', ['-e', source], (error, stdout) =>
+            error ? reject(error) : resolve(stdout.trim()),
+        )
+    })
+
+/** Errs towards "running": quitting a Mail the user opened would be worse than leaving ours open. */
+const isMailRunning = (): Promise<boolean> =>
+    runAppleScript('application "Mail" is running').then(
+        output => output !== 'false',
+        error => {
+            console.error('[AppleMailImporter] Could not tell whether Mail is running:', error)
+            return true
+        },
+    )
+
+const quitMail = (): Promise<void> =>
+    runAppleScript('if application "Mail" is running then tell application "Mail" to quit').then(
+        () => undefined,
+        error => console.error('[AppleMailImporter] Could not quit Mail:', error),
+    )
+
+export class AppleMailRepository implements EmailImporterPlugin {
+    loadEmails(
+        abortSignal: AbortSignal,
+        mailboxName: string | null,
+        receivedSince: Date | null,
+    ): Observable<EmailImportStreamPacket> {
         const result$ = new Subject<EmailImportStreamPacket>()
 
-        const mailboxName = this.settings.getSettings().emailPluginConfig?.APPLE_MAIL?.mailboxName
         if (!mailboxName) {
             result$.error(new Error('[AppleMailImporter] Mailbox name is not set in settings'))
             return result$
@@ -60,27 +98,51 @@ export class AppleMailRepository implements EmailImporterPlugin {
 
         const appleScriptPath = join(appPaths.resources, 'apple-scripts', 'export-emails.applescript')
 
-        void fs.mkdtemp(join(app.getPath('temp'), 'apple-mail-export-')).then(
-            exportPath => {
-                const childProcess = exec(
-                    `osascript "${appleScriptPath}" "${mailboxName}" "${exportPath}"`,
-                    { signal: abortSignal },
-                    error => {
-                        if (error) {
-                            // Only forward the error if it wasn't due to the abort signal
-                            if (!abortSignal.aborted) {
-                                const parsedErrorMessage = error.message.match(/Mail got an error: (.+)/)?.[1]
-                                if (parsedErrorMessage) {
-                                    console.error('[AppleMailImporter] ', parsedErrorMessage)
-                                    result$.error(new Error(`[AppleMailImporter] ${parsedErrorMessage}`))
-                                } else {
-                                    console.error('[AppleMailImporter] ', error)
-                                    result$.error(error)
-                                }
-                            }
-                        }
+        void Promise.all([fs.mkdtemp(join(app.getPath('temp'), 'apple-mail-export-')), isMailRunning()]).then(
+            ([exportPath, wasMailRunning]) => {
+                const args = [appleScriptPath, mailboxName, exportPath]
+                if (receivedSince) args.push(formatAppleScriptDate(receivedSince))
 
-                        result$.complete()
+                // spawn rather than exec: exec buffers all output and kills the export past 1 MB of it
+                const childProcess = spawn('osascript', args, { signal: abortSignal })
+
+                // An import may only be marked as covered once every exported email reached the
+                // stream, so lines are handled in order and the stream settles only after the last one.
+                // A line that fails does not stop the export, but fails it once the rest is handled.
+                let handledLines = Promise.resolve()
+                let lineFailure: Error | null = null
+                const unhandledOutput: string[] = []
+                createInterface({ input: childProcess.stderr }).on('line', line => {
+                    handledLines = handledLines
+                        .then(() => this.handleExportLine(line, result$, unhandledOutput))
+                        .catch((error: unknown) => {
+                            console.error('[AppleMailImporter] ', error)
+                            lineFailure ??= error instanceof Error ? error : new Error(String(error))
+                        })
+                })
+                childProcess.stdout.on('data', data => {
+                    console.log('[AppleMailImporter] ', String(data).replace(/\n$/, ''))
+                })
+
+                let isSettled = false
+                /** `getError` runs once every line is handled, so it sees all of the script's output. */
+                const settle = (getError: () => Error | null) => {
+                    if (isSettled) return
+                    isSettled = true
+
+                    void handledLines.then(async () => {
+                        const error = getError() ?? lineFailure
+                        // The export opens Mail if it is closed. Close it again before the stream
+                        // settles, so a following import sees Mail as the user left it.
+                        if (!wasMailRunning) await quitMail()
+
+                        // An aborted export completes rather than errors: the user asked it to stop
+                        if (error && !abortSignal.aborted) {
+                            console.error('[AppleMailImporter] ', error.message)
+                            result$.error(error)
+                        } else {
+                            result$.complete()
+                        }
 
                         fs.rm(exportPath, { recursive: true }).catch(err => {
                             console.error(
@@ -90,52 +152,20 @@ export class AppleMailRepository implements EmailImporterPlugin {
                                 err,
                             )
                         })
-                    },
-                )
+                    })
+                }
 
-                childProcess.stdout?.on('data', async data => {
-                    const str = String(data)
-                    console.log('[AppleMailImporter] ', str.replace(/\n$/, ''))
+                let spawnError: Error | null = null
+                childProcess.on('error', error => {
+                    spawnError = error
+                    // A process that never started emits no 'close' to wait for
+                    if (childProcess.pid === undefined) settle(() => error)
                 })
-                childProcess.stderr?.on('data', async data => {
-                    const str = String(data)
-
-                    const match = str.match(/Processed email (\d+)\/(\d+): (.+)/)
-                    if (match) {
-                        const [_, current, total, filePath] = match
-                        if (!filePath) {
-                            console.error('[AppleMailImporter] No file path found in output:', str)
-                            return
-                        }
-
-                        const [dataFileContents, htmlFileContents] = await Promise.all([
-                            fs.readFile(filePath, 'utf-8').catch(err => {
-                                console.error(
-                                    '[AppleMailImporter] Error reading data file',
-                                    filePath,
-                                    ':',
-                                    err,
-                                )
-                                return null
-                            }),
-                            fs.readFile(filePath.replace(/\.txt$/, '.html'), 'utf-8').catch(() => {
-                                // HTML file may not exist if the email had no HTML body
-                                return ''
-                            }),
-                        ])
-                        if (!dataFileContents) {
-                            return
-                        }
-
-                        const email = parseAppleMailFile(dataFileContents, htmlFileContents)
-                        if (email) {
-                            result$.next({ current: Number(current), total: Number(total), email })
-                        } else {
-                            console.error('[AppleMailImporter] Failed to parse email from', filePath)
-                        }
-                    } else {
-                        console.error('[AppleMailImporter] ', str.replace(/\n$/, ''))
-                    }
+                childProcess.on('close', exitCode => {
+                    settle(
+                        () =>
+                            spawnError ?? (exitCode === 0 ? null : toExportError(exitCode, unhandledOutput)),
+                    )
                 })
             },
             error => {
@@ -144,5 +174,42 @@ export class AppleMailRepository implements EmailImporterPlugin {
         )
 
         return result$
+    }
+
+    private async handleExportLine(
+        line: string,
+        result$: Subject<EmailImportStreamPacket>,
+        unhandledOutput: string[],
+    ): Promise<void> {
+        const match = line.match(/Processed email (\d+)\/(\d+): (.+)/)
+        if (!match) {
+            console.error('[AppleMailImporter] ', line)
+            unhandledOutput.push(line)
+            return
+        }
+
+        const [, current, total, filePath] = match
+        if (!filePath) {
+            console.error('[AppleMailImporter] No file path found in output:', line)
+            return
+        }
+
+        const [dataFileContents, htmlFileContents] = await Promise.all([
+            fs.readFile(filePath, 'utf-8').catch((error: unknown) => {
+                console.error('[AppleMailImporter] Error reading data file', filePath, ':', error)
+                throw new Error(`[AppleMailImporter] Could not read exported email ${filePath}`)
+            }),
+            fs.readFile(filePath.replace(/\.txt$/, '.html'), 'utf-8').catch(() => {
+                // HTML file may not exist if the email had no HTML body
+                return ''
+            }),
+        ])
+        const email = parseAppleMailFile(dataFileContents, htmlFileContents)
+        if (!email) {
+            // The script reports an email even when writing its file failed, so treat a file that
+            // does not parse as an incomplete export
+            throw new Error(`[AppleMailImporter] Could not parse exported email ${filePath}`)
+        }
+        result$.next({ current: Number(current), total: Number(total), email })
     }
 }

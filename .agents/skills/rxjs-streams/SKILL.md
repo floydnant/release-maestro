@@ -49,7 +49,8 @@ Read these before inventing a new shape.
 
 **Wrapping a non-Rx source.** `apps/maestro-electron/src/app/services/email/apple-mail.repository.ts`
 turns a spawned AppleScript process into an `Observable` via a `Subject`: `next()` per parsed message,
-`complete()` when the process exits, and the `AbortSignal` tears it down. When wrapping a source that
+`complete()` once the process has exited and every queued message is handled, and the `AbortSignal`
+tears it down. When wrapping a source that
 emits, this is the shape — a `Subject` you own and complete, not a bare `new Observable` with manual
 bookkeeping.
 
