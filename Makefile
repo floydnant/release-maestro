@@ -82,7 +82,7 @@ open-dmg: ## Open the generated DMG file (macOS)
 	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
 	open "$$dmgPath"
 install-dmg: package ## Install the packaged app (macOS) using the DMG
-	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
+	dmgPath="$$(find dist/executables -name '*-universal.dmg' -print -quit | tr -d '\n')" && \
 	hdiutil attach "$$dmgPath" && \
 	volumeName="$$(find /Volumes -d -name "Release Maestro *-universal" -print -quit | tr -d '\n')" && \
 	appPath="$$volumeName/Release Maestro.app" && \
