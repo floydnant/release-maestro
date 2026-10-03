@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core'
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    effect,
+    ElementRef,
+    inject,
+    signal,
+    viewChild,
+} from '@angular/core'
 import { LibraryFolderValidation, LibraryScanTerminalResult } from '@release-maestro/core'
 import { ElectronService } from '../../../core/services'
 import { LibraryService } from '../../../core/services/library.service'
@@ -28,6 +37,7 @@ const OUTCOME_LABELS: Record<LibraryScanTerminalResult['outcome'], string> = {
 export class LibrarySettingsComponent {
     private readonly electronService = inject(ElectronService)
     readonly library = inject(LibraryService)
+    private readonly addFoldersButton = viewChild.required<ElementRef<HTMLButtonElement>>('addFoldersButton')
 
     readonly folders = signal<string[]>([])
     private readonly savedFolders = signal<string[]>([])
@@ -156,6 +166,13 @@ export class LibrarySettingsComponent {
         void this.electronService.revealInFileManager(path)
     }
 
+    cancelScan(event: MouseEvent): void {
+        if (event.currentTarget === document.activeElement) {
+            this.addFoldersButton().nativeElement.focus({ preventScroll: true })
+        }
+        this.library.cancelScan()
+    }
+
     async saveAndRescan(): Promise<void> {
         if (this.saveInFlight() || this.library.isScanning()) return
         this.saveInFlight.set(true)
@@ -164,7 +181,7 @@ export class LibrarySettingsComponent {
                 await this.library.saveFolders(this.folders())
                 this.savedFolders.set(this.folders())
             }
-            await this.library.startScan('manual')
+            if (this.folders().length > 0) await this.library.startScan('manual')
         } finally {
             this.saveInFlight.set(false)
         }

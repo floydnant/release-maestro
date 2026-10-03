@@ -4,9 +4,11 @@ import {
     computed,
     DestroyRef,
     effect,
+    ElementRef,
     inject,
     linkedSignal,
     signal,
+    viewChild,
 } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
@@ -42,6 +44,12 @@ type ScanIndicatorView =
           scanId: number
           newSongs: number
           changedSongs: number
+          successfulReads: number
+          /**
+           * Files the library holds that read fine, now or in an earlier scan. A file that fails is
+           * read again by every scan, so an unchanged rescan can fail without anything being wrong.
+           */
+          readableFiles: number
           missingSongs: number
           failedFiles: number
       }
@@ -76,6 +84,7 @@ export class AppComponent {
     history = inject(HistoryService)
     private settingsService = inject(SettingsService)
     private router = inject(Router)
+    private readonly titleBar = viewChild.required<ElementRef<HTMLElement>>('titleBar')
 
     readonly isElectron = this.electronService.isElectron
     readonly isMacos = this.isElectron && this.electronService.platform === 'darwin'
@@ -124,6 +133,13 @@ export class AppComponent {
     }
     cancelEmailImport() {
         this.feedService.cancelEmailImport()
+    }
+
+    cancelScan(event: MouseEvent): void {
+        if (event.currentTarget === document.activeElement) {
+            this.titleBar().nativeElement.focus({ preventScroll: true })
+        }
+        this.libraryService.cancelScan()
     }
 
     minimizeWindow() {
@@ -265,6 +281,8 @@ export class AppComponent {
                         status.terminal.imported - status.terminal.new,
                     ),
                     missingSongs: status.terminal.missing,
+                    successfulReads: status.terminal.imported,
+                    readableFiles: status.terminal.discovered - status.terminal.readFailureCount,
                     failedFiles: status.terminal.discoveryFailureCount + status.terminal.readFailureCount,
                 },
                 minDwellMs: 0,

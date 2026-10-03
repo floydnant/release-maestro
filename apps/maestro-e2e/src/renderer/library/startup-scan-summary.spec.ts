@@ -9,6 +9,7 @@ const completedStatus = (
     failedFiles = 0,
     missingSongs = 0,
     resumedReads = 0,
+    terminalOverrides: Partial<LibraryScanTerminalResult> = {},
 ): LibraryScanStatus => {
     const terminal: LibraryScanTerminalResult = {
         outcome: 'completed',
@@ -32,6 +33,7 @@ const completedStatus = (
         failuresTruncated: false,
         normalizationIssues: 0,
         error: null,
+        ...terminalOverrides,
     }
     return {
         ...terminal,
@@ -45,6 +47,37 @@ const completedStatus = (
 }
 
 test.describe('startup scan summary', () => {
+    test('a startup scan can be cancelled from the title bar', async ({ page }) => {
+        const reading: LibraryScanStatus = {
+            ...completedStatus(0, 1),
+            revision: 1,
+            phase: 'reading',
+            finishedAt: null,
+            readDone: 0,
+            terminal: null,
+        }
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: reading, albums: [], lastScan: null },
+            })
+            .build()
+        const controller = await createRendererScenario(page, scenario, '/home')
+
+        const cancel = page.getByRole('button', { name: 'Cancel scan' })
+        await expect(cancel).toBeVisible()
+        await cancel.focus()
+        await cancel.press('Enter')
+        await expect.poll(async () => (await controller.calls('library:cancel-scan')).length).toBe(1)
+
+        await controller.emit('library:scan-status', {
+            status: { ...reading, revision: 2, phase: 'cancelled' },
+            newAlbums: [],
+        })
+        await expect(cancel).toBeHidden()
+        await expect(page.locator('header.title-bar')).toBeFocused()
+    })
+
     test('hides the completed summary after four seconds', async ({ page }) => {
         const scenario = scenarioBuilder()
             .handler('library:get-scan-status', {
@@ -157,17 +190,64 @@ test.describe('startup scan summary', () => {
         expect(completedLayout).toEqual(runningLayout)
     })
 
-    test('does not claim failed reads were added', async ({ page }) => {
-        const scenario = scenarioBuilder()
-            .handler('library:get-scan-status', {
-                kind: 'resolve',
-                value: { status: completedStatus(2, 0, 'startup', 1), albums: [], lastScan: null },
-            })
-            .build()
-        await createRendererScenario(page, scenario, '/home')
+    for (const { label, status, summary, icon, color } of [
+        {
+            label: 'successful new reads alongside a failed read',
+            status: completedStatus(2, 0, 'startup', 1),
+            summary: 'Read 1 track · 1 track failed',
+            icon: 'success',
+            color: 'content.success',
+        },
+        {
+            label: 'successful updates alongside failed reads',
+            status: completedStatus(0, 12, 'startup', 2),
+            summary: 'Read 10 tracks · 2 tracks failed',
+            icon: 'success',
+            color: 'content.success',
+        },
+        {
+            label: 'successful resumed reads alongside failures and missing tracks',
+            status: completedStatus(0, 0, 'startup', 1, 3, 2),
+            summary: 'Read 1 track · 1 track failed · 3 tracks missing',
+            icon: 'success',
+            color: 'content.success',
+        },
+        {
+            label: 'an unchanged rescan where the same files fail again',
+            status: completedStatus(0, 0, 'startup', 34, 0, 0, {
+                discovered: 6408,
+                unchanged: 6408,
+                readTotal: 34,
+                readsAttempted: 34,
+                imported: 0,
+            }),
+            summary: 'Nothing new · 34 tracks failed',
+            icon: 'success',
+            color: 'content.secondary',
+        },
+        {
+            label: 'all reads failed',
+            status: completedStatus(2, 0, 'startup', 2),
+            summary: 'Scan finished · 2 tracks failed',
+            icon: 'error',
+            color: 'content.danger',
+        },
+    ]) {
+        test(label, async ({ page }) => {
+            const scenario = scenarioBuilder()
+                .handler('library:get-scan-status', {
+                    kind: 'resolve',
+                    value: { status, albums: [], lastScan: null },
+                })
+                .build()
+            await createRendererScenario(page, scenario, '/home')
 
-        await expect(page.getByRole('status')).toHaveText('Scan finished · 1 track failed')
-    })
+            const result = page.getByRole('status')
+            await expect(result).toHaveText(summary)
+            await expect(result.locator('app-icon')).toHaveAttribute('name', icon)
+            await expect(result.locator('app-icon')).toHaveAttribute('color', color)
+        })
+    }
 
     test('reports missing tracks instead of saying nothing changed', async ({ page }) => {
         const scenario = scenarioBuilder()

@@ -57,6 +57,59 @@ const scanStatus = (terminal: LibraryScanTerminalResult): LibraryScanStatus => (
 })
 
 test.describe('library settings scenarios', () => {
+    test('a running scan can be cancelled from settings', async ({ page }) => {
+        const reading: LibraryScanStatus = {
+            ...scanStatus(terminalResult()),
+            revision: 1,
+            trigger: 'manual',
+            phase: 'reading',
+            finishedAt: null,
+            readDone: 1,
+            terminal: null,
+        }
+        const scenario = scenarioBuilder()
+            .settings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: reading, albums: [], lastScan: null },
+            })
+            .build()
+        const controller = await createRendererScenario(page, scenario, '/settings/library')
+
+        await expect(page.getByText('Reading tracks… 1/2')).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Rescan now' })).toBeDisabled()
+        const cancel = page.getByRole('button', { name: 'Cancel scan' }).last()
+        await cancel.focus()
+        await cancel.press('Enter')
+        await expect.poll(async () => (await controller.calls('library:cancel-scan')).length).toBe(1)
+
+        const cancelled = terminalResult({ outcome: 'cancelled', trigger: 'manual' })
+        await controller.emit('library:scan-status', {
+            status: { ...scanStatus(cancelled), revision: 2 },
+            newAlbums: [],
+        })
+        await expect(page.getByLabel('Latest scan result')).toContainText('Cancelled')
+        await expect(page.getByRole('button', { name: 'Add folders…' })).toBeFocused()
+        await expect(page.getByRole('button', { name: 'Rescan now' })).toBeEnabled()
+
+        await page.getByRole('button', { name: 'Remove folder' }).click()
+        await expect(page.getByText('Saving without folders stops scans.')).toBeVisible()
+        await page.getByRole('button', { name: 'Save changes' }).click()
+        await expect
+            .poll(async () => (await controller.calls('patch-settings')).at(-1)?.payload)
+            .toEqual({
+                library: { folders: [], onboardingSkipped: true },
+            })
+        expect(await controller.calls('library:start-scan')).toHaveLength(0)
+
+        await controller.setHandler('get-settings', {
+            kind: 'resolve',
+            value: { library: { folders: [], onboardingSkipped: true }, emailPluginConfig: {} },
+        })
+        await page.getByRole('link', { name: 'Home' }).click()
+        await expect(page).toHaveURL(/\/home$/)
+    })
+
     // Rescanning with a drive unplugged is how its tracks get marked missing, so an
     // unreachable folder is reported but must never disable the rescan (ADR 0003).
     test('an unavailable folder is reported without blocking a rescan', async ({ page }) => {

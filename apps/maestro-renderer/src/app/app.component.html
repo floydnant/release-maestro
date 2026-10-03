@@ -160,7 +160,9 @@
 
     <div class="app-shell__content | flex min-w-0 flex-1 flex-col">
         <header
-            class="title-bar | flex h-[2.25rem] flex-none items-stretch text-content-secondary select-none [-webkit-app-region:drag]"
+            #titleBar
+            class="title-bar | flex h-[2.25rem] flex-none items-stretch text-content-secondary select-none [-webkit-app-region:drag] focus-visible:outline-2 focus-visible:outline-border-focus"
+            tabindex="-1"
             [class]="
                 isImportRoute()
                     ? 'title-bar--overlay | absolute inset-x-0 top-0 z-50 [border-bottom-style:none] border-b-current bg-transparent'
@@ -204,6 +206,17 @@
                                 }
                             }
                         </p>
+                        @if (libraryService.isScanning()) {
+                            <button
+                                class="scan-cancel | btn-nkd-neutral size-6 self-center p-0 [-webkit-app-region:no-drag]"
+                                type="button"
+                                aria-label="Cancel scan"
+                                title="Cancel scan"
+                                (click)="cancelScan($event)"
+                            >
+                                <app-icon name="close" size="14" aria-hidden="true"></app-icon>
+                            </button>
+                        }
                     }
                 }
                 <p class="scan-summary | type-body-sm" role="status" aria-live="polite">
@@ -213,26 +226,61 @@
                             <span
                                 class="flex items-center gap-1 px-2"
                                 [class.text-content-success]="
-                                    scan.failedFiles === 0 &&
-                                    scan.missingSongs === 0 &&
-                                    (scan.newSongs > 0 || scan.changedSongs > 0)
+                                    (scan.failedFiles > 0 && scan.successfulReads > 0) ||
+                                    (scan.failedFiles === 0 &&
+                                        scan.missingSongs === 0 &&
+                                        (scan.newSongs > 0 || scan.changedSongs > 0))
                                 "
                                 [class.text-content-secondary]="
-                                    scan.failedFiles === 0 &&
-                                    (scan.missingSongs > 0 ||
-                                        (scan.newSongs === 0 && scan.changedSongs === 0))
+                                    (scan.failedFiles === 0 &&
+                                        (scan.missingSongs > 0 ||
+                                            (scan.newSongs === 0 && scan.changedSongs === 0))) ||
+                                    (scan.failedFiles > 0 &&
+                                        scan.successfulReads === 0 &&
+                                        scan.readableFiles > 0)
                                 "
-                                [class.text-content-danger]="scan.failedFiles > 0"
+                                [class.text-content-danger]="
+                                    scan.failedFiles > 0 &&
+                                    scan.successfulReads === 0 &&
+                                    scan.readableFiles === 0
+                                "
                             >
                                 @if (scan.failedFiles > 0) {
-                                    <app-icon
-                                        class="size-[25px] shrink-0"
-                                        name="error"
-                                        color="content.danger"
-                                        size="18"
-                                    ></app-icon>
-                                    Scan finished · {{ scan.failedFiles }}
-                                    {{ scan.failedFiles === 1 ? 'track' : 'tracks' }} failed
+                                    @if (scan.successfulReads > 0) {
+                                        <app-icon
+                                            class="size-[25px] shrink-0"
+                                            name="success"
+                                            color="content.success"
+                                            size="18"
+                                        ></app-icon>
+                                        Read {{ scan.successfulReads }}
+                                        {{ scan.successfulReads === 1 ? 'track' : 'tracks' }}
+                                    } @else if (scan.readableFiles > 0) {
+                                        <!-- The same files failed again; the rest of the library is fine -->
+                                        <app-icon
+                                            class="size-[25px] shrink-0"
+                                            name="success"
+                                            color="content.secondary"
+                                            size="18"
+                                        ></app-icon>
+                                        Nothing new
+                                    } @else {
+                                        <app-icon
+                                            class="size-[25px] shrink-0"
+                                            name="error"
+                                            color="content.danger"
+                                            size="18"
+                                        ></app-icon>
+                                        Scan finished
+                                    }
+                                    <span [class.text-content-secondary]="scan.successfulReads > 0">
+                                        · {{ scan.failedFiles }}
+                                        {{ scan.failedFiles === 1 ? 'track' : 'tracks' }} failed
+                                        @if (scan.missingSongs > 0) {
+                                            · {{ scan.missingSongs }}
+                                            {{ scan.missingSongs === 1 ? 'track' : 'tracks' }} missing
+                                        }
+                                    </span>
                                 } @else if (
                                     scan.newSongs === 0 && scan.changedSongs === 0 && scan.missingSongs === 0
                                 ) {

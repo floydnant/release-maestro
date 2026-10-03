@@ -1,8 +1,12 @@
 <div class="max-w-2xl">
     <h2 class="type-section-title text-content-primary">Library folders</h2>
     <p class="type-body-sm mt-1 text-content-muted">
-        The folders that make up your music collection. Saving changes runs a rescan; files under removed
-        folders stay in the database but are marked as no longer present.
+        @if (folders().length === 0) {
+            Saving without folders stops scans. Existing tracks stay in the library until the next scan.
+        } @else {
+            The folders that make up your music collection. Saving changes runs a rescan; files under removed
+            folders stay in the database but are marked as no longer present.
+        }
     </p>
 
     <app-folder-list
@@ -16,28 +20,35 @@
     ></app-folder-list>
 
     <div class="mt-4 flex items-center gap-3">
-        <button class="btn-neutral" type="button" (click)="addFolders()">Add folders…</button>
+        <button #addFoldersButton class="btn-neutral" type="button" (click)="addFolders()">
+            Add folders…
+        </button>
         <button
             class="btn-primary"
             type="button"
-            [disabled]="saveInFlight() || library.isScanning() || folders().length === 0"
+            [disabled]="saveInFlight() || library.isScanning() || (!isDirty() && folders().length === 0)"
             (click)="saveAndRescan()"
         >
-            {{ isDirty() ? 'Save and rescan' : 'Rescan now' }}
+            {{ folders().length === 0 ? 'Save changes' : isDirty() ? 'Save and rescan' : 'Rescan now' }}
         </button>
     </div>
 
     <h2 class="type-section-title mt-8 text-content-primary">Scan status</h2>
     @if (library.isScanning()) {
         @if (library.scanStatus(); as scanStatus) {
-            <p class="type-body-sm mt-2 flex items-center gap-2 text-content-secondary">
-                <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
-                @if (scanStatus.phase === 'discovering') {
-                    Discovering files… {{ scanStatus.discovered }} found
-                } @else {
-                    Reading tracks… {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
-                }
-            </p>
+            <div class="scan-status-actions | mt-2 flex flex-wrap items-center gap-3">
+                <p class="type-body-sm flex items-center gap-2 text-content-secondary">
+                    <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
+                    @if (scanStatus.phase === 'discovering') {
+                        Discovering files… {{ scanStatus.discovered }} found
+                    } @else {
+                        Reading tracks… {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
+                    }
+                </p>
+                <button class="btn-nkd-neutral" type="button" (click)="cancelScan($event)">
+                    Cancel scan
+                </button>
+            </div>
         }
     } @else if (terminalSummaryText(); as summaryText) {
         <p class="type-body-sm mt-2 text-content-secondary" aria-label="Latest scan result">
