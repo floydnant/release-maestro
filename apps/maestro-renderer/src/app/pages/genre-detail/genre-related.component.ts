@@ -1,3 +1,4 @@
+import { HlmAlert, HlmAlertDescription } from '@spartan-ng/helm/alert'
 import { HlmButton } from '@spartan-ng/helm/button'
 import {
     ChangeDetectionStrategy,
@@ -22,7 +23,7 @@ import { CatalogListComponent } from '../../shared/components/catalog-list/catal
     selector: 'app-genre-related',
     templateUrl: './genre-related.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [HlmButton, CatalogListComponent],
+    imports: [HlmAlert, HlmAlertDescription, HlmButton, CatalogListComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class GenreRelatedComponent {
