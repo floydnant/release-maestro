@@ -22,5 +22,13 @@ in THIRD_PARTY_NOTICES.txt:
 - apps/maestro-renderer/src/assets/i18n/en.json
 - apps/maestro-renderer/src/index.html
 
+The proprietary restrictions above also do not apply to Spartan-derived Helm
+source in apps/maestro-renderer/src/app/shared/ui, identified by that directory's
+upstream.json. That source retains its upstream MIT license in
+apps/maestro-renderer/src/app/shared/ui/LICENSE, reproduced in
+THIRD_PARTY_NOTICES.txt. This exclusion applies to the Spartan-derived source,
+including its adaptations, and does not change the terms for original
+project-specific code.
+
 All other original source files and project-specific assets in this repository
 remain proprietary and all rights are reserved by Floyd Haremsa.

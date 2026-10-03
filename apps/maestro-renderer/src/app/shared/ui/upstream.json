@@ -1,0 +1,37 @@
+{
+    "repository": "https://github.com/spartan-ng/spartan",
+    "tag": "v1.5.0",
+    "source": "libs/helm/<family>/src",
+    "families": [
+        "button",
+        "input",
+        "textarea",
+        "label",
+        "field",
+        "native-select",
+        "badge",
+        "card",
+        "table",
+        "progress",
+        "spinner",
+        "tooltip",
+        "separator",
+        "alert",
+        "collapsible",
+        "dialog",
+        "dropdown-menu",
+        "context-menu",
+        "select",
+        "utils"
+    ],
+    "adaptations": [
+        "Release Maestro semantic tokens, typography and motion",
+        "Semantic app-icon glyphs instead of Lucide",
+        "Token-aware Tailwind merging",
+        "Progress indicator respects max",
+        "Button preserves native static tabindex and accepts dynamic tabindex input",
+        "TemplateRef dialog service rendering with implicit context",
+        "Field description inputs forwarded to native controls",
+        "Select highlight follows Brain data-highlighted state"
+    ]
+}

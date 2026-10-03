@@ -32,7 +32,8 @@
         "lib": ["es2022", "dom"],
         "useDefineForClassFields": false,
         "paths": {
-            "@release-maestro/core": ["libs/maestro-core/src/index.ts"]
+            "@release-maestro/core": ["libs/maestro-core/src/index.ts"],
+            "@spartan-ng/helm/*": ["apps/maestro-renderer/src/app/shared/ui/*/index.ts"]
         },
         "baseUrl": ".",
         "ignoreDeprecations": "6.0",

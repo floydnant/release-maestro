@@ -1,3 +1,4 @@
+/** Rule options derive from the shared authority, including opt-in class-bearing template inputs. */
 type ClassCheckerOptions = import('./lib/class-checker.cjs').ClassCheckerOptions
 
 /**

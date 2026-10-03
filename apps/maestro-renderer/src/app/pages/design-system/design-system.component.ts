@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component } from '@angular/core'
+import { SpartanSpecimenComponent } from './spartan-specimen.component'
 import {
     contrastPairs,
     foundationColorIdentifiers,
@@ -17,7 +18,7 @@ import {
 
 @Component({
     selector: 'app-design-system',
-    imports: [CommonModule],
+    imports: [CommonModule, SpartanSpecimenComponent],
     templateUrl: './design-system.component.html',
     styleUrls: ['./design-system.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,

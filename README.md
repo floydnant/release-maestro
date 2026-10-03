@@ -11,7 +11,7 @@ A desktop app for your music. Scan your local collection into a searchable libra
 
 | Layer      | Technology                           |
 | ---------- | ------------------------------------ |
-| Frontend   | Angular, Tailwind CSS, ng-primitives |
+| Frontend   | Angular, Tailwind CSS, Spartan UI    |
 | Backend    | Electron, Node.js                    |
 | Audio tags | Rust (metadata-engine sidecar)       |
 | Database   | SQLite (better-sqlite3), Drizzle ORM |
@@ -100,6 +100,23 @@ There is no repo-wide typecheck target; `build` is the type gate for app code. S
 - [docs/adr/](docs/adr/) — architectural decisions and the reasoning behind non-obvious ones
 - [docs/testing.md](docs/testing.md) — test layers, E2E conventions, fixtures
 
+## Renderer UI
+
+Standard controls use Spartan UI. Its Brain runtime is an npm dependency; editable Helm components
+live in [shared/ui](apps/maestro-renderer/src/app/shared/ui/). Their defaults use Release Maestro's
+generated semantic tokens, system typography and desktop interaction states. Customize those shared
+defaults once so buttons, fields, cards and overlays stay consistent across screens.
+
+Product components still own music data, scan state, windowed grids and navigation. The UI library
+does not change [browse windowing and selection](docs/adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md)
+or [route history](docs/adr/0006-only-route-changes-are-history-steps.md). The design-system specimen
+shows the shared components and their interaction states.
+
+For new controls and component updates, follow
+[frontend-design](.agents/skills/frontend-design/SKILL.md). The
+[library evaluation](docs/research/angular-ui-libraries.md) records the selection and compatibility
+checks.
+
 ## Projects
 
 Five Nx projects, whose names are not self-explanatory:
@@ -164,3 +181,6 @@ Copyright (c) 2026 Floyd Haremsa. All rights reserved for the original,
 project-specific code in this repository. A small set of scaffold-derived files
 is excluded pending rewrite and/or third-party notice cleanup. See
 [LICENSE.md](LICENSE.md).
+
+Copied Spartan Helm components retain their upstream
+[MIT license](apps/maestro-renderer/src/app/shared/ui/LICENSE).
