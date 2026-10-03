@@ -23,15 +23,16 @@ import { IconComponent } from '../icon/icon.component'
     hostDirectives: [HlmTh],
     host: {
         role: 'columnheader',
-        class: 'block px-0 border-b border-border-subtle',
+        class: 'block h-auto px-0 border-b border-border-subtle',
         '[attr.aria-sort]': 'ariaSort()',
     },
     template: `
         <button
             hlmBtn
-            variant="ghost"
+            variant="plain"
+            size="none"
             type="button"
-            class="flex size-full items-center justify-start gap-1 rounded-none p-2 type-label-sm text-content-muted"
+            class="flex w-full items-center justify-start gap-1 rounded-none p-2 type-label-sm text-content-muted"
             [class.justify-end]="numeric()"
             [class.text-content-primary]="isActive()"
             [attr.aria-label]="'Sort by ' + (sortLabel() ?? label())"

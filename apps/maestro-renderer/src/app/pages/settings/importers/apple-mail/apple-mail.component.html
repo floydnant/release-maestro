@@ -1,13 +1,16 @@
 <div class="settings-item |">
     <p class="type-label-sm text-content-muted uppercase">Apple Mail</p>
     <h1 class="mt-1 type-section-title text-content-primary">Mailbox import</h1>
-    <div hlmField class="mailbox-field | mt-6 max-w-xs">
-        <label hlmLabel for="setting-mailboxName-input">Mailbox Name</label>
-        <p hlmFieldDescription id="setting-mailboxName-description">
+    <div hlmField class="mailbox-field | mt-6 max-w-xs gap-0">
+        <label hlmLabel class="type-label-md text-content-primary" for="setting-mailboxName-input"
+            >Mailbox Name</label
+        >
+        <p hlmFieldDescription class="description | mt-1" id="setting-mailboxName-description">
             The name of the mailbox to import from Apple Mail.
         </p>
         <input
             hlmInput
+            class="mt-3"
             id="setting-mailboxName-input"
             aria-describedby="setting-mailboxName-description"
             [(ngModel)]="mailboxName"
