@@ -92,6 +92,60 @@ describe('moved songs', () => {
         expect(rows()).toEqual([expect.objectContaining({ id: original.id, present: true })])
     })
 
+    it('keeps discovery chronology separate from Added after an interrupted initial import', () => {
+        const oldSong = metadata('/music/original.mp3')
+        repository.processPrescanBatch([fact(oldSong)], first, true)
+        repository.ingestMetadata(oldSong, fact(oldSong), first)
+        const original = rows()[0]
+        if (!original) throw new Error('Expected an imported song')
+        const moved = metadata('/music/renamed.mp3')
+        repository.processPrescanBatch([fact(moved)], next, true)
+        repository.ingestMetadata(moved, fact(moved), next)
+        finish(next)
+        expect(rows()).toEqual([
+            expect.objectContaining({
+                id: original.id,
+                addedAt: new Date(500),
+                path: moved.path,
+            }),
+        ])
+    })
+
+    it('retains a copy observed while its original was excluded, even after the original is deleted', () => {
+        discover([metadata('/excluded/original.mp3')], first)
+        const original = rows()[0]
+        if (!original) throw new Error('Expected an imported song')
+        discover([metadata('/included/copy.mp3')], next)
+        repository.recordSongAvailable(original.id, next)
+        finish(next)
+        const copies = rows()
+        discover([metadata('/included/copy.mp3')], new Date(30_000))
+        finish(new Date(30_000))
+        expect(
+            rows()
+                .map(song => song.id)
+                .sort(),
+        ).toEqual(copies.map(song => song.id).sort())
+        expect(rows()).toHaveLength(2)
+    })
+
+    it('matches pre-upgrade folder moves when external artwork changes location', () => {
+        discover([metadata('/old/original.mp3', { coverPath: '/old/cover.jpg' })], first)
+        const original = rows()[0]
+        if (!original) throw new Error('Expected an imported song')
+        database.db.update(songsTable).set({ contentHash: null }).run()
+        repository.markNotSeenPresent(new Date(15_000))
+        discover([metadata('/new/original.mp3', { coverPath: '/new/cover.jpg' })], next)
+        finish(next)
+        expect(rows()).toEqual([
+            expect.objectContaining({
+                id: original.id,
+                path: '/new/original.mp3',
+                coverPath: '/new/cover.jpg',
+            }),
+        ])
+    })
+
     it('does not merge different bytes that have identical metadata', () => {
         discover([metadata('/music/original.mp3')], first)
         discover([metadata('/external/other.mp3', { contentHash: 'b'.repeat(64) })], next)
