@@ -346,12 +346,14 @@ test.describe('renderer scenario IPC harness', () => {
             current: 1,
             total: 2,
             message: 'First event',
+            trigger: 'manual',
         })
         await controller.emit('email-import-progress', {
             phase: 'processing',
             current: 2,
             total: 2,
             message: 'Second event',
+            trigger: 'manual',
         })
 
         await expect

@@ -8,11 +8,11 @@ import { diContainer } from '../di'
 // import { DatabaseClient } from '../database/database.client' // TODO: Use when needed
 import {
     asAppIpcMain,
+    emailImportTriggerSchema,
     FeedLoadError,
     LibraryBrowseIpcChannel,
     LibraryIpcChannel,
     MetadataIpcChannel,
-    toRendererEmitter,
 } from '@release-maestro/core'
 import App from '../app'
 import { LibraryBrowseRepository } from '../services/library/library-browse.repository'
@@ -55,32 +55,19 @@ ipc.handle('patch-settings', async (_event, patch) => {
     return settingsService.patchSettings(patch)
 })
 
-// Handle email import functionality
-ipc.handle('trigger-email-import', async event => {
-    const abortController = new AbortController()
-    const abortHandler = () => abortController.abort()
-    ipc.once('email-import-abort', abortHandler)
+// Email imports (lifecycle owned by EmailImportService; progress is streamed to all windows on
+// `email-import-progress`)
+ipc.handle('trigger-email-import', async (_event, request) => {
+    const trigger = emailImportTriggerSchema.parse(request?.trigger)
+    const { EmailImportService } = await import('../services/feed/email-import.service')
+    const importService = await diContainer.get(EmailImportService)
+    await importService.start(trigger)
+})
 
-    const { FeedBackendService } = await import('../services/feed/feed.backend.service')
-    const feedService = await diContainer.get(FeedBackendService)
-    const result$ = await feedService.triggerEmailImport(abortController.signal)
-    const emitter = toRendererEmitter(event.sender)
-
-    return new Promise<void>((resolve, reject) => {
-        result$.subscribe({
-            next: progressEvent => {
-                emitter.send('email-import-progress', progressEvent)
-            },
-            error: err => {
-                reject(err)
-                ipc.removeListener('email-import-abort', abortHandler)
-            },
-            complete: () => {
-                resolve()
-                ipc.removeListener('email-import-abort', abortHandler)
-            },
-        })
-    })
+ipc.on('email-import-abort', async () => {
+    const { EmailImportService } = await import('../services/feed/email-import.service')
+    const importService = await diContainer.get(EmailImportService)
+    importService.cancel()
 })
 
 // Handle feed loading

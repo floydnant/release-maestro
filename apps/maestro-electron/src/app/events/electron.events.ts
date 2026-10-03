@@ -6,6 +6,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { asAppIpcMain } from '@release-maestro/core'
 import { environment } from '../../environments/environment'
+import { cleanupApplication } from '../app-shutdown'
 
 const ipc = asAppIpcMain(ipcMain)
 
@@ -23,8 +24,8 @@ ipc.handle('get-app-version', () => {
 })
 
 // Handle App termination
-ipc.on('quit', (event, code) => {
-    app.exit(code)
+ipc.on('quit', (_event, code) => {
+    void cleanupApplication().then(() => app.exit(code))
 })
 
 ipc.handle('window-minimize', event => {

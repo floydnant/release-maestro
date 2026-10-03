@@ -75,7 +75,7 @@ test.describe('startup scan summary', () => {
             newAlbums: [],
         })
         await expect(cancel).toBeHidden()
-        await expect(page.locator('header.title-bar')).toBeFocused()
+        await expect(page.getByRole('banner')).toBeFocused()
     })
 
     test('hides the completed summary after four seconds', async ({ page }) => {
@@ -87,7 +87,7 @@ test.describe('startup scan summary', () => {
             .build()
         await createRendererScenario(page, scenario, '/home')
 
-        const summary = page.getByRole('status')
+        const summary = page.getByRole('status', { name: 'Library scan' })
         await expect(summary).toHaveText('Nothing new')
         await page.waitForTimeout(3000)
         await expect(summary).toHaveText('Nothing new')
@@ -108,7 +108,7 @@ test.describe('startup scan summary', () => {
                 .build()
             await createRendererScenario(page, scenario, '/home')
 
-            await expect(page.getByRole('status')).toHaveText(summary)
+            await expect(page.getByRole('status', { name: 'Library scan' })).toHaveText(summary)
         })
     }
 
@@ -121,7 +121,7 @@ test.describe('startup scan summary', () => {
             .build()
         await createRendererScenario(page, scenario, '/home')
 
-        const icon = page.getByRole('status').locator('app-icon')
+        const icon = page.getByRole('status', { name: 'Library scan' }).locator('app-icon')
         await expect(icon).toHaveAttribute('name', 'success')
         await expect(icon).toHaveAttribute('color', 'content.secondary')
     })
@@ -135,7 +135,7 @@ test.describe('startup scan summary', () => {
             .build()
         await createRendererScenario(page, scenario, '/home')
 
-        await expect(page.getByRole('status')).toHaveText('Updated 1 track')
+        await expect(page.getByRole('status', { name: 'Library scan' })).toHaveText('Updated 1 track')
     })
 
     test('keeps the completed icon aligned with the running indicator', async ({ page }) => {
@@ -172,7 +172,7 @@ test.describe('startup scan summary', () => {
         })
 
         await controller.emit('library:scan-status', { status: completed, newAlbums: [] })
-        const summary = page.getByRole('status')
+        const summary = page.getByRole('status', { name: 'Library scan' })
         await expect(summary).toHaveText('Nothing new')
         const completedLayout = await summary.locator('span').evaluate(element => {
             const icon = element.querySelector('app-icon')
@@ -242,7 +242,7 @@ test.describe('startup scan summary', () => {
                 .build()
             await createRendererScenario(page, scenario, '/home')
 
-            const result = page.getByRole('status')
+            const result = page.getByRole('status', { name: 'Library scan' })
             await expect(result).toHaveText(summary)
             await expect(result.locator('app-icon')).toHaveAttribute('name', icon)
             await expect(result.locator('app-icon')).toHaveAttribute('color', color)
@@ -258,8 +258,11 @@ test.describe('startup scan summary', () => {
             .build()
         await createRendererScenario(page, scenario, '/home')
 
-        await expect(page.getByRole('status')).toHaveText('5 tracks missing')
-        await expect(page.getByRole('status').locator('app-icon')).toHaveAttribute('name', 'missingSong')
+        await expect(page.getByRole('status', { name: 'Library scan' })).toHaveText('5 tracks missing')
+        await expect(page.getByRole('status', { name: 'Library scan' }).locator('app-icon')).toHaveAttribute(
+            'name',
+            'missingSong',
+        )
     })
 
     test('shows additions alongside missing tracks', async ({ page }) => {
@@ -271,7 +274,9 @@ test.describe('startup scan summary', () => {
             .build()
         await createRendererScenario(page, scenario, '/home')
 
-        await expect(page.getByRole('status')).toHaveText('Added 2 tracks · 3 tracks missing')
+        await expect(page.getByRole('status', { name: 'Library scan' })).toHaveText(
+            'Added 2 tracks · 3 tracks missing',
+        )
     })
 
     test('announces the result after paced progress, not each progress update', async ({ page }) => {
@@ -293,9 +298,9 @@ test.describe('startup scan summary', () => {
         const controller = await createRendererScenario(page, scenario, '/home')
 
         await expect(page.locator('.scan-indicator')).toContainText('Reading')
-        await expect(page.getByRole('status')).toBeEmpty()
+        await expect(page.getByRole('status', { name: 'Library scan' })).toBeEmpty()
         await controller.emit('library:scan-status', { status: completed, newAlbums: [] })
-        await expect(page.getByRole('status')).toHaveText('Added 1 track')
+        await expect(page.getByRole('status', { name: 'Library scan' })).toHaveText('Added 1 track')
     })
 
     test('manual scan completion does not show a startup summary', async ({ page }) => {

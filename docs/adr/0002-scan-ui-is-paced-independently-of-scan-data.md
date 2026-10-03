@@ -11,6 +11,8 @@ stutters and then bursts at completion. Both surfaces therefore deliberately lag
   time, because the user asked for them and is watching.
 - The startup scan's completed summary stays visible for 4 seconds after the pacer displays it,
   then disappears even though the last scan status remains completed.
+- An _auto import_ of email (see the release feed glossary) reports in the title bar the same way:
+  `EmailImportIndicatorComponent` holds each phase for 1s and shows the summary for 4 seconds.
 - `ImportMosaicComponent` places covers at a constant cadence (`TICK_MS`) from a bounded sample
   (`MAX_PENDING`) of a moving recent-results window. The wall therefore builds at the same speed no
   matter how far ahead the scan is, while the covers roughly follow the scan's current cursor and

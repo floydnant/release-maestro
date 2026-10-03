@@ -1,4 +1,5 @@
 import { lastValueFrom, Subject, toArray } from 'rxjs'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { Email, EmailImportStreamPacket } from '@release-maestro/core'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
@@ -24,26 +25,44 @@ const packet = (dateReceived: string, current = 1, total = 1): EmailImportStream
     } satisfies Email,
 })
 
+const releasePacket = (dateReceived: string, releaseUrl: string): EmailImportStreamPacket => ({
+    current: 1,
+    total: 1,
+    email: {
+        messageId: `<${releaseUrl}@example.com>`,
+        subject: 'New release from Test Artist',
+        dateReceived,
+        sender: 'Bandcamp <noreply@bandcamp.com>',
+        plainBody: '',
+        htmlBody: `<a href="${releaseUrl}">check it out here</a>`,
+        isRead: false,
+        vendor: 'APPLE_MAIL',
+    },
+})
+
 describe('FeedBackendService email import', () => {
     let feedRepository: FeedBackendRepository
     let emails$: Subject<EmailImportStreamPacket>
-    let loadEmails: jest.Mock
+    let loadEmails: jest.MockedFunction<EmailBackendRepository['loadEmails']>
     let mailboxName: string | null
     let service: FeedBackendService
 
     beforeEach(() => {
         feedRepository = new FeedBackendRepository(createMigratedTestDatabase().client)
         emails$ = new Subject()
-        loadEmails = jest.fn(async () => emails$)
+        loadEmails = jest.fn<
+            ReturnType<EmailBackendRepository['loadEmails']>,
+            Parameters<EmailBackendRepository['loadEmails']>
+        >(async () => emails$)
         mailboxName = 'Bandcamp'
-        const emailRepository = {
+        const emailRepository = fromPartial<EmailBackendRepository>({
             loadEmails,
             getMailboxName: () => mailboxName,
-        } as unknown as EmailBackendRepository
+        })
         service = new FeedBackendService(
             emailRepository,
-            {} as BandcampApiBackendService,
-            {} as WebScrapingService,
+            fromPartial<BandcampApiBackendService>({}),
+            fromPartial<WebScrapingService>({}),
             feedRepository,
         )
     })
@@ -113,15 +132,17 @@ describe('FeedBackendService email import', () => {
         expect(checkpoint?.getTime()).toBeLessThanOrEqual(Date.now())
     })
 
-    it('does not checkpoint a cancelled import', async () => {
+    it('reports and does not checkpoint a cancelled import', async () => {
         const { updates, abortController } = await runImport()
 
         emails$.next(packet('2026-10-01T21:40:12'))
         abortController.abort()
         // The exporter completes, rather than errors, when it is aborted
         emails$.complete()
-        await updates
 
+        const reported = await updates
+        expect(reported.at(-1)).toEqual({ phase: 'cancelled' })
+        expect(reported).not.toContainEqual(expect.objectContaining({ phase: 'completed' }))
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
     })
 
@@ -132,6 +153,72 @@ describe('FeedBackendService email import', () => {
         emails$.error(new Error('Mail got an error'))
 
         await expect(updates).resolves.toContainEqual(expect.objectContaining({ phase: 'error' }))
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
+    })
+
+    it('completes with saved successes while retaining the checkpoint after skipped emails', async () => {
+        const checkpoint = new Date('2026-09-28T21:40:12')
+        await feedRepository.advanceEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp', checkpoint)
+        const { updates } = await runImport()
+
+        emails$.next({ current: 1, total: 2, email: null })
+        emails$.next(releasePacket('2026-10-01T21:40:12', 'https://test.bandcamp.com/album/first'))
+        emails$.complete()
+
+        const reported = await updates
+        expect(reported.at(-1)).toEqual({
+            phase: 'completed',
+            totalProcessed: 2,
+            totalImported: 1,
+            newlyImported: 1,
+            skippedEmails: 1,
+        })
+        expect(reported).not.toContainEqual(expect.objectContaining({ phase: 'error' }))
+        expect(await feedRepository.listFeedItems(0, 10)).toHaveLength(1)
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toEqual(
+            checkpoint,
+        )
+    })
+
+    it('retries the uncovered range next time and deduplicates the successes already saved', async () => {
+        const first = releasePacket('2026-10-01T21:40:12', 'https://test.bandcamp.com/album/first')
+        const recovered = releasePacket('2026-09-29T08:00:00', 'https://test.bandcamp.com/album/recovered')
+        const { updates } = await runImport()
+        emails$.next(first)
+        emails$.next({ current: 2, total: 2, email: null })
+        emails$.complete()
+        await updates
+
+        emails$ = new Subject()
+        const next = await runImport()
+        emails$.next(first)
+        emails$.next(recovered)
+        emails$.complete()
+
+        expect(loadEmails.mock.calls[1]?.[3]).toBeNull()
+        await expect(next.updates).resolves.toContainEqual(
+            expect.objectContaining({ phase: 'completed', totalProcessed: 2, totalImported: 2 }),
+        )
+        expect(await feedRepository.listFeedItems(0, 10)).toHaveLength(2)
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toEqual(
+            new Date('2026-10-01T21:40:12'),
+        )
+    })
+
+    it('completes normally and leaves all skipped emails for the next import', async () => {
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 2, email: null })
+        emails$.next({ current: 2, total: 2, email: null })
+        emails$.complete()
+
+        await expect(updates).resolves.toContainEqual({
+            phase: 'completed',
+            totalProcessed: 2,
+            totalImported: 0,
+            newlyImported: 0,
+            skippedEmails: 2,
+        })
+        expect(await feedRepository.listFeedItems(0, 10)).toEqual([])
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
     })
 

@@ -6,27 +6,22 @@ import {
     effect,
     ElementRef,
     inject,
-    linkedSignal,
     signal,
     viewChild,
 } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
 import { TranslateService } from '@ngx-translate/core'
-import { EmailImportProgressUpdate } from '@release-maestro/core'
-import { filter, map, Observable } from 'rxjs'
+import { filter, map } from 'rxjs'
 import { webEnv } from '../environments/environment'
 import { ElectronService } from './core/services'
+import { EmailImportIndicatorComponent } from './email-import-indicator.component'
 import { WebAudioPlayer } from './core/services/audio-player.service'
 import { FeedService } from './core/services/feed.service'
 import { HistoryService } from './core/services/history.service'
 import { LibraryService } from './core/services/library.service'
 import { SettingsService } from './core/settings/settings.service'
 import { IconComponent } from './shared/components/icon/icon.component'
-import {
-    ProgressBarComponent,
-    ProgressBarSegment,
-} from './shared/components/progress-bar/progress-bar.component'
 import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
 import { MinDwellPacer } from './shared/utils/min-dwell-pacer'
 
@@ -71,9 +66,13 @@ const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contentedit
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.css'],
     standalone: true,
-    host: { class: 'block min-h-full', '(document:keydown)': 'onDocumentKeydown($event)' },
+    host: {
+        class: 'block min-h-full',
+        '(document:keydown)': 'onDocumentKeydown($event)',
+        '(window:focus)': 'autoImportEmails()',
+    },
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterModule, ProgressBarComponent, ProgressRingComponent, IconComponent],
+    imports: [RouterModule, ProgressRingComponent, IconComponent, EmailImportIndicatorComponent],
 })
 export class AppComponent {
     translate = inject(TranslateService)
@@ -126,20 +125,29 @@ export class AppComponent {
         return null
     }
 
-    triggerEmailImport() {
-        this.feedService.triggerEmailImport().catch(err => {
-            console.error('Failed to trigger email import:', err)
+    /** On app start and window focus. The main process only runs it when the last import is stale. */
+    autoImportEmails() {
+        if (!this.isElectron) return
+        this.feedService.triggerEmailImport('auto').catch(err => {
+            console.error('Failed to trigger auto email import:', err)
         })
     }
-    cancelEmailImport() {
+
+    cancelAutoEmailImport(event: MouseEvent): void {
+        this.releaseTitleBarFocus(event)
         this.feedService.cancelEmailImport()
     }
 
     cancelScan(event: MouseEvent): void {
+        this.releaseTitleBarFocus(event)
+        this.libraryService.cancelScan()
+    }
+
+    /** A title bar cancel button disappears once it is clicked, so keep focus in the title bar. */
+    private releaseTitleBarFocus(event: MouseEvent): void {
         if (event.currentTarget === document.activeElement) {
             this.titleBar().nativeElement.focus({ preventScroll: true })
         }
-        this.libraryService.cancelScan()
     }
 
     minimizeWindow() {
@@ -159,27 +167,6 @@ export class AppComponent {
             console.error('Failed to close window:', err)
         })
     }
-
-    importProgress_ = toSignal(
-        this.feedService.emailImportProgress$ as Observable<EmailImportProgressUpdate | { phase: 'idle' }>,
-        { initialValue: { phase: 'idle' as const } },
-    )
-    importProgress = linkedSignal(() => this.importProgress_())
-
-    progressBarSegments = computed((): ProgressBarSegment[] => {
-        const progress = this.importProgress()
-        if (!progress || progress.phase === 'idle') return []
-
-        if (progress.phase === 'error') {
-            return [{ percent: 100, color: 'content.danger' }]
-        }
-        if (progress.phase === 'completed') {
-            return [{ percent: 100, color: 'content.success' }]
-        }
-
-        const percent = (progress.current / progress.total) * 100
-        return [{ percent, color: 'content.success' }]
-    })
 
     // --- library scan indicator / setup nudge -------------------------------
 
@@ -237,6 +224,7 @@ export class AppComponent {
         } else {
             console.log('Run in browser')
         }
+        this.autoImportEmails()
 
         // Feed the pacer the desired indicator whenever the scan status or route changes.
         effect(() => {

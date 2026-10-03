@@ -108,6 +108,10 @@ export default class App {
         // Initialize core services
         await diContainer.get(DatabaseClient)
         await diContainer.get(SettingsBackendService)
+        // The container caches only finished instances, so the first two import requests (app start
+        // and window focus) would each build their own service and their own running-import guard
+        const { EmailImportService } = await import('./services/feed/email-import.service')
+        await diContainer.get(EmailImportService)
 
         console.log('Services initialized successfully')
     }

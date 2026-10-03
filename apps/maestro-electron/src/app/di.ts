@@ -7,6 +7,11 @@ import { SettingsBackendService } from './services/settings.backend.service'
 import { EmailBackendRepository } from './services/email/email.backend.repository'
 import { FeedBackendRepository } from './services/feed/feed.backend.repository'
 import { FeedBackendService } from './services/feed/feed.backend.service'
+import {
+    deserializeEmailImportState,
+    EmailImportService,
+    EmailImportState,
+} from './services/feed/email-import.service'
 import { BandcampApiBackendService } from './services/bandcamp/bandcamp-api.backend.service'
 import { WebScrapingService } from './services/web-scraping/web-scraping.service'
 import { MetadataBackendService } from './services/metadata/metadata.backend.service'
@@ -57,6 +62,20 @@ export const diContainer = new DiContainer({
                     await di.get(BandcampApiBackendService),
                     await di.get(WebScrapingService),
                     await di.get(FeedBackendRepository),
+                ),
+        },
+        {
+            provide: EmailImportService,
+            useFactory: async di =>
+                new EmailImportService(
+                    await di.get(FeedBackendService),
+                    await di.get(EmailBackendRepository),
+                    new Conf<EmailImportState>({
+                        cwd: appPaths.data,
+                        configName: 'email-import-state',
+                        deserialize: deserializeEmailImportState,
+                        clearInvalidConfig: true,
+                    }),
                 ),
         },
         {

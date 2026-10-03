@@ -22,3 +22,75 @@
 
     <button class="btn-primary" (click)="saveSettings()">Save</button>
 }
+
+<div class="email-import | mt-8 max-w-2xl">
+    <h2 class="type-section-title text-content-primary">Import</h2>
+    <p class="type-body-sm mt-1 text-content-muted" id="email-import-description">
+        New emails are imported when the app starts and when you return to it, at most once an hour. Import
+        now to check the mailbox right away.
+    </p>
+
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+        <button
+            class="btn-neutral"
+            type="button"
+            aria-describedby="email-import-description"
+            [disabled]="!canImport()"
+            (click)="importNow()"
+        >
+            Import now
+        </button>
+        @if (importBlockedReason(); as reason) {
+            <p class="type-body-sm text-content-muted">{{ reason }}</p>
+        }
+    </div>
+
+    @if (importUpdate(); as update) {
+        @if (update.phase === 'started' || update.phase === 'processing') {
+            <div class="email-import-progress | mt-3 flex flex-wrap items-center gap-3">
+                <p class="type-body-sm flex items-center gap-2 text-content-secondary">
+                    <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
+                    @if (update.phase === 'processing') {
+                        Importing emails {{ update.current }}/{{ update.total }}
+                    } @else {
+                        Checking mail…
+                    }
+                </p>
+                <button class="btn-nkd-neutral" type="button" (click)="cancelImport($event)">
+                    Cancel import
+                </button>
+            </div>
+        }
+    }
+
+    <!-- Only the result is announced: progress would be read out again for every email -->
+    <p
+        #importStatus
+        class="email-import-result | type-body-sm mt-3 focus-visible:outline-2 focus-visible:outline-border-focus"
+        tabindex="-1"
+        role="status"
+        aria-label="Last email import"
+    >
+        @if (importUpdate(); as update) {
+            @if (update.phase === 'completed') {
+                <span class="text-content-secondary">
+                    Last import: {{ update.totalProcessed }}
+                    {{ update.totalProcessed === 1 ? 'email' : 'emails' }} processed,
+                    {{ update.newlyImported }} new
+                    {{
+                        (update.newlyImported === 1 ? 'release' : 'releases') +
+                            (update.skippedEmails ? '.' : '')
+                    }}
+                    @if (update.skippedEmails; as skippedEmails) {
+                        {{ skippedEmails }} {{ skippedEmails === 1 ? 'email' : 'emails' }} couldn't be read.
+                        We'll try again next time.
+                    }
+                </span>
+            } @else if (update.phase === 'cancelled') {
+                <span class="text-content-secondary">Last import was cancelled.</span>
+            } @else if (update.phase === 'error') {
+                <span class="text-content-danger">Last import failed: {{ update.errorMessage }}</span>
+            }
+        }
+    </p>
+</div>

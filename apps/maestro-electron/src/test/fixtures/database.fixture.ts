@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { existsSync } from 'fs'
@@ -22,5 +23,5 @@ export const createMigratedTestDatabase = () => {
     const db = drizzle(sqlite, { schema })
     migrate(db, { migrationsFolder })
 
-    return { sqlite, db, client: { db } as unknown as DatabaseClient }
+    return { sqlite, db, client: fromPartial<DatabaseClient>({ db }) }
 }

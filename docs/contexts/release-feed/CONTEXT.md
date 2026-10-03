@@ -22,7 +22,8 @@ _Avoid_: mail provider, email client, plugin
 **Mailbox**:
 The one named Apple Mail mailbox the export reads from (`mailboxName`). Exactly one is configured
 today. Multiple mailboxes are a noted future possibility, but are not represented in the settings.
-Each mailbox has its own _import checkpoint_, so switching to another one starts with a full export.
+Each mailbox has its own _import checkpoint_. Switching to a mailbox without a checkpoint starts
+with a full export. Returning to a previously imported mailbox reuses its checkpoint.
 
 **Export**:
 The AppleScript pass that pulls messages out of Apple Mail (`apple-scripts/export-emails.applescript`).
@@ -30,15 +31,35 @@ It leaves the mail app and produces raw emails. Everything downstream is import.
 checkpoint_, it exports only the messages received from shortly before it, and Mail does the filtering.
 The export opens Mail when it is closed. Then it quits Mail again when it finishes, fails, or is
 cancelled. When Mail was already open, the export leaves it open.
+Each message is attempted up to three times. A message that still cannot be exported or read is
+skipped for this pass, so the remaining messages can be imported.
 _Avoid_: sync, fetch, download
 
 **Import**:
-One pass that turns exported emails into feed items. It streams progress to the renderer as
-`processing`, then exactly one `completed` or `error`, and reports both `totalImported` (how many the
-pass covered) and `newlyImported` (how many were not already in the feed) — a user re-running an
-import may legitimately see a nonzero total and a zero new count, because it re-reads the overlap
-before its _import checkpoint_.
+One pass that turns exported emails into feed items. Only one runs at a time (`EmailImportService`).
+It streams progress to every window as `started`, then `processing` for each email (none when nothing
+was exported), then exactly one `completed`, `cancelled`, or `error`, and reports both `totalImported` (how many the pass covered) and
+`newlyImported` (how many were not already in the feed) — a user re-running an import may
+legitimately see a nonzero total and a zero new count, because it re-reads the overlap before its
+_import checkpoint_. Each update carries its trigger. The title bar shows every import, but paces and
+summarizes only _auto imports_. A `manual` import starts from the Apple Mail settings page, which shows
+the running or last import of the session whatever its trigger. A completed import that adds releases
+reloads an open empty or caught-up feed. A feed already displaying releases keeps its current items
+and playback. On macOS, closing the last window keeps the import coordinator and its dependencies
+alive. Quitting the app aborts and drains the import before closing the database.
+An import with skipped emails still completes and keeps its successfully imported releases. Its
+summary reports how many emails will be retried, and its checkpoint stays unchanged so the next
+import includes them again.
 _Avoid_: scan (that is a music-library word), refresh
+
+**Auto import**:
+An _import_ the app starts on its own, on app start and on window focus, when the last import of any
+trigger started more than an hour ago and a _mailbox_ is configured on macOS. It reports in the title
+bar like the startup library scan, except on the import route. A completed or failed one ends in a
+summary that hides after four seconds; a cancelled one ends in nothing. A manual request while one
+runs takes it over, and from then on it is shown live, without the summary. If the _mailbox_ changed since it started,
+the manual request cancels it and starts a new import instead.
+_Avoid_: background sync, polling
 
 **Import checkpoint**:
 How far a mailbox has been imported: the newest date received that a completed import covered, kept
