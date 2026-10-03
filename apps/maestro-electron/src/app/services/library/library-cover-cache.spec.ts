@@ -223,4 +223,49 @@ describe('library cover cache recovery', () => {
         expect(readFiles).toHaveBeenCalledTimes(1)
         expect(database.db.select().from(songsTable).get()?.extractorVersion).toBe(extractorVersion)
     })
+
+    it.each(['failed', 'cancelled', 'rename chain'])(
+        'preserves a moved identity after %s cover recovery',
+        async outcome => {
+            const oldPath = join(cacheDir, 'original.flac')
+            writeFileSync(oldPath, 'audio bytes')
+            const song = seedSong(oldPath, join(cacheDir, 'missing.png'))
+            const identity = database.db.select().from(songsTable).get()
+            const abort = new AbortController()
+            const recovery = scanService([song])
+            recovery.readFiles.mockImplementationOnce(() => {
+                if (outcome == 'cancelled') abort.abort()
+                return from<MetadataScanUpdate[]>([
+                    { phase: 'itemError', path: oldPath, error: 'cache unavailable' },
+                ])
+            })
+            await firstValueFrom(recovery.service.scan([cacheDir], abort.signal).pipe(toArray()))
+            let path = join(cacheDir, 'renamed.flac')
+            renameSync(oldPath, path)
+            const movedSong = () => ({
+                fact: { ...song.fact, path, fileName: 'renamed.flac' },
+                metadata: { ...song.metadata, path, fileName: 'renamed.flac' },
+            })
+            if (outcome == 'rename chain') {
+                const intermediate = scanService([movedSong()])
+                intermediate.readFiles.mockImplementationOnce(() =>
+                    from<MetadataScanUpdate[]>([
+                        { phase: 'item', metadata: movedSong().metadata },
+                        { phase: 'itemError', path: '/broken', error: 'unrelated failure' },
+                    ]),
+                )
+                await firstValueFrom(intermediate.service.scan([cacheDir]).pipe(toArray()))
+                const next = join(cacheDir, 'third.flac')
+                renameSync(path, next)
+                path = next
+            }
+            const retry = scanService([movedSong()])
+            await firstValueFrom(retry.service.scan([cacheDir]).pipe(toArray()))
+            expect(database.db.select().from(songsTable).all()).toEqual([
+                expect.objectContaining({ id: identity?.id, addedAt: identity?.addedAt, path }),
+            ])
+            await firstValueFrom(retry.service.scan([cacheDir]).pipe(toArray()))
+            expect(retry.readFiles).toHaveBeenCalledTimes(1)
+        },
+    )
 })

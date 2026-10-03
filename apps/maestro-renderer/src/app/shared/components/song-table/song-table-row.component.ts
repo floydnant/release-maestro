@@ -1,4 +1,5 @@
 import { NgClass } from '@angular/common'
+import { RetryCoverAfterScanDirective } from '../../directives/retry-cover-after-scan.directive'
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import type { SongRow } from '@release-maestro/core'
@@ -36,7 +37,7 @@ import {
     selector: 'app-song-table-row',
     templateUrl: './song-table-row.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [NgClass, HlmButton, HlmOverflowTooltip, HlmTooltip, IconComponent, RouterLink],
+    imports: [RetryCoverAfterScanDirective, NgClass, HlmButton, HlmOverflowTooltip, HlmTooltip, IconComponent, RouterLink],
     host: { class: 'contents' },
 })
 export class SongTableRowComponent {

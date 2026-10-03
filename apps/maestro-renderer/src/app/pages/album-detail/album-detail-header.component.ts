@@ -1,6 +1,7 @@
 import { HlmBadge } from '@spartan-ng/helm/badge'
 import { HlmButton } from '@spartan-ng/helm/button'
 import { HlmOverflowTooltip } from '@spartan-ng/helm/tooltip'
+import { RetryCoverAfterScanDirective } from '../../shared/directives/retry-cover-after-scan.directive'
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import type { AlbumDetail } from '@release-maestro/core'
@@ -20,7 +21,7 @@ import { formatTotalDuration, formatTrackCount } from '../../shared/utils/format
     selector: 'app-album-detail-header',
     templateUrl: './album-detail-header.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [HlmBadge, HlmOverflowTooltip, HlmButton, IconComponent, RouterLink],
+    imports: [RetryCoverAfterScanDirective, HlmBadge, HlmOverflowTooltip, HlmButton, IconComponent, RouterLink],
     host: { class: 'flex shrink-0 gap-5 px-4 pb-4 pt-3' },
 })
 export class AlbumDetailHeaderComponent {
