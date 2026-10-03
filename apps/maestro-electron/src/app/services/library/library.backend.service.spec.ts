@@ -1,6 +1,6 @@
 import { firstValueFrom, from, Observable, Subject, toArray } from 'rxjs'
 import { fromPartial } from '@total-typescript/shoehorn'
-import { link, mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { access, link, mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MetadataPrescanUpdate, MetadataScanUpdate, PrescanFileFact } from '@release-maestro/core'
@@ -237,14 +237,14 @@ describe('LibraryBackendService', () => {
             }
         },
     )
-    it.each(['file case', 'folder case', 'hardlink', 'symlink'])(
+    it.each(['file case', 'folder case', 'hardlink', 'symlink', 'case alias with copy'])(
         'distinguishes a case rename from independent directory entries: %s',
         async kind => {
             const directory = await mkdtemp(join(tmpdir(), 'maestro-move-'))
             try {
                 const oldFolder = join(directory, 'Album')
                 await mkdir(oldFolder)
-                const oldPath = join(oldFolder, 'Song.mp3')
+                let oldPath = join(oldFolder, 'Song.mp3')
                 await writeFile(oldPath, 'original')
                 let foundPath = join(oldFolder, 'song.mp3')
                 if (kind === 'file case') await rename(oldPath, foundPath)
@@ -255,6 +255,13 @@ describe('LibraryBackendService', () => {
                     foundPath = join(oldFolder, 'copy.mp3')
                     if (kind === 'hardlink') await link(oldPath, foundPath)
                     else await symlink(oldPath, foundPath)
+                    if (kind === 'case alias with copy') {
+                        const alias = join(directory, 'ALBUM')
+                        // A differently cased configured folder remains an alias on macOS/Windows.
+                        // On case-sensitive volumes, a directory symlink represents the alias instead.
+                        await access(alias).catch(() => symlink(oldFolder, alias, 'junction'))
+                        oldPath = join(alias, 'Song.mp3')
+                    }
                 }
                 const repository = newRepositoryMock()
                 repository.countSongsNeedingMetadata.mockReturnValue(0)
