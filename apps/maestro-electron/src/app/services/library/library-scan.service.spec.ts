@@ -1,10 +1,8 @@
 import { Subject } from 'rxjs'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { LibraryFolderValidation, LibraryScanUpdate } from '@release-maestro/core'
 import { InMemoryStore } from '../../utils/persistent-store.util'
-import { SettingsBackendService } from '../settings.backend.service'
-import { LibraryFoldersService } from './library-folders.service'
 import { LibraryScanService, LibraryScanState } from './library-scan.service'
-import { LibraryBackendService } from './library.backend.service'
 
 jest.mock('electron', () => ({
     BrowserWindow: { getAllWindows: () => [] },
@@ -34,9 +32,9 @@ describe('LibraryScanService', () => {
         settings = { getSettings: jest.fn(() => ({ library: { folders: ['/music'] } })) }
         stateStore = new InMemoryStore<LibraryScanState>()
         service = new LibraryScanService(
-            backend as unknown as LibraryBackendService,
-            settings as unknown as SettingsBackendService,
-            folders as unknown as LibraryFoldersService,
+            fromPartial(backend),
+            fromPartial(settings),
+            fromPartial(folders),
             stateStore,
         )
     })

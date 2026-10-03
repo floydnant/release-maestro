@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { WebAudioPlayer } from './audio-player.service'
 
 class FakeAudio extends EventTarget {
@@ -12,7 +13,7 @@ class FakeAudio extends EventTarget {
         MEDIA_ERR_NETWORK: 2,
         MEDIA_ERR_DECODE: 3,
         MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-    }
+    } satisfies Partial<MediaError>
 
     pause = jest.fn()
     play = jest.fn(() => Promise.resolve())
@@ -34,7 +35,7 @@ describe(WebAudioPlayer.name, () => {
 
     beforeEach(() => {
         audio = new FakeAudio()
-        jest.spyOn(globalThis, 'Audio').mockImplementation(() => audio as unknown as HTMLAudioElement)
+        jest.spyOn(globalThis, 'Audio').mockImplementation(() => fromPartial(audio))
 
         originalAudioContext = Object.getOwnPropertyDescriptor(globalThis, 'AudioContext')
         Object.defineProperty(globalThis, 'AudioContext', {
