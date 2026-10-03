@@ -202,6 +202,24 @@ describe('LibraryScanService', () => {
         expect(backend.scan).toHaveBeenLastCalledWith(['/music'], expect.anything(), false)
     })
 
+    it('publishes the final classification after discovery paths reconcile as moves', async () => {
+        const status = await service.startScan('manual', ['/music'])
+        updates$.next({ phase: 'discovery', discovered: 2, new: 1, changed: 0, unchanged: 1 })
+        updates$.next({
+            phase: 'completed',
+            count: 1,
+            total: 2,
+            new: 0,
+            changed: 1,
+            unchanged: 1,
+            missing: 0,
+        })
+        updates$.complete()
+        expect(status).toMatchObject({ new: 0, changed: 1, unchanged: 1 })
+        expect(status.terminal).toMatchObject({ new: 0, changed: 1, unchanged: 1, missing: 0 })
+        expect(stateStore.get('lastScan')).toMatchObject({ new: 0, changed: 1, unchanged: 1 })
+    })
+
     it('an aborted scan terminates as cancelled, not failed', async () => {
         const status = await service.startScan('onboarding', ['/music'])
         updates$.next({ phase: 'discovery', discovered: 5, new: 5, changed: 0, unchanged: 0 })

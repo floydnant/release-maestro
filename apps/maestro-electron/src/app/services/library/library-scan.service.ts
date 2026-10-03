@@ -209,6 +209,10 @@ export class LibraryScanService {
                         }
                         break
                     case 'completed': {
+                        // Move matching can reclassify newly discovered paths after deep read.
+                        status.new = update.new ?? status.new
+                        status.changed = update.changed ?? status.changed
+                        status.unchanged = update.unchanged ?? status.unchanged
                         this.finishScan(status, 'completed', {
                             failures,
                             discoveryFailureCount,
