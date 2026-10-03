@@ -229,7 +229,12 @@ const compareLocations = async (original: string, found: string): Promise<'moved
     if (before == 'unknown') return 'unknown'
     try {
         const after = await stat(found)
-        if (before.ino != 0 && before.ino == after.ino && before.dev == after.dev) {
+        if (
+            original.toLowerCase() == found.toLowerCase() &&
+            before.ino != 0 &&
+            before.ino == after.ino &&
+            before.dev == after.dev
+        ) {
             // realpath preserves input casing on macOS. Directory entries reveal the actual spelling.
             // Independent hardlinks and symlinks still have their own entry and remain copies.
             for (let path = original; dirname(path) != path; path = dirname(path)) {
