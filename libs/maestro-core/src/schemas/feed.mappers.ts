@@ -14,11 +14,13 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
     linkMetadataMap: Record<string, ScrapedLinkMetadata | null> | null,
     error: { userFacingMessage: string } | null,
 ): HydratedBandcampReleaseFeedItem {
-    if (source.type != 'EMAIL.BANDCAMP_NEW_RELEASE')
-        throw new Error('Cannot map fans bought music email to hydrated feed item')
+    const newRelease = source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' ? source : null
+    const sourceLinks = newRelease?.links ?? []
+    const releaseType = tralbum?.type ?? data.tralbumType
 
     return {
         ...item,
+        sourceType: source.type,
         error: error?.userFacingMessage ? { message: error.userFacingMessage } : null,
         data: {
             releaseUrl: data.tralbumUrl,
@@ -26,25 +28,25 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
             emailReceivedAt: new Date(source.dateReceived),
             isEmailRead: source.isRead,
             emailId: source.messageId,
-            releaseName: tralbum?.title || source.subject,
+            releaseName: tralbum?.title || newRelease?.subject || data.tralbumUrl,
             band: tralbum?.band || null,
             artist: tralbum?.artist || null,
-            releaseType: source.releaseType,
+            releaseType,
             about:
                 tralbum?.about
                     .replace(/^\s*(released|releases).+\n/m, '')
                     .replace(/(^((<br>)|\n|\s)+)|(((<br>)|\n|\s)+$)/g, '') ||
-                source.plainBody
+                (newRelease?.plainBody ?? '')
                     .replace(/(\s{2,}\?\s*)|(\s*\?\s{2,})/g, '\n')
                     .replace(/�/g, '')
                     .replace(
                         /((Unfollow|Unsubscribe) .+)(?=\n)/i,
-                        `<a href="${source.links?.find(link => link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH))}">$1</a>`,
+                        `<a href="${sourceLinks.find(link => link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH))}">$1</a>`,
                     )
-                    .replace(/check it out here/i, match => `<a href="${source.releaseUrl}">${match}</a>`)
+                    .replace(/check it out here/i, match => `<a href="${data.tralbumUrl}">${match}</a>`)
                     .trim()
                     .replace(/\n/g, '<br>'),
-            links: [...new Set(source.links)]?.filter(isUsefulUrlFromBandcampEmail).map(url => {
+            links: [...new Set(sourceLinks)].filter(isUsefulUrlFromBandcampEmail).map(url => {
                 const meta = linkMetadataMap?.[url]
                 return {
                     title: meta?.title || url,
@@ -52,15 +54,15 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
                     url: url,
                 }
             }),
-            unsubscribeUrl: source.links?.find(link => link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH)) || null,
+            unsubscribeUrl: sourceLinks.find(link => link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH)) || null,
             unsubscribeText:
-                source.plainBody.match(/((Unfollow|Unsubscribe) .+)(?=\n)/i)?.[0].replace(/�/g, '') ||
+                newRelease?.plainBody.match(/((Unfollow|Unsubscribe) .+)(?=\n)/i)?.[0].replace(/�/g, '') ||
                 'Unfollow',
             imageUrl:
                 tralbum?.artworkUrl ||
-                source.links?.find(link => link.includes('f4.bcbits.com'))?.replace('_9.jpg', '_16.jpg'),
+                sourceLinks.find(link => link.includes('f4.bcbits.com'))?.replace('_9.jpg', '_16.jpg'),
             iframeUrl: tralbum?.id
-                ? `https://bandcamp.com/EmbeddedPlayer/${source.releaseType}=${tralbum.id}/size=large/bgcol=999999/linkcol=0687f5`
+                ? `https://bandcamp.com/EmbeddedPlayer/${releaseType}=${tralbum.id}/size=large/bgcol=999999/linkcol=0687f5`
                 : null,
             tracks: tralbum?.tracks || [],
         },
