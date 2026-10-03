@@ -1,7 +1,7 @@
 {
     "name": "release-maestro",
     "productName": "Release Maestro",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "main": "main.js",
     "private": true,
     "packageManager": "pnpm@12.8.1",
@@ -78,7 +78,6 @@
         "@typescript-eslint/utils": "8.71.0",
         "angular-eslint": "22.5.0",
         "chrome-devtools-mcp": "1.10.1",
-        "conventional-changelog-cli": "5.0.0",
         "drizzle-kit": "0.31.11",
         "electron": "44.4.5",
         "electron-builder": "26.15.3",

@@ -11,7 +11,7 @@
         "build-app": {
             "executor": "nx-electron:build",
             "cache": true,
-            "inputs": ["production", "^production"],
+            "inputs": ["production", "^production", "{workspaceRoot}/package.json"],
             "outputs": ["{options.outputPath}"],
             "dependsOn": ["^build"],
             "options": {
@@ -42,7 +42,7 @@
         "build-e2e": {
             "executor": "nx-electron:build",
             "cache": true,
-            "inputs": ["production", "^production"],
+            "inputs": ["production", "^production", "{workspaceRoot}/package.json"],
             "outputs": ["{options.outputPath}"],
             "dependsOn": ["^build", "metadata-engine:build"],
             "options": {
@@ -70,6 +70,12 @@
             "command": "node tools/dev-instance/cli.mjs run-dev"
         },
         "package": {
+            "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/package.json",
+                "{workspaceRoot}/electron-builder.json"
+            ],
             "dependsOn": [
                 "maestro-renderer:build",
                 "prepare-icons",
@@ -90,10 +96,17 @@
                         "filter": ["**/*"]
                     }
                 ],
-                "prepackageOnly": true
+                "prepackageOnly": true,
+                "publishPolicy": "never"
             }
         },
         "make": {
+            "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/package.json",
+                "{workspaceRoot}/electron-builder.json"
+            ],
             "dependsOn": [
                 "maestro-renderer:build",
                 "prepare-icons",
@@ -107,6 +120,7 @@
                 "name": "maestro-electron",
                 "sourcePath": "dist/apps",
                 "outputPath": "dist/executables",
+                "publishPolicy": "never",
                 "files": [
                     {
                         "from": "maestro-renderer/browser",
