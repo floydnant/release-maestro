@@ -36,6 +36,7 @@
         "Role-qualified table presentation selectors for the existing windowed ARIA grid",
         "Two-arc SVG spinner preserves original geometry, colors and ambient motion",
         "Content-sized controls and plain button/alert variants preserve existing appearance",
+        "History button background uses pointer hover while keyboard focus retains its ring",
         "Native textarea rows and explicit field spacing preserve original form layout",
         "Tooltips use a 600ms delay and wrap within 24rem and the viewport",
         "Pinned Brain tooltip patch captures nested scroll and dismisses pending or hovered overlays",

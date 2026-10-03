@@ -32,8 +32,8 @@ Sidebar links use the `navigation` button variant. Angular's `RouterLinkActive` 
 `aria-current="page"`, and the shared variant supplies the active appearance. The `link` variant
 allows inline links to shrink inside bounded library cells.
 
-History controls use the `history` variant. Only pointer hover fills their background; keyboard
-focus keeps the focus ring without that fill.
+History controls use the `history` variant and the shared `pointer-hover` state. Only pointer hover
+fills their background; keyboard focus keeps the focus ring without that fill.
 
 The track grid composes the role-qualified table directives with its existing windowing and row
 layout. Scan progress keeps its outcome segments and circular geometry inside `HlmProgress`;
