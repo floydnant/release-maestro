@@ -16,6 +16,7 @@ import {
     notExists,
     notInArray,
     or,
+    sql,
 } from 'drizzle-orm'
 import { DatabaseClient } from '../../database/database.client'
 import {
@@ -61,6 +62,11 @@ export interface PrescanBatchComparison {
     new: number
 }
 
+export interface MovedSongCandidate {
+    missing: DbSong
+    found: DbSong
+}
+
 const titleFromFileName = (fileName: string): string => fileName.replace(/\.[^.]+$/, '').trim() || fileName
 const NORMALIZATION_ISSUE_DETECTOR_VERSION = 1
 
@@ -73,6 +79,157 @@ const issueFingerprint = (issue: NormalizationIssue): string =>
 
 export class LibraryBackendRepository {
     constructor(private readonly database: Pick<DatabaseClient, 'db'>) {}
+
+    /** Match only complete, unambiguous pairs after every discovery/deep-read batch. */
+    findMovedSongCandidates(seenAt: Date): MovedSongCandidate[] {
+        const candidates = new Map<string, MovedSongCandidate>()
+        for (const key of ['contentHash', 'metadataHash'] as const) {
+            const column = songsTable[key]
+            const groups = this.database.db
+                .select({ hash: column, size: songsTable.size })
+                .from(songsTable)
+                .where(isNotNull(column))
+                .groupBy(column, songsTable.size)
+                .having(
+                    and(
+                        eq(count(), 2),
+                        sql`sum(case when ${songsTable.lastSeenAt} = ${seenAt.getTime()} then 1 else 0 end) = 1`,
+                    ),
+                )
+                .all()
+            for (const group of groups) {
+                if (!group.hash) continue
+                const pair = this.database.db
+                    .select()
+                    .from(songsTable)
+                    .where(and(eq(column, group.hash), eq(songsTable.size, group.size)))
+                    .all()
+                const found = pair.find(song => song.lastSeenAt.getTime() == seenAt.getTime())
+                const missing = pair.find(song => song.lastSeenAt < seenAt)
+                if (!found || !missing || !found.addedAt || found.addedAt <= missing.lastSeenAt) continue
+                // A failed read may leave a hash for an older version of this path.
+                if (pair.some(song => song.scannedFileFingerprint != song.fileFingerprint)) continue
+                if (!found.contentHash || !found.present) continue
+                if (key == 'metadataHash') {
+                    // Upgrade fallback: no content proof exists for an already-missing old row.
+                    // Require full tag equality, size, and identifying tags; never override a hash.
+                    if (
+                        missing.contentHash ||
+                        !missing.rawTitle?.trim() ||
+                        missing.rawTitle == missing.fileName ||
+                        !(missing.rawArtist?.trim() || missing.rawAlbumTitle?.trim()) ||
+                        !missing.duration
+                    )
+                        continue
+                }
+                if (!candidates.has(found.id)) candidates.set(found.id, { missing, found })
+            }
+        }
+        return [...candidates.values()]
+    }
+
+    /** Keep the original identity and user state, replace its location and latest derived data atomically. */
+    reconcileMovedSong({ missing, found }: MovedSongCandidate): void {
+        this.database.db.transaction(tx => {
+            const issues = tx
+                .select()
+                .from(normalizationIssuesTable)
+                .where(
+                    and(
+                        eq(normalizationIssuesTable.entityType, 'SONG'),
+                        inArray(normalizationIssuesTable.entityId, [missing.id, found.id]),
+                    ),
+                )
+                .all()
+            const originalIssues = new Map(
+                issues.filter(issue => issue.entityId == missing.id).map(issue => [issue.fingerprint, issue]),
+            )
+            const foundIssues = issues.filter(issue => issue.entityId == found.id)
+            for (const issue of foundIssues) {
+                const original = originalIssues.get(issue.fingerprint)
+                if (original) {
+                    tx.update(normalizationIssuesTable)
+                        .set({
+                            lastSeenAt: issue.lastSeenAt,
+                            detectorVersion: issue.detectorVersion,
+                            status: original.status == 'DISMISSED' ? original.status : issue.status,
+                            closedAt: original.status == 'DISMISSED' ? original.closedAt : issue.closedAt,
+                        })
+                        .where(eq(normalizationIssuesTable.id, original.id))
+                        .run()
+                    tx.delete(normalizationIssuesTable).where(eq(normalizationIssuesTable.id, issue.id)).run()
+                } else {
+                    tx.update(normalizationIssuesTable)
+                        .set({ entityId: missing.id })
+                        .where(eq(normalizationIssuesTable.id, issue.id))
+                        .run()
+                }
+            }
+            for (const issue of originalIssues.values()) {
+                if (
+                    issue.status == 'OPEN' &&
+                    !foundIssues.some(current => current.fingerprint == issue.fingerprint)
+                ) {
+                    tx.update(normalizationIssuesTable)
+                        .set({ status: 'DISAPPEARED', closedAt: found.lastScannedAt })
+                        .where(eq(normalizationIssuesTable.id, issue.id))
+                        .run()
+                }
+            }
+            tx.delete(songArtistsTable).where(eq(songArtistsTable.songId, missing.id)).run()
+            tx.update(songArtistsTable)
+                .set({ songId: missing.id })
+                .where(eq(songArtistsTable.songId, found.id))
+                .run()
+            tx.delete(songGenresTable).where(eq(songGenresTable.songId, missing.id)).run()
+            tx.update(songGenresTable)
+                .set({ songId: missing.id })
+                .where(eq(songGenresTable.songId, found.id))
+                .run()
+            tx.delete(songsTable).where(eq(songsTable.id, found.id)).run()
+            tx.update(songsTable)
+                .set({
+                    ...found,
+                    id: missing.id,
+                    addedAt: missing.addedAt,
+                    externalRefs: mergeExternalRefs([missing.externalRefs, found.externalRefs]),
+                })
+                .where(eq(songsTable.id, missing.id))
+                .run()
+            const albumIds = [missing.albumId, found.albumId].filter((id): id is string => id != null)
+            if (albumIds.length > 0) {
+                tx.update(albumsTable)
+                    .set({
+                        dateAdded: sql`(select max(${songsTable.createdAt}) from ${songsTable} where ${songsTable.albumId} = ${albumsTable.id})`,
+                    })
+                    .where(inArray(albumsTable.id, albumIds))
+                    .run()
+            }
+        })
+    }
+
+    countOpenIssuesForReadSongs(seenAt: Date): number {
+        return (
+            this.database.db
+                .select({ value: sql<number>`count(distinct ${songsTable.id})` })
+                .from(songsTable)
+                .innerJoin(
+                    normalizationIssuesTable,
+                    and(
+                        eq(normalizationIssuesTable.entityType, 'SONG'),
+                        eq(normalizationIssuesTable.entityId, songsTable.id),
+                    ),
+                )
+                .where(
+                    and(
+                        eq(songsTable.lastSeenAt, seenAt),
+                        sql`${songsTable.lastScannedAt} >= ${seenAt.getTime()}`,
+                        eq(normalizationIssuesTable.status, 'OPEN'),
+                    ),
+                )
+                .get()?.value ?? 0
+        )
+    }
 
     nextScanSeenAt(): Date {
         const latest = this.database.db
@@ -167,8 +324,13 @@ export class LibraryBackendRepository {
             songsNeedingMetadata(extractorVersion),
         )
         const where = afterPath
-            ? and(eq(songsTable.present, true), pendingCondition, gt(songsTable.path, afterPath))
-            : and(eq(songsTable.present, true), pendingCondition)
+            ? and(
+                  eq(songsTable.lastSeenAt, seenAt),
+                  eq(songsTable.present, true),
+                  pendingCondition,
+                  gt(songsTable.path, afterPath),
+              )
+            : and(eq(songsTable.lastSeenAt, seenAt), eq(songsTable.present, true), pendingCondition)
 
         return this.database.db
             .select({
@@ -527,6 +689,7 @@ export class LibraryBackendRepository {
                 tagType: metadata.fileInfo?.tagType ?? null,
                 codec: metadata.fileInfo?.codec ?? null,
                 metadataHash: metadataHash(metadata),
+                contentHash: metadata.contentHash,
                 normalizerVersion: NORMALIZER_VERSION,
                 extractorVersion,
                 externalRefs,
@@ -822,6 +985,7 @@ export class LibraryBackendRepository {
  */
 const songsNeedingMetadata = (extractorVersion: string) =>
     or(
+        isNull(songsTable.contentHash),
         isNull(songsTable.scannedFileFingerprint),
         ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
         metadataRevisionMismatch(extractorVersion),
