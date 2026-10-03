@@ -13,6 +13,8 @@ import { RouterModule } from '@angular/router'
 import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
+import { HlmProgressImports } from '@spartan-ng/helm/progress'
+import { HlmAlertImports } from '@spartan-ng/helm/alert'
 import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
@@ -59,12 +61,16 @@ type FeedState =
         RouterModule,
         HlmButtonImports,
         HlmTooltipImports,
+        HlmProgressImports,
+        HlmAlertImports,
     ],
 })
 export class FeedComponent {
     electronService = inject(ElectronService)
     feedService = inject(FeedService)
     audioPlayer = inject(WebAudioPlayer)
+    readonly playbackProgressLabel = (value: number, max: number) =>
+        `${formatDuration(value)} of ${formatDuration(max)}`
 
     feedEntries = viewChildren<ElementRef<HTMLElement>>('feedEntry')
     currentFeedIndex = signal(0)

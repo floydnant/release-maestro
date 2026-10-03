@@ -31,7 +31,7 @@ import { IconComponent } from '../icon/icon.component'
             hlmBtn
             variant="ghost"
             type="button"
-            class="flex h-full w-full items-center justify-start gap-1 rounded-none p-2 type-label-sm text-content-muted"
+            class="flex size-full items-center justify-start gap-1 rounded-none p-2 type-label-sm text-content-muted"
             [class.justify-end]="numeric()"
             [class.text-content-primary]="isActive()"
             [attr.aria-label]="'Sort by ' + (sortLabel() ?? label())"

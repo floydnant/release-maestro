@@ -53,6 +53,39 @@ test.describe('release feed playback scenarios', () => {
                 return currentTime / duration
             })
             .toBeGreaterThan(0.7)
+        await expect(progress).toHaveAttribute('aria-valuetext', /\d+:\d{2} of \d+:\d{2}/)
+        await expect
+            .poll(() =>
+                progress.evaluate(meter => {
+                    const indicator = meter.querySelector('[data-slot="progress-indicator"]')
+                    if (!indicator) throw new Error('Playback progress indicator is missing')
+                    const bounds = meter.getBoundingClientRect()
+                    return (indicator.getBoundingClientRect().right - bounds.left) / bounds.width
+                }),
+            )
+            .toBeGreaterThan(0.7)
+    })
+
+    test('keeps long track titles and seek controls inside the artwork column', async ({ page }) => {
+        const title =
+            'An exceptionally long track title that must truncate beside its duration and play control'
+        const release = createHydratedRelease()
+        const longRelease = {
+            ...release,
+            data: { ...release.data, tracks: release.data.tracks.map(track => ({ ...track, title })) },
+        }
+        await createRendererScenario(page, scenarioBuilder().feed([longRelease]).build())
+        const seeker = page.getByRole('button', { name: `Seek within ${title}` })
+        await expect(seeker).toBeVisible()
+        const overflow = await seeker.evaluate(button => {
+            const row = button.closest('[data-track-index]')
+            if (!row) throw new Error('Track row is missing')
+            return Math.max(
+                row.scrollWidth - row.clientWidth,
+                button.getBoundingClientRect().right - row.getBoundingClientRect().right,
+            )
+        })
+        expect(overflow).toBeLessThanOrEqual(1)
     })
 
     test('toggles the current track from the sidebar playback control', async ({ page }) => {

@@ -20,7 +20,7 @@
                         <p hlmDialogDescription>Choose a label for this library folder.</p>
                     </hlm-dialog-header>
                     <div class="grid gap-2">
-                        <label class="type-label-md" for="preview-folder-label">Folder label</label>
+                        <label hlmLabel for="preview-folder-label">Folder label</label>
                         <input
                             #folderLabel
                             hlmInput
@@ -117,7 +117,7 @@
             </div>
             <div hlmCardContent class="grid gap-4">
                 <div class="grid gap-2">
-                    <label class="type-label-md" for="shared-release-search">Search releases</label>
+                    <label hlmLabel for="shared-release-search">Search releases</label>
                     <input
                         hlmInput
                         id="shared-release-search"
@@ -126,7 +126,7 @@
                     />
                 </div>
                 <div class="grid gap-2">
-                    <label class="type-label-md" for="shared-library-order">Library order</label>
+                    <label hlmLabel for="shared-library-order">Library order</label>
                     <hlm-native-select selectId="shared-library-order" [(value)]="order">
                         <option value="dateAdded">Date added</option>
                         <option value="title">Title</option>
@@ -134,7 +134,7 @@
                     </hlm-native-select>
                 </div>
                 <div class="grid gap-2">
-                    <label class="type-label-md" for="shared-library-view">Library view</label>
+                    <label hlmLabel for="shared-library-view">Library view</label>
                     <hlm-select [(value)]="libraryView">
                         <hlm-select-trigger buttonId="shared-library-view">
                             <hlm-select-value />
@@ -147,7 +147,7 @@
                     </hlm-select>
                 </div>
                 <div class="grid gap-2">
-                    <label class="type-label-md" for="shared-disabled-input">Unavailable filter</label>
+                    <label hlmLabel for="shared-disabled-input">Unavailable filter</label>
                     <input hlmInput id="shared-disabled-input" disabled value="Library scan in progress" />
                 </div>
             </div>

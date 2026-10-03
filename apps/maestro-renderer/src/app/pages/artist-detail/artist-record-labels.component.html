@@ -1,6 +1,14 @@
 @if (result().status === 'error') {
-    <div class="artist-record-labels__error | flex items-center justify-center gap-3 p-4" role="alert">
-        <p class="artist-record-labels__error-message | type-body-sm text-content-secondary">
+    <div
+        hlmAlert
+        variant="destructive"
+        class="artist-record-labels__error | flex items-center justify-center gap-3 p-4"
+        role="alert"
+    >
+        <p
+            hlmAlertDescription
+            class="artist-record-labels__error-message | type-body-sm text-content-secondary"
+        >
             Could not load record labels for this artist
         </p>
         <button hlmBtn variant="secondary" type="button" (click)="onRetry()">Try again</button>
