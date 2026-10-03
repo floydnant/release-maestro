@@ -78,7 +78,7 @@ At the initial inspection on 2026-10-03, the [root manifest](../../package.json)
 imports of ng-primitives, CDK or Floating UI. Reuse was mainly the button, input, badge and panel
 utilities in [styles.css](../../apps/maestro-renderer/src/styles.css).
 
-The [Tailwind configuration](../../apps/maestro-renderer/tailwind.config.js) replaces spacing, radius, opacity and shadow scales with generated tokens. A copied library class can therefore have a different value or emit no CSS. Renderer guidance requires semantic tokens. Lint enforces enumerable class lists, `app-*` component selectors and `appCamelCase` directive selectors. CVA/class-merging helpers and library selectors need deliberate integration with [renderer lint](../../apps/maestro-renderer/eslint.config.mjs) and [root lint](../../eslint.config.mjs).
+The [generated Tailwind theme](../../apps/maestro-renderer/src/styles/design-tokens.generated.css) supplies spacing, radius, opacity, shadow and typography tokens. A copied library class can therefore have a different value or emit no CSS. Renderer guidance requires semantic tokens. Lint enforces enumerable class lists, `app-*` component selectors and `appCamelCase` directive selectors. CVA/class-merging helpers and library selectors need deliberate integration with [renderer lint](../../apps/maestro-renderer/eslint.config.mjs) and [root lint](../../eslint.config.mjs).
 
 Use the existing [token sources](../../apps/maestro-renderer/design-tokens/) for colors, typography, density, focus, hover, disabled and motion states. Adapt the shared components once, then reuse their approved variants. This is how the library can reduce inconsistency while retaining Release Maestro's product language.
 

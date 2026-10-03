@@ -73,7 +73,10 @@ test.describe('shared UI components', () => {
         await expect(albums).toHaveCSS('background-color', highlightColor)
         await expect(tracks).not.toHaveCSS('background-color', highlightColor)
         await expect(trigger).toHaveAttribute('aria-activedescendant', /.+/)
-        await expect(trigger).toHaveAttribute('aria-activedescendant', await albums.getAttribute('id'))
+        await expect(trigger).toHaveAttribute(
+            'aria-activedescendant',
+            await albums.evaluate(option => option.id),
+        )
         await expect(albums).toHaveAttribute('aria-selected', 'false')
 
         await trigger.press('Enter')
