@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review a branch, PR, or working-tree diff against a fixed point for regressions, repository standards, and spec. Use for code review or "review this".
+description: Review a branch, PR, or working-tree diff for regressions, repository standards, spec, and the quality of changed agent guidance. Use for code review or "review this".
 ---
 
 # Code review
@@ -11,15 +11,22 @@ Review committed and uncommitted changes on three independent axes:
 - **Standards.** Does the code follow this repo's documented standards?
 - **Spec.** Does the change implement the originating issue or stated scope?
 
-Run the axes in parallel sub-agents. The parent owns verification evidence and any missing checks.
-Leave fixes for a separate request.
+Run the axes in parallel sub-agents. The parent owns verification evidence, missing checks, and the
+final judgement. Leave fixes for a separate request.
+
+When the diff changes agent guidance, review the instructions themselves. For each consequential rule,
+trace a realistic agent task through its trigger, action, and stopping condition. Check whether the
+rule conflicts with other guidance, makes the agent skip needed work, or makes it do work the user
+did not ask for. Lead the review with consequential guidance findings. Passing checks and a match
+with the PR description do not establish that the guidance makes good decisions.
 
 ## Process
 
 ### 1. Pin the fixed point and scope
 
-Use the user's fixed point. Otherwise default to the merge base with `main` and state that choice.
-Confirm the ref resolves before calculating the base. If `main` is unavailable, ask for a fixed point.
+Use the user's fixed point when supplied. For a PR, use that PR's base branch, including the parent
+branch of a stacked PR. Otherwise use `origin/main`. Resolve the chosen ref before calculating the
+merge base, and state which ref you used. If it is unavailable, ask for a fixed point.
 
 ```sh
 BASE=$(git merge-base <fixed-point> HEAD)
@@ -40,16 +47,18 @@ findings.
 
 Reuse verification before running checks:
 
-- Session results apply when no relevant code changed afterward.
 - PR CI is authoritative for its current head SHA. It does not cover additional local changes.
+- Session results apply to the files and state they checked. If relevant files changed afterward,
+  cite the result as earlier evidence and say what it no longer covers.
 - A clear relevant pass or failure needs no rerun. Report failures and continue static review.
 - Pending, skipped, cancelled, stale, or inaccessible results leave coverage unknown.
 
-For missing coverage, run the narrowest non-mutating check using
-`.agents/skills/verification-loop/SKILL.md` and `docs/testing.md`. Use Make for repo-wide checks,
-Nx for focused project checks, and `make format-check` for formatting. Run missing checks while
-sub-agents work. Record each result's source and scope; report checks that cannot run as gaps.
-Passing checks do not prove correctness.
+For missing coverage, run the narrowest non-mutating check when its result could change the review
+and the check is practical. Follow `.agents/skills/verification-loop/SKILL.md` and `docs/testing.md`.
+Use Make for repo-wide checks, Nx for focused project checks, and `make format-check` for formatting.
+Run needed checks while sub-agents work. Record each result's source and scope; report checks that
+cannot run as gaps. Do not turn a possibly stale result into a current pass. Passing checks do not
+prove correctness.
 
 ### 3. Identify the spec source
 
@@ -108,6 +117,11 @@ and workflows, per `AGENTS.md` ("Keeping the docs true"). If code changes warran
 diff doesn't include it, report that as a Standards finding too, for example if a new concept is
 introduced in the code but not documented.
 
+For changed agent guidance, also read `.agents/skills/writing-for-agents/SKILL.md` and the guidance
+that the changed instructions invoke. Test the directions against realistic tasks. Check whether an
+agent can tell when to invoke the guidance, what to do, and when to stop. Review the advice for
+conflicts and unnecessary work, even if it matches the current repository and the PR description.
+
 Inspect added files and changed lines for accidentally included secrets, local data, logs, or build artifacts, allowing intentional generated files.
 
 #### Code-smell baseline
@@ -153,8 +167,9 @@ brief. Operator choice and subscription lifetime affect behavior as well as stan
 standard by file and rule. Distinguish hard violations from judgement calls. Include the code-smell
 baseline in the brief or give its exact path and section. Require a hunk and concrete maintenance
 cost for a smell. Skip tooling-enforced issues. Check changed documentation against the current
-code and commands, and report missing updates required by `AGENTS.md`. Number findings `S1`, `S2`,
-and so on. Keep the report under 400 words.
+code and commands, and report missing updates required by `AGENTS.md`. For changed agent guidance,
+assess the instructions as directions an agent will follow, as described in step 4. Number findings
+`S1`, `S2`, and so on. Keep the report under 400 words.
 
 **Spec brief.** Read the authoritative spec and scope from step 3, then the diff. Report missing or
 partial requirements, scope creep, and incorrect implementations. Quote the requirement or scope
@@ -167,20 +182,22 @@ First reuse relevant session or CI evidence from step 2. Run the smallest decisi
 that claim lacks a clear result and the check is practical. Keep temporary probes out of the
 committed tree. State what the evidence proves and what remains unknown.
 
-Report each numbered finding separately under `## Regression`, `## Standards`, or `## Spec`.
-Keep each axis's order and judgement. Do not merge or rerank findings across axes.
+Synthesize the sub-agents' findings. Remove duplicates, resolve disagreements with evidence, and
+prioritize by impact. Preserve each finding's source axis so the reader can trace its reasoning.
+When agent guidance is the main subject, lead with `## Agent guidance` and the consequences for
+agent behavior. Put distinct regression, standards, and spec findings after it, and omit empty axes.
+Do not repeat a guidance finding in another section merely to fill an axis.
 
 Under `## Regression`, preserve separate `### Regressions found` and `### Correctness findings`
 subsections. Keep useful deliberate-change context in `### Seems intentional`, unrelated findings
 in `### Bundled / unrelated changes`, and unresolved risks in `### Unproven risks`.
 Intentional changes and unproven risks do not count as findings.
 
-Write `None.` for empty finding subsections or axes. Omit empty context and risk subsections.
-If all three axes were reviewed and have no findings, context, or risks, replace them with
-`No findings across regression, standards, and spec.` Write `Spec unavailable` when skipped.
+When code is the main subject, write `None.` for empty finding subsections or axes. Omit empty context and risk
+subsections. If the guidance review and all three axes have no findings, context, or risks, write
+`No findings.` Write `Spec unavailable` when skipped.
 
-Put `## Gates` first only when verification evidence shows a failure. Number failures `G1`, `G2`,
-and so on. Name the failed check and whether the result comes from the session, CI, or this review.
-Otherwise give one short verification sentence, such as `Verification reused from successful CI
-for <SHA>; no checks rerun.` Name unknown or pending coverage without claiming success. Include
-finding counts per axis when there are findings; skip zero counts in a clean report.
+Report verification after the findings unless a failed check prevents a trustworthy review. Name
+the source and scope of each relevant result. State when evidence predates changed files or CI does
+not cover local edits. Do not rerun checks solely to replace a clear CI result. Include finding
+counts per axis when they help the reader; skip zero counts in a clean report.

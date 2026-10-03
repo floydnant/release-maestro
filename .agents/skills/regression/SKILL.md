@@ -17,8 +17,8 @@ changed code. Cite the file and line, and say what breaks.
 
 Use the parent's resolved base and scope when supplied. Otherwise establish them below.
 
-- Read `git status`, the current branch, and the merge base with `main` (or the base named in the
-  request).
+- Read `git status`, the current branch, and the merge base with the user's fixed point. For a PR,
+  use its base branch, including the parent branch of a stacked PR. Otherwise use `origin/main`.
 - Inspect `git log --oneline` and `git diff --stat` for the scoped commits, and include uncommitted
   working-tree changes unless the user scoped you to committed work only.
 - Inspect relevant untracked files separately because Git diffs omit them.

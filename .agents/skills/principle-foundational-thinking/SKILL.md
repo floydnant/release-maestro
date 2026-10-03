@@ -17,4 +17,5 @@ At code level, DRY the structure, not every line. Types and data models should c
 
 Each increment should land a coherent abstraction or deepen one that exists. Do not spread a new capability across callers as special-case coordination.
 
-Remove obsolete code before adding the foundations that replace it.
+Remove obsolete code once its replacement supports the callers. Do not keep both paths longer than
+the migration needs.

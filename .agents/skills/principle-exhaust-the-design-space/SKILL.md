@@ -5,9 +5,13 @@ description: 'Apply when facing a novel UI interaction or architectural decision
 
 # Exhaust the Design Space
 
-When a novel interaction or architectural decision has no established precedent, explore several concrete alternatives before implementation. Building the wrong thing costs more than exploring three options.
+When a novel interaction or architectural decision has no established precedent, compare distinct
+alternatives before implementation. Stop exploring once the choice has enough evidence.
 
-**The rule.** When the right answer is not obvious, compare at least two distinct designs using sketches, small prototypes, or concrete interfaces. Use the cheapest form that answers the question. Compare them side by side. Once the choice is clear, stop exploring and implement the smallest robust version. Design it twice is this rule by another name. A second flavor of the first shape does not count.
+**The rule.** Start with two distinct designs using sketches, small prototypes, or concrete
+interfaces. Use the cheapest form that answers the question. Add a third if the tradeoff remains
+unclear, then stop unless new evidence reveals a missing alternative. Compare the designs side by
+side and implement the smallest robust choice. A second flavor of the first shape does not count.
 
 **When it applies:**
 

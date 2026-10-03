@@ -1,5 +1,5 @@
 interface:
     display_name: 'Code Review'
-    short_description: 'Review a diff for regressions, standards, and spec'
+    short_description: 'Review code and agent guidance changes'
 policy:
     allow_implicit_invocation: true
