@@ -34,6 +34,9 @@ description: Verification loop using repository make targets.
 - `make test-tools` — repository tools tests. `make test` includes them; `make agents-check` checks
   the agent skills and harness adapters.
 - `make format-check` — non-mutating formatting check, for review and CI-style verification.
+- `make security` — current npm and Rust vulnerability advisories; requires network access and runs
+  separately from `make sure`. `make sbom` generates dependency inventories; `make sbom-release`
+  adds an inventory of an existing package. See `docs/security.md` for exception policy and limits.
 - `make affected` — build, lint, unit tests, development Electron E2E, and renderer E2E, scoped to
   what git says changed; does not check or mutate formatting.
 - `make e2e-renderer` — renderer-only E2E and part of `make sure`.

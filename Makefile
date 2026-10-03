@@ -5,6 +5,19 @@ ICON_SOURCE := $(ICON_DIR)/app-icon.png
 SKIP_NX_CACHE := false
 E2E_REPORT := electron
 PNPM := pnpm
+ARTIFACT_DIR := dist/executables
+
+.PHONY: security security-tools security-policy-check sbom sbom-release
+security-tools: ## Download checksum-pinned security tools for this platform
+	node tools/security/cli.mjs install
+security: ## Scan both lockfiles for known vulnerabilities (requires network)
+	node tools/security/cli.mjs scan
+security-policy-check: ## Validate vulnerability exceptions and their expiry dates
+	node tools/security/cli.mjs policy
+sbom: ## Generate repository and runtime CycloneDX SBOMs in dist/security
+	node tools/security/cli.mjs sbom
+sbom-release: ## Generate source and artifact SBOMs for an existing package (ARTIFACT_DIR=path)
+	node tools/security/cli.mjs sbom "$(ARTIFACT_DIR)"
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)

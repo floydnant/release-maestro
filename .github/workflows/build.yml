@@ -27,6 +27,19 @@ jobs:
             - name: Build the app
               run: make package
 
+            - name: Fetch locked SBOM dependencies
+              run: cargo fetch --locked --manifest-path apps/metadata-engine/Cargo.toml
+
+            - name: Generate release SBOMs
+              run: make sbom-release
+
+            - name: Upload release SBOMs
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: release-sbom-linux
+                  path: dist/security/
+                  if-no-files-found: error
+
             # @TODO: add back in when we have a proper release pipeline
             # - name: Upload artifact
             #   uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -43,6 +56,19 @@ jobs:
             - name: Build the app
               run: make package
 
+            - name: Fetch locked SBOM dependencies
+              run: cargo fetch --locked --manifest-path apps/metadata-engine/Cargo.toml
+
+            - name: Generate release SBOMs
+              run: make sbom-release
+
+            - name: Upload release SBOMs
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: release-sbom-macos
+                  path: dist/security/
+                  if-no-files-found: error
+
             # @TODO: add back in when we have a proper release pipeline
             # - name: Upload artifact
             #   uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -58,6 +84,19 @@ jobs:
 
             - name: Build the app
               run: make package
+
+            - name: Fetch locked SBOM dependencies
+              run: cargo fetch --locked --manifest-path apps/metadata-engine/Cargo.toml
+
+            - name: Generate release SBOMs
+              run: make sbom-release
+
+            - name: Upload release SBOMs
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: release-sbom-windows
+                  path: dist/security/
+                  if-no-files-found: error
 
             # @TODO: add back in when we have a proper release pipeline
             # - name: Upload artifact

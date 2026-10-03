@@ -73,6 +73,9 @@ make format-check  # non-mutating formatting check
 make e2e           # full Electron E2E against the development build
 make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
+make security     # scan npm and Rust dependencies for known vulnerabilities
+make sbom         # generate repository and runtime CycloneDX inventories
+make sbom-release # add an artifact inventory after make package
 ```
 
 `make sure` mutates formatting. Electron E2E and renderer E2E may run together. Electron E2E uses
@@ -99,6 +102,7 @@ There is no repo-wide typecheck target; `build` is the type gate for app code. S
   glossaries in [docs/contexts/](docs/contexts/), and which projects each context spans
 - [docs/adr/](docs/adr/) — architectural decisions and the reasoning behind non-obvious ones
 - [docs/testing.md](docs/testing.md) — test layers, E2E conventions, fixtures
+- [docs/security.md](docs/security.md) — vulnerability gates, exceptions, and SBOM outputs
 
 ## Projects
 
