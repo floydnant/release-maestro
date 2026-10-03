@@ -5,6 +5,9 @@ bundle with a renderer port, Electron CDP port, and Node inspector port. Slot ze
 and 5858. Later slots offset all three ports together. If any port in a slot is busy, the manager
 tries the next complete slot. Debug endpoints listen on loopback.
 
+The renderer port serves assets to Electron. For live UI inspection, attach to the Electron CDP
+port with [`inspect-running-app`](../.agents/skills/inspect-running-app/SKILL.md).
+
 The manager stores a manifest at `.release-maestro-instance.json` in the worktree and a locked,
 user-scoped registry under the home directory. The manifest holds a generated worktree ID, checkout
 identity, and a copy of its bundle. The registry owns the allocation. A branch change keeps the ID.
