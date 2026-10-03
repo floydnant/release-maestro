@@ -15,13 +15,20 @@
             </span>
             @if (pingError(); as error) {
                 <button hlmBtn variant="ghost" type="button" (click)="ping()">Retry health check</button>
-                <div hlmAlert variant="destructive" class="worker-error | max-w-xs">
-                    <p hlmAlertDescription>{{ error }}</p>
+                <div hlmAlert variant="plain" class="worker-error | max-w-xs text-right">
+                    <p hlmAlertDescription class="text-xs text-content-danger">{{ error }}</p>
                 </div>
             } @else {
                 @if (pingResult(); as result) {
                     <div hlmCollapsible class="text-right">
-                        <button hlmBtn hlmCollapsibleTrigger variant="ghost" size="sm" type="button">
+                        <button
+                            hlmBtn
+                            hlmCollapsibleTrigger
+                            variant="plain"
+                            size="none"
+                            class="text-xs text-content-muted"
+                            type="button"
+                        >
                             Health payload
                         </button>
                         <pre
@@ -86,7 +93,7 @@
                     <input
                         hlmInput
                         aria-label="Read file path"
-                        class="font-mono"
+                        class="font-mono text-sm"
                         [ngModel]="readPath()"
                         (ngModelChange)="readPath.set($event)"
                         placeholder="/absolute/path/to/song.flac"
@@ -124,7 +131,7 @@
                     <input
                         hlmInput
                         aria-label="Write file path"
-                        class="font-mono"
+                        class="font-mono text-sm"
                         [ngModel]="writePath()"
                         (ngModelChange)="writePath.set($event)"
                         placeholder="/absolute/path/to/song.flac"
@@ -134,14 +141,11 @@
                     <textarea
                         hlmTextarea
                         aria-label="Write tag payload"
-                        class="font-mono"
+                        class="font-mono text-sm"
+                        aria-describedby="write-tag-payload-description"
                         [ngModel]="writePayloadText()"
                         (ngModelChange)="writePayloadText.set($event)"
                     ></textarea>
-                    <p hlmFieldDescription>
-                        Writes go through the Rust engine tri-state update contract. Use this only on
-                        disposable files.
-                    </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                     <button hlmBtn variant="destructive" type="button" (click)="writeTags()">
@@ -149,6 +153,14 @@
                     </button>
                     <p class="type-body-sm text-content-muted">Use disposable files only.</p>
                 </div>
+                <p
+                    hlmFieldDescription
+                    id="write-tag-payload-description"
+                    class="type-body-sm text-content-secondary"
+                >
+                    Writes go through the Rust engine tri-state update contract. Use this only on disposable
+                    files.
+                </p>
                 @if (writeError(); as error) {
                     <div hlmAlert variant="destructive">
                         <p hlmAlertDescription>{{ error }}</p>
@@ -169,6 +181,15 @@
                     <div class="max-w-2xl">
                         <p class="type-label-sm text-content-muted uppercase">Persisted library scan</p>
                         <h3 class="mt-1 type-section-title text-content-primary">Full Library Scan</h3>
+                        <p
+                            hlmFieldDescription
+                            id="library-scan-paths-description"
+                            class="mt-2 type-body-sm text-content-secondary"
+                        >
+                            Enter one folder per line, or leave empty to scan the configured library folders.
+                            Runs through the shared LibraryScanService (same as onboarding and startup
+                            rescans).
+                        </p>
                     </div>
                     <div class="flex gap-2">
                         @if (!scanInFlight()) {
@@ -182,14 +203,11 @@
                 </div>
 
                 <div hlmField>
-                    <p hlmFieldDescription>
-                        Enter one folder per line, or leave empty to scan the configured library folders. Runs
-                        through the shared LibraryScanService (same as onboarding and startup rescans).
-                    </p>
                     <textarea
                         hlmTextarea
                         aria-label="Library scan paths"
-                        class="min-h-24 font-mono"
+                        class="min-h-24 font-mono text-sm"
+                        aria-describedby="library-scan-paths-description"
                         [ngModel]="scanPathsText()"
                         (ngModelChange)="scanPathsText.set($event)"
                         placeholder="/music/library&#10;/other/folder"
@@ -199,7 +217,7 @@
                 <app-progress-bar [segments]="scanProgressSegments()" [shouldGlow]="scanInFlight()" />
 
                 <div class="grid gap-3 md:grid-cols-5">
-                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 rounded-lg bg-background-canvas p-3 shadow-none">
                         <p class="type-label-sm text-content-muted uppercase">New</p>
                         <p
                             aria-label="New songs"
@@ -208,7 +226,7 @@
                             {{ scanStatus()?.new ?? 0 }}
                         </p>
                     </div>
-                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 rounded-lg bg-background-canvas p-3 shadow-none">
                         <p class="type-label-sm text-content-muted uppercase">Changed</p>
                         <p
                             aria-label="Changed songs"
@@ -217,7 +235,7 @@
                             {{ scanStatus()?.changed ?? 0 }}
                         </p>
                     </div>
-                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 rounded-lg bg-background-canvas p-3 shadow-none">
                         <p class="type-label-sm text-content-muted uppercase">Unchanged</p>
                         <p
                             aria-label="Unchanged songs"
@@ -226,7 +244,7 @@
                             {{ scanStatus()?.unchanged ?? 0 }}
                         </p>
                     </div>
-                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 rounded-lg bg-background-canvas p-3 shadow-none">
                         <p class="type-label-sm text-content-muted uppercase">Missing</p>
                         <p
                             aria-label="Missing songs"
@@ -235,7 +253,7 @@
                             {{ scanStatus()?.terminal?.missing ?? 0 }}
                         </p>
                     </div>
-                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 rounded-lg bg-background-canvas p-3 shadow-none">
                         <p class="type-label-sm text-content-muted uppercase">Tag issues</p>
                         <p
                             aria-label="Normalization issues"
@@ -258,13 +276,18 @@
                         </div>
                     }
                     @if (status.terminal; as terminal) {
-                        <div hlmCollapsible hlmCard class="raw-scan-result | gap-0 bg-background-canvas p-3">
+                        <div
+                            hlmCollapsible
+                            hlmCard
+                            class="raw-scan-result | gap-0 rounded-lg bg-background-canvas p-3 shadow-none"
+                        >
                             <button
                                 hlmBtn
                                 hlmCollapsibleTrigger
-                                variant="ghost"
+                                variant="plain"
+                                size="none"
                                 type="button"
-                                class="justify-start"
+                                class="justify-start type-label-md text-content-primary"
                             >
                                 Raw terminal result
                             </button>
@@ -304,7 +327,7 @@
                             <span
                                 hlmBadge
                                 variant="secondary"
-                                class="scan-phase | justify-center font-mono"
+                                class="scan-phase | justify-center px-2 py-0.5 font-mono text-xs leading-4 font-normal"
                                 [class]="scanPhaseClass(entry.status.phase)"
                             >
                                 {{ entry.status.phase }}
