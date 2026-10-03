@@ -5,11 +5,31 @@ export const fansBoughtMusicEmail: Email = {
     subject: 'Fans you follow bought new music on Bandcamp',
     dateReceived: '2026-10-01T21:40:12Z',
     sender: 'Bandcamp <noreply@bandcamp.com>',
-    plainBody: 'Fans you follow bought First Release and Second Release.',
+    plainBody: 'First Release: Bought by Adam Pitts. Second Release: Bought by Maya and River & Rain.',
+    // Reduced Bandcamp email structure, with synthetic releases and fan names.
     htmlBody: `
-        <a href="https://test.bandcamp.com/album/first?from=fan">First Release</a>
-        <a href="https://test.bandcamp.com/album/first?from=artwork">First Release artwork</a>
-        <a href="https://other.bandcamp.com/track/second?from=fan">Second Release</a>
+        <a href="https://bandcamp.com/someone-else">Someone Else</a> and others bought new music.
+        <div>
+            <a href="https://test.bandcamp.com/album/first?from=artwork"><img alt="First Release artwork"></a>
+            <div class="item-tralbum-text">
+                <a href="https://test.bandcamp.com/album/first?t=1&amp;from=fanactv-adam">First Release</a>
+                <div class="bought-by">
+                    Bought by <a href="http://bandcamp.com/adam">Adam Pitts</a>
+                    <div class="purchaser-photos"><a href="http://bandcamp.com/adam"><img></a></div>
+                </div>
+            </div>
+        </div>
+        <div class="item-tralbum-text">
+            <a href="https://other.bandcamp.com/track/second?from=fanactv-maya">Second Release</a>
+            <div class="bought-by">
+                Bought by <a href="http://bandcamp.com/maya">Maya</a> and
+                <a href="http://bandcamp.com/river">River &amp; Rain</a>
+                <div class="purchaser-photos">
+                    <a href="http://bandcamp.com/maya"><img></a>
+                    <a href="http://bandcamp.com/river"><img></a>
+                </div>
+            </div>
+        </div>
     `,
     isRead: true,
     vendor: 'APPLE_MAIL',
@@ -42,6 +62,13 @@ export const fansBoughtMusicFeedItem: BandcampFeedItem = {
         dateReceived: fansBoughtMusicEmail.dateReceived,
         isRead: fansBoughtMusicEmail.isRead,
         tralbumUrls: ['https://test.bandcamp.com/album/first', 'https://other.bandcamp.com/track/second'],
+        purchases: [
+            { tralbumUrl: 'https://test.bandcamp.com/album/first', fanNames: ['Adam Pitts'] },
+            {
+                tralbumUrl: 'https://other.bandcamp.com/track/second',
+                fanNames: ['Maya', 'River & Rain'],
+            },
+        ],
     },
 }
 

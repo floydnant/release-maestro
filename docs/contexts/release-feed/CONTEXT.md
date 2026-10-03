@@ -86,8 +86,10 @@ mail body.
 **Fans-bought-music notification**:
 The Bandcamp notification about releases bought by fans the user follows
 (`EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC`). It carries a list of release URLs, so import creates one feed
-item per distinct URL. Each keeps the notification's event date and read state. These releases show
-a "Bought by fans you follow" chip in the feed, including when hydration fails.
+item per distinct URL. Each keeps the notification's event date and read state. The notification
+associates each release with the names of the fans who bought it. These releases show a "Bought by
+Adam Pitts" chip using those names, including when hydration fails. Multiple buyers appear together.
+Older imported notifications without buyer attribution show "Bought by fans you follow".
 
 **Feed source item**:
 A parsed notification, before it becomes a feed item. This is the boundary type: one source item can
