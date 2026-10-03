@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "85e686b1-9636-4a6a-9d7e-fbc5800e7374",
+  "id": "a4d03926-b71f-4d38-897f-e5d7c6519e86",
   "prevId": "f27652dc-482f-43b8-9c0f-8eac657bc410",
   "tables": {
     "album_artists": {
@@ -1200,6 +1200,22 @@
           "notNull": false,
           "autoincrement": false
         },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "0"
+        },
+        "last_available_at": {
+          "name": "last_available_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "0"
+        },
         "file_fingerprint": {
           "name": "file_fingerprint",
           "type": "text",
@@ -1541,10 +1557,9 @@
           ],
           "isUnique": false
         },
-        "songs_metadata_hash_size_idx": {
-          "name": "songs_metadata_hash_size_idx",
+        "songs_size_idx": {
+          "name": "songs_size_idx",
           "columns": [
-            "metadata_hash",
             "size"
           ],
           "isUnique": false

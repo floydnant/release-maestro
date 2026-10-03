@@ -1,5 +1,6 @@
 import { Observable } from 'rxjs'
-import { stat } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
+import { basename, dirname } from 'node:path'
 import {
     LibraryScanUpdate,
     MetadataPrescanUpdate,
@@ -144,14 +145,19 @@ export class LibraryBackendService {
                 // Failed/cancelled reads leave their discovery rows for the next scan to retry.
                 if (errors == 0 && prescanErrors == 0) {
                     const moves = []
+                    const copies = []
                     for (const candidate of this.repository.findMovedSongCandidates(scanStartedAt)) {
-                        const absent = await pathIsAbsent(candidate.missing.path)
+                        const location = await compareLocations(candidate.missing.path, candidate.found.path)
                         if (abortSignal?.aborted) return
-                        if (absent) moves.push(candidate)
+                        if (location == 'moved') moves.push(candidate)
+                        if (location == 'copy') copies.push(candidate)
+                    }
+                    for (const candidate of copies) {
+                        this.repository.recordSongAvailable(candidate.missing.id, scanStartedAt)
                     }
                     for (const candidate of moves) {
                         this.repository.reconcileMovedSong(candidate)
-                        if (candidate.found.addedAt?.getTime() == scanStartedAt.getTime()) {
+                        if (candidate.found.firstSeenAt.getTime() == scanStartedAt.getTime()) {
                             newCount -= 1
                             changed += 1
                         }
@@ -210,17 +216,28 @@ export class LibraryBackendService {
     }
 }
 
-/** An excluded but reachable original is a copy, not a move. Permission failures are inconclusive. */
-const pathIsAbsent = async (path: string): Promise<boolean> => {
+/** Distinguish an independent original from case aliases on case-insensitive filesystems. */
+const compareLocations = async (original: string, found: string): Promise<'moved' | 'copy' | 'unknown'> => {
+    const before = await stat(original).catch(error => (isAbsent(error) ? 'absent' : 'unknown'))
+    if (before == 'absent') return 'moved'
+    if (before == 'unknown') return 'unknown'
     try {
-        await stat(path)
-        return false
-    } catch (error) {
-        return (
-            typeof error == 'object' &&
-            error != null &&
-            'code' in error &&
-            (error.code == 'ENOENT' || error.code == 'ENOTDIR')
-        )
+        const after = await stat(found)
+        if (before.ino != 0 && before.ino == after.ino && before.dev == after.dev) {
+            // realpath preserves input casing on macOS. Directory entries reveal the actual spelling.
+            // Independent hardlinks and symlinks still have their own entry and remain copies.
+            for (let path = original; dirname(path) != path; path = dirname(path)) {
+                if (!(await readdir(dirname(path))).includes(basename(path))) return 'moved'
+            }
+        }
+        return 'copy'
+    } catch {
+        return 'unknown'
     }
 }
+
+const isAbsent = (error: unknown): boolean =>
+    typeof error == 'object' &&
+    error != null &&
+    'code' in error &&
+    (error.code == 'ENOENT' || error.code == 'ENOTDIR')

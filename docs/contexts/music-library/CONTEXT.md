@@ -75,13 +75,15 @@ A SHA-256 digest of all file bytes, read by the metadata engine during deep read
 byte-identical files independently of their paths and filesystem timestamps. It differs from the
 file fingerprint, which includes the path and decides whether another deep read is needed.
 Existing reachable songs receive a content hash on their next scan. For older songs already missing,
-move matching requires a unique full-metadata-hash and size match with identifying title and artist
-or album tags. That fallback is an inference, not proof of equal audio bytes. Untagged older missing
+move matching requires unique matching stored tags, audio properties, and size, with identifying
+title and artist or album tags. Artwork paths and user-added external references are excluded. That fallback is an inference, not proof of equal audio bytes. Untagged older missing
 songs need a scan at their original location before content matching is possible.
 
 Move matching requires exactly one unseen song and one seen song with the matching identity. The
-destination must have first appeared after the original was last seen, and the original path must
-no longer exist. Known copies, ambiguous matches, changed bytes with known hashes, and inconclusive
+destination must have first appeared after the original was last confirmed available. These scan
+timestamps are separate from the Added date. Availability includes discovery and successful probes
+of excluded originals, so known copies stay distinct after either disappears. The original directory
+entry must no longer exist; case-only renames resolve to the destination and also count as moves. Known copies, ambiguous matches, changed bytes with known hashes, and inconclusive
 filesystem errors retain separate rows. Moving and editing tags together is not a byte-identical move.
 
 **Missing**:
