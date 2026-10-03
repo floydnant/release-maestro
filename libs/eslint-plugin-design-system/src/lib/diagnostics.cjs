@@ -91,6 +91,8 @@ const TEMPLATE_MESSAGES = {
     ...MEMBER_MESSAGES,
     partialClass:
         '`{{className}}` is glued to a runtime value — suppress with a reason if the vocabulary is closed.',
+    unexpectedDescriptor:
+        '`{{attribute}}` accepts styling classes only — put the descriptor on the element\'s `class` attribute.',
 }
 
 /**

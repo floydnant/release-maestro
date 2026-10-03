@@ -1,0 +1,13 @@
+diff --git a/fesm2022/spartan-ng-brain-tooltip.mjs b/fesm2022/spartan-ng-brain-tooltip.mjs
+index a07146268c6cf7957d23fafb45c894bead457f21..1649bd27a1cde049edb83a4266ed1560638039af 100644
+--- a/fesm2022/spartan-ng-brain-tooltip.mjs
++++ b/fesm2022/spartan-ng-brain-tooltip.mjs
+@@ -484,7 +484,7 @@ class BrnTooltip {
+     _initScrollListener() {
+         this._listenersRefs = [
+             ...this._listenersRefs,
+-            this._renderer.listen(this._document.defaultView, 'scroll', () => this._hide()),
++            this._renderer.listen(this._document, 'scroll', () => this._dismiss(), { capture: true }),
+         ];
+     }
+     _cleanupTriggerEvents() {

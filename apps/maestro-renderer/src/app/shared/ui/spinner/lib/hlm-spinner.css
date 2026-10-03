@@ -1,0 +1,23 @@
+/* Preserve the application's two 20% arcs, each rotating from its own SVG offset.
+   Their shared animation needs a per-ring custom property for those offsets. */
+.spinner-ring {
+    transition: stroke-dashoffset var(--duration-slow) var(--ease-standard);
+    --rotation: -90deg;
+    transform: rotate(var(--rotation));
+    transform-origin: 50% 50%;
+    stroke-linecap: round;
+    animation: spinner-rotation var(--duration-ambient) linear infinite;
+}
+
+.spinner-ring-2 {
+    --rotation: -270deg;
+}
+
+@keyframes spinner-rotation {
+    0% {
+        transform: rotate(calc(var(--rotation) + 0deg));
+    }
+    100% {
+        transform: rotate(calc(var(--rotation) + 360deg));
+    }
+}

@@ -2,8 +2,11 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core'
 import { NgIcon, provideIcons } from '@ng-icons/core'
 import {
     octCheckCircleFill,
+    octCheck,
+    octChevronDown,
     octChevronLeft,
     octChevronRight,
+    octChevronUp,
     octDash,
     octFileDirectory,
     octFileDirectoryFill,
@@ -29,6 +32,9 @@ import { solarAlarmSleep } from '@ng-icons/solar-icons/outline'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 const icons = {
+    check: octCheck,
+    chevronDown: octChevronDown,
+    chevronUp: octChevronUp,
     success: octCheckCircleFill,
     windowMinimize: octDash,
     folder: octFileDirectory,

@@ -81,6 +81,12 @@ module.exports = {
     create(context) {
         const options = context.options[0] ?? {}
         const reportDynamic = options.reportDynamic ?? true
+        /** @type {string[]} */
+        const configuredClassAttributes = options.additionalClassAttributes ?? []
+        const additionalClassAttributes = new Set(
+            configuredClassAttributes.filter(name => !CLASS_ATTRIBUTES.has(name)),
+        )
+        const classAttributes = new Set([...CLASS_ATTRIBUTES, ...additionalClassAttributes])
         const sourceCode = context.sourceCode
         const { isThemeVariable, isValid, suggest } = createClassChecker(options, {
             cwd: context.cwd,
@@ -128,13 +134,13 @@ module.exports = {
          * @param {string} value
          * @param {{ offset?: number|null, truncatedStart?: boolean, truncatedEnd?: boolean,
          *           fallbackLoc: import('eslint').AST.SourceLocation,
-         *           descriptorsApply?: boolean }} placement
+         *           descriptorsApply?: boolean, stylingOnlyAttribute?: string }} placement
          *   `descriptorsApply` is false for surfaces where the convention has no meaning, so the
          *   diagnostic does not ask "descriptor?" somewhere a descriptor could never belong.
          */
         const checkClassList = (
             value,
-            { offset, truncatedStart, truncatedEnd, fallbackLoc, descriptorsApply = true },
+            { offset, truncatedStart, truncatedEnd, fallbackLoc, descriptorsApply = true, stylingOnlyAttribute },
         ) => {
             const positioned = offset !== null && offset !== undefined
             const { tokens, malformed } = tokenizeClassList(value, {
@@ -170,7 +176,17 @@ module.exports = {
                     })
                 }
 
-                if (token.kind === 'descriptor' || token.kind === 'interpolated') continue
+                if (token.kind === 'descriptor') {
+                    if (stylingOnlyAttribute) {
+                        context.report({
+                            messageId: 'unexpectedDescriptor',
+                            data: { attribute: stylingOnlyAttribute },
+                            loc,
+                        })
+                    }
+                    continue
+                }
+                if (token.kind === 'interpolated') continue
 
                 if (token.kind === 'partial') {
                     if (reportDynamic) {
@@ -197,7 +213,8 @@ module.exports = {
                     truncatedStart: literal.truncatedStart,
                     truncatedEnd: literal.truncatedEnd,
                     fallbackLoc,
-                    descriptorsApply: node.name !== ROUTER_LINK_ACTIVE,
+                    descriptorsApply: node.name !== ROUTER_LINK_ACTIVE && !additionalClassAttributes.has(node.name),
+                    stylingOnlyAttribute: additionalClassAttributes.has(node.name) ? node.name : undefined,
                 })
             }
 
@@ -214,12 +231,13 @@ module.exports = {
         return {
             /** @param {AngularTextAttribute} node */
             TextAttribute(node) {
-                if (!CLASS_ATTRIBUTES.has(node.name) || !node.valueSpan) return
+                if (!classAttributes.has(node.name) || !node.valueSpan) return
 
                 checkClassList(node.value, {
                     offset: node.valueSpan.start.offset,
                     fallbackLoc: locFor(node.sourceSpan.start.offset, node.sourceSpan.end.offset),
-                    descriptorsApply: node.name !== ROUTER_LINK_ACTIVE,
+                    descriptorsApply: node.name !== ROUTER_LINK_ACTIVE && !additionalClassAttributes.has(node.name),
+                    stylingOnlyAttribute: additionalClassAttributes.has(node.name) ? node.name : undefined,
                 })
             },
 
@@ -230,7 +248,7 @@ module.exports = {
                     return
                 }
 
-                if (CLASS_ATTRIBUTES.has(node.name)) checkExpression(node)
+                if (classAttributes.has(node.name)) checkExpression(node)
             },
         }
     },
