@@ -126,6 +126,9 @@ By default, hydration filters releases with no _playable tracks_ out of the disp
 → Feed can disable this filter. Filtering preserves the item's view and snooze state, so a later
 hydration can show it once a track becomes playable. A filtered batch continues loading older
 candidates until the visible page is filled or the eligible releases run out.
+The app remembers up to 1,000 releases confirmed unplayable for five minutes to avoid fetching them
+again on every scroll. Later hydration rechecks them after that interval. Disabling the filter
+bypasses the interval. Hydration errors stay visible because their track availability is unknown.
 _Avoid_: scraping — that names the implementation, not the behavior
 
 **Playable track**:

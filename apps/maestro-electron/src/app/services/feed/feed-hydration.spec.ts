@@ -35,7 +35,10 @@ describe('feed hydration playable-track filter', () => {
         )
     })
 
-    afterEach(() => database.sqlite.close())
+    afterEach(() => {
+        database.sqlite.close()
+        jest.restoreAllMocks()
+    })
 
     const seed = async (...ids: string[]) => {
         const items = ids.map((id, index) =>
@@ -114,7 +117,17 @@ describe('feed hydration playable-track filter', () => {
         await seed('preorder')
         await expect(service.loadFeed(0, 5)).resolves.toEqual([])
         scrape.mockResolvedValue(scrapedRelease(['https://audio.example/preview.mp3']))
+        await expect(service.loadFeed(0, 5)).resolves.toEqual([])
+        expect(scrape).toHaveBeenCalledTimes(1)
+        jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 5 * 60 * 1000)
         expect((await service.loadFeed(0, 5)).map(item => item.id)).toEqual(['preorder'])
+    })
+
+    it('bounds remembered unplayable releases and rechecks evicted entries', async () => {
+        const items = Array.from({ length: 1001 }, (_, index) => bandcampFeedItem(String(index), new Date()))
+        await expect(service.hydrateFeed(items)).resolves.toEqual([])
+        await expect(service.hydrateFeed(items.slice(0, 1))).resolves.toEqual([])
+        expect(scrape).toHaveBeenCalledTimes(1002)
     })
 
     it('reads the setting on each request and includes unplayable releases when disabled', async () => {
@@ -124,12 +137,12 @@ describe('feed hydration playable-track filter', () => {
         expect((await service.loadFeed(0, 5)).map(item => item.id)).toEqual(['preorder'])
     })
 
-    it('filters failed hydration without losing the item, and exposes its error when disabled', async () => {
+    it('keeps hydration errors visible when release playability is unknown', async () => {
         await seed('unreachable')
         scrape.mockRejectedValue(
             new BandcampApiFailedToFetchTralbumException('https://test.bandcamp.com', 404),
         )
-        await expect(service.loadFeed(0, 5)).resolves.toEqual([])
+        expect((await service.loadFeed(0, 5))[0]?.error).not.toBeNull()
         settings.patchSettings({ feed: { hideUnplayableReleases: false } })
         const items = await service.loadFeed(0, 5)
         expect(items[0]?.error).not.toBeNull()
