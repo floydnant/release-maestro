@@ -46,7 +46,8 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
                     .replace(/^\s*(released|releases).+\n/m, '')
                     .replace(/(^((<br>)|\n|\s)+)|(((<br>)|\n|\s)+$)/g, '') ||
                 (newRelease?.plainBody ?? '')
-                    .replace(/(\s{2,}\?\s*)|(\s*\?\s{2,})/g, '\n')
+                    // Only start once per whitespace run. A following '?' can start another separator.
+                    .replace(/(?<!\s)(?:\s{2,}\?\s*|\s*\?\s{2,})|\?\s{2,}/g, '\n')
                     .replace(/�/g, '')
                     .replace(
                         /(Unfollow|Unsubscribe) [^\r\n]+/i,

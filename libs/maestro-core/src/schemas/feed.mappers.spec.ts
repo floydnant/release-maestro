@@ -143,6 +143,26 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
     })
 
     it.each([
+        ['First  ?  Second\t?\t\tThird', 'First<br>Second<br>Third'],
+        ['First ? Second', 'First ? Second'],
+        ['First  ?   ?  Second', 'First<br><br>Second'],
+        [`First${' '.repeat(1000)}Second`, `First${' '.repeat(1000)}Second`],
+    ])('preserves email whitespace formatting for %s', (plainBody, expected) => {
+        const item: BandcampFeedItem = {
+            ...fansBoughtMusicFeedItem,
+            source: {
+                ...newReleaseEmail,
+                plainBody,
+                type: 'EMAIL.BANDCAMP_NEW_RELEASE',
+                releaseUrl: fansBoughtMusicFeedItem.data.tralbumUrl,
+                releaseType: 'album',
+                links: [],
+            },
+        }
+        expect(mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null).data.about).toBe(expected)
+    })
+
+    it.each([
         'https://f4.bcbits.com.evil.example/img/a123_9.jpg',
         'https://evil.example/f4.bcbits.com/img/a123_9.jpg',
         'https://f4.bcbits.com@evil.example/img/a123_9.jpg',
