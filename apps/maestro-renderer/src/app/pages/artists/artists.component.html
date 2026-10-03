@@ -13,9 +13,10 @@
     >
         <div class="artist-sort | flex min-w-[35.5rem] items-center gap-6 border-b border-border-subtle px-6">
             <button
-            hlmBtn variant="ghost"
+                hlmBtn
+                variant="ghost"
                 type="button"
-                class="artist-sort__name | type-label-sm flex min-w-0 flex-1 justify-start items-center gap-1 rounded-none px-0 py-2 text-content-primary"
+                class="artist-sort__name | flex min-w-0 flex-1 items-center justify-start gap-1 rounded-none px-0 py-2 type-label-sm text-content-primary"
                 (click)="onSort()"
                 [attr.aria-label]="
                     query().sort.direction === 'asc' ? 'Sort artists Z to A' : 'Sort artists A to Z'
@@ -31,17 +32,17 @@
             <!-- Hidden from assistive tech: each cell below spells its own unit out, so
              announcing these too would read every row's counts twice. -->
             <span
-                class="artist-sort__tracks | type-label-sm w-24 shrink-0 py-2 text-right text-content-muted"
+                class="artist-sort__tracks | w-24 shrink-0 py-2 text-right type-label-sm text-content-muted"
                 aria-hidden="true"
                 >Tracks</span
             >
             <span
-                class="artist-sort__albums | type-label-sm w-24 shrink-0 py-2 text-right text-content-muted"
+                class="artist-sort__albums | w-24 shrink-0 py-2 text-right type-label-sm text-content-muted"
                 aria-hidden="true"
                 >Albums</span
             >
             <span
-                class="artist-sort__years | type-label-sm w-24 shrink-0 py-2 text-right text-content-muted"
+                class="artist-sort__years | w-24 shrink-0 py-2 text-right type-label-sm text-content-muted"
                 aria-hidden="true"
                 >Years active</span
             >

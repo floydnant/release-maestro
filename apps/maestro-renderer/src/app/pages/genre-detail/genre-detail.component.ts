@@ -27,7 +27,8 @@ const LOADING: DetailState = { status: 'loading' }
     selector: 'app-genre-detail',
     templateUrl: './genre-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [HlmButton, 
+    imports: [
+        HlmButton,
         RouterLink,
         TabBarComponent,
         EntitySongsComponent,
