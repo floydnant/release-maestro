@@ -191,7 +191,7 @@ export interface ArtistCreditSegment {
 /** One row of the track list. Values are `null` where the tag was absent. */
 export interface SongRow {
     id: string
-    /** Absolute filesystem path — the only stable thing a missing song still has. */
+    /** Last known absolute filesystem path; a reconciled move changes it but keeps the song ID. */
     path: string
     /** `false` once a scan could not find the file. Rendered dimmed and marked. */
     present: boolean
