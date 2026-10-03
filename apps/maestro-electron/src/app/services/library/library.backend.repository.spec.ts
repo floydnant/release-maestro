@@ -457,13 +457,13 @@ describe('LibraryBackendRepository', () => {
             fileName: second.fileName,
             createdAt: fact.createdAt + 1000,
         }
-        repository.ingestMetadata(first, fact, scannedAt)
-        repository.ingestMetadata(second, secondFact, scannedAt)
+        repository.ingestMetadata(first, fact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
         const originalSongs = db.select().from(songsTable).orderBy(asc(songsTable.path)).all()
         const originalAlbum = db.select().from(albumsTable).get()
         if (!originalAlbum) throw new Error('expected original album')
 
-        repository.ingestMetadata({ ...first, ...edit }, fact, scannedAt)
+        repository.ingestMetadata({ ...first, ...edit }, fact, scannedAt, EXTRACTOR_VERSION)
         expect(db.select().from(albumsTable).all()).toHaveLength(2)
         expect(db.select().from(albumsTable).where(eq(albumsTable.id, originalAlbum.id)).get()).toMatchObject(
             {
@@ -475,8 +475,8 @@ describe('LibraryBackendRepository', () => {
             originalAlbum.id,
         )
 
-        repository.ingestMetadata({ ...second, ...edit }, secondFact, scannedAt)
-        repository.ingestMetadata({ ...first, ...edit }, fact, scannedAt)
+        repository.ingestMetadata({ ...second, ...edit }, secondFact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata({ ...first, ...edit }, fact, scannedAt, EXTRACTOR_VERSION)
         const songs = db.select().from(songsTable).orderBy(asc(songsTable.path)).all()
         const albums = db.select().from(albumsTable).all()
         expect(songs.map(song => song.id)).toEqual(originalSongs.map(song => song.id))
@@ -514,14 +514,14 @@ describe('LibraryBackendRepository', () => {
             coverPath: '/cache/b.jpg',
         }
         const secondFact = { ...fact, path: second.path, fileName: second.fileName }
-        repository.ingestMetadata(second, secondFact, scannedAt)
-        repository.ingestMetadata(first, fact, scannedAt)
-        repository.ingestMetadata(second, secondFact, scannedAt)
+        repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(first, fact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
         expect(db.select().from(albumsTable).get()?.coverPath).toBe('/cache/a.jpg')
         db.update(songsTable).set({ present: false }).where(eq(songsTable.path, first.path)).run()
-        repository.ingestMetadata({ ...second, coverPath: null }, secondFact, scannedAt)
+        repository.ingestMetadata({ ...second, coverPath: null }, secondFact, scannedAt, EXTRACTOR_VERSION)
         expect(db.select().from(albumsTable).get()?.coverPath).toBe('/cache/a.jpg')
-        repository.ingestMetadata({ ...first, coverPath: null }, fact, scannedAt)
+        repository.ingestMetadata({ ...first, coverPath: null }, fact, scannedAt, EXTRACTOR_VERSION)
         expect(db.select().from(albumsTable).get()?.coverPath).toBeNull()
     })
 
@@ -531,8 +531,9 @@ describe('LibraryBackendRepository', () => {
             newSongFixture({ albumTitle: 'Album', albumArtist: 'Artist' }),
             fact,
             scannedAt,
+            EXTRACTOR_VERSION,
         )
-        repository.ingestMetadata(newSongFixture(), fact, scannedAt)
+        repository.ingestMetadata(newSongFixture(), fact, scannedAt, EXTRACTOR_VERSION)
         expect(db.select().from(albumsTable).all()).toEqual([])
         expect(db.select().from(albumArtistsTable).all()).toEqual([])
         expect(db.select().from(songsTable).get()?.albumId).toBeNull()
@@ -544,6 +545,7 @@ describe('LibraryBackendRepository', () => {
             newSongFixture({ albumTitle: 'Album', albumArtist: 'Artist', coverPath: '/cache/a.jpg' }),
             fact,
             scannedAt,
+            EXTRACTOR_VERSION,
         )
         db.update(songsTable).set({ present: false }).run()
         db.update(albumsTable).set({ coverPath: '/cache/stale.jpg' }).run()
