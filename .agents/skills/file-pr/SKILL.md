@@ -14,6 +14,6 @@ description: File a PR for completed work, then follow its CI and review comment
   to the PR. Link recorded evidence under `## Evidence` in the PR description. Skip this step when
   it adds no useful proof.
 - Open the PR using [the repository template](../../../.github/pull_request_template.md), or submit
-  the stack through `github-stack`. Watch CI and review comments on the current head. Validate each
-  comment, address actionable ones, and repeat after pushing fixes. Finish when CI passes and the
-  available actionable comments are resolved; report any review still pending.
+  the stack through `github-stack`. Watch CI and review comments. Validate each comment, address
+  actionable ones, and repeat after pushing fixes. Finish when CI passes and the available actionable
+  comments are resolved; report any review still pending.
