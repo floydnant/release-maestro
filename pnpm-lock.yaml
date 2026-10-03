@@ -162,6 +162,9 @@ settings:
   autoInstallPeers: false
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@spartan-ng/brain@1.5.0': 78a8d837061143f7b1709d0de000f47c1a6bbab3671bfc32cbb9f77bfdf8f64a
+
 importers:
 
   .:
@@ -204,7 +207,7 @@ importers:
         version: 36.1.0(@ng-icons/core@36.1.0(@angular-devkit/schematics@22.2.0(chokidar@5.0.0))(@angular/common@22.2.0(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2))(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3))(@schematics/angular@22.2.0(chokidar@5.0.0))(rxjs@7.8.2))
       '@spartan-ng/brain':
         specifier: 1.5.0
-        version: 1.5.0(ab0f8d463d97ef27eff75650bff72696)
+        version: 1.5.0(patch_hash=78a8d837061143f7b1709d0de000f47c1a6bbab3671bfc32cbb9f77bfdf8f64a)(ab0f8d463d97ef27eff75650bff72696)
       bandcamp-fetch:
         specifier: 3.2.1
         version: 3.2.1(puppeteer-core@24.43.1(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
@@ -11391,7 +11394,7 @@ snapshots:
     dependencies:
       '@sinonjs/commons': 3.0.1
 
-  '@spartan-ng/brain@1.5.0(ab0f8d463d97ef27eff75650bff72696)':
+  '@spartan-ng/brain@1.5.0(patch_hash=78a8d837061143f7b1709d0de000f47c1a6bbab3671bfc32cbb9f77bfdf8f64a)(ab0f8d463d97ef27eff75650bff72696)':
     dependencies:
       '@angular/cdk': 22.2.0(@angular/common@22.2.0(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2))(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3))(@angular/forms@22.2.0(@angular/common@22.2.0(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2))(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3))(@angular/platform-browser@22.2.0(@angular/common@22.2.0(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2))(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3)))(rxjs@7.8.2))(@angular/platform-browser@22.2.0(@angular/common@22.2.0(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2))(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3)))(rxjs@7.8.2)
       '@angular/common': 22.2.0(@angular/core@22.2.0(@angular/compiler@22.2.0)(rxjs@7.8.2)(zone.js@0.16.3))(rxjs@7.8.2)

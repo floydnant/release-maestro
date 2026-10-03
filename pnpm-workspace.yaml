@@ -79,3 +79,5 @@ minimumReleaseAgeExclude:
     - playwright@1.64.0-alpha-1789764292000
     - playwright-core@1.64.0-alpha-1789764292000
 minimumReleaseAgeExcludePrune: true
+patchedDependencies:
+    '@spartan-ng/brain@1.5.0': patches/@spartan-ng__brain@1.5.0.patch
