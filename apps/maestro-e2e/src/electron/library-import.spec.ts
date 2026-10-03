@@ -96,22 +96,26 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     await expect(page.getByLabel('Latest scan result')).toContainText('Completed', { timeout: 20_000 })
     await expect(page.getByLabel('Latest scan result')).toContainText('6 failed')
     await expect(page.getByLabel('Latest scan result')).toContainText('0 imported')
-    await electronApp.close()
-    await rm(cacheDir)
-
-    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
-    page = await electronApp.firstWindow()
-    await expect(page).toHaveURL(/\/home$/)
-    await page.getByRole('link', { name: 'Settings' }).click()
-    await page.getByRole('link', { name: 'Library', exact: true }).click()
-    await expect(page.getByLabel('Latest scan result')).toContainText('Completed', { timeout: 20_000 })
-    await expect(page.getByLabel('Latest scan result')).toContainText('6 imported')
-    expect((await readdir(cacheDir)).sort()).toEqual(coverNames)
-    expect(await Promise.all(coverNames.map(name => readFile(join(cacheDir, name))))).toEqual(originalCovers)
-
     await page.getByRole('link', { name: 'Albums', exact: true }).click()
     const covers = page.getByRole('grid', { name: 'Albums' }).locator('img')
     await expect(covers).toHaveCount(4)
+    await expect
+        .poll(() =>
+            covers.evaluateAll(images =>
+                images.every(
+                    image => image instanceof HTMLImageElement && image.complete && image.naturalWidth == 0,
+                ),
+            ),
+        )
+        .toBe(true)
+    await rm(cacheDir)
+    // Keep the failed image elements mounted while the normal scan pipeline repairs the cache.
+    await page.evaluate(async () => {
+        const { ipcRenderer }: typeof import('electron') = require('electron')
+        await ipcRenderer.invoke('library:start-scan', { trigger: 'manual' })
+    })
+    await expect.poll(async () => (await readdir(cacheDir).catch(() => [])).sort()).toEqual(coverNames)
+    expect(await Promise.all(coverNames.map(name => readFile(join(cacheDir, name))))).toEqual(originalCovers)
     await expect
         .poll(() =>
             covers.evaluateAll(images =>

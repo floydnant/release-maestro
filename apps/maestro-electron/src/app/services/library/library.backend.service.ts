@@ -241,12 +241,7 @@ export class LibraryBackendService {
                     try {
                         return (await stat(coverPath)).isFile() ? [] : [coverPath]
                     } catch (error) {
-                        if (
-                            typeof error === 'object' &&
-                            error !== null &&
-                            'code' in error &&
-                            (error.code === 'ENOENT' || error.code === 'ENOTDIR')
-                        ) {
+                        if (isAbsent(error)) {
                             return [coverPath]
                         }
                         inspectionErrors.set(coverPath, error)

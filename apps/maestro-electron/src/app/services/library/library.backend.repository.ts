@@ -484,10 +484,10 @@ export class LibraryBackendRepository {
 
     queueSongsWithMissingCovers(seenAt: Date, songPaths: string[]): void {
         if (songPaths.length === 0) return
-        // Persist pending reads so cancellation or a read failure retries on the next scan.
+        // Artwork retries must not invalidate the fingerprint that proves the audio hash.
         this.database.db
             .update(songsTable)
-            .set({ scannedFileFingerprint: null })
+            .set({ coverNeedsRefresh: true })
             .where(and(eq(songsTable.lastSeenAt, seenAt), inArray(songsTable.path, songPaths)))
             .run()
     }
@@ -843,6 +843,7 @@ export class LibraryBackendRepository {
                 createdAt: fact.createdAt ? new Date(fact.createdAt) : null,
                 fileFingerprint: fileFingerprint(fact),
                 scannedFileFingerprint: fileFingerprint(fact),
+                coverNeedsRefresh: false,
                 present: true,
                 lastSeenAt: existingSong?.lastSeenAt ?? scannedAt,
                 lastScannedAt: scannedAt,
@@ -1044,6 +1045,7 @@ export class LibraryBackendRepository {
  */
 const songsNeedingMetadata = (extractorVersion: string) =>
     or(
+        eq(songsTable.coverNeedsRefresh, true),
         isNull(songsTable.contentHash),
         isNull(songsTable.scannedFileFingerprint),
         ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),

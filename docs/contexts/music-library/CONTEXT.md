@@ -58,6 +58,8 @@ pending metadata in the database, not from the discovery tallies, which makes an
 resumable. A changed file, an older extractor/normalizer revision, or a missing referenced cover makes metadata
 pending. Each scan checks cover paths in bounded batches for songs reached during discovery. It queues missing
 covers for deep read even when the audio files are unchanged.
+Cover refresh state persists until a successful read. It is separate from the scanned file
+fingerprint, so failed artwork recovery does not discard valid content-hash evidence for a later move.
 _Avoid_: full scan, tag scan
 
 **Reconciliation**:
