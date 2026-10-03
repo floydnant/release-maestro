@@ -1,0 +1,5 @@
+interface:
+    display_name: 'File PR'
+    short_description: 'Review, file, and follow a pull request'
+policy:
+    allow_implicit_invocation: true

@@ -13,6 +13,9 @@ description: Test-driven development with red-green-refactor loop. Use when user
 
 **Bad tests** are coupled to implementation. They mock internal collaborators, test private methods, or verify through external means (like querying a database directly instead of using the interface). The warning sign: your test breaks when you refactor, but behavior hasn't changed. If you rename an internal function and tests fail, those tests were testing implementation, not behavior.
 
+**Tautological tests** recompute the expected result using the same logic as the implementation.
+Use an independent expected value, such as a known-good literal, worked example, or spec requirement.
+
 See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
 
 ## Anti-Pattern: Horizontal Slices

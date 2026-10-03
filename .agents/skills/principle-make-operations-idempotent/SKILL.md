@@ -9,6 +9,10 @@ Design operations so they converge to the correct state regardless of how many t
 
 **Why:** Commands, lifecycle operations, and processing loops run where crashes, restarts, and retries are normal. If partial state changes the next run's outcome, every restart becomes a debugging session.
 
+Check partial writes, concurrent invocations, and failure between side effects. A marker or file
+can exist even when the previous attempt did not finish. Use stable identity and explicit state
+transitions where needed. Add only the reconciliation the operation needs.
+
 **The pattern:**
 
 - Convergent startup: scan for existing state, clean stale artifacts, adopt live sessions
