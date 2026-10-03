@@ -1,5 +1,5 @@
 interface:
     display_name: 'Inspect Running App'
-    short_description: 'Chrome DevTools against the running dev app'
+    short_description: 'Inspect the existing Electron window over CDP'
 policy:
     allow_implicit_invocation: true

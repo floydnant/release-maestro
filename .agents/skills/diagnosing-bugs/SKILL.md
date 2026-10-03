@@ -24,9 +24,9 @@ Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give
 ### Ways to construct one, in roughly this order
 
 1. **Failing test** at whatever seam reaches the bug: unit, integration, e2e.
-2. **Curl / HTTP script** against a running dev server.
+2. **Protocol script** against the running Electron app's debug endpoints. Attach with [inspect-running-app](../inspect-running-app/SKILL.md).
 3. **CLI invocation** with a fixture input, diffing stdout against a known-good snapshot.
-4. **Headless browser script** (Playwright / Puppeteer) that drives the UI and asserts on DOM/console/network.
+4. **Electron UI script** attached to the existing window that asserts on DOM/console/network. Use [e2e-testing](../e2e-testing/SKILL.md) for committed specs and its documented mocked renderer scenarios.
 5. **Replay a captured trace.** Save a real network request / payload / event log to disk; replay it through the code path in isolation.
 6. **Throwaway harness.** Spin up a minimal subset of the system (one service, mocked deps) that exercises the bug code path with a single function call.
 7. **Property / fuzz loop.** If the bug is "sometimes wrong output", run 1000 random inputs and look for the failure mode.
