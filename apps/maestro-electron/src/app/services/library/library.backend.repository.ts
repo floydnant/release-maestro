@@ -36,7 +36,7 @@ import {
 
 /**
  * Change-detection tallies for one prescan batch. The deep-read queue is NOT
- * derived from this — `listSongsNeedingMetadata` (fingerprint or revision mismatch in the DB)
+ * derived from this — `listSongsNeedingMetadata` (pending metadata in the DB)
  * is the sole source, which also makes interrupted scans resumable.
  */
 export interface PrescanBatchComparison {
@@ -460,6 +460,36 @@ export class LibraryBackendRepository {
             .set({ present: false })
             .where(and(eq(songsTable.present, true), lt(songsTable.lastSeenAt, scanStartedAt)))
             .run().changes
+    }
+
+    /** Use the song path index to check covers without repeatedly sorting the whole library. */
+    listSeenSongCovers(seenAt: Date, afterPath: string | null, limit: number) {
+        return this.database.db
+            .select({ path: songsTable.path, coverPath: songsTable.coverPath })
+            .from(songsTable)
+            .where(
+                and(
+                    eq(songsTable.lastSeenAt, seenAt),
+                    isNotNull(songsTable.coverPath),
+                    afterPath === null ? undefined : gt(songsTable.path, afterPath),
+                ),
+            )
+            .orderBy(asc(songsTable.path))
+            .limit(limit)
+            .all()
+            .flatMap(song =>
+                song.coverPath === null ? [] : [{ path: song.path, coverPath: song.coverPath }],
+            )
+    }
+
+    queueSongsWithMissingCovers(seenAt: Date, songPaths: string[]): void {
+        if (songPaths.length === 0) return
+        // Persist pending reads so cancellation or a read failure retries on the next scan.
+        this.database.db
+            .update(songsTable)
+            .set({ scannedFileFingerprint: null })
+            .where(and(eq(songsTable.lastSeenAt, seenAt), inArray(songsTable.path, songPaths)))
+            .run()
     }
 
     listSongsNeedingMetadata(
@@ -1007,9 +1037,9 @@ export class LibraryBackendRepository {
  * when they were written out separately a condition added to one silently did not
  * reach the other.
  *
- * A file qualifies when it has never been read, when the file itself changed, or when
- * it was last read by an older revision of the normalizer or Rust extractor. Those clauses
- * let a changed rule reach rows already in the database: nothing
+ * A file qualifies when it has never been read, when a missing cover queued it again,
+ * when the file itself changed, or when it was last read by an older revision of the
+ * normalizer or Rust extractor. Those clauses let changed rules reach rows already in the database: nothing
  * happens on disk, so the fingerprint alone would skip them forever.
  */
 const songsNeedingMetadata = (extractorVersion: string) =>
