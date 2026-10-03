@@ -17,18 +17,20 @@
                     <p class="text-content-danger">
                         <app-icon name="error" color="content.danger" size="3rem"></app-icon>
                     </p>
-                    <p class="mt-2 text-center type-label-md text-content-danger">
+                    <p class="type-label-md mt-2 text-center text-content-danger">
                         {{ feedState.error }}
                     </p>
 
-                    <button class="mt-3 btn-nkd-neutral" (click)="retryNotifier$.next()">Retry</button>
+                    <button hlmBtn variant="ghost" class="mt-3" type="button" (click)="retryNotifier$.next()">
+                        Retry
+                    </button>
                 </div>
             } @else if (feedState.status === 'caught-up') {
                 <div
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
                     <p class="type-section-title text-content-primary">No new releases</p>
-                    <p class="mt-2 type-body-sm text-content-muted">
+                    <p class="type-body-sm mt-2 text-content-muted">
                         You're all caught up! Check back later for new releases.
                     </p>
                 </div>
@@ -37,7 +39,7 @@
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
                     <p class="type-section-title text-content-primary">No new releases</p>
-                    <p class="mt-2 type-body-sm text-content-muted">
+                    <p class="type-body-sm mt-2 text-content-muted">
                         It looks like you haven't set up your feed yet. Go to
                         <a class="" routerLink="/settings">settings</a>
                         to get started.
@@ -69,7 +71,7 @@
                             >
                                 @for (track of feedItem.data.tracks; track $index) {
                                     <li
-                                        class="track | relative flex min-h-6 items-center gap-1 type-body-sm"
+                                        class="track | type-body-sm relative flex min-h-6 items-center gap-1"
                                         [attr.data-track-index]="$index"
                                         [ngClass]="{
                                             'text-content-muted': !track.streamUrl,
@@ -78,12 +80,11 @@
                                     >
                                         @if (track.streamUrl) {
                                             <button
+                                                hlmBtn
+                                                variant="ghost"
+                                                size="icon-xs"
                                                 type="button"
-                                                class="track-control | grid size-6 shrink-0 place-items-center rounded-sm text-content-secondary transition-colors"
-                                                [ngClass]="{
-                                                    'hover:bg-action-quiet-hover hover:text-content-primary':
-                                                        isCurrentTrack(track.streamUrl),
-                                                }"
+                                                class="track-control | type-body-sm rounded-sm"
                                                 [attr.aria-label]="
                                                     isCurrentTrack(track.streamUrl) && audioPlayer.isLoading()
                                                         ? 'Loading ' + track.title
@@ -119,13 +120,16 @@
                                                 }
                                             </button>
                                             <button
+                                                hlmBtn
+                                                variant="ghost"
                                                 type="button"
-                                                class="track-seeker | relative flex min-w-0 grow items-center justify-between gap-2 rounded-sm py-1 text-left text-content-primary"
+                                                class="track-seeker | type-body-sm relative h-auto min-w-0 grow justify-between rounded-sm px-0 py-1 text-left text-content-primary"
                                                 [attr.aria-label]="'Seek within ' + track.title"
+                                                [hlmTooltip]="track.title"
                                                 (mousedown)="$event.preventDefault()"
                                                 (click)="seekTrack($event, track.streamUrl)"
                                             >
-                                                <span class="truncate" [title]="track.title">{{
+                                                <span class="truncate">{{
                                                     track.title
                                                 }}</span>
                                                 <span class="shrink-0">
@@ -159,7 +163,7 @@
                                                     {{ $index + 1 }}.
                                                 }
                                             </span>
-                                            <span class="min-w-0 grow truncate" [title]="track.title">{{
+                                            <span class="min-w-0 grow truncate" [hlmTooltip]="track.title">{{
                                                 track.title
                                             }}</span>
                                             <span class="shrink-0">
@@ -205,7 +209,7 @@
                                         {{ feedItem.data.releaseName }}
                                     </a>
                                 </h1>
-                                <p class="mt-1 type-body-sm">
+                                <p class="type-body-sm mt-1">
                                     @if (feedItem.data.artist) {
                                         <span class="artist | text-content-secondary select-text">
                                             by {{ feedItem.data.artist }}
@@ -214,7 +218,7 @@
                                     }
                                     <span
                                         class="dates | text-content-muted"
-                                        [title]="
+                                        [hlmTooltip]="
                                             'released ' +
                                             (feedItem.data.releaseDate | date) +
                                             ', announced ' +
@@ -230,20 +234,23 @@
                                 </p>
 
                                 <p
-                                    class="about | mt-6 type-body-sm text-content-secondary select-text"
+                                    class="about | type-body-sm mt-6 text-content-secondary select-text"
                                     [innerHTML]="feedItem.data.about | safe: 'html'"
                                 ></p>
 
                                 <!-- @TODO: abstract this into a <link-meta-previews /> -->
-                                <ul class="links | mt-5 flex flex-wrap gap-1 type-body-sm">
+                                <ul class="links | type-body-sm mt-5 flex flex-wrap gap-1">
                                     @for (link of feedItem.data.links; track $index) {
                                         <li class="flex w-full">
                                             <a
+                                                hlmBtn
+                                                variant="secondary"
+                                                size="sm"
                                                 [href]="link.url"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                class="flex max-w-full items-center gap-1.5 truncate rounded-lg bg-background-surface px-2 py-1 transition-colors duration-fast hover:bg-background-elevated not-hover:text-content-muted"
-                                                [title]="link.title + '\n' + link.url"
+                                                class="max-w-full justify-start"
+                                                [hlmTooltip]="link.title + '\n' + link.url"
                                             >
                                                 <img
                                                     class="favicon |"
@@ -268,9 +275,18 @@
 
                                     <div class="flex rounded-tl-xl text-xl">
                                         <button
-                                            class="-mr-2 flex items-center gap-2 p-2 text-content-muted transition-colors duration-fast hover:text-content-primary"
+                                            hlmBtn
+                                            variant="ghost"
+                                            size="icon"
+                                            class="feed-snooze | -mr-2"
+                                            type="button"
                                             (click)="toggleCurrentFeedItemSnoozedState()"
-                                            [title]="
+                                            [attr.aria-label]="
+                                                snoozedFeedItems.has(feedItem.id)
+                                                    ? 'Remove release snooze'
+                                                    : 'Snooze release'
+                                            "
+                                            [hlmTooltip]="
                                                 snoozedFeedItems.has(feedItem.id)
                                                     ? 'Click to un-snooze (don\'t show again)'
                                                     : 'Click to snooze (show again tomorrow)'
@@ -302,7 +318,7 @@
                                         alt="Label image for {{ feedItem.data.band.name }}"
                                     />
                                 }
-                                <p class="mt-2 type-label-md text-content-primary select-text">
+                                <p class="type-label-md mt-2 text-content-primary select-text">
                                     {{ feedItem.data.band.name }}
                                 </p>
                                 <p class="type-body-sm text-content-muted select-text">
@@ -310,22 +326,28 @@
                                 </p>
                                 @if (feedItem.data.unsubscribeUrl) {
                                     <a
+                                        hlmBtn
+                                        variant="secondary"
+                                        size="sm"
                                         [href]="feedItem.data.unsubscribeUrl"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="relative mt-2.5 btn-muted block text-center type-label-md not-hover:no-underline [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
-                                        [title]="feedItem.data.unsubscribeText"
+                                        class="relative mt-2.5 w-full [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
+                                        [attr.aria-label]="'Unfollow ' + feedItem.data.band.name"
+                                        [hlmTooltip]="feedItem.data.unsubscribeText"
                                     >
                                         <span class="opacity-0">Text</span>
                                         <span class="following | absolute inset-0 py-1.5">Following</span>
                                         <span class="unfollow | absolute inset-0 py-1.5">Unfollow</span>
                                     </a>
                                 }
-                                <p class="mt-2.5 type-body-sm text-content-secondary select-text">
+                                <p
+                                    class="type-body-sm mt-2.5 text-content-secondary select-text"
+                                >
                                     {{ feedItem.data.band.bio }}
                                 </p>
 
-                                <ul class="label-links | mt-2.5 type-body-sm">
+                                <ul class="label-links | type-body-sm mt-2.5">
                                     @for (link of feedItem.data.band.links; track $index) {
                                         <li class="truncate leading-5">
                                             <a
@@ -333,7 +355,7 @@
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 class="max-w-full truncate text-content-primary not-hover:no-underline"
-                                                [title]="link.text + '\n' + link.url"
+                                                [hlmTooltip]="link.text + '\n' + link.url"
                                             >
                                                 {{ link.text }}
                                             </a>

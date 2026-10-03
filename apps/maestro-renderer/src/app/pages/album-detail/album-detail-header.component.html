@@ -13,13 +13,14 @@
 }
 
 <div class="flex min-w-0 flex-col justify-end gap-1 pb-1">
-    <h1 class="album-title | truncate type-hero-title" [title]="album().title">{{ album().title }}</h1>
+    <h1 class="album-title | type-hero-title truncate" [hlmTooltip]="album().title">{{ album().title }}</h1>
 
-    <p class="album-artist | min-w-0 truncate type-section-title text-content-secondary">
+    <p class="album-artist | type-section-title min-w-0 truncate text-content-secondary">
         @if (album().albumArtists.length) {
             @for (artist of album().albumArtists; track artist.id; let last = $last) {
                 <a
-                    class="text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+            hlmBtn variant="link"
+                class="text-content-secondary underline-offset-2 hover:text-content-action hover:underline h-auto p-0 inline type-section-title"
                     [routerLink]="['/artists', artist.id]"
                 >
                     {{ artist.name }}
@@ -36,7 +37,7 @@
     <!-- One line of facts, separated rather than laid out as a table: they are short,
          several are usually absent, and a label column of five rows for three values
          reads as a form rather than as a record sleeve. -->
-    <p class="flex min-w-0 flex-wrap items-center gap-x-2 type-body-sm text-content-muted">
+    <p class="type-body-sm flex min-w-0 flex-wrap items-center gap-x-2 text-content-muted">
         <span class="tabular-nums">{{ songCount() }} {{ songCountLabel() }}</span>
 
         @if (duration()) {
@@ -52,7 +53,8 @@
         @if (album().recordLabelId && album().recordLabelText) {
             <span aria-hidden="true">•</span>
             <a
-                class="rounded-sm underline-offset-2 hover:text-content-action hover:underline"
+            hlmBtn variant="link"
+                class="rounded-sm underline-offset-2 hover:text-content-action hover:underline h-auto p-0 inline type-body-sm"
                 [routerLink]="['/record-labels', album().recordLabelId]"
             >
                 {{ album().recordLabelText }}
@@ -76,7 +78,7 @@
         >
             @for (genre of album().genres; track genre.id) {
                 <a
-                    class="badge no-underline! transition-colors hover:border-border-default hover:bg-background-elevated"
+            hlmBadge variant="secondary"                    class="no-underline! transition-colors hover:border-border-default hover:bg-background-elevated"
                     [routerLink]="['/genres', genre.id]"
                 >
                     {{ genre.name }}

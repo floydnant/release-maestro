@@ -1,3 +1,4 @@
+import { HlmTable, HlmTh, HlmTr } from '@spartan-ng/helm/table'
 import { NgClass } from '@angular/common'
 import {
     afterNextRender,
@@ -133,7 +134,7 @@ let nextTableId = 0
     selector: 'app-song-table',
     templateUrl: './song-table.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [NgClass, SongTableHeadingComponent, SongTableRowComponent],
+    imports: [HlmTable, HlmTh, HlmTr, NgClass, SongTableHeadingComponent, SongTableRowComponent],
     host: {
         class: 'flex min-h-0 min-w-0 flex-1 flex-col',
         '(document:mousedown)': 'onDocumentPointerDown($event)',

@@ -11,9 +11,12 @@
                     aria-label="History"
                 >
                     <button
-                        class="history-back-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed disabled:cursor-default disabled:text-content-muted"
+                        hlmBtn
+                        variant="ghost"
+                        size="icon-xs"
+                        class="history-back-button |"
                         type="button"
-                        title="Back"
+                        hlmTooltip="Back"
                         aria-label="Back"
                         [disabled]="!history.canGoBack()"
                         (click)="history.back()"
@@ -21,9 +24,12 @@
                         <app-icon name="navigationBack" size="18"></app-icon>
                     </button>
                     <button
-                        class="history-forward-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed disabled:cursor-default disabled:text-content-muted"
+                        hlmBtn
+                        variant="ghost"
+                        size="icon-xs"
+                        class="history-forward-button |"
                         type="button"
-                        title="Forward"
+                        hlmTooltip="Forward"
                         aria-label="Forward"
                         [disabled]="!history.canGoForward()"
                         (click)="history.forward()"
@@ -38,66 +44,82 @@
                     <ul class="flex flex-col gap-1">
                         <li>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmBtn
+                                variant="ghost"
+                                class="w-full justify-start"
                                 routerLink="/home"
-                                routerLinkActive="active-link"
+                                routerLinkActive="bg-action-quiet-hover text-content-primary"
                                 [routerLinkActiveOptions]="{ exact: true }"
                                 >Home</a
                             >
                         </li>
                         <li>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmBtn
+                                variant="ghost"
+                                class="w-full justify-start"
                                 routerLink="/feed"
-                                routerLinkActive="active-link"
+                                routerLinkActive="bg-action-quiet-hover text-content-primary"
                                 >Feed</a
                             >
                         </li>
                         <li>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmBtn
+                                variant="ghost"
+                                class="w-full justify-start"
                                 routerLink="/tracks"
-                                routerLinkActive="active-link"
+                                routerLinkActive="bg-action-quiet-hover text-content-primary"
                                 >Tracks</a
                             >
                         </li>
                         <li>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmBtn
+                                variant="ghost"
+                                class="w-full justify-start"
                                 routerLink="/albums"
-                                routerLinkActive="active-link"
+                                routerLinkActive="bg-action-quiet-hover text-content-primary"
                                 >Albums</a
                             >
                         </li>
                         <li>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmBtn
+                                variant="ghost"
+                                class="w-full justify-start"
                                 routerLink="/artists"
-                                routerLinkActive="active-link"
+                                routerLinkActive="bg-action-quiet-hover text-content-primary"
                                 >Artists</a
                             >
                         </li>
                         <li>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmBtn
+                                variant="ghost"
+                                class="w-full justify-start"
                                 routerLink="/record-labels"
-                                routerLinkActive="active-link"
+                                routerLinkActive="bg-action-quiet-hover text-content-primary"
                                 >Record labels</a
                             >
                         </li>
                         <li>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmBtn
+                                variant="ghost"
+                                class="w-full justify-start"
                                 routerLink="/genres"
-                                routerLinkActive="active-link"
+                                routerLinkActive="bg-action-quiet-hover text-content-primary"
                                 >Genres</a
                             >
                         </li>
                         <li>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmBtn
+                                variant="ghost"
+                                class="w-full justify-start"
                                 routerLink="/settings"
-                                routerLinkActive="active-link"
+                                routerLinkActive="bg-action-quiet-hover text-content-primary"
                                 >Settings</a
                             >
                         </li>
@@ -105,15 +127,18 @@
                 </nav>
 
                 @if (showLibrarySetupCta()) {
-                    <hr />
+                    <hr hlmSeparator class="my-3" />
                     <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
-                    <a class="mt-2 btn-primary block text-center" routerLink="/import">Set up library</a>
+                    <a hlmBtn class="mt-2" routerLink="/import">Set up library</a>
                 }
 
                 <div class="flex h-full items-center justify-center">
                     <div class="flex flex-col gap-3">
                         <button
-                            class="btn-neutral w-full"
+                            hlmBtn
+                            variant="secondary"
+                            class="w-full"
+                            type="button"
                             (click)="audioPlayer.isPlaying() ? audioPlayer.pause() : audioPlayer.play()"
                         >
                             {{ audioPlayer.isPlaying() ? 'PAUSE' : 'PLAY' }}
@@ -174,10 +199,13 @@
                         </p>
                         @if (libraryService.isScanning()) {
                             <button
-                                class="scan-cancel | btn-nkd-neutral size-6 self-center p-0 [-webkit-app-region:no-drag]"
+                                hlmBtn
+                                variant="ghost"
+                                size="icon-xs"
+                                class="scan-cancel | self-center [-webkit-app-region:no-drag]"
                                 type="button"
                                 aria-label="Cancel scan"
-                                title="Cancel scan"
+                                hlmTooltip="Cancel scan"
                                 (click)="cancelScan($event)"
                             >
                                 <app-icon name="close" size="14" aria-hidden="true"></app-icon>
@@ -312,25 +340,37 @@
                 <!-- Keep native :hover semantics. The project's hover: variant also matches keyboard focus. -->
                 <div class="title-bar__controls | flex [-webkit-app-region:no-drag]">
                     <button
-                        class="title-bar__button | inline-flex h-full w-[2.875rem] items-center justify-center text-content-muted transition-[background-color,color] duration-fast ease-standard [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
+                        hlmBtn
+                        variant="ghost"
+                        size="icon"
+                        class="title-bar__button | h-full w-[2.875rem] rounded-none text-content-muted hover:bg-transparent hover:text-content-muted active:bg-transparent [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
                         type="button"
-                        title="Minimize"
+                        aria-label="Minimize"
+                        hlmTooltip="Minimize"
                         (click)="minimizeWindow()"
                     >
                         <app-icon name="windowMinimize" size="14"></app-icon>
                     </button>
                     <button
-                        class="title-bar__button | inline-flex h-full w-[2.875rem] items-center justify-center text-content-muted transition-[background-color,color] duration-fast ease-standard [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
+                        hlmBtn
+                        variant="ghost"
+                        size="icon"
+                        class="title-bar__button | h-full w-[2.875rem] rounded-none text-content-muted hover:bg-transparent hover:text-content-muted active:bg-transparent [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
                         type="button"
-                        title="Maximize"
+                        aria-label="Maximize"
+                        hlmTooltip="Maximize"
                         (click)="toggleMaximizeWindow()"
                     >
                         <app-icon name="windowMaximize" size="14"></app-icon>
                     </button>
                     <button
-                        class="title-bar__button--close | inline-flex h-full w-[2.875rem] items-center justify-center text-content-muted transition-[background-color,color] duration-fast ease-standard [&:hover]:bg-status-danger-background [&:hover]:text-status-danger-content"
+                        hlmBtn
+                        variant="ghost"
+                        size="icon"
+                        class="title-bar__button--close | h-full w-[2.875rem] rounded-none text-content-muted hover:bg-transparent hover:text-content-muted active:bg-transparent [&:hover]:bg-status-danger-background [&:hover]:text-status-danger-content"
                         type="button"
-                        title="Close"
+                        aria-label="Close"
+                        hlmTooltip="Close"
                         (click)="closeWindow()"
                     >
                         <app-icon name="close" size="14"></app-icon>

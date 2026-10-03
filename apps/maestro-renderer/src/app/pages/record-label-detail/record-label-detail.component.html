@@ -5,14 +5,17 @@
     @case ('missing') {
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
             <p class="type-body-md text-content-primary">This record label is no longer in your library</p>
-            <a class="btn-primary" routerLink="/record-labels">Back to record labels</a>
+            <a hlmBtn variant="default"
+                routerLink="/record-labels">Back to record labels</a>
         </div>
     }
     @case ('error') {
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center" role="alert">
             <p class="type-body-md text-content-primary">Could not load this record label</p>
-            <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
-            <a class="btn-neutral" routerLink="/record-labels">Back to record labels</a>
+            <button hlmBtn variant="default"
+                type="button" (click)="onRetry()">Try again</button>
+            <a hlmBtn variant="secondary"
+                routerLink="/record-labels">Back to record labels</a>
         </div>
     }
 }

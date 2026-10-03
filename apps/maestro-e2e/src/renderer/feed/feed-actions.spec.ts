@@ -23,12 +23,16 @@ test.describe('release feed item actions', () => {
     test('toggles the current feed item snooze state', async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().feed([createHydratedRelease()]).build())
 
-        const snoozeButton = page.getByTitle('Click to snooze (show again tomorrow)')
+        const snoozeButton = page.getByRole('button', { name: 'Snooze release', exact: true })
 
         await expect(snoozeButton).toBeVisible()
 
-        await snoozeButton.click()
+        await snoozeButton.focus()
 
-        await expect(page.getByTitle(/Click to un-snooze/)).toBeVisible()
+        await expect(page.getByRole('tooltip')).toHaveText('Click to snooze (show again tomorrow)')
+
+        await snoozeButton.press('Enter')
+
+        await expect(page.getByRole('button', { name: 'Remove release snooze', exact: true })).toBeVisible()
     })
 })

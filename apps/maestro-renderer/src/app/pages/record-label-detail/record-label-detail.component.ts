@@ -1,3 +1,4 @@
+import { HlmButton } from '@spartan-ng/helm/button'
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core'
 import { toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, RouterLink } from '@angular/router'
@@ -45,7 +46,7 @@ const recordLabelLinks = (recordLabel: RecordLabelDetail): ExternalLink[] => {
     selector: 'app-record-label-detail',
     templateUrl: './record-label-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
+    imports: [HlmButton, 
         RouterLink,
         TabBarComponent,
         EntitySongsComponent,
