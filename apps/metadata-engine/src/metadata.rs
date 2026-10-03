@@ -185,6 +185,10 @@ pub enum ReadSongMetadataError {
     FileNameMissing {
         path: String,
     },
+    CoverArtCacheWriteFailed {
+        path: String,
+        message: String,
+    },
 }
 
 impl fmt::Display for ReadSongMetadataError {
@@ -205,6 +209,12 @@ impl fmt::Display for ReadSongMetadataError {
             }
             ReadSongMetadataError::FileNameMissing { path: _ } => {
                 write!(formatter, "Failed to read file name")
+            }
+            ReadSongMetadataError::CoverArtCacheWriteFailed { path, message } => {
+                write!(
+                    formatter,
+                    "Failed to cache cover art at '{path}': {message}"
+                )
             }
             ReadSongMetadataError::NotAnAudioFile { path: _, extension } => {
                 let extension = extension.as_deref().unwrap_or("none");
@@ -625,6 +635,22 @@ pub fn read_song_metadata_v2(
     file_path: &Path,
     cover_art_cache_dir: String,
 ) -> Result<SongMetadata, ReadSongMetadataError> {
+    read_song_metadata(file_path, cover_art_cache_dir, false)
+}
+
+/// A scan must retain pending metadata when artwork cannot be cached.
+pub fn read_song_metadata_for_scan(
+    file_path: &Path,
+    cover_art_cache_dir: String,
+) -> Result<SongMetadata, ReadSongMetadataError> {
+    read_song_metadata(file_path, cover_art_cache_dir, true)
+}
+
+fn read_song_metadata(
+    file_path: &Path,
+    cover_art_cache_dir: String,
+    require_cached_cover: bool,
+) -> Result<SongMetadata, ReadSongMetadataError> {
     let path = file_path.to_string_lossy().into_owned();
     let metadata = fs::metadata(file_path).map_err(|error| match error.kind() {
         io::ErrorKind::NotFound => ReadSongMetadataError::FileNotFound { path: path.clone() },
@@ -916,47 +942,54 @@ pub fn read_song_metadata_v2(
 
     let cover_path = tagged_file
         .primary_tag()
-        .and_then(|tag| {
-            tag.pictures().first().and_then(|cover| {
-                let file_ext: Option<&str> = cover.mime_type().and_then(|mime| {
-                    ImageFormat::from_lofty_mimetype(mime.clone()).map(|format| format.extension())
-                });
-                if file_ext.is_none() {
-                    eprintln!(
-                        "Unsupported or missing MIME type for cover art: {:?}",
-                        cover.mime_type()
-                    );
-                    return None;
-                }
-
-                // Content-addressed filename: derived from the image bytes
-                // rather than the song's file name. This avoids collisions
-                // between same-named files in different folders and lets
-                // identical artwork dedupe to a single cache entry.
-                let digest = hex_digest(cover.data());
-                let cover_path = format!(
-                    "{}{}{}.{}",
-                    cover_art_cache_dir,
-                    separator(),
-                    digest,
-                    file_ext.unwrap()
+        .and_then(|tag| tag.pictures().first())
+        .map(|cover| {
+            let file_ext: Option<&str> = cover.mime_type().and_then(|mime| {
+                ImageFormat::from_lofty_mimetype(mime.clone()).map(|format| format.extension())
+            });
+            if file_ext.is_none() {
+                eprintln!(
+                    "Unsupported or missing MIME type for cover art: {:?}",
+                    cover.mime_type()
                 );
+                return Ok(None);
+            }
 
-                // Identical bytes always hash to the same path, so an
-                // existing file is guaranteed to hold the same artwork.
-                if Path::new(&cover_path).exists() {
-                    return Some(cover_path);
-                }
+            // Content-addressed filename: derived from the image bytes
+            // rather than the song's file name. This avoids collisions
+            // between same-named files in different folders and lets
+            // identical artwork dedupe to a single cache entry.
+            let digest = hex_digest(cover.data());
+            let cover_path = format!(
+                "{}{}{}.{}",
+                cover_art_cache_dir,
+                separator(),
+                digest,
+                file_ext.unwrap()
+            );
 
-                match fs::write(cover_path.clone(), cover.data()) {
-                    Ok(_) => Some(cover_path),
-                    Err(err) => {
-                        eprintln!("Failed to write cover art: {:?}", err);
-                        None
-                    }
+            // A failed write can leave a truncated file. Reuse only complete covers.
+            if fs::metadata(&cover_path).is_ok_and(|metadata| {
+                metadata.is_file() && metadata.len() == cover.data().len() as u64
+            }) {
+                return Ok(Some(cover_path));
+            }
+
+            if let Err(error) = fs::write(&cover_path, cover.data()) {
+                if require_cached_cover {
+                    return Err(ReadSongMetadataError::CoverArtCacheWriteFailed {
+                        path: cover_path,
+                        message: error.to_string(),
+                    });
                 }
-            })
+                // A completed tag edit must still return its metadata and final path.
+                eprintln!("Failed to write cover art: {error}");
+                return Ok(None);
+            }
+            Ok(Some(cover_path))
         })
+        .transpose()?
+        .flatten()
         .or_else(|| {
             Path::new(&path)
                 .parent()

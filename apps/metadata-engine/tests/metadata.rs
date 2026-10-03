@@ -175,6 +175,68 @@ fn reads_independently_authored_metadata_across_formats_and_legacy_aliases() {
 }
 
 #[test]
+fn cover_cache_write_failure_is_an_item_error_and_can_retry() {
+    let library = Library::new();
+    let mut engine = Engine::new();
+    let case = cases()
+        .into_iter()
+        .find(|case| case.artwork && case.writable)
+        .unwrap();
+    let path = library.copy(&case.file);
+    let original = engine.request("read_file", library.params(&path));
+    let cache = library.0.join("cache");
+    // A file occupying the cache directory blocks writes on every platform.
+    std::fs::remove_dir_all(&cache).unwrap();
+    std::fs::write(&cache, b"blocked").unwrap();
+    let params = json!({"paths": [path], "coverArtCacheDir": cache});
+    let failed = engine.exchange("read_files", params.clone());
+    let error = failed
+        .iter()
+        .find(|message| message["event"] == "item_error")
+        .expect("cache write failure must not return coverless metadata");
+    assert_eq!(error["data"]["path"], path.to_str().unwrap());
+    assert!(error["data"]["error"]
+        .as_str()
+        .unwrap()
+        .contains("cover art"));
+    assert_eq!(failed.last().unwrap()["result"]["count"], 0);
+
+    let mut write_params = library.params(&path);
+    write_params["update"] = json!({"title": "Saved with blocked cache"});
+    let written = engine.request("write_tags", write_params);
+    assert_eq!(written["title"], "Saved with blocked cache");
+    assert_eq!(written["coverPath"], Value::Null);
+
+    std::fs::remove_file(&cache).unwrap();
+    let retried = engine.exchange("read_files", params);
+    let item = retried
+        .iter()
+        .find(|message| message["event"] == "item")
+        .unwrap();
+    assert_eq!(item["data"]["metadata"]["coverPath"], original["coverPath"]);
+    assert_eq!(
+        std::fs::read(item["data"]["metadata"]["coverPath"].as_str().unwrap()).unwrap(),
+        std::fs::read(fixtures().join("cover.png")).unwrap()
+    );
+}
+
+#[test]
+fn rereads_replace_truncated_cached_covers() {
+    let library = Library::new();
+    let mut engine = Engine::new();
+    let case = cases().into_iter().find(|case| case.artwork).unwrap();
+    let path = library.copy(&case.file);
+    let original = engine.request("read_file", library.params(&path));
+    let cover = original["coverPath"].as_str().unwrap();
+    std::fs::write(cover, b"partial").unwrap();
+    engine.request("read_file", library.params(&path));
+    assert_eq!(
+        std::fs::read(cover).unwrap(),
+        std::fs::read(fixtures().join("cover.png")).unwrap()
+    );
+}
+
+#[test]
 fn edits_and_clears_tags_without_losing_unrelated_metadata_or_artwork() {
     let library = Library::new();
     let mut engine = Engine::new();
