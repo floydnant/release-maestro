@@ -39,7 +39,6 @@ export class HlmFieldDescription implements OnDestroy {
         classes(() =>
             hlm([
                 'type-body-sm text-content-muted leading-normal font-normal group-has-data-horizontal/field:text-balance',
-                'last:mt-0 nth-last-2:-mt-1',
                 '[&>a:hover]:text-content-action [&>a]:underline [&>a]:underline-offset-4',
             ]),
         )

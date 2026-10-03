@@ -6,7 +6,7 @@ import type { ClassValue } from 'clsx'
 import { injectBrnButtonConfig } from './hlm-button.token'
 
 export const buttonVariants = cva(
-    'gap-2 rounded-lg type-label-md no-underline transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-border-focus data-disabled:bg-action-primary-disabled data-disabled:text-content-muted group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
+    'no-underline transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-border-focus data-disabled:text-content-muted group/button inline-flex items-center justify-center outline-none [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
     {
         variants: {
             variant: {
@@ -17,21 +17,43 @@ export const buttonVariants = cva(
                 secondary:
                     'bg-action-secondary text-action-secondary-content hover:bg-action-secondary-hover active:bg-action-secondary-pressed',
                 ghost: 'text-content-secondary hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed',
+                history:
+                    'text-content-secondary hoverable:[&:hover:not(:disabled)]:bg-action-quiet-hover hoverable:[&:hover:not(:disabled)]:text-content-primary',
+                plain: '',
+                muted: 'bg-background-surface text-content-muted hover:bg-background-elevated hover:text-content-secondary',
+                navigation:
+                    'justify-start text-content-secondary hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content aria-[current=page]:shadow-sm aria-[current=page]:hover:bg-action-secondary-hover',
                 destructive:
                     'border border-status-danger-border bg-status-danger-background text-status-danger-content hover:bg-status-danger-hover',
-                link: 'text-content-action underline-offset-4 hover:underline',
+                link: 'shrink text-content-action underline-offset-4 hover:underline',
             },
             size: {
-                default: 'h-(--foundation-size-control-md) px-3 py-1.5',
+                default: 'rounded-lg px-3 py-1.5 type-label-md',
+                none: '',
                 xs: 'h-6 gap-1 rounded-md px-2 type-label-sm',
-                sm: 'h-(--foundation-size-control-sm) gap-1.5 px-2.5 type-label-sm',
-                lg: 'h-(--foundation-size-control-lg) px-4',
-                icon: 'size-(--foundation-size-control-md) p-0',
-                'icon-xs': 'size-6 p-0',
-                'icon-sm': 'size-(--foundation-size-control-sm) p-0',
-                'icon-lg': 'size-(--foundation-size-control-lg) p-0',
+                sm: 'h-(--foundation-size-control-sm) gap-1.5 rounded-lg px-2.5 type-label-sm',
+                lg: 'h-(--foundation-size-control-lg) rounded-lg px-4 type-label-md',
+                icon: 'size-(--foundation-size-control-md) rounded-lg p-0',
+                'icon-xs': 'size-6 rounded-lg p-0',
+                'icon-sm': 'size-(--foundation-size-control-sm) rounded-lg p-0',
+                'icon-lg': 'size-(--foundation-size-control-lg) rounded-lg p-0',
             },
         },
+        compoundVariants: [
+            {
+                variant: [
+                    'default',
+                    'outline',
+                    'secondary',
+                    'ghost',
+                    'muted',
+                    'navigation',
+                    'destructive',
+                    'link',
+                ],
+                class: 'data-disabled:bg-action-primary-disabled',
+            },
+        ],
         defaultVariants: {
             variant: 'default',
             size: 'default',

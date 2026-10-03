@@ -15,7 +15,7 @@ export class HlmTextarea {
     constructor() {
         classes(() =>
             hlm(
-                'rounded-lg border border-border-default bg-background-canvas px-3 py-2 type-body-md text-content-primary transition-colors duration-fast ease-standard focus-visible:border-border-focus focus-visible:ring-2 focus-visible:ring-border-focus data-[matches-spartan-invalid=true]:border-status-danger-border placeholder:text-content-muted flex field-sizing-content min-h-16 w-full outline-none disabled:cursor-not-allowed disabled:opacity-50',
+                'rounded-lg border border-border-default bg-background-canvas px-3 py-1 type-body-md text-content-primary transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-border-focus data-[matches-spartan-invalid=true]:border-status-danger-border placeholder:text-content-muted w-full outline-none disabled:cursor-not-allowed',
             ),
         )
     }

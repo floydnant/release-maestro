@@ -11,6 +11,11 @@ semantic tokens and established compositions when building or refining renderer 
 - Standard controls come from `apps/maestro-renderer/src/app/shared/ui/`: buttons, fields, badges,
   cards, progress indicators and overlays. Use their variants before adding product-level styling.
   Repeated changes to appearance belong in the shared component defaults.
+- A migration preserves the existing visuals. Compare the previous padding, content height,
+  typography and interaction states before choosing a variant. Regular buttons remain content-sized.
+  Invisible click targets use `variant="plain" size="none"` and retain their existing layout;
+  seeking targets and sortable headings do not get hover backgrounds. The component library supplies
+  behavior without imposing a new visual treatment.
 - Brain supplies the packaged interaction behavior. Helm source is local and editable. Keep data
   fetching, domain state and recovery actions in product components; compose their controls from
   shared UI.

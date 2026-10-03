@@ -79,7 +79,7 @@ export class HlmNativeSelect implements ControlValueAccessor {
 
     protected readonly _computedSelectClass = computed(() =>
         hlm(
-            'h-(--foundation-size-control-md) w-full appearance-none rounded-lg border border-border-default bg-background-canvas py-1 ps-3 pe-8 type-body-md text-content-primary focus-visible:ring-2 focus-visible:ring-border-focus data-[size=sm]:h-(--foundation-size-control-sm) data-[matches-spartan-invalid=true]:border-status-danger-border outline-none disabled:pointer-events-none disabled:cursor-not-allowed',
+            'h-auto w-full appearance-none rounded-lg border border-border-default bg-background-canvas py-1 ps-3 pe-8 type-body-md text-content-primary focus-visible:ring-2 focus-visible:ring-border-focus data-[size=sm]:h-(--foundation-size-control-sm) data-[matches-spartan-invalid=true]:border-status-danger-border outline-none disabled:cursor-not-allowed',
             this.selectClass(),
         ),
     )
@@ -128,7 +128,7 @@ export class HlmNativeSelect implements ControlValueAccessor {
     )
 
     constructor() {
-        classes(() => hlm(' group/native-select relative w-fit has-[select:disabled]:opacity-50'))
+        classes(() => hlm('group/native-select relative w-fit'))
     }
 
     protected _valueChanged(event: Event): void {
