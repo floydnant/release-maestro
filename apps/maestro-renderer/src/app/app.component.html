@@ -12,9 +12,9 @@
                 >
                     <button
                         hlmBtn
-                        variant="ghost"
+                        variant="history"
                         size="icon-xs"
-                        class="history-back-button |"
+                        class="history-back-button | rounded-md disabled:cursor-default data-disabled:bg-transparent"
                         type="button"
                         hlmTooltip="Back"
                         aria-label="Back"
@@ -25,9 +25,9 @@
                     </button>
                     <button
                         hlmBtn
-                        variant="ghost"
+                        variant="history"
                         size="icon-xs"
-                        class="history-forward-button |"
+                        class="history-forward-button | rounded-md disabled:cursor-default data-disabled:bg-transparent"
                         type="button"
                         hlmTooltip="Forward"
                         aria-label="Forward"
@@ -135,9 +135,9 @@
                 </nav>
 
                 @if (showLibrarySetupCta()) {
-                    <hr hlmSeparator class="my-3" />
+                    <hr hlmSeparator class="my-4" />
                     <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
-                    <a hlmBtn class="mt-2" routerLink="/import">Set up library</a>
+                    <a hlmBtn class="mt-2 w-full" routerLink="/import">Set up library</a>
                 }
 
                 <div class="flex h-full items-center justify-center">

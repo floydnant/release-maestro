@@ -1,8 +1,9 @@
 @if (mode === 'spinning') {
     <hlm-spinner
-        [style.width.px]="diameter"
-        [style.height.px]="diameter"
-        [style.color]="color()"
+        [diameter]="diameter"
+        [strokeWidth]="strokeWidth"
+        [color]="color()"
+        [bgColor]="bgColor()"
         [aria-label]="ariaLabel()"
     />
 } @else {

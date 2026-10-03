@@ -53,8 +53,10 @@
             {{ summaryText }}
         </p>
         @if (terminal()?.error; as terminalError) {
-            <div hlmAlert variant="destructive" class="scan-error | mt-3">
-                <p hlmAlertDescription>{{ terminalError.message }}</p>
+            <div hlmAlert variant="plain" class="scan-error | mt-1">
+                <p hlmAlertDescription class="type-body-sm text-content-danger">
+                    {{ terminalError.message }}
+                </p>
             </div>
         }
         @if (unavailableFoldersText(); as unavailableText) {
@@ -99,7 +101,6 @@
                         <button
                             hlmBtn
                             variant="ghost"
-                            size="icon-sm"
                             class="reveal-file | shrink-0 text-content-muted"
                             type="button"
                             [hlmTooltip]="revealLabel"

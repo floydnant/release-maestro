@@ -44,6 +44,18 @@
                     </div>
                 }
             </div>
+            <h3 class="mt-6 type-label-md">Surfaces</h3>
+            <div class="mt-3 grid grid-cols-3 gap-4">
+                <div class="rounded-lg border border-border-subtle bg-background-canvas p-4">
+                    <code class="type-code-sm">canvas</code>
+                </div>
+                <div class="rounded-lg border border-border-subtle bg-background-surface p-4">
+                    <code class="type-code-sm">surface</code>
+                </div>
+                <div class="rounded-lg border border-border-default bg-background-elevated p-4">
+                    <code class="type-code-sm">elevated</code>
+                </div>
+            </div>
         </section>
 
         <section hlmCard class="token-panel | gap-0 p-6">
@@ -132,44 +144,6 @@
                         <code class="type-code-sm">{{ token }}</code>
                     </div>
                 }
-            </div>
-        </section>
-
-        <section hlmCard class="token-panel | gap-0 p-6">
-            <h2 class="type-section-title">Components and interaction states</h2>
-            <div class="mt-4 flex flex-wrap gap-3">
-                <button hlmBtn>Primary action</button>
-                <button hlmBtn variant="secondary">Secondary action</button>
-                <button hlmBtn variant="ghost">Quiet action</button>
-                <button hlmBtn variant="destructive">Danger action</button>
-                <button hlmBtn variant="ghost">Muted action</button>
-                <button hlmBtn disabled>Disabled</button>
-            </div>
-            <div class="mt-6 grid max-w-xs gap-3">
-                <label hlmLabel for="specimen-input">Release filter</label>
-                <input
-                    id="specimen-input"
-                    hlmInput
-                    placeholder="Artist, label, or release"
-                    value="Bandcamp"
-                />
-                <div class="flex gap-2">
-                    <span hlmBadge>Announced today</span>
-                    <span hlmBadge variant="outline" class="hydrated-badge | text-content-success"
-                        >Hydrated</span
-                    >
-                </div>
-            </div>
-            <div class="mt-6 grid grid-cols-3 gap-4">
-                <div class="rounded-lg border border-border-subtle bg-background-canvas p-4">
-                    <code class="type-code-sm">canvas</code>
-                </div>
-                <div class="rounded-lg border border-border-subtle bg-background-surface p-4">
-                    <code class="type-code-sm">surface</code>
-                </div>
-                <div class="rounded-lg border border-border-default bg-background-elevated p-4">
-                    <code class="type-code-sm">elevated</code>
-                </div>
             </div>
         </section>
     </div>

@@ -1,10 +1,6 @@
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component } from '@angular/core'
-import { HlmButton } from '@spartan-ng/helm/button'
-import { HlmBadge } from '@spartan-ng/helm/badge'
 import { HlmCard } from '@spartan-ng/helm/card'
-import { HlmInput } from '@spartan-ng/helm/input'
-import { HlmLabel } from '@spartan-ng/helm/label'
 import { SpartanSpecimenComponent } from './spartan-specimen.component'
 import {
     contrastPairs,
@@ -23,7 +19,7 @@ import {
 
 @Component({
     selector: 'app-design-system',
-    imports: [CommonModule, SpartanSpecimenComponent, HlmButton, HlmBadge, HlmCard, HlmInput, HlmLabel],
+    imports: [CommonModule, SpartanSpecimenComponent, HlmCard],
     templateUrl: './design-system.component.html',
     styleUrls: ['./design-system.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,

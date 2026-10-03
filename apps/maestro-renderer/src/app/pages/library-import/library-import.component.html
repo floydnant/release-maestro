@@ -26,7 +26,7 @@
                         hlmBtn
                         variant="ghost"
                         type="button"
-                        class="add-folder-btn | h-auto w-full grow rounded-t-none border-t border-border-subtle py-3"
+                        class="add-folder-btn | w-full grow gap-2 rounded-t-none border-t border-border-subtle px-4 py-3 type-body-md"
                         aria-label="Add folders"
                         (click)="addFolders()"
                     >
@@ -36,7 +36,9 @@
                 </app-folder-list>
 
                 <div class="mt-8 flex items-center gap-3">
-                    <button hlmBtn variant="ghost" type="button" (click)="skip()">Skip for now</button>
+                    <button hlmBtn variant="ghost" class="text-content-muted" type="button" (click)="skip()">
+                        Skip for now
+                    </button>
                     <span class="grow"></span>
                     <button
                         hlmBtn
@@ -176,7 +178,14 @@
                         </div>
                         @if (status.failedFiles > 0) {
                             <p class="mt-4 type-body-sm">
-                                <a hlmBtn variant="link" routerLink="/settings/library">View failed files</a>
+                                <a
+                                    hlmBtn
+                                    variant="link"
+                                    size="none"
+                                    class="underline"
+                                    routerLink="/settings/library"
+                                    >View failed files</a
+                                >
                             </p>
                         }
                     } @else if (terminalBanner(); as terminal) {
@@ -185,8 +194,13 @@
                                 The next startup scan picks up where this one left off.
                             </p>
                         } @else {
-                            <div hlmAlert variant="destructive" class="import-error | mt-6">
-                                <p hlmAlertDescription>
+                            <div hlmAlert variant="plain" class="import-error | mt-6">
+                                <p hlmAlertDescription class="type-body-md text-content-danger">
+                                    <app-icon
+                                        name="error"
+                                        color="content.danger"
+                                        class="translate-y-px align-middle"
+                                    ></app-icon>
                                     {{ terminal.error?.message || 'The import failed unexpectedly.' }}
                                 </p>
                             </div>
@@ -202,12 +216,25 @@
                         </div>
                         @if (status.failedFiles > 0) {
                             <p class="mt-3 type-body-sm">
-                                <a hlmBtn variant="link" routerLink="/settings/library">View failed files</a>
+                                <a
+                                    hlmBtn
+                                    variant="link"
+                                    size="none"
+                                    class="underline"
+                                    routerLink="/settings/library"
+                                    >View failed files</a
+                                >
                             </p>
                         }
                     } @else {
                         <div class="mt-6">
-                            <button hlmBtn variant="ghost" type="button" (click)="cancelScan()">
+                            <button
+                                hlmBtn
+                                variant="ghost"
+                                class="text-content-muted"
+                                type="button"
+                                (click)="cancelScan()"
+                            >
                                 Cancel import
                             </button>
                         </div>
