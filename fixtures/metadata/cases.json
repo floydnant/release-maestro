@@ -874,5 +874,52 @@
             "label": "Blue Night Jungle"
         },
         "writable": true
+    },
+    {
+        "file": "external-refs.mp3",
+        "expected": {
+            "title": "External references"
+        },
+        "extras": [
+            ["Isrc", "GBABC2600001"],
+            ["Barcode", "001234"],
+            ["AcoustId", "acoustid-1"],
+            ["Custom: ASIN", "B000000001"],
+            ["Custom: DISCOGS_ARTIST_ID", "456"],
+            ["Custom: DISCOGS_MASTER_RELEASE_ID", "123"],
+            ["Custom: SPOTIFY_TRACK_ID", "spotify-song-1"]
+        ]
+    },
+    {
+        "file": "external-refs.flac",
+        "expected": {
+            "title": "External references"
+        },
+        "extras": [
+            ["Isrc", "GBABC2600001"],
+            ["Barcode", "001234"],
+            ["AcoustId", "acoustid-1"],
+            ["Custom: ASIN", "B000000001"],
+            ["Custom: DISCOGS_ARTIST_ID", "456"],
+            ["Custom: DISCOGS_MASTER_RELEASE_ID", "123"],
+            ["Custom: SPOTIFY_TRACK_ID", "spotify-song-1"],
+            ["Custom: EAN", "001234"]
+        ]
+    },
+    {
+        "file": "external-refs.m4a",
+        "expected": {
+            "title": "External references"
+        },
+        "extras": [
+            ["Isrc", "GBABC2600001"],
+            ["Barcode", "001234"],
+            ["AcoustId", "acoustid-1"],
+            ["Custom: ----:com.apple.iTunes:ASIN", "B000000001"],
+            ["Custom: ----:com.apple.iTunes:DISCOGS_ARTIST_ID", "456"],
+            ["Custom: ----:com.apple.iTunes:DISCOGS_MASTER_RELEASE_ID", "123"],
+            ["Custom: ----:com.apple.iTunes:SPOTIFY_TRACK_ID", "spotify-song-1"],
+            ["Custom: ----:org.example:SPOTIFY_TRACK_ID", "private-id"]
+        ]
     }
 ]

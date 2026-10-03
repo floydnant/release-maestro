@@ -3,7 +3,13 @@ import { createHash } from 'crypto'
 import { ExternalRefKeys, ExternalRefs, NormalizationIssue } from '../../database/drizzle.schema'
 
 const MULTI_VALUE_SEPARATOR = /(?:\s(?:&|feat\.?|ft\.?|vs\.?|x|×)\s|[;/,])/i
-const EXTERNAL_REF_KEYS: Record<string, string> = {}
+const EXTERNAL_REF_KEYS: Record<string, ExternalRefKeys> = {
+    ACOUSTID: ExternalRefKeys.AcoustIdId,
+    UPC: ExternalRefKeys.Barcode,
+    EAN: ExternalRefKeys.Barcode,
+    EANUPN: ExternalRefKeys.Barcode,
+    UPN: ExternalRefKeys.Barcode,
+}
 for (const [key, value] of Object.entries(ExternalRefKeys)) {
     EXTERNAL_REF_KEYS[key.toUpperCase()] = value
 }
@@ -21,7 +27,7 @@ for (const [key, value] of Object.entries(ExternalRefKeys)) {
  * stamped with an older version are re-read on the next scan; that is the only thing
  * that makes a normaliser change reach data already in the database.
  */
-export const NORMALIZER_VERSION = 3
+export const NORMALIZER_VERSION = 5
 
 export const normalizeDisplayText = (value: string | null | undefined): string | null => {
     const normalized = value?.trim().replace(/\s+/g, ' ')
@@ -129,6 +135,7 @@ export const metadataHash = (metadata: SongMetadata): string =>
 const canonicalExtraMetadataKey = (key: string): string =>
     key
         .replace(/^Custom:\s*/i, '')
+        .replace(/^----:com\.apple\.iTunes:/, '')
         .replace(/[^a-z0-9]/gi, '')
         .toUpperCase()
 
@@ -175,6 +182,7 @@ export const relevantExternalRefsMap = {
     artists: [
         ExternalRefKeys.MusicBrainzArtistId,
         ExternalRefKeys.DiscogsArtistLink,
+        ExternalRefKeys.DiscogsArtistId,
         ExternalRefKeys.BeatportArtistUrl,
         ExternalRefKeys.BandcampArtistId,
     ],
@@ -184,14 +192,24 @@ export const relevantExternalRefsMap = {
         ExternalRefKeys.MusicBrainzReleaseGroupId,
         ExternalRefKeys.MusicBrainzAlbumId,
         ExternalRefKeys.DiscogsReleaseId,
+        ExternalRefKeys.DiscogsMasterReleaseId,
         ExternalRefKeys.BeatportReleaseId,
         ExternalRefKeys.BandcampReleaseId,
+        ExternalRefKeys.Barcode,
+        ExternalRefKeys.Asin,
+        ExternalRefKeys.SpotifyReleaseId,
+        ExternalRefKeys.DeezerReleaseId,
+        ExternalRefKeys.TraxsourceReleaseId,
+        ExternalRefKeys.BeatsourceReleaseId,
+        ExternalRefKeys.ItunesReleaseId,
+        ExternalRefKeys.JunodownloadReleaseId,
     ],
     recordLabels: [
         ExternalRefKeys.MusicBrainzLabelId,
         ExternalRefKeys.DiscogsLabelLink,
         ExternalRefKeys.BeatportLabelUrl,
         ExternalRefKeys.BandcampLabelUrl,
+        ExternalRefKeys.DiscogsLabelId,
         ExternalRefKeys.BandcampLabelId,
     ],
     // For completeness. Not filtering tracks as they always need to

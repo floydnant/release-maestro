@@ -72,6 +72,74 @@ describe('library normalization', () => {
         } satisfies ExternalRefs)
     })
 
+    it.each([
+        ['AcoustId', 'ACOUSTID_ID'],
+        ['Custom: Acoustid Id', 'ACOUSTID_ID'],
+        ['Isrc', 'ISRC'],
+        ['Barcode', 'BARCODE'],
+        ['Custom: UPC', 'BARCODE'],
+        ['Custom: EAN', 'BARCODE'],
+        ['Custom: EAN/UPN', 'BARCODE'],
+        ['Custom: UPN', 'BARCODE'],
+        ['Custom: DISCOGS_MASTER_RELEASE_ID', 'DISCOGS_MASTER_RELEASE_ID'],
+        ['Custom: DISCOGS_ARTIST_ID', 'DISCOGS_ARTIST_ID'],
+        ['Custom: DISCOGS_LABEL_ID', 'DISCOGS_LABEL_ID'],
+        ['Custom: ASIN', 'ASIN'],
+        ['Custom: SPOTIFY_TRACK_ID', 'SPOTIFY_TRACK_ID'],
+        ['Custom: SPOTIFY_RELEASE_ID', 'SPOTIFY_RELEASE_ID'],
+        ['Custom: DEEZER_TRACK_ID', 'DEEZER_TRACK_ID'],
+        ['Custom: DEEZER_RELEASE_ID', 'DEEZER_RELEASE_ID'],
+        ['Custom: TRAXSOURCE_TRACK_ID', 'TRAXSOURCE_TRACK_ID'],
+        ['Custom: TRAXSOURCE_RELEASE_ID', 'TRAXSOURCE_RELEASE_ID'],
+        ['Custom: BEATSOURCE_TRACK_ID', 'BEATSOURCE_TRACK_ID'],
+        ['Custom: BEATSOURCE_RELEASE_ID', 'BEATSOURCE_RELEASE_ID'],
+        ['Custom: ITUNES_TRACK_ID', 'ITUNES_TRACK_ID'],
+        ['Custom: ITUNES_RELEASE_ID', 'ITUNES_RELEASE_ID'],
+        ['Custom: JUNODOWNLOAD_RELEASE_ID', 'JUNODOWNLOAD_RELEASE_ID'],
+    ])('imports %s under %s', (rawKey, key) => {
+        expect(extractExternalRefs([[rawKey, ' 001234 ']], null)).toEqual({ [key]: ['001234'] })
+    })
+
+    it('reads Apple MP4 freeform references and deduplicates aliases without losing values', () => {
+        expect(
+            extractExternalRefs(
+                [
+                    ['Custom: ----:com.apple.iTunes:Acoustid Id', 'acoustid-1'],
+                    ['Custom: ACOUSTID_ID', ' acoustid-1 '],
+                    ['Custom: ----:com.apple.iTunes:SPOTIFY_TRACK_ID', 'spotify-1'],
+                    ['Custom: ----:com.apple.iTunes:DISCOGS_RELEASE_ID', '123'],
+                    ['Custom: UPC', '001234'],
+                    ['Barcode', '001234'],
+                    ['Custom: EAN', '005678'],
+                    ['Isrc', 'GBABC2600001'],
+                    ['Isrc', 'GBABC2600002'],
+                ],
+                null,
+            ),
+        ).toEqual({
+            ACOUSTID_ID: ['acoustid-1'],
+            SPOTIFY_TRACK_ID: ['spotify-1'],
+            DISCOGS_RELEASE_ID: ['123'],
+            BARCODE: ['001234', '005678'],
+            ISRC: ['GBABC2600001', 'GBABC2600002'],
+        } satisfies ExternalRefs)
+    })
+
+    it('ignores blanks, unrelated fields, fingerprints and other MP4 namespaces', () => {
+        expect(
+            extractExternalRefs(
+                [
+                    ['Custom: ACOUSTID_ID', '  '],
+                    ['Custom: Acoustid Fingerprint', 'opaque-fingerprint'],
+                    ['Custom: ----:org.example:SPOTIFY_TRACK_ID', 'private-id'],
+                    ['Custom: SPOTIFY_POPULARITY', '80'],
+                    ['Custom: URL', 'https://example.com'],
+                ],
+                null,
+            ),
+        ).toEqual({})
+    })
+
     it('flags ambiguous artist text without splitting it', () => {
         const issues = detectNormalizationIssues(
             newSongFixture({

@@ -435,5 +435,50 @@ file.tags.add(id3.TXXX(encoding=3, desc="INITIALKEY", text=["Dm"]))
 file.save()
 case(path.name, FIELDS, writable=True)
 
+# External references exercise semantic keys, custom text and MP4 namespaces.
+for extension in ["mp3", "flac", "m4a"]:
+    path = ROOT / f"external-refs.{extension}"
+    shutil.copyfile(ROOT / f"vardae-invocacion-del-cielo.{extension}", path)
+    file = mutagen.File(path)
+    file.tags.clear()
+    custom_refs = {
+        "ASIN": "B000000001",
+        "DISCOGS_ARTIST_ID": "456",
+        "DISCOGS_MASTER_RELEASE_ID": "123",
+        "SPOTIFY_TRACK_ID": "spotify-song-1",
+    }
+    if extension == "mp3":
+        file.tags.add(id3.TIT2(encoding=3, text=["External references"]))
+        file.tags.add(id3.TSRC(encoding=3, text=["GBABC2600001"]))
+        file.tags.add(id3.TXXX(encoding=3, desc="BARCODE", text=["001234"]))
+        file.tags.add(id3.TXXX(encoding=3, desc="Acoustid Id", text=["acoustid-1"]))
+        for key, value in custom_refs.items():
+            file.tags.add(id3.TXXX(encoding=3, desc=key, text=[value]))
+        extras = [[f"Custom: {key}", value] for key, value in custom_refs.items()]
+    elif extension == "flac":
+        file.clear_pictures()
+        file["TITLE"] = "External references"
+        file["ISRC"] = "GBABC2600001"
+        file["BARCODE"] = "001234"
+        file["EAN"] = "001234"
+        file["ACOUSTID_ID"] = "acoustid-1"
+        custom_refs = {key.upper().replace(" ", "_"): value for key, value in custom_refs.items()}
+        for key, value in custom_refs.items():
+            file[key] = value
+        extras = [[f"Custom: {key}", value] for key, value in custom_refs.items()]
+        extras.append(["Custom: EAN", "001234"])
+    else:
+        file["\xa9nam"] = ["External references"]
+        prefix = "----:com.apple.iTunes:"
+        for key, value in {**custom_refs, "ISRC": "GBABC2600001", "BARCODE": "001234",
+                           "Acoustid Id": "acoustid-1"}.items():
+            file[prefix + key] = [MP4FreeForm(value.encode())]
+        file["----:org.example:SPOTIFY_TRACK_ID"] = [MP4FreeForm(b"private-id")]
+        extras = [[f"Custom: {prefix}{key}", value] for key, value in custom_refs.items()]
+        extras.append(["Custom: ----:org.example:SPOTIFY_TRACK_ID", "private-id"])
+    file.save()
+    case(path.name, {"title": "External references"},
+         extras=[["Isrc", "GBABC2600001"], ["Barcode", "001234"], ["AcoustId", "acoustid-1"], *extras])
+
 (ROOT / "cover.png").write_bytes(PNG)
 (ROOT / "cases.json").write_text(json.dumps(CASES, indent=4, ensure_ascii=False) + "\n")

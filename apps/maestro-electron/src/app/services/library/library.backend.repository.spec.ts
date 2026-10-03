@@ -141,6 +141,81 @@ describe('LibraryBackendRepository', () => {
         expect(repository.countSongsNeedingMetadata()).toBe(1)
     })
 
+    it('keeps performer references separate from compilation album artists', () => {
+        const metadata = newSongFixture({
+            artist: 'Performer',
+            albumArtist: 'Various Artists',
+            albumTitle: 'Compilation',
+            extraMetadata: [
+                ['Custom: DISCOGS_ARTIST_ID', '456'],
+                ['MusicBrainzArtistId', 'performer-id'],
+                ['MusicBrainzReleaseArtistId', 'album-artist-id'],
+            ],
+        })
+        const seenAt = new Date('2026-06-15T10:00:00Z')
+        repository.ingestMetadata(metadata, fact, seenAt)
+        repository.ingestMetadata(metadata, fact, seenAt)
+
+        const artists = db.select().from(artistsTable).all()
+        const browse = new LibraryBrowseRepository({ db })
+        const performer = artists.find(artist => artist.name == 'Performer')!
+        const albumArtist = artists.find(artist => artist.name == 'Various Artists')!
+        expect(browse.getArtistDetail(performer.id)?.externalRefs).toEqual({
+            DISCOGS_ARTIST_ID: ['456'],
+            MUSICBRAINZ_ARTIST_ID: ['performer-id'],
+        })
+        expect(browse.getArtistDetail(albumArtist.id)?.externalRefs).toEqual({
+            MUSICBRAINZ_ARTIST_ID: ['album-artist-id'],
+        })
+    })
+
+    it('keeps recording references on songs and shares product references with albums', () => {
+        const metadata = newSongFixture({
+            artist: 'Artist',
+            albumArtist: 'Artist',
+            albumTitle: 'Album',
+            label: 'Record label',
+            extraMetadata: [
+                ['Custom: ----:com.apple.iTunes:Acoustid Id', 'acoustid-1'],
+                ['Isrc', 'GBABC2600001'],
+                ['Custom: UPC', '001234'],
+                ['Custom: ASIN', 'B000000001'],
+                ['Custom: SPOTIFY_TRACK_ID', 'spotify-song-1'],
+                ['Custom: SPOTIFY_RELEASE_ID', 'spotify-album-1'],
+                ['Custom: DISCOGS_MASTER_RELEASE_ID', '123'],
+                ['Custom: DISCOGS_ARTIST_ID', '456'],
+                ['Custom: DISCOGS_LABEL_ID', '789'],
+            ],
+        })
+        const seenAt = new Date('2026-06-15T10:00:00Z')
+        repository.ingestMetadata(metadata, fact, seenAt)
+        repository.ingestMetadata(metadata, fact, seenAt)
+
+        expect(db.select().from(songsTable).get()?.externalRefs).toEqual({
+            ACOUSTID_ID: ['acoustid-1'],
+            ISRC: ['GBABC2600001'],
+            BARCODE: ['001234'],
+            ASIN: ['B000000001'],
+            DISCOGS_ARTIST_ID: ['456'],
+            DISCOGS_LABEL_ID: ['789'],
+            SPOTIFY_TRACK_ID: ['spotify-song-1'],
+            SPOTIFY_RELEASE_ID: ['spotify-album-1'],
+            DISCOGS_MASTER_RELEASE_ID: ['123'],
+        })
+        expect(db.select().from(albumsTable).get()?.externalRefs).toEqual({
+            BARCODE: ['001234'],
+            ASIN: ['B000000001'],
+            SPOTIFY_RELEASE_ID: ['spotify-album-1'],
+            DISCOGS_MASTER_RELEASE_ID: ['123'],
+        })
+        const artist = db.select().from(artistsTable).get()!
+        const browse = new LibraryBrowseRepository({ db })
+        expect(browse.getArtistDetail(artist.id)?.externalRefs).toEqual({ DISCOGS_ARTIST_ID: ['456'] })
+        expect(db.select().from(recordLabelsTable).get()?.externalRefs).toEqual({
+            DISCOGS_LABEL_ID: ['789'],
+        })
+    })
+
     it('ingests normalized relations while preserving raw artist text', () => {
         const seenAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], seenAt)

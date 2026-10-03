@@ -168,3 +168,20 @@ test('record label detail has retry and missing states', async ({ page }) => {
     await page.getByRole('button', { name: 'Try again' }).click()
     await expect(page.getByText('This record label is no longer in your library')).toBeVisible()
 })
+
+test('Discogs IDs become label detail links', async ({ page }) => {
+    await createRendererScenario(
+        page,
+        scenario()
+            .handler('library:get-record-label-detail', {
+                kind: 'resolve',
+                value: { ...recordLabel, externalRefs: { DISCOGS_LABEL_ID: ['456'] } },
+            })
+            .build(),
+        '/record-labels/kosmische',
+    )
+    await expect(page.getByRole('link', { name: 'Discogs' })).toHaveAttribute(
+        'href',
+        'https://www.discogs.com/label/456',
+    )
+})

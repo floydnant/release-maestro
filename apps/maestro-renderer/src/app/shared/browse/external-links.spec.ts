@@ -17,6 +17,28 @@ describe('externalLinks', () => {
         ])
     })
 
+    it('deduplicates and numbers links shared by ID and URL tags', () => {
+        expect(
+            externalLinks(
+                {
+                    DISCOGS_ARTIST_ID: ['456', '123'],
+                    DISCOGS_ARTIST_LINK: ['https://www.discogs.com/artist/456'],
+                },
+                [
+                    { key: ExternalRefKeys.DiscogsArtistLink, label: 'Discogs', domain: 'discogs.com' },
+                    {
+                        key: ExternalRefKeys.DiscogsArtistId,
+                        label: 'Discogs',
+                        base: 'https://www.discogs.com/artist/',
+                    },
+                ],
+            ),
+        ).toEqual([
+            { label: 'Discogs 1', url: 'https://www.discogs.com/artist/123' },
+            { label: 'Discogs 2', url: 'https://www.discogs.com/artist/456' },
+        ])
+    })
+
     it('keeps http(s) URLs on the service domain or its subdomains only', () => {
         const refs = {
             [ExternalRefKeys.BandcampLabelUrl]: [
