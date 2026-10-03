@@ -4,8 +4,10 @@ import {
     and,
     asc,
     count,
+    countDistinct,
     eq,
     gt,
+    gte,
     inArray,
     isNotNull,
     isNull,
@@ -187,7 +189,7 @@ export class LibraryBackendRepository {
             .having(
                 and(
                     gt(count(), 1),
-                    sql`sum(case when ${songsTable.lastSeenAt} = ${seenAt.getTime()} then 1 else 0 end) = 1`,
+                    eq(count(sql`case when ${eq(songsTable.lastSeenAt, seenAt)} then 1 end`), 1),
                 ),
             )
             .all()
@@ -373,7 +375,7 @@ export class LibraryBackendRepository {
     countOpenIssuesForReadSongs(seenAt: Date): number {
         return (
             this.database.db
-                .select({ value: sql<number>`count(distinct ${songsTable.id})` })
+                .select({ value: countDistinct(songsTable.id) })
                 .from(songsTable)
                 .innerJoin(
                     normalizationIssuesTable,
@@ -385,7 +387,7 @@ export class LibraryBackendRepository {
                 .where(
                     and(
                         eq(songsTable.lastSeenAt, seenAt),
-                        sql`${songsTable.lastScannedAt} >= ${seenAt.getTime()}`,
+                        gte(songsTable.lastScannedAt, seenAt),
                         eq(normalizationIssuesTable.status, 'OPEN'),
                     ),
                 )
