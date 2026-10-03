@@ -50,6 +50,16 @@ describe(FeedComponent.name, () => {
         expect(component).toBeTruthy()
     })
 
+    it('requests remaining releases from the start while excluding already loaded releases', async () => {
+        await fixture.whenStable()
+        const feed = TestBed.inject(FeedService)
+        component.loadedFeedItemIds.add('already-loaded')
+        component.furthestScrolledIndex.set(1)
+        fixture.detectChanges()
+        await fixture.whenStable()
+        expect(feed.loadFeed).toHaveBeenLastCalledWith(0, 6, ['already-loaded'])
+    })
+
     it('starts a new track at the point selected on its seeker', () => {
         const trackSeeker = document.createElement('button')
         jest.spyOn(trackSeeker, 'getBoundingClientRect').mockReturnValue({

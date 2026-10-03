@@ -1,4 +1,5 @@
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
+import { bandcampFeedItem } from '../../../test/fixtures/feed.fixture'
 import { FeedBackendRepository } from './feed.backend.repository'
 
 describe('FeedBackendRepository email import checkpoint', () => {
@@ -14,5 +15,25 @@ describe('FeedBackendRepository email import checkpoint', () => {
         )
 
         await expect(repository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toEqual(newest)
+    })
+})
+
+describe('FeedBackendRepository exclusions', () => {
+    it('supports exclusion lists beyond SQLite statement-variable limits', async () => {
+        const database = createMigratedTestDatabase()
+        try {
+            const repository = new FeedBackendRepository(database.client)
+            await repository.ingestFeedItems([
+                bandcampFeedItem('excluded', new Date('2026-10-02')),
+                bandcampFeedItem('remaining', new Date('2026-10-01')),
+            ])
+            const excludedIds = Array.from({ length: 40000 }, (_, index) => `excluded-${index}`)
+            excludedIds.push('excluded')
+            expect((await repository.listFeedItems(0, 5, excludedIds)).map(item => item.id)).toEqual([
+                'remaining',
+            ])
+        } finally {
+            database.sqlite.close()
+        }
     })
 })

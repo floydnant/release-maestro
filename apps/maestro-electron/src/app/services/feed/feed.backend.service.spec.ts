@@ -5,6 +5,7 @@ import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixt
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
+import { SettingsBackendService } from '../settings.backend.service'
 import { FeedBackendRepository } from './feed.backend.repository'
 import { FeedBackendService } from './feed.backend.service'
 
@@ -64,6 +65,7 @@ describe('FeedBackendService email import', () => {
             fromPartial<BandcampApiBackendService>({}),
             fromPartial<WebScrapingService>({}),
             feedRepository,
+            fromPartial<SettingsBackendService>({}),
         )
     })
 

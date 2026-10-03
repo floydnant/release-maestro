@@ -100,7 +100,10 @@ export const MainIpcContract = defineIpcContract({
      */
     'trigger-email-import': defineIpcRequest<{ trigger: EmailImportTrigger }>(),
     'email-import-abort': defineIpcEvent(),
-    'load-feed': defineIpcRequest<{ index: number; count: number }, HydratedFeedItem[] | FeedLoadError>(),
+    'load-feed': defineIpcRequest<
+        { index: number; count: number; excludedIds?: string[] },
+        HydratedFeedItem[] | FeedLoadError
+    >(),
     'has-feed': defineIpcRequest<void, boolean>(),
     'mark-feed-item-viewed': defineIpcRequest<{
         id: string
