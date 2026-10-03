@@ -2,91 +2,102 @@
     <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div class="max-w-3xl">
             <p class="type-label-sm text-content-success uppercase">Developer diagnostics</p>
-            <h2 class="mt-1 type-hero-title text-content-primary">Debug Console</h2>
-            <p class="mt-3 type-body-sm text-content-secondary">
+            <h2 class="type-hero-title mt-1 text-content-primary">Debug Console</h2>
+            <p class="type-body-sm mt-3 text-content-secondary">
                 A home for internal diagnostics across renderer, Electron, and worker boundaries. The current
                 toolset focuses on metadata engine health, direct tag probes, and persisted library scans.
             </p>
         </div>
 
         <div class="flex flex-col items-start gap-2 sm:items-end">
-            <span [class]="'badge border ' + workerHealthClass()">
+            <span hlmBadge variant="secondary" [class]="workerHealthClass()">
                 Metadata worker {{ workerHealthText() }}
             </span>
             @if (pingError(); as error) {
-                <button class="btn-nkd-neutral" (click)="ping()">Retry health check</button>
-                <p class="max-w-xs text-right text-xs text-content-danger">{{ error }}</p>
+                <button hlmBtn variant="ghost" type="button" (click)="ping()">Retry health check</button>
+                <div hlmAlert variant="destructive" class="worker-error | max-w-xs">
+                    <p hlmAlertDescription>{{ error }}</p>
+                </div>
             } @else {
                 @if (pingResult(); as result) {
-                    <details class="text-right">
-                        <summary class="cursor-pointer text-xs text-content-muted">Health payload</summary>
+                    <div hlmCollapsible class="text-right">
+                        <button hlmBtn hlmCollapsibleTrigger variant="ghost" size="sm" type="button">
+                            Health payload
+                        </button>
                         <pre
+                            hlmCollapsibleContent
+                            aria-label="Metadata worker health payload"
                             class="mt-2 max-h-32 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 text-left font-mono text-xs text-content-secondary"
                             >{{ result | json }}</pre>
-                    </details>
+                    </div>
                 }
             }
         </div>
     </header>
 
     <section class="mb-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <div class="panel p-4">
+        <div hlmCard class="scan-metric | gap-0 p-4">
             <p class="type-label-sm text-content-muted uppercase">Status</p>
             <p aria-label="Scan status" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanStatus()?.phase ?? 'idle' }}
             </p>
         </div>
-        <div class="panel p-4">
+        <div hlmCard class="scan-metric | gap-0 p-4">
             <p class="type-label-sm text-content-muted uppercase">Progress</p>
             <p class="font-mono text-xl font-semibold text-content-primary">{{ progress() }}%</p>
         </div>
-        <div class="panel p-4">
+        <div hlmCard class="scan-metric | gap-0 p-4">
             <p class="type-label-sm text-content-muted uppercase">Discovered</p>
             <p aria-label="Discovered files" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanStatus()?.discovered ?? 0 }}
             </p>
         </div>
-        <div class="panel p-4">
+        <div hlmCard class="scan-metric | gap-0 p-4">
             <p class="type-label-sm text-content-muted uppercase">Imported</p>
             <p aria-label="Imported items" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanStatus()?.imported ?? 0 }}
             </p>
         </div>
-        <div class="panel p-4">
+        <div hlmCard class="scan-metric | gap-0 p-4">
             <p class="type-label-sm text-content-muted uppercase">Errors</p>
             <p aria-label="Scan errors" class="font-mono text-xl font-semibold text-content-primary">
                 {{ scanStatus()?.failedFiles ?? 0 }}
             </p>
         </div>
-        <div class="panel p-4">
+        <div hlmCard class="scan-metric | gap-0 p-4">
             <p class="type-label-sm text-content-muted uppercase">Duration</p>
             <p class="font-mono text-xl font-semibold text-content-primary">{{ scanDurationText() }}</p>
         </div>
     </section>
 
     <section class="mb-5">
-        <div class="panel p-4">
+        <div hlmCard class="diagnostic-module | gap-0 p-4">
             <p class="type-label-sm text-content-muted uppercase">Diagnostic module</p>
-            <h3 class="mt-1 type-section-title text-content-primary">Metadata engine</h3>
+            <h3 class="type-section-title mt-1 text-content-primary">Metadata engine</h3>
         </div>
     </section>
 
     <div class="grid gap-5 xl:grid-cols-[minmax(22rem,0.8fr)_minmax(38rem,1.4fr)]">
         <div class="space-y-5">
-            <section class="space-y-3 panel p-4">
+            <section hlmCard class="metadata-read | gap-3 p-4">
                 <p class="type-label-sm text-content-muted uppercase">Direct metadata read</p>
                 <h3 class="type-section-title text-content-primary">Inspect file tags</h3>
-                <input
-                    aria-label="Read file path"
-                    class="w-full input font-mono text-sm"
-                    [ngModel]="readPath()"
-                    (ngModelChange)="readPath.set($event)"
-                    placeholder="/absolute/path/to/song.flac"
-                />
+                <div hlmField>
+                    <input
+                        hlmInput
+                        aria-label="Read file path"
+                        class="font-mono"
+                        [ngModel]="readPath()"
+                        (ngModelChange)="readPath.set($event)"
+                        placeholder="/absolute/path/to/song.flac"
+                    />
+                </div>
                 <div class="flex flex-wrap gap-2">
-                    <button class="btn-primary" (click)="readFile()">Read File</button>
+                    <button hlmBtn type="button" (click)="readFile()">Read File</button>
                     <button
-                        class="btn-nkd-neutral"
+                        hlmBtn
+                        variant="ghost"
+                        type="button"
                         [disabled]="!readPath()"
                         (click)="setWritePathFromReadPath()"
                     >
@@ -94,11 +105,9 @@
                     </button>
                 </div>
                 @if (readError(); as error) {
-                    <p
-                        class="rounded-lg border border-status-danger-border bg-status-danger-background p-3 text-sm text-status-danger-content"
-                    >
-                        {{ error }}
-                    </p>
+                    <div hlmAlert variant="destructive">
+                        <p hlmAlertDescription>{{ error }}</p>
+                    </div>
                 }
                 @if (readResult(); as result) {
                     <pre
@@ -108,36 +117,42 @@
                 }
             </section>
 
-            <section class="space-y-3 panel p-4">
+            <section hlmCard class="metadata-write | gap-3 p-4">
                 <p class="type-label-sm text-content-muted uppercase">Write probe</p>
                 <h3 class="type-section-title text-content-primary">Apply tag update</h3>
-                <input
-                    aria-label="Write file path"
-                    class="w-full input font-mono text-sm"
-                    [ngModel]="writePath()"
-                    (ngModelChange)="writePath.set($event)"
-                    placeholder="/absolute/path/to/song.flac"
-                />
-                <textarea
-                    aria-label="Write tag payload"
-                    class="w-full input font-mono text-sm"
-                    [ngModel]="writePayloadText()"
-                    (ngModelChange)="writePayloadText.set($event)"
-                ></textarea>
+                <div hlmField>
+                    <input
+                        hlmInput
+                        aria-label="Write file path"
+                        class="font-mono"
+                        [ngModel]="writePath()"
+                        (ngModelChange)="writePath.set($event)"
+                        placeholder="/absolute/path/to/song.flac"
+                    />
+                </div>
+                <div hlmField>
+                    <textarea
+                        hlmTextarea
+                        aria-label="Write tag payload"
+                        class="font-mono"
+                        [ngModel]="writePayloadText()"
+                        (ngModelChange)="writePayloadText.set($event)"
+                    ></textarea>
+                    <p hlmFieldDescription>
+                        Writes go through the Rust engine tri-state update contract. Use this only on
+                        disposable files.
+                    </p>
+                </div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <button class="btn-danger" (click)="writeTags()">Write Tags</button>
+                    <button hlmBtn variant="destructive" type="button" (click)="writeTags()">
+                        Write Tags
+                    </button>
                     <p class="type-body-sm text-content-muted">Use disposable files only.</p>
                 </div>
-                <p class="type-body-sm text-content-secondary">
-                    Writes go through the Rust engine tri-state update contract. Use this only on disposable
-                    files.
-                </p>
                 @if (writeError(); as error) {
-                    <p
-                        class="rounded-lg border border-status-danger-border bg-status-danger-background p-3 text-sm text-status-danger-content"
-                    >
-                        {{ error }}
-                    </p>
+                    <div hlmAlert variant="destructive">
+                        <p hlmAlertDescription>{{ error }}</p>
+                    </div>
                 }
                 @if (writeResult(); as result) {
                     <pre
@@ -149,38 +164,42 @@
         </div>
 
         <div class="space-y-5">
-            <section class="space-y-4 panel p-4">
+            <section hlmCard class="library-scan | gap-4 p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="max-w-2xl">
                         <p class="type-label-sm text-content-muted uppercase">Persisted library scan</p>
-                        <h3 class="mt-1 type-section-title text-content-primary">Full Library Scan</h3>
-                        <p class="mt-2 type-body-sm text-content-secondary">
-                            Enter one folder per line, or leave empty to scan the configured library folders.
-                            Runs through the shared LibraryScanService (same as onboarding and startup
-                            rescans).
-                        </p>
+                        <h3 class="type-section-title mt-1 text-content-primary">Full Library Scan</h3>
                     </div>
                     <div class="flex gap-2">
                         @if (!scanInFlight()) {
-                            <button class="btn-primary" (click)="startScan()">Start Scan</button>
+                            <button hlmBtn type="button" (click)="startScan()">Start Scan</button>
                         } @else {
-                            <button class="btn-neutral" (click)="cancelScan()">Cancel</button>
+                            <button hlmBtn variant="secondary" type="button" (click)="cancelScan()">
+                                Cancel
+                            </button>
                         }
                     </div>
                 </div>
 
-                <textarea
-                    aria-label="Library scan paths"
-                    class="min-h-24 w-full input font-mono text-sm"
-                    [ngModel]="scanPathsText()"
-                    (ngModelChange)="scanPathsText.set($event)"
-                    placeholder="/music/library&#10;/other/folder"
-                ></textarea>
+                <div hlmField>
+                    <p hlmFieldDescription>
+                        Enter one folder per line, or leave empty to scan the configured library folders. Runs
+                        through the shared LibraryScanService (same as onboarding and startup rescans).
+                    </p>
+                    <textarea
+                        hlmTextarea
+                        aria-label="Library scan paths"
+                        class="min-h-24 font-mono"
+                        [ngModel]="scanPathsText()"
+                        (ngModelChange)="scanPathsText.set($event)"
+                        placeholder="/music/library&#10;/other/folder"
+                    ></textarea>
+                </div>
 
                 <app-progress-bar [segments]="scanProgressSegments()" [shouldGlow]="scanInFlight()" />
 
                 <div class="grid gap-3 md:grid-cols-5">
-                    <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
                         <p class="type-label-sm text-content-muted uppercase">New</p>
                         <p
                             aria-label="New songs"
@@ -189,7 +208,7 @@
                             {{ scanStatus()?.new ?? 0 }}
                         </p>
                     </div>
-                    <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
                         <p class="type-label-sm text-content-muted uppercase">Changed</p>
                         <p
                             aria-label="Changed songs"
@@ -198,7 +217,7 @@
                             {{ scanStatus()?.changed ?? 0 }}
                         </p>
                     </div>
-                    <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
                         <p class="type-label-sm text-content-muted uppercase">Unchanged</p>
                         <p
                             aria-label="Unchanged songs"
@@ -207,7 +226,7 @@
                             {{ scanStatus()?.unchanged ?? 0 }}
                         </p>
                     </div>
-                    <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
                         <p class="type-label-sm text-content-muted uppercase">Missing</p>
                         <p
                             aria-label="Missing songs"
@@ -216,7 +235,7 @@
                             {{ scanStatus()?.terminal?.missing ?? 0 }}
                         </p>
                     </div>
-                    <div class="rounded-lg border border-border-subtle bg-background-canvas p-3">
+                    <div hlmCard class="scan-metric | gap-0 bg-background-canvas p-3">
                         <p class="type-label-sm text-content-muted uppercase">Tag issues</p>
                         <p
                             aria-label="Normalization issues"
@@ -234,40 +253,43 @@
                         </p>
                     }
                     @if (status.terminal?.error; as terminalError) {
-                        <p
-                            class="rounded-lg border border-status-danger-border bg-status-danger-background p-3 text-sm text-status-danger-content"
-                        >
-                            {{ terminalError.code }}: {{ terminalError.message }}
-                        </p>
+                        <div hlmAlert variant="destructive">
+                            <p hlmAlertDescription>{{ terminalError.code }}: {{ terminalError.message }}</p>
+                        </div>
                     }
                     @if (status.terminal; as terminal) {
-                        <details class="rounded-lg border border-border-subtle bg-background-canvas p-3">
-                            <summary class="cursor-pointer text-sm font-semibold text-content-primary">
+                        <div hlmCollapsible hlmCard class="raw-scan-result | gap-0 bg-background-canvas p-3">
+                            <button
+                                hlmBtn
+                                hlmCollapsibleTrigger
+                                variant="ghost"
+                                type="button"
+                                class="justify-start"
+                            >
                                 Raw terminal result
-                            </summary>
+                            </button>
                             <pre
+                                hlmCollapsibleContent
                                 aria-label="Raw scan summary"
                                 class="mt-3 overflow-auto rounded-lg border border-border-subtle bg-background-canvas p-3 font-mono text-xs text-content-secondary"
                                 >{{ terminal | json }}</pre>
-                        </details>
+                        </div>
                     }
                 }
                 @if (scanError(); as error) {
-                    <p
-                        class="rounded-lg border border-status-danger-border bg-status-danger-background p-3 text-sm text-status-danger-content"
-                    >
-                        {{ error }}
-                    </p>
+                    <div hlmAlert variant="destructive">
+                        <p hlmAlertDescription>{{ error }}</p>
+                    </div>
                 }
             </section>
 
-            <section class="overflow-hidden panel p-0">
+            <section hlmCard class="scan-log | gap-0 overflow-hidden p-0">
                 <div class="flex items-center justify-between gap-3 border-b border-border-subtle p-4">
                     <div>
                         <p class="type-label-sm text-content-muted uppercase">Status stream</p>
-                        <h3 class="mt-1 type-section-title text-content-primary">Scan status snapshots</h3>
+                        <h3 class="type-section-title mt-1 text-content-primary">Scan status snapshots</h3>
                     </div>
-                    <button class="btn-nkd-neutral" (click)="clearScanLog()">Clear</button>
+                    <button hlmBtn variant="ghost" type="button" (click)="clearScanLog()">Clear</button>
                 </div>
 
                 <div class="max-h-[32rem] overflow-auto">
@@ -280,16 +302,16 @@
                                 #{{ entry.status.scanId }} {{ entry.status.trigger }}
                             </span>
                             <span
-                                [class]="
-                                    'rounded-full border px-2 py-0.5 text-center font-mono ' +
-                                    scanPhaseClass(entry.status.phase)
-                                "
+                                hlmBadge
+                                variant="secondary"
+                                class="scan-phase | justify-center font-mono"
+                                [class]="scanPhaseClass(entry.status.phase)"
                             >
                                 {{ entry.status.phase }}
                             </span>
                             <span
                                 class="truncate font-mono text-content-secondary"
-                                [title]="logEntryDetail(entry.status)"
+                                [hlmTooltip]="logEntryDetail(entry.status)"
                             >
                                 {{ logEntryDetail(entry.status) }}
                             </span>

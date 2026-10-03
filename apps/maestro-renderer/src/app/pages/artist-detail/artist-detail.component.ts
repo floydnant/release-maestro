@@ -1,3 +1,4 @@
+import { HlmButton } from '@spartan-ng/helm/button'
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core'
 import { toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, RouterLink } from '@angular/router'
@@ -47,7 +48,7 @@ const artistLinks = (artist: ArtistDetail): ExternalLink[] => [
     selector: 'app-artist-detail',
     templateUrl: './artist-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
+    imports: [HlmButton, 
         RouterLink,
         TabBarComponent,
         EntityAlbumsComponent,

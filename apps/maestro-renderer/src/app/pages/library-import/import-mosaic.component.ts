@@ -9,6 +9,7 @@ import {
     signal,
 } from '@angular/core'
 import { LibraryAlbumPreview } from '@release-maestro/core'
+import { HlmTooltip } from '@spartan-ng/helm/tooltip'
 import { fileUrl } from '../../shared/utils/file-url.util'
 
 interface MosaicCell {
@@ -47,7 +48,7 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
  */
 @Component({
     selector: 'app-import-mosaic',
-    imports: [],
+    imports: [HlmTooltip],
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
         class: 'block size-full overflow-hidden',
@@ -77,7 +78,7 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
                             <img
                                 class="mosaic-tile--enter absolute inset-0 size-full object-cover"
                                 [src]="fileUrl(revisionCell.current.coverPath)"
-                                [title]="tileTitle(revisionCell.current)"
+                                [hlmTooltip]="tileTitle(revisionCell.current)"
                                 alt=""
                             />
                         }

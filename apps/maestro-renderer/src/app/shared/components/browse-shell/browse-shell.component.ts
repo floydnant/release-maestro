@@ -1,3 +1,6 @@
+import { HlmBadge } from '@spartan-ng/helm/badge'
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmInput } from '@spartan-ng/helm/input'
 import { DecimalPipe } from '@angular/common'
 import {
     ChangeDetectionStrategy,
@@ -61,7 +64,7 @@ export interface BrowseFilterState {
     selector: 'app-browse-shell',
     templateUrl: './browse-shell.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, IconComponent, RouterLink],
+    imports: [HlmButton, HlmBadge, HlmInput, DecimalPipe, IconComponent, RouterLink],
     host: {
         class: 'flex min-h-0 min-w-0 flex-1 flex-col',
         '(document:keydown)': 'onDocumentKeydown($event)',

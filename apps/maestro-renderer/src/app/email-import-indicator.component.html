@@ -19,10 +19,13 @@
         </p>
         @if (isRunning()) {
             <button
-                class="email-import-cancel | btn-nkd-neutral size-6 self-center p-0 [-webkit-app-region:no-drag]"
+                hlmBtn
+                variant="ghost"
+                size="icon-xs"
+                class="email-import-cancel | self-center [-webkit-app-region:no-drag]"
                 type="button"
                 aria-label="Cancel email import"
-                title="Cancel email import"
+                hlmTooltip="Cancel email import"
                 (click)="cancelImport.emit($event)"
             >
                 <app-icon name="close" size="14" aria-hidden="true"></app-icon>
@@ -33,7 +36,7 @@
 <p class="email-import-summary | type-body-sm" role="status" aria-label="Email import" aria-live="polite">
     @if (hidden() ? null : summary(); as summary) {
         <!-- The spinner's 25px box draws an 18px ring. Match both dimensions. -->
-        <span class="flex items-center gap-1 px-2" [class]="summaryClass()" [title]="summary.title">
+        <span class="flex items-center gap-1 px-2" [class]="summaryClass()" [hlmTooltip]="summary.title">
             <app-icon
                 class="size-[25px] shrink-0"
                 [name]="summary.icon"

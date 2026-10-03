@@ -1,3 +1,4 @@
+import { HlmButton } from '@spartan-ng/helm/button'
 import { DecimalPipe } from '@angular/common'
 import { ChangeDetectionStrategy, Component, input } from '@angular/core'
 import { RouterLink, type Params } from '@angular/router'
@@ -43,7 +44,7 @@ export interface Tab<TKey extends string = string> {
     selector: 'app-tab-bar',
     templateUrl: './tab-bar.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, RouterLink],
+    imports: [HlmButton, DecimalPipe, RouterLink],
     host: {
         role: 'navigation',
         class: 'flex flex-wrap items-center gap-1',

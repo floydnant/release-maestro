@@ -11,6 +11,8 @@ import {
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
 import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
+import { HlmButtonImports } from '@spartan-ng/helm/button'
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
@@ -55,6 +57,8 @@ type FeedState =
         ProgressRingComponent,
         IconComponent,
         RouterModule,
+        HlmButtonImports,
+        HlmTooltipImports,
     ],
 })
 export class FeedComponent {
