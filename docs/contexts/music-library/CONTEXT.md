@@ -56,6 +56,7 @@ _Avoid_: crawl, walk, indexing
 The second scan phase. Reads full tags and cover art for files seen by the current discovery that
 still need metadata. A changed fingerprint, missing content hash, changed metadata revision, or
 unavailable cached cover queues a read, including work left unfinished by an earlier scan.
+Cover refresh state persists until a successful read and does not discard the song's audio identity.
 
 _Avoid_: full scan, tag scan
 

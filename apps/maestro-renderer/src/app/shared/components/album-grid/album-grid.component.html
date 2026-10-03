@@ -92,6 +92,7 @@
                                     >
                                         @if (album.coverPath) {
                                             <img
+                                                appRetryCoverAfterScan
                                                 class="size-full object-cover opacity-0 transition-opacity duration-moderate ease-standard"
                                                 alt=""
                                                 [src]="fileUrl(album.coverPath)"

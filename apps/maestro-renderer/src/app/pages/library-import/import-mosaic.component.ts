@@ -1,3 +1,4 @@
+import { RetryCoverAfterScanDirective } from '../../shared/directives/retry-cover-after-scan.directive'
 import {
     ChangeDetectionStrategy,
     Component,
@@ -47,7 +48,7 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
  */
 @Component({
     selector: 'app-import-mosaic',
-    imports: [],
+    imports: [RetryCoverAfterScanDirective],
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
         class: 'block size-full overflow-hidden',
@@ -69,12 +70,14 @@ const RECENT_RESULT_WINDOW = MAX_PENDING * 4
                         @for (revisionCell of [cell]; track revisionCell.revision) {
                             @if (revisionCell.previous; as previous) {
                                 <img
+                                    appRetryCoverAfterScan
                                     class="mosaic-tile--leave absolute inset-0 size-full object-cover"
                                     [src]="fileUrl(previous.coverPath)"
                                     alt=""
                                 />
                             }
                             <img
+                                appRetryCoverAfterScan
                                 class="mosaic-tile--enter absolute inset-0 size-full object-cover"
                                 [src]="fileUrl(revisionCell.current.coverPath)"
                                 [title]="tileTitle(revisionCell.current)"

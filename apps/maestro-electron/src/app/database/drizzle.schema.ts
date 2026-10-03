@@ -183,6 +183,7 @@ export const songsTable = sqliteTable(
             .default(sql`0`),
         fileFingerprint: text('file_fingerprint').notNull(),
         scannedFileFingerprint: text('scanned_file_fingerprint'),
+        coverNeedsRefresh: integer('cover_needs_refresh', { mode: 'boolean' }).notNull().default(false),
         present: integer('present', { mode: 'boolean' }).notNull().default(true),
         lastSeenAt: integer('last_seen_at', { mode: 'timestamp_ms' }).notNull(),
         lastScannedAt: integer('last_scanned_at', { mode: 'timestamp_ms' }),
