@@ -184,7 +184,7 @@
                         'justify-center': !groupAt().has(index),
                         'justify-end': groupAt().has(index),
                     }"
-                    [style.height.px]="rowHeight()"
+                    [style.height.px]="rowHeightAt(index)"
                     [attr.aria-rowindex]="index + 2"
                     [attr.aria-selected]="selected"
                     [attr.aria-label]="rowLabel(row, groupLabelAt(index))"
@@ -192,7 +192,7 @@
                 >
                     @if (groupAt().get(index); as group) {
                         <div
-                            class="song-table__group | type-body-sm flex h-6 w-full items-center gap-2 border-b border-border-subtle bg-background-surface px-6 text-content-secondary"
+                            class="song-table__group | flex h-6 w-full items-center gap-2 border-b border-border-subtle bg-background-surface px-6 type-body-sm text-content-secondary"
                             role="presentation"
                         >
                             <span>{{ group.label }}</span>

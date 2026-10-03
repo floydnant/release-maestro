@@ -116,12 +116,13 @@ match".
 "song" universally names one thing. So code takes the unambiguous word and the UI takes the one users
 actually say. The same register split as _record label_ and as _discovery_, which is _prescan_ at the
 metadata-engine boundary.
-_Avoid_: `track` in any identifier; file, item, entry as synonyms for song
+_Avoid_: `track` in identifiers except the tagged `trackNumber` and `trackTotal`; file, item, entry as synonyms for song
 
-**Track number** is the deliberate exception and stays `trackNumber` in code: it names a position on an
-album, not a song. Do not "correct" it to `songNumber`.
+**Track number** and **track total** are deliberate exceptions: `trackNumber` names a tagged position,
+and `trackTotal` names the tagged total for a disc. Counts of library rows use `songCount`.
+Do not rename the tag fields to `songNumber` or `songTotal`.
 
-It is **always the tag and never a position in a list**. A file with no track number is `null`, and
+The track number is **always the tag and never a position in a list**. A file with no track number is `null`, and
 stays `null`.
 
 **External reference**:
