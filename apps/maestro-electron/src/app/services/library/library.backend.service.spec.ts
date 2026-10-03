@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MetadataPrescanUpdate, MetadataScanUpdate, PrescanFileFact } from '@release-maestro/core'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
-import { MovedSongCandidate } from './library.backend.repository'
+import { MovedSongCandidate, PrescanBatchComparison } from './library.backend.repository'
 import { LibraryBackendService } from './library.backend.service'
 
 const EXTRACTOR_VERSION = '1111111111111111'
@@ -19,7 +19,13 @@ const fact: PrescanFileFact = {
 
 const newRepositoryMock = () => ({
     nextScanSeenAt: jest.fn(() => new Date('2026-06-15T10:00:00Z')),
-    processPrescanBatch: jest.fn(() => ({ unchanged: 0, changed: 0, new: 1 })),
+    processPrescanBatch: jest.fn((): PrescanBatchComparison => ({
+        unchanged: 0,
+        changed: 0,
+        new: 1,
+        changedPaths: [],
+    })),
+    findAvailabilityProbes: jest.fn(() => []),
     findMovedSongCandidates: jest.fn((): MovedSongCandidate[] => []),
     reconcileMovedSong: jest.fn(),
     recordSongAvailable: jest.fn(),
@@ -120,7 +126,7 @@ describe('LibraryBackendService', () => {
         // Discovery was incomplete — nothing may be flagged missing.
         expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
         expect(repository.removeUnusedCatalogEntities).toHaveBeenCalledTimes(1)
-        expect(repository.findMovedSongCandidates).not.toHaveBeenCalled()
+        expect(repository.reconcileMovedSong).not.toHaveBeenCalled()
         const completed = updates.find(update => update.phase === 'completed')
         expect(completed).toMatchObject({ missing: 0, errors: 1 })
     })
@@ -153,7 +159,7 @@ describe('LibraryBackendService', () => {
         const updates = await updatesPromise
 
         expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
-        expect(repository.findMovedSongCandidates).not.toHaveBeenCalled()
+        expect(repository.reconcileMovedSong).not.toHaveBeenCalled()
         expect(metadataService.readFiles).not.toHaveBeenCalled()
         // A cancelled scan produces no `completed` update — the caller derives
         // the cancelled outcome from the abort signal.
@@ -180,16 +186,14 @@ describe('LibraryBackendService', () => {
             )
             const result = firstValueFrom(service.scan(['/music'], abort.signal).pipe(toArray()))
             return Promise.resolve().then(async () => {
-                expect(repository.findMovedSongCandidates).not.toHaveBeenCalled()
+                expect(repository.reconcileMovedSong).not.toHaveBeenCalled()
                 expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
                 if (outcome === 'failed')
                     read$.next({ phase: 'itemError', path: fact.path, error: 'read failed' })
                 if (outcome === 'cancelled') abort.abort()
                 read$.complete()
                 await result
-                expect(repository.findMovedSongCandidates).toHaveBeenCalledTimes(
-                    outcome === 'completed' ? 1 : 0,
-                )
+                expect(repository.findMovedSongCandidates).toHaveBeenCalledTimes(1)
                 expect(repository.markNotSeenPresent).toHaveBeenCalledTimes(outcome === 'cancelled' ? 0 : 1)
             })
         },

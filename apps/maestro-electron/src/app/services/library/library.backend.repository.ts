@@ -43,6 +43,7 @@ export interface PrescanBatchComparison {
     unchanged: number
     changed: number
     new: number
+    changedPaths: string[]
 }
 
 export interface MovedSongCandidate {
@@ -63,6 +64,43 @@ const issueFingerprint = (issue: NormalizationIssue): string =>
 export class LibraryBackendRepository {
     constructor(private readonly database: Pick<DatabaseClient, 'db'>) {}
 
+    /** Positive availability evidence must not depend on a destination finishing its metadata read. */
+    findAvailabilityProbes(seenAt: Date): { songId: string; originalPath: string; foundPath: string }[] {
+        const seenSizes = this.database.db
+            .select({ size: songsTable.size })
+            .from(songsTable)
+            .where(and(eq(songsTable.lastSeenAt, seenAt), isNotNull(songsTable.firstSeenAt)))
+        const originals = this.database.db
+            .select({
+                id: songsTable.id,
+                path: songsTable.path,
+                size: songsTable.size,
+                lastAvailableAt: songsTable.lastAvailableAt,
+            })
+            .from(songsTable)
+            .where(and(lt(songsTable.lastSeenAt, seenAt), inArray(songsTable.size, seenSizes)))
+            .all()
+        return originals.flatMap(original => {
+            const found = this.database.db
+                .select({ path: songsTable.path })
+                .from(songsTable)
+                .where(
+                    and(
+                        eq(songsTable.lastSeenAt, seenAt),
+                        eq(songsTable.size, original.size),
+                        gt(songsTable.firstSeenAt, original.lastAvailableAt),
+                    ),
+                )
+                .all()
+            // Prefer a possible case alias: its old spelling is not a separate original.
+            const destination =
+                found.find(song => song.path.toLowerCase() == original.path.toLowerCase()) ?? found[0]
+            return destination
+                ? [{ songId: original.id, originalPath: original.path, foundPath: destination.path }]
+                : []
+        })
+    }
+
     /** Match only complete, unambiguous pairs after every discovery/deep-read batch. */
     findMovedSongCandidates(seenAt: Date): MovedSongCandidate[] {
         const candidates = new Map<string, MovedSongCandidate>()
@@ -82,7 +120,8 @@ export class LibraryBackendRepository {
             if (pair.length != 2) return
             const found = pair.find(song => song.lastSeenAt.getTime() == seenAt.getTime())
             const missing = pair.find(song => song.lastSeenAt < seenAt)
-            if (!found || !missing || found.firstSeenAt <= missing.lastAvailableAt) return
+            if (!found || !missing || !found.firstSeenAt || found.firstSeenAt <= missing.lastAvailableAt)
+                return
             // A failed read may leave a hash for an older version of this path.
             if (pair.some(song => song.scannedFileFingerprint != song.fileFingerprint)) return
             if (!found.contentHash || !found.present) return
@@ -251,7 +290,7 @@ export class LibraryBackendRepository {
 
     processPrescanBatch(facts: PrescanFileFact[], seenAt: Date, initialScan = false): PrescanBatchComparison {
         if (facts.length == 0) {
-            return { unchanged: 0, changed: 0, new: 0 }
+            return { unchanged: 0, changed: 0, new: 0, changedPaths: [] }
         }
 
         const existingSongs = this.database.db
@@ -272,6 +311,7 @@ export class LibraryBackendRepository {
             unchanged: 0,
             changed: 0,
             new: 0,
+            changedPaths: [],
         }
 
         this.database.db.transaction(tx => {
@@ -310,6 +350,7 @@ export class LibraryBackendRepository {
                     comparison.unchanged += 1
                 } else {
                     comparison.changed += 1
+                    comparison.changedPaths.push(fact.path)
                 }
             }
         })
