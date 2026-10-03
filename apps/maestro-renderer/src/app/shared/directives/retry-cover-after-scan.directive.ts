@@ -21,8 +21,8 @@ export class RetryCoverAfterScanDirective {
             )
             // This subscription performs a DOM effect; it does not copy stream values into state.
             .subscribe(() => {
-                if (image.getAttribute('src') && image.complete && image.naturalWidth == 0)
-                    image.src = image.src
+                const source = image.getAttribute('src')
+                if (source && image.complete && image.naturalWidth == 0) image.src = source
             })
     }
 }
