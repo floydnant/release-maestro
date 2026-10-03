@@ -8,7 +8,13 @@ use lofty::{
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
-use std::{error::Error, fmt, fs, io, path::Path, time::SystemTime};
+use std::{
+    error::Error,
+    fmt, fs,
+    io::{self, Read},
+    path::Path,
+    time::SystemTime,
+};
 
 type NullableField<T> = Option<Option<T>>;
 
@@ -91,6 +97,7 @@ pub struct FileInfo {
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SongMetadata {
+    pub content_hash: String,
     pub title: String,
     pub artist: Option<String>,
     pub album_title: Option<String>,
@@ -953,7 +960,27 @@ pub fn read_song_metadata_v2(
                 .and_then(get_first_image_in_folder)
         });
 
+    let content_hash = file_content_hash(file_path).map_err(|error| {
+        ReadSongMetadataError::FileMetadataReadFailed {
+            path: path.clone(),
+            message: error.to_string(),
+        }
+    })?;
+    let after_read =
+        fs::metadata(file_path).map_err(|error| ReadSongMetadataError::FileMetadataReadFailed {
+            path: path.clone(),
+            message: error.to_string(),
+        })?;
+    if metadata.len() != after_read.len() || metadata.modified().ok() != after_read.modified().ok()
+    {
+        return Err(ReadSongMetadataError::FileMetadataReadFailed {
+            path,
+            message: "File changed while reading metadata and content".to_string(),
+        });
+    }
+
     Ok(SongMetadata {
+        content_hash,
         path,
         file_name: file_name.clone(),
         title: title.unwrap_or(file_name),
@@ -982,12 +1009,31 @@ pub fn read_song_metadata_v2(
     })
 }
 
+fn file_content_hash(path: &Path) -> io::Result<String> {
+    let mut file = fs::File::open(path)?;
+    let mut hash = Sha256::new();
+    let mut buffer = [0_u8; 65_536];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hash.update(&buffer[..count]);
+    }
+    Ok(hash
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_energy_update, apply_item_key_update_with_alias_removal, hex_digest,
-        is_audio_file_extension, is_supported_audio_file_extension, read_song_metadata_v2,
-        FileInfo, ReadSongMetadataError, SongMetadata, SongMetadataUpdateable,
+        apply_energy_update, apply_item_key_update_with_alias_removal, file_content_hash,
+        hex_digest, is_audio_file_extension, is_supported_audio_file_extension,
+        read_song_metadata_v2, FileInfo, ReadSongMetadataError, SongMetadata,
+        SongMetadataUpdateable,
     };
     use crate::custom_tags::LegacyField;
     use crate::native_tags::NativeTags;
@@ -1110,6 +1156,7 @@ mod tests {
     #[test]
     fn serializes_and_deserializes_musical_key_wire_name() {
         let metadata = SongMetadata {
+            content_hash: "a".repeat(64),
             title: "Song".to_string(),
             artist: None,
             album_title: None,
@@ -1156,6 +1203,29 @@ mod tests {
         let update: SongMetadataUpdateable =
             serde_json::from_str(r#"{"musicalKey":"Gm"}"#).expect("should deserialize update");
         assert_eq!(update.musical_key, Some(Some("Gm".to_string())));
+    }
+
+    #[test]
+    fn content_identity_survives_copy_and_rename_but_detects_different_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("old.wav");
+        let new = dir.path().join("renamed.wav");
+        std::fs::write(&old, b"same audio bytes").unwrap();
+        std::fs::copy(&old, &new).unwrap();
+        assert_eq!(
+            file_content_hash(&old).unwrap(),
+            file_content_hash(&new).unwrap()
+        );
+        std::fs::remove_file(&old).unwrap();
+        assert_eq!(
+            file_content_hash(&new).unwrap(),
+            hex_digest(b"same audio bytes")
+        );
+        std::fs::write(&new, b"some other bytes").unwrap();
+        assert_ne!(
+            file_content_hash(&new).unwrap(),
+            hex_digest(b"same audio bytes")
+        );
     }
 
     #[test]

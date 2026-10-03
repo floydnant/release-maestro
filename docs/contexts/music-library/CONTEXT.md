@@ -59,9 +59,44 @@ interrupted scan resumable.
 _Avoid_: full scan, tag scan
 
 **Reconciliation**:
-Marking songs absent (`present = false`) when discovery did not see them. Skipped when the scan was
-cancelled, since a cancelled discovery has not seen every file — see ADR 0003.
+Matching moved songs to their existing identity, then marking songs absent (`present = false`) when
+discovery did not see them. Runs after deep read. Move application and absence marking stop when the scan was cancelled or discovery
+reported errors — see ADR 0003. Read failures also defer moves until a complete retry. Successful
+probes still retain proof that excluded originals coexist with copies, even on failed or cancelled scans.
 _Avoid_: pruning, cleanup, deletion
+
+**Moved song**:
+A previously imported file discovered at a different path, including a renamed file. A unique match
+keeps the original song ID, Added date, external references, and dismissed normalization issues.
+It is reported as changed, including moves repaired on retry. Unchanged rescans can also repair a
+unique missing/present pair left by an earlier interrupted scan with known discovery history.
+
+**Content hash**:
+A SHA-256 digest of all file bytes, read by the metadata engine during deep read. It identifies
+byte-identical files independently of their paths and filesystem timestamps. It differs from the
+file fingerprint, which includes the path and decides whether another deep read is needed.
+Existing reachable songs receive a content hash on their next scan. For older songs already missing,
+move matching requires unique matching stored tags, audio properties, and size, with identifying
+title and artist or album tags. Artwork paths and user-added external references are excluded. That fallback is an inference, not proof of equal audio bytes. Untagged older missing
+songs need a scan at their original location before content matching is possible.
+
+Move matching requires one original identity and exactly one seen path with the matching identity. The
+destination must have first appeared after the original was last confirmed available. These scan
+timestamps are separate from the Added date. First discovery is unknown for pre-upgrade rows; those
+rows cannot act as destinations in automatic matching. Their future moves still match newly discovered
+destinations. Existing legacy duplicates remain separate because past coexistence cannot be reconstructed.
+Availability includes discovery and successful probes
+of excluded originals, so known copies stay distinct after either disappears. The original directory
+entry must no longer exist; case-only renames resolve to the destination and also count as moves. Known copies, ambiguous matches, changed bytes with known hashes, and inconclusive
+filesystem errors retain separate rows. Moving and editing tags together is not a byte-identical move.
+
+**Pending move**:
+A unique rename confirmed by an absent original directory entry, waiting for a complete scan before
+identity merging. The destination stores the original song ID. Later renames and returns to the
+original path can reuse that evidence after a failed scan. All intermediate paths must be absent
+before merging. Observed coexistence discards the pending relationship and keeps separate songs.
+A discovered path that never completes a metadata read has no identity evidence. Its missing
+discovery row remains separate if the file moves again before a successful read.
 
 **Missing**:
 A song in the database whose file was not seen by the last complete discovery. `present` means "the
