@@ -49,6 +49,9 @@ const quiet = [{ ...authorities, reportDynamic: false }]
  * file rather than one per case.
  */
 const typed = [{ ...authorities, resolveTypes: true }]
+const innerClassAttributes = ['innerClass', 'iconClass']
+const innerClasses = [{ ...authorities, additionalClassAttributes: innerClassAttributes }]
+const typedInnerClasses = [{ ...authorities, resolveTypes: true, additionalClassAttributes: innerClassAttributes }]
 
 /** @param {string} className */
 const unknown = className => ({ messageId: 'unknownClass', data: { className } })
@@ -212,6 +215,25 @@ templateTester.run('valid-template-classnames', templateRule, {
         template('A10 component-local custom property', '<div class="w-[var(--progress-width)]"></div>'),
 
         template('non-class attributes are untouched', '<div [style.width]="w" title="flex"></div>'),
+        template(
+            'class-bearing input names are opt-in',
+            '<ui-control innerClass="fleex" [iconClass]="widenedClass"></ui-control>',
+        ),
+        template(
+            'configured inner class literals use the same authorities',
+            '<ui-control innerClass="flex type-body-sm" iconClass="scoped-only"></ui-control>',
+            { options: innerClasses },
+        ),
+        template(
+            'configured inner classes resolve closed members',
+            '<ui-control [innerClass]="badgeClass()" [iconClass]="modeClass()"></ui-control>',
+            { options: typedInnerClasses },
+        ),
+        template(
+            'additional inputs preserve the standard descriptor convention',
+            '<ui-control class="control | flex" ngClass="inner | hidden" routerLinkActive="active-link" innerClass="gap-3"></ui-control>',
+            { options: [{ ...authorities, additionalClassAttributes: [...innerClassAttributes, 'class', 'ngClass', 'routerLinkActive'] }] },
+        ),
         template('reporting stays configurable', '<div [class]="workerHealthClass()"></div>', {
             options: quiet,
         }),
@@ -251,6 +273,36 @@ templateTester.run('valid-template-classnames', templateRule, {
     ],
 
     invalid: [
+        template(
+            'configured inner class literals reject unknown utilities without a descriptor hint',
+            '<ui-control innerClass="fleex"></ui-control>',
+            { options: innerClasses, errors: [didYouMean('fleex', 'flex')] },
+        ),
+        template(
+            'configured bound inner classes validate every literal branch',
+            '<ui-control [innerClass]="cond ? \'flex\' : \'hiddenn\'"></ui-control>',
+            { options: innerClasses, errors: [didYouMean('hiddenn', 'hidden')] },
+        ),
+        template(
+            'configured inner classes report unresolved dynamic members',
+            '<ui-control [iconClass]="workerHealthClass()"></ui-control>',
+            { options: innerClasses, errors: [unresolved.unknownMember('workerHealthClass')] },
+        ),
+        template(
+            'configured inner classes reject broad string members',
+            '<ui-control [innerClass]="widenedClass"></ui-control>',
+            { options: typedInnerClasses, errors: [unresolved.wider('widenedClass', 'string')] },
+        ),
+        template(
+            'configured inner classes cannot exempt a descriptor from validation',
+            '<ui-control innerClass="inner-control | flex"></ui-control>',
+            { options: innerClasses, errors: [{ messageId: 'unexpectedDescriptor', data: { attribute: 'innerClass' } }] },
+        ),
+        template(
+            'bound inner class descriptors remain styling-only',
+            '<ui-control [iconClass]="\'inner-icon | hidden\'"></ui-control>',
+            { options: innerClasses, errors: [{ messageId: 'unexpectedDescriptor', data: { attribute: 'iconClass' } }] },
+        ),
         template('R1 unknown generated class', '<p class="type-code-sl"></p>', {
             errors: [orDescriptor('type-code-sl', 'type-code-sm')],
         }),
