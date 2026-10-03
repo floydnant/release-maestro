@@ -1988,8 +1988,15 @@ export const spawnPackageBinary = (binary, args, options = {}) => {
     const configured = process.env['RELEASE_MAESTRO_PNPM_COMMAND']?.trim()
     if (configured) return spawnManaged(configured, ['exec', binary, ...args], options)
     const npmExecPath = process.env['npm_execpath']?.trim()
-    if (npmExecPath && existsSync(npmExecPath) && /(?:^|[/\\])pnpm(?:\.c?js)?$/i.test(npmExecPath)) {
-        return spawnManaged(process.execPath, [npmExecPath, 'exec', binary, ...args], options)
+    if (
+        npmExecPath &&
+        existsSync(npmExecPath) &&
+        /(?:^|[/\\])pnpm(?:\.(?:[cm]?js|cmd|exe))?$/i.test(npmExecPath)
+    ) {
+        const commandArgs = ['exec', binary, ...args]
+        return /\.[cm]?js$/i.test(npmExecPath)
+            ? spawnManaged(process.execPath, [npmExecPath, ...commandArgs], options)
+            : spawnManaged(npmExecPath, commandArgs, options)
     }
     const executableNames = process.platform === 'win32' ? ['pnpm.cmd', 'pnpm.exe', 'pnpm'] : ['pnpm']
     const available = (process.env['PATH'] ?? '')

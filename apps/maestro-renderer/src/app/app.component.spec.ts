@@ -4,6 +4,7 @@ import { provideTranslateService } from '@ngx-translate/core'
 import { provideWebAudioPlayerMock } from '../test/mocks'
 import { AppComponent } from './app.component'
 import { ElectronService } from './core/services'
+import { SettingsService } from './core/settings/settings.service'
 
 describe(AppComponent.name, () => {
     beforeEach(waitForAsync(() => {
@@ -14,6 +15,7 @@ describe(AppComponent.name, () => {
                 provideTranslateService(),
                 provideRouter([]),
                 ElectronService,
+                { provide: SettingsService, useValue: { settings: { value: () => null } } },
                 provideWebAudioPlayerMock(),
             ],
         }).compileComponents()
