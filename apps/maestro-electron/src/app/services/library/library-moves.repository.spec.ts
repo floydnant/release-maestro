@@ -72,14 +72,14 @@ describe('moved songs', () => {
         discover([metadata('/music/original.mp3')], first)
         const original = rows().at(0)
         if (!original) throw new Error('Expected an imported song')
-        database.db.update(songsTable).set({ contentHash: null }).run()
+        database.db.update(songsTable).set({ contentHash: null, firstSeenAt: null }).run()
         repository.markNotSeenPresent(new Date(15_000))
         discover([metadata('/external/original.mp3')], next)
         finish(next)
         expect(rows()).toEqual([expect.objectContaining({ id: original.id, contentHash: 'a'.repeat(64) })])
     })
 
-    it('repairs a unique missing/present pair left by the old importer without another deep read', () => {
+    it('repairs a unique missing/present pair left by an interrupted scan without another deep read', () => {
         discover([metadata('/music/original.mp3')], first)
         const original = rows().at(0)
         if (!original) throw new Error('Expected an imported song')
@@ -133,7 +133,7 @@ describe('moved songs', () => {
         discover([metadata('/old/original.mp3', { coverPath: '/old/cover.jpg' })], first)
         const original = rows()[0]
         if (!original) throw new Error('Expected an imported song')
-        database.db.update(songsTable).set({ contentHash: null }).run()
+        database.db.update(songsTable).set({ contentHash: null, firstSeenAt: null }).run()
         repository.markNotSeenPresent(new Date(15_000))
         discover([metadata('/new/original.mp3', { coverPath: '/new/cover.jpg' })], next)
         finish(next)
@@ -144,6 +144,31 @@ describe('moved songs', () => {
                 coverPath: '/new/cover.jpg',
             }),
         ])
+    })
+
+    it('retains legacy duplicates whose discovery order is unknown, even after repeated scans', () => {
+        const oldSong = metadata('/old/original.mp3')
+        const foundSong = metadata('/new/original.mp3')
+        discover([oldSong], first)
+        discover([foundSong], next)
+        database.db
+            .update(songsTable)
+            .set({ firstSeenAt: null, contentHash: null, addedAt: new Date(500) })
+            .run()
+        const originals = rows()
+            .map(song => song.id)
+            .sort()
+        for (const time of [30_000, 40_000]) {
+            const seenAt = new Date(time)
+            discover([foundSong], seenAt)
+            finish(seenAt)
+            expect(
+                rows()
+                    .map(song => song.id)
+                    .sort(),
+            ).toEqual(originals)
+            expect(rows().every(song => song.firstSeenAt === null)).toBe(true)
+        }
     })
 
     it('does not merge different bytes that have identical metadata', () => {

@@ -175,10 +175,8 @@ export const songsTable = sqliteTable(
         modifiedAt: integer('modified_at', { mode: 'timestamp_ms' }).notNull(),
         createdAt: integer('created_at', { mode: 'timestamp_ms' }),
         addedAt: integer('added_at', { mode: 'timestamp_ms' }),
-        /** Scan chronology is independent of the filesystem-derived Added date. */
-        firstSeenAt: integer('first_seen_at', { mode: 'timestamp_ms' })
-            .notNull()
-            .default(sql`0`),
+        /** Scan chronology is independent of Added. Null means pre-upgrade history is unknown. */
+        firstSeenAt: integer('first_seen_at', { mode: 'timestamp_ms' }),
         /** Includes successful probes of originals outside the configured folders. */
         lastAvailableAt: integer('last_available_at', { mode: 'timestamp_ms' })
             .notNull()

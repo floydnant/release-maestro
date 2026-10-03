@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { copyFile, mkdir, readdir, rename, rm } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { ElectronApplication, Page } from 'playwright'
 import { z } from 'zod'
@@ -64,7 +64,7 @@ const scanStatus = async (page: Page) => {
         .parse(result).status
 }
 
-const rescan = async (page: Page, button = 'Rescan now') => {
+const rescan = async (page: Page, button = 'Rescan now', readFailures = 0) => {
     const before = await scanStatus(page)
     await page.getByRole('button', { name: button, exact: true }).click()
     await expect
@@ -74,7 +74,7 @@ const rescan = async (page: Page, button = 'Rescan now') => {
         })
         .toBe(true)
     const status = await scanStatus(page)
-    expect(status.terminal).toMatchObject({ discoveryFailureCount: 0, readFailureCount: 0 })
+    expect(status.terminal).toMatchObject({ discoveryFailureCount: 0, readFailureCount: readFailures })
     return status.terminal
 }
 
@@ -199,7 +199,7 @@ test('renames, folder moves and missing-first relocation preserve track IDs and 
     expect(afterRemoval.find(song => song.id === first.id)?.present).toBe(false)
 })
 
-test('a copy first seen while its original folder is excluded keeps its own identity', async ({}, testInfo) => {
+test('a copy keeps its identity after a partial import excludes its original folder', async ({}, testInfo) => {
     const library = await buildTaggedLibrary(testInfo)
     const copiedLibrary = await buildTaggedLibrary(testInfo, [])
     const appData = testInfo.outputPath('app-data')
@@ -212,17 +212,20 @@ test('a copy first seen while its original folder is excluded keeps its own iden
     await page.getByRole('button', { name: 'Take me to my library' }).click()
     const original = firstSong(await songs(page))
     await copyFile(original.path, join(copiedLibrary, 'copy.mp3'))
+    const unreadable = join(copiedLibrary, 'broken.mp3')
+    await writeFile(unreadable, 'invalid audio bytes')
     await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await page.getByRole('link', { name: 'Library', exact: true }).click()
     await page.getByTitle('Remove folder', { exact: true }).click()
     await chooseFolder(app, copiedLibrary)
     await page.getByRole('button', { name: 'Add folders…' }).click()
-    await rescan(page, 'Save and rescan')
+    await rescan(page, 'Save and rescan', 1)
     const copies = await songs(page)
-    expect(copies).toHaveLength(7)
+    expect(copies).toHaveLength(8)
+    await rm(unreadable)
     await rm(original.path)
     await rescan(page)
-    expect(await songs(page)).toEqual(copies)
+    expect((await songs(page)).map(song => song.id)).toEqual(copies.map(song => song.id))
     await rescan(page)
-    expect(await songs(page)).toEqual(copies)
+    expect((await songs(page)).map(song => song.id)).toEqual(copies.map(song => song.id))
 })
