@@ -67,6 +67,7 @@ export type HydratedBandcampReleaseFeedItem = {
     error: { message: string } | null
     id: string
     type: 'BANDCAMP.TRALBUM'
+    sourceType: BandcampFeedItem['source']['type']
 }
 
 export type HydratedFeedItem = HydratedBandcampReleaseFeedItem

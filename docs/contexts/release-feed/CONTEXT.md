@@ -84,9 +84,10 @@ The notification announcing one release from an artist the user follows
 mail body.
 
 **Fans-bought-music notification**:
-The other Bandcamp notification shape (`EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC`). It announces several
-releases at once and carries a list of URLs rather than one release, so it fans out into multiple
-feed items.
+The Bandcamp notification about releases bought by fans the user follows
+(`EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC`). It carries a list of release URLs, so import creates one feed
+item per distinct URL. Each keeps the notification's event date and read state. These releases show
+a "Bought by fans you follow" chip in the feed, including when hydration fails.
 
 **Feed source item**:
 A parsed notification, before it becomes a feed item. This is the boundary type: one source item can
@@ -126,8 +127,9 @@ _Avoid_: scraping — that names the implementation, not the behavior
 
 **Dedupe identifier**:
 What makes two notifications about the same release one feed item. It is the release URL, and it is
-unique per feed item type in the database. Two Bandcamp emails about the same album collapse; the
-same URL arriving from a different source type would not.
+unique per feed item type in the database. Bandcamp notifications about the same release collapse
+across both notification types. The first imported notification supplies the retained source. The
+same URL with a different feed item type would not collapse.
 
 **Event date**:
 When the thing the feed item describes actually happened — for a notification, when the email was

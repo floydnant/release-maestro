@@ -314,6 +314,7 @@ export const scenarioBuilder = (scenario: Partial<RendererScenario> = {}) => {
 export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {}): HydratedFeedItem => ({
     id: 'release-1',
     type: 'BANDCAMP.TRALBUM',
+    sourceType: 'EMAIL.BANDCAMP_NEW_RELEASE',
     error: null,
     data: {
         releaseUrl: 'https://example.bandcamp.com/album/gecko',

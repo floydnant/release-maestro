@@ -195,6 +195,10 @@
                                     </div>
                                 }
 
+                                @if (feedItem.sourceType === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC') {
+                                    <span class="feed-source | mb-2 badge">Bought by fans you follow</span>
+                                }
+
                                 <h1 class="tralbum-title | type-hero-title">
                                     <a
                                         [href]="feedItem.data.releaseUrl"
