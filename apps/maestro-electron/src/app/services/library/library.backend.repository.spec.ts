@@ -186,8 +186,8 @@ describe('LibraryBackendRepository', () => {
             ],
         })
         const seenAt = new Date('2026-06-15T10:00:00Z')
-        repository.ingestMetadata(metadata, fact, seenAt)
-        repository.ingestMetadata(metadata, fact, seenAt)
+        repository.ingestMetadata(metadata, fact, seenAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(metadata, fact, seenAt, EXTRACTOR_VERSION)
 
         const artists = db.select().from(artistsTable).all()
         const browse = new LibraryBrowseRepository({ db })
@@ -221,8 +221,8 @@ describe('LibraryBackendRepository', () => {
             ],
         })
         const seenAt = new Date('2026-06-15T10:00:00Z')
-        repository.ingestMetadata(metadata, fact, seenAt)
-        repository.ingestMetadata(metadata, fact, seenAt)
+        repository.ingestMetadata(metadata, fact, seenAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(metadata, fact, seenAt, EXTRACTOR_VERSION)
 
         expect(db.select().from(songsTable).get()?.externalRefs).toEqual({
             ACOUSTID_ID: ['acoustid-1'],
@@ -365,6 +365,7 @@ describe('LibraryBackendRepository', () => {
             }),
             fact,
             scannedAt,
+            EXTRACTOR_VERSION,
         )
 
         const artists = db.select().from(artistsTable).all()
@@ -394,14 +395,14 @@ describe('LibraryBackendRepository', () => {
             artist: 'Correct Artist',
             extraMetadata: [['MUSICBRAINZ_ARTIST_ID', 'correct-id']],
         })
-        repository.ingestMetadata(original, fact, scannedAt)
-        repository.ingestMetadata(corrected, fact, scannedAt)
+        repository.ingestMetadata(original, fact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(corrected, fact, scannedAt, EXTRACTOR_VERSION)
         const artist = db.select().from(artistsTable).where(eq(artistsTable.name, 'Correct Artist')).get()!
         const browse = new LibraryBrowseRepository({ db })
         expect(browse.getArtistDetail(artist.id)?.externalRefs).toEqual({
             MUSICBRAINZ_ARTIST_ID: ['correct-id'],
         })
-        repository.ingestMetadata({ ...corrected, extraMetadata: [] }, fact, scannedAt)
+        repository.ingestMetadata({ ...corrected, extraMetadata: [] }, fact, scannedAt, EXTRACTOR_VERSION)
         expect(browse.getArtistDetail(artist.id)?.externalRefs).toEqual({})
     })
 
