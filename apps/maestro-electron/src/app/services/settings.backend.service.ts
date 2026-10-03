@@ -32,6 +32,7 @@ export class SettingsBackendService {
             // `onboardingSkipped`) must not drop its siblings the way a plain
             // top-level spread would.
             library: { ...current.library, ...patch.library },
+            ...(patch.feed && { feed: { ...current.feed, ...patch.feed } }),
         })
     }
 }

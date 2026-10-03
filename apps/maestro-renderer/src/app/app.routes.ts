@@ -101,6 +101,13 @@ export const appRoutes: Route[] = [
         component: SettingsComponent,
         children: [
             {
+                path: 'feed',
+                loadComponent: () =>
+                    import('./pages/settings/feed/feed-settings.component').then(
+                        m => m.FeedSettingsComponent,
+                    ),
+            },
+            {
                 path: 'library',
                 loadComponent: () =>
                     import('./pages/settings/library/library-settings.component').then(

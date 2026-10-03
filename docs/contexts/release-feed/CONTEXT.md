@@ -122,7 +122,16 @@ One entry in the release feed. Its identity is the release, not the email — se
 **Hydration**:
 Enriching an imported release by reading the linked Bandcamp page and filling in fuller metadata. A
 feed item can be present but unhydrated, and hydration can fail on its own without losing the item.
+By default, hydration filters releases with no _playable tracks_ out of the displayed feed. Settings
+→ Feed can disable this filter. Filtering preserves the item's view and snooze state, so a later
+hydration can show it once a track becomes playable. A filtered batch continues loading older
+candidates until the visible page is filled or the eligible releases run out.
 _Avoid_: scraping — that names the implementation, not the behavior
+
+**Playable track**:
+A release track with a nonempty stream URL that the feed player can preview. A track listing alone
+does not make a release playable. A release needs only one playable track to pass the feed filter.
+_Avoid_: released track, owned track, downloaded track
 
 **Dedupe identifier**:
 What makes two notifications about the same release one feed item. It is the release URL, and it is
@@ -137,7 +146,8 @@ _Avoid_: date, timestamp, created at
 
 **Viewed**:
 A feed item the user has seen (`lastViewedAt`). Viewing is throttled — re-viewing within a few
-minutes does not re-stamp it. An unviewed item is always in the feed; a viewed one has left it unless
+minutes does not re-stamp it. An unviewed item is eligible for the feed, subject to the playable-track
+filter; a viewed one has left it unless
 it is snoozed.
 
 **Snoozed**:

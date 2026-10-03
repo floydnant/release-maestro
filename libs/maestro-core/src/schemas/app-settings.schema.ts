@@ -25,6 +25,8 @@ export type LibrarySettings = z.infer<typeof librarySettingsSchema>
  */
 export const appSettingsSchema = z.object({
     library: librarySettingsSchema.prefault({}),
+    /** Missing filter preferences use the enabled default, including older stores. */
+    feed: z.object({ hideUnplayableReleases: z.boolean().optional() }).optional(),
     emailPluginConfig: emailPluginConfigSchema.catch({}),
 })
 export type AppSettings = z.infer<typeof appSettingsSchema>
@@ -40,6 +42,10 @@ export type AppSettings = z.infer<typeof appSettingsSchema>
  * whole-group catch would quietly destroy the rest of that group's settings.
  */
 export const storedAppSettingsSchema = z.object({
+    feed: z
+        .object({ hideUnplayableReleases: z.boolean().optional().catch(undefined) })
+        .optional()
+        .catch(undefined),
     library: z
         .object({
             folders: z.string().array().optional().catch(undefined),

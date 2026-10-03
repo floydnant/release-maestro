@@ -103,10 +103,9 @@ export class FeedComponent {
                         furthestScrolledIndex + NUM_PREFETCH_ITEMS - Math.max(lastLoadedItemIndex, 0)
 
                     try {
-                        const items = await this.feedService.loadFeed(
-                            lastLoadedItemIndex + 1,
-                            itemCountToFetch,
-                        )
+                        const items = await this.feedService.loadFeed(0, itemCountToFetch, [
+                            ...this.loadedFeedItemIds,
+                        ])
                         const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
                         if (items.length != newItems.length) {
                             console.warn(
