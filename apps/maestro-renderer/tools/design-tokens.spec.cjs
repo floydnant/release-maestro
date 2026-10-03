@@ -459,7 +459,7 @@ it('detects stale generated CSS and accepts the current artifacts', () => {
         file === generatedPath ? '/* stale */' : read(file, ...args),
     )
     try {
-        expect(() => checkGenerated()).toThrow('Generated design tokens are stale: src/styles/design-tokens.generated.css')
+        expect(() => checkGenerated()).toThrow(`Generated design tokens are stale: ${path.join('src', 'styles', 'design-tokens.generated.css')}`)
     } finally {
         spy.mockRestore()
     }
