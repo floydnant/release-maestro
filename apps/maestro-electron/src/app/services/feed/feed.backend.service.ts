@@ -28,31 +28,33 @@ import { FeedBackendRepository } from './feed.backend.repository'
  */
 const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
 
-const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): BandcampFeedItem | null => {
-    if (email.type == 'EMAIL.BANDCAMP_NEW_RELEASE') {
-        if (!email.releaseUrl) return null
-
-        return {
-            id: crypto.randomUUID(),
-            type: 'BANDCAMP.TRALBUM',
-            dedupeIdentifier: email.releaseUrl,
-            ingestedAt: new Date(),
-            eventDate: new Date(email.dateReceived),
-            isSnoozed: false,
-            lastViewedAt: null,
-            data: {
-                tralbumUrl: email.releaseUrl,
-                tralbumType: email.releaseUrl.includes('/album/') ? 'album' : 'track',
-            },
-            source: email,
-        }
-    }
-    // @TODO: Implement this type
-    if (email.type == 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC') {
-        return null
+const mapBandcampEmailToFeedItems = (email: BandcampEmailFeedSourceItem): BandcampFeedItem[] => {
+    let releaseUrls: string[]
+    switch (email.type) {
+        case 'EMAIL.BANDCAMP_NEW_RELEASE':
+            releaseUrls = email.releaseUrl ? [email.releaseUrl] : []
+            break
+        case 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC':
+            releaseUrls = email.tralbumUrls
+            break
+        default:
+            return assertUnreachable(email, 'Unhandled Bandcamp email type:')
     }
 
-    return assertUnreachable(email as never, 'Unhandled Bandcamp email type:')
+    return releaseUrls.map(releaseUrl => ({
+        id: crypto.randomUUID(),
+        type: 'BANDCAMP.TRALBUM',
+        dedupeIdentifier: releaseUrl,
+        ingestedAt: new Date(),
+        eventDate: new Date(email.dateReceived),
+        isSnoozed: false,
+        lastViewedAt: null,
+        data: {
+            tralbumUrl: releaseUrl,
+            tralbumType: releaseUrl.includes('/album/') ? 'album' : 'track',
+        },
+        source: email,
+    }))
 }
 
 export class FeedBackendService {
@@ -128,7 +130,7 @@ export class FeedBackendService {
                         .map(email => parseBandcampEmail(email))
                         .filter(isTruthy)
 
-                    const feedItems = emailFeedSourceItems.map(mapBandcampEmailToFeedItem).filter(isTruthy)
+                    const feedItems = emailFeedSourceItems.flatMap(mapBandcampEmailToFeedItems)
                     totalImported += feedItems.length
 
                     await this.feedBackendRepository.ingestFeedItems(feedItems)
