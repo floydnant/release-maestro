@@ -34,7 +34,7 @@ import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
-import { GROUPED_SONG_ROW_HEIGHT, LIST_ROW_HEIGHT, listWindowOffsetAt } from '../../shared/browse/list-window'
+import { listWindowOffsetAt } from '../../shared/browse/list-window'
 import { SongQueryParam, nextSort, songSortFromParams } from '../../shared/browse/song-query-params'
 import {
     emptySelection,
@@ -212,23 +212,47 @@ export class AlbumDetailComponent {
      * The slice the table wants, seeded from that position so the first window fetched
      * is the right one — see `TracksComponent.viewport`.
      */
+    private orderedDiscGroups = computed(() => {
+        if (this.sort().field != SongSortField.trackNumber) return []
+        const album = this.album()
+        if (!album) return []
+        const ordered = this.sort().direction == 'desc' ? [...album.discGroups].reverse() : album.discGroups
+        let startIndex = 0
+        return ordered.map(group => {
+            const section = {
+                discNumber: group.discNumber,
+                startIndex: startIndex,
+                label: group.discNumber == null ? 'Disc unknown' : `Disc ${group.discNumber}`,
+                summary: `${group.songCount}${group.trackTotal != null && group.trackTotal != group.songCount ? `/${group.trackTotal}` : ''} ${group.songCount == 1 && (group.trackTotal == null || group.trackTotal == group.songCount) ? 'track' : 'tracks'}`,
+            }
+            startIndex += group.songCount
+            return section
+        })
+    })
+
     private viewportSource = computed(
         () => ({
             query: this.query(),
-            rowHeight:
-                this.sort().field == SongSortField.trackNumber && this.album()?.discGroups.length
-                    ? GROUPED_SONG_ROW_HEIGHT
-                    : LIST_ROW_HEIGHT,
+            groupStarts: this.orderedDiscGroups().map(group => group.startIndex),
         }),
-        { equal: (a, b) => sameQuery(a.query, b.query) && a.rowHeight == b.rowHeight },
+        {
+            equal: (a, b) =>
+                sameQuery(a.query, b.query) &&
+                a.groupStarts.length == b.groupStarts.length &&
+                a.groupStarts.every((start, index) => start == b.groupStarts[index]),
+        },
     )
 
-    protected viewport = linkedSignal<{ query: SongQuery; rowHeight: number }, BrowseWindow>({
+    protected viewport = linkedSignal<{ query: SongQuery; groupStarts: number[] }, BrowseWindow>({
         source: () => this.viewportSource(),
-        computation: ({ rowHeight }, previous) => ({
-            offset: untracked(() => offsetForRestore(this.restoreScrollTop(), rowHeight)),
-            limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
-        }),
+        computation: ({ query, groupStarts }, previous) => {
+            const restore = untracked(() => this.restoreScrollTop())
+            if (previous && sameQuery(previous.source.query, query) && restore == null) return previous.value
+            return {
+                offset: offsetForRestore(restore, groupStarts),
+                limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
+            }
+        },
     })
 
     constructor() {
@@ -277,21 +301,9 @@ export class AlbumDetailComponent {
     protected songCountLabel = computed(() => (this.headerSongCount() == 1 ? TRACK_LABEL : TRACKS_LABEL))
 
     protected discGroups = computed<readonly SongTableGroup[]>(() => {
-        if (this.sort().field != SongSortField.trackNumber) return []
         const album = this.album()
         if (!album) return []
-        const ordered = this.sort().direction == 'desc' ? [...album.discGroups].reverse() : album.discGroups
-        let startIndex = 0
-        const groups = ordered.map(group => {
-            const section = {
-                discNumber: group.discNumber,
-                startIndex: startIndex,
-                label: group.discNumber == null ? 'Disc unknown' : `Disc ${group.discNumber}`,
-                summary: `${group.songCount}${group.trackTotal != null && group.trackTotal != group.songCount ? `/${group.trackTotal}` : ''} ${group.songCount == 1 && (group.trackTotal == null || group.trackTotal == group.songCount) ? 'track' : 'tracks'}`,
-            }
-            startIndex += group.songCount
-            return section
-        })
+        const groups = this.orderedDiscGroups()
         const result = this.result()
         if (result.rows.some(song => song.albumId != album.id)) return []
         return groups.every((group, position) =>
@@ -402,5 +414,5 @@ export class AlbumDetailComponent {
 }
 
 /** Where a window has to start for a remembered scroll position to be inside it. */
-const offsetForRestore = (scrollTop: number | null, rowHeight: number): number =>
-    scrollTop == null ? 0 : listWindowOffsetAt(scrollTop, rowHeight)
+const offsetForRestore = (scrollTop: number | null, groupStarts: readonly number[]): number =>
+    scrollTop == null ? 0 : listWindowOffsetAt(scrollTop, groupStarts)

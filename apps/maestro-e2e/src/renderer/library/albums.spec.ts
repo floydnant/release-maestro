@@ -828,6 +828,16 @@ test.describe('the album detail page', () => {
         await expect(page.getByText('Disc 2')).toBeVisible()
         await expect(page.getByText('1/3 tracks')).toBeVisible()
         await expect(page.getByRole('row', { name: 'Disc 1, Second' })).toBeVisible()
+        await expect
+            .poll(() =>
+                page.getByRole('grid', { name: 'Tracks' }).evaluate(element =>
+                    [...element.querySelectorAll('[role="row"][aria-selected]')].map(row => {
+                        const bounds = row.getBoundingClientRect()
+                        return bounds.height
+                    }),
+                ),
+            )
+            .toEqual([64, 40, 64])
     })
 
     test('keeps disc sections when tracks sort in descending order', async ({ page }) => {
