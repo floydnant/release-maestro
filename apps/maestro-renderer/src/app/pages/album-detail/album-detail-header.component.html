@@ -13,13 +13,15 @@
 }
 
 <div class="flex min-w-0 flex-col justify-end gap-1 pb-1">
-    <h1 class="album-title | truncate type-hero-title" [title]="album().title">{{ album().title }}</h1>
+    <h1 class="album-title | truncate type-hero-title" [hlmTooltip]="album().title">{{ album().title }}</h1>
 
     <p class="album-artist | min-w-0 truncate type-section-title text-content-secondary">
         @if (album().albumArtists.length) {
             @for (artist of album().albumArtists; track artist.id; let last = $last) {
                 <a
-                    class="text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                    hlmBtn
+                    variant="link"
+                    class="inline h-auto p-0 type-section-title text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                     [routerLink]="['/artists', artist.id]"
                 >
                     {{ artist.name }}
@@ -52,7 +54,9 @@
         @if (album().recordLabelId && album().recordLabelText) {
             <span aria-hidden="true">•</span>
             <a
-                class="rounded-sm underline-offset-2 hover:text-content-action hover:underline"
+                hlmBtn
+                variant="link"
+                class="inline h-auto rounded-sm p-0 type-body-sm underline-offset-2 hover:text-content-action hover:underline"
                 [routerLink]="['/record-labels', album().recordLabelId]"
             >
                 {{ album().recordLabelText }}
@@ -76,7 +80,9 @@
         >
             @for (genre of album().genres; track genre.id) {
                 <a
-                    class="badge no-underline! transition-colors hover:border-border-default hover:bg-background-elevated"
+                    hlmBadge
+                    variant="secondary"
+                    class="no-underline! transition-colors hover:border-border-default hover:bg-background-elevated"
                     [routerLink]="['/genres', genre.id]"
                 >
                     {{ genre.name }}

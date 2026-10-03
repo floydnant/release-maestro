@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core'
+import { HlmProgress } from '@spartan-ng/helm/progress'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 export type ProgressBarSegment = {
@@ -11,7 +12,7 @@ export type ProgressBarSegment = {
     templateUrl: './progress-bar.component.html',
     styleUrls: ['./progress-bar.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [],
+    imports: [HlmProgress],
 })
 export class ProgressBarComponent {
     isShownAsPercentage = true
@@ -23,6 +24,7 @@ export class ProgressBarComponent {
     totalPercent = computed(() => this.segments().reduce((acc, segment) => acc + segment.percent, 0))
 
     shouldGlow = input<boolean>(true)
+    ariaLabel = input('Library scan progress', { alias: 'aria-label' })
 
     semanticColor = semanticColor
 }

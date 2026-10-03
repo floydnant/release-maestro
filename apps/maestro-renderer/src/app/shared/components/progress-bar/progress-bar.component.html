@@ -1,10 +1,9 @@
 <div
-    class="progress-container"
+    hlmProgress
+    class="progress-container | flex h-auto overflow-visible bg-transparent"
     [class.glow]="shouldGlow()"
-    role="progressbar"
-    [attr.aria-valuenow]="totalPercent()"
-    [attr.aria-valuemin]="0"
-    [attr.aria-valuemax]="100"
+    [value]="totalPercent()"
+    [attr.aria-label]="ariaLabel()"
 >
     <div class="progress-bar | flex h-1.5 grow rounded-full bg-border-subtle transition-colors">
         @for (segment of segments(); track $index) {

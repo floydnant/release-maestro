@@ -1,3 +1,5 @@
+import { HlmAlert, HlmAlertDescription } from '@spartan-ng/helm/alert'
+import { HlmButton } from '@spartan-ng/helm/button'
 import {
     ChangeDetectionStrategy,
     Component,
@@ -39,7 +41,7 @@ const KINDS: Record<EntitySongsKind, { name: string; param: string; filter: (id:
     selector: 'app-entity-songs',
     templateUrl: './entity-songs.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [SongTableComponent],
+    imports: [HlmAlert, HlmAlertDescription, HlmButton, SongTableComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class EntitySongsComponent {

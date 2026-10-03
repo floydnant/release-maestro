@@ -5,13 +5,13 @@
 } @else if (detail().status === 'missing') {
     <div class="artist-detail__missing | flex flex-col items-center gap-3 p-8 text-center">
         <h1 class="type-section-title">Artist not found</h1>
-        <a class="btn-primary" routerLink="/artists">Back to artists</a>
+        <a hlmBtn variant="default" routerLink="/artists">Back to artists</a>
     </div>
 } @else if (detail().status === 'error') {
     <div class="artist-detail__error | flex flex-col items-center gap-3 p-8 text-center" role="alert">
         <h1 class="type-section-title">Could not load this artist</h1>
-        <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
-        <a class="btn-neutral" routerLink="/artists">Back to artists</a>
+        <button hlmBtn variant="default" type="button" (click)="onRetry()">Try again</button>
+        <a hlmBtn variant="secondary" routerLink="/artists">Back to artists</a>
     </div>
 }
 @for (entry of content(); track entry.artist.id) {

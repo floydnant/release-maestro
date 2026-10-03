@@ -1,36 +1,41 @@
-<svg [attr.height]="diameter" [attr.width]="diameter">
-    <circle
-        class="progress-bg |"
-        [attr.stroke-width]="strokeWidth"
-        [attr.stroke]="bgColor()"
-        fill="transparent"
-        [attr.r]="radius"
-        [attr.cx]="position"
-        [attr.cy]="position"
+@if (mode === 'spinning') {
+    <hlm-spinner
+        [diameter]="diameter"
+        [strokeWidth]="strokeWidth"
+        [color]="color()"
+        [bgColor]="bgColor()"
+        [aria-label]="ariaLabel()"
     />
-    <circle
-        class="progress-ring"
-        [class.spin]="mode == 'spinning'"
-        [attr.stroke-width]="strokeWidth"
-        [attr.stroke]="color()"
-        [attr.stroke-dasharray]="strokeDasharray"
-        [attr.stroke-dashoffset]="offset"
-        fill="transparent"
-        [attr.r]="radius"
-        [attr.cx]="position"
-        [attr.cy]="position"
-    />
-    @if (mode == 'spinning') {
-        <circle
-            class="progress-ring progress-ring-2 spin"
-            [attr.stroke-width]="strokeWidth"
-            [attr.stroke]="color()"
-            [attr.stroke-dasharray]="strokeDasharray"
-            [attr.stroke-dashoffset]="offset"
-            fill="transparent"
-            [attr.r]="radius"
-            [attr.cx]="position"
-            [attr.cy]="position"
-        />
-    }
-</svg>
+} @else {
+    <div
+        hlmProgress
+        class="progress-meter | inline-block overflow-visible rounded-none bg-transparent"
+        [value]="progress"
+        [attr.aria-label]="ariaLabel()"
+        [style.height.px]="diameter"
+        [style.width.px]="diameter"
+    >
+        <svg [attr.height]="diameter" [attr.width]="diameter">
+            <circle
+                class="progress-bg |"
+                [attr.stroke-width]="strokeWidth"
+                [attr.stroke]="bgColor()"
+                fill="transparent"
+                [attr.r]="radius"
+                [attr.cx]="position"
+                [attr.cy]="position"
+            />
+            <circle
+                class="progress-ring"
+                [attr.stroke-width]="strokeWidth"
+                [attr.stroke]="color()"
+                [attr.stroke-dasharray]="strokeDasharray"
+                [attr.stroke-dashoffset]="offset"
+                fill="transparent"
+                [attr.r]="radius"
+                [attr.cx]="position"
+                [attr.cy]="position"
+            />
+        </svg>
+    </div>
+}

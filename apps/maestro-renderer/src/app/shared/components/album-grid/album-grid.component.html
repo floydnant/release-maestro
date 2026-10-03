@@ -71,13 +71,14 @@
                                      it needs — the padding, the gap and the text block are
                                      the same on all of them. -->
                                 <a
+                                    hlmCard
                                     #tile
-                                    class="album-tile | flex size-full cursor-default flex-col gap-2 rounded-md p-2 no-underline! outline-hidden hover:bg-background-surface focus-visible:ring-2 focus-visible:ring-border-focus"
+                                    class="album-tile | flex size-full cursor-default flex-col gap-2 rounded-md border-0 bg-background-canvas p-2 no-underline! shadow-none outline-hidden hover:bg-background-surface focus-visible:ring-2 focus-visible:ring-border-focus"
                                     [id]="tileElementId(index)"
                                     [tabindex]="tabbableIndex() === index ? 0 : -1"
                                     [routerLink]="['/albums', album.id]"
                                     [attr.aria-label]="tileLabel(album)"
-                                    [title]="tileLabel(album)"
+                                    [hlmTooltip]="tileLabel(album)"
                                     (focus)="onTileFocus(index)"
                                     (keydown)="onKeydown($event)"
                                 >

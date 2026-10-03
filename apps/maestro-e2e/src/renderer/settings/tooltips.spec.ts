@@ -30,7 +30,7 @@ const scrollTriggerPanel = async (trigger: Locator) => {
 test.describe('shared tooltips', () => {
     test.beforeEach(async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/settings/design-system')
-        await expect(page.getByRole('heading', { name: 'Shared UI components' })).toBeVisible()
+        await expect(page.getByRole('heading', { name: 'Components' })).toBeVisible()
     })
 
     test('waits 600 milliseconds before showing a hovered tooltip', async ({ page }) => {
@@ -50,7 +50,7 @@ test.describe('shared tooltips', () => {
         await trigger.hover()
         await expect(page.getByRole('tooltip')).toBeVisible()
         await trigger.click()
-        await page.getByRole('heading', { name: 'Shared UI components' }).hover()
+        await page.getByRole('heading', { name: 'Components' }).hover()
         await expect(page.getByRole('tooltip')).toBeHidden()
         await expect(trigger).toBeFocused()
     })
@@ -121,7 +121,7 @@ test.describe('shared tooltips', () => {
         const trigger = page.getByRole('button', { name: 'About library scans' })
         await trigger.hover()
         await page.clock.runFor(300)
-        await page.getByRole('heading', { name: 'Shared UI components' }).hover()
+        await page.getByRole('heading', { name: 'Components' }).hover()
         await page.clock.runFor(600)
         await expect(page.getByRole('tooltip')).toBeHidden()
 
@@ -140,7 +140,7 @@ test.describe('shared tooltips', () => {
         await tooltip.hover()
         await page.keyboard.press('Escape')
         await expect(tooltip).toBeHidden()
-        await page.getByRole('heading', { name: 'Shared UI components' }).hover()
+        await page.getByRole('heading', { name: 'Components' }).hover()
         await trigger.hover()
         await expect(tooltip).toHaveText('The library stays available while folders are scanned.')
     })

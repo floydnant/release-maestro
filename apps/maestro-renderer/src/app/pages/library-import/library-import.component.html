@@ -23,8 +23,10 @@
                     (folderRemoved)="removeFolder($event)"
                 >
                     <button
+                        hlmBtn
+                        variant="ghost"
                         type="button"
-                        class="add-folder-btn | flex w-full grow items-center justify-center gap-2 rounded-b-[10px] border-t border-border-subtle px-4 py-3 text-left text-content-secondary transition-colors hover:bg-action-quiet-hover hover:text-content-primary"
+                        class="add-folder-btn | w-full grow gap-2 rounded-t-none border-t border-border-subtle px-4 py-3 type-body-md"
                         aria-label="Add folders"
                         (click)="addFolders()"
                     >
@@ -34,12 +36,12 @@
                 </app-folder-list>
 
                 <div class="mt-8 flex items-center gap-3">
-                    <button class="btn-nkd-neutral text-content-muted" type="button" (click)="skip()">
+                    <button hlmBtn variant="ghost" class="text-content-muted" type="button" (click)="skip()">
                         Skip for now
                     </button>
                     <span class="grow"></span>
                     <button
-                        class="btn-primary"
+                        hlmBtn
                         type="button"
                         [disabled]="pendingFolders().length == 0 || startInFlight()"
                         (click)="startImport()"
@@ -58,9 +60,7 @@
                     that contain your music and try again.
                 </p>
                 <div class="mt-6">
-                    <button class="btn-primary" type="button" (click)="backToFolders()">
-                        Choose different folders
-                    </button>
+                    <button hlmBtn type="button" (click)="backToFolders()">Choose different folders</button>
                 </div>
             </div>
         </div>
@@ -82,7 +82,8 @@
                 fading out above and below so the cover wall shines around it. Its height
                 follows the content, so it always fits the UI instead of an arbitrary shape. -->
             <div
-                class="content-band | mx-auto w-fit rounded-xl border border-border-subtle bg-black/70 px-10 py-16 shadow-lg backdrop-blur-md"
+                hlmCard
+                class="content-band | mx-auto w-fit gap-0 bg-black/70 px-10 py-16 shadow-lg backdrop-blur-md"
             >
                 <div class="mx-auto w-full max-w-2xl px-8 text-center">
                     @if (step() === 'done') {
@@ -170,16 +171,19 @@
                             </p>
                         }
                         <div class="mt-8 flex items-center justify-center gap-3">
-                            <button class="btn-nkd-neutral" type="button" (click)="backToFolders()">
+                            <button hlmBtn variant="ghost" type="button" (click)="backToFolders()">
                                 Change folders
                             </button>
-                            <button class="btn-primary" type="button" (click)="finish()">
-                                Take me to my library
-                            </button>
+                            <button hlmBtn type="button" (click)="finish()">Take me to my library</button>
                         </div>
                         @if (status.failedFiles > 0) {
                             <p class="mt-4 type-body-sm">
-                                <a class="text-content-action" routerLink="/settings/library"
+                                <a
+                                    hlmBtn
+                                    variant="link"
+                                    size="none"
+                                    class="underline"
+                                    routerLink="/settings/library"
                                     >View failed files</a
                                 >
                             </p>
@@ -190,36 +194,47 @@
                                 The next startup scan picks up where this one left off.
                             </p>
                         } @else {
-                            <p class="mt-6 type-body-md text-content-danger">
-                                <app-icon
-                                    name="error"
-                                    color="content.danger"
-                                    class="translate-y-px align-middle"
-                                ></app-icon>
-                                {{ terminal.error?.message || 'The import failed unexpectedly.' }}
-                            </p>
+                            <div hlmAlert variant="plain" class="import-error | mt-6">
+                                <p hlmAlertDescription class="type-body-md text-content-danger">
+                                    <app-icon
+                                        name="error"
+                                        color="content.danger"
+                                        class="translate-y-px align-middle"
+                                    ></app-icon>
+                                    {{ terminal.error?.message || 'The import failed unexpectedly.' }}
+                                </p>
+                            </div>
                         }
                         <div class="mt-4 flex items-center justify-center gap-3">
-                            <button class="btn-primary" type="button" (click)="retryScan()">
-                                Retry import
-                            </button>
-                            <button class="btn-neutral" type="button" (click)="backToFolders()">
+                            <button hlmBtn type="button" (click)="retryScan()">Retry import</button>
+                            <button hlmBtn variant="secondary" type="button" (click)="backToFolders()">
                                 Change folders
                             </button>
-                            <button class="btn-nkd-neutral" type="button" (click)="finish()">
+                            <button hlmBtn variant="ghost" type="button" (click)="finish()">
                                 Continue anyway
                             </button>
                         </div>
                         @if (status.failedFiles > 0) {
                             <p class="mt-3 type-body-sm">
-                                <a class="text-content-action" routerLink="/settings/library"
+                                <a
+                                    hlmBtn
+                                    variant="link"
+                                    size="none"
+                                    class="underline"
+                                    routerLink="/settings/library"
                                     >View failed files</a
                                 >
                             </p>
                         }
                     } @else {
                         <div class="mt-6">
-                            <button class="btn-nkd-neutral text-content-muted" (click)="cancelScan()">
+                            <button
+                                hlmBtn
+                                variant="ghost"
+                                class="text-content-muted"
+                                type="button"
+                                (click)="cancelScan()"
+                            >
                                 Cancel import
                             </button>
                         </div>

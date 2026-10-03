@@ -1,3 +1,5 @@
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmTh } from '@spartan-ng/helm/table'
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import type { SongSort, SongSortField } from '@release-maestro/core'
 import { IconComponent } from '../icon/icon.component'
@@ -17,16 +19,20 @@ import { IconComponent } from '../icon/icon.component'
 @Component({
     selector: 'app-song-table-heading',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent],
+    imports: [HlmButton, IconComponent],
+    hostDirectives: [HlmTh],
     host: {
         role: 'columnheader',
-        class: 'block border-b border-border-subtle',
+        class: 'block h-auto px-0 border-b border-border-subtle',
         '[attr.aria-sort]': 'ariaSort()',
     },
     template: `
         <button
+            hlmBtn
+            variant="plain"
+            size="none"
             type="button"
-            class="flex w-full items-center gap-1 p-2 type-label-sm text-content-muted"
+            class="flex w-full items-center justify-start gap-1 rounded-none p-2 type-label-sm text-content-muted"
             [class.justify-end]="numeric()"
             [class.text-content-primary]="isActive()"
             [attr.aria-label]="'Sort by ' + (sortLabel() ?? label())"

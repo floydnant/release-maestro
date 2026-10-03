@@ -1,3 +1,4 @@
+import { HlmButton } from '@spartan-ng/helm/button'
 import {
     ChangeDetectionStrategy,
     Component,
@@ -99,7 +100,7 @@ const LOADING_STATE: DetailState = { status: 'loading', album: null }
     selector: 'app-album-detail',
     templateUrl: './album-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [AlbumDetailHeaderComponent, IconComponent, RouterLink, SongTableComponent],
+    imports: [HlmButton, AlbumDetailHeaderComponent, IconComponent, RouterLink, SongTableComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class AlbumDetailComponent {

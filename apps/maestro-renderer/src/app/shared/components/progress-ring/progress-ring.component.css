@@ -1,24 +1,8 @@
-/* The two rings share keyframes but rotate from different per-ring offsets.
-   Keep their SVG stroke and animation rules together around --rotation. */
+/* Determinate circular progress keeps the application's SVG geometry. */
 .progress-ring {
     transition: stroke-dashoffset var(--duration-slow) var(--ease-standard);
     --rotation: -90deg;
     transform: rotate(var(--rotation));
     transform-origin: 50% 50%;
     stroke-linecap: round;
-}
-.progress-ring-2 {
-    --rotation: -270deg;
-}
-.progress-ring.spin {
-    animation: custom-spin var(--duration-ambient) linear infinite;
-}
-
-@keyframes custom-spin {
-    0% {
-        transform: rotate(calc(var(--rotation) + 0deg));
-    }
-    100% {
-        transform: rotate(calc(var(--rotation) + 360deg));
-    }
 }

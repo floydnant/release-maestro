@@ -1,3 +1,6 @@
+import { HlmBadge } from '@spartan-ng/helm/badge'
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmTooltip } from '@spartan-ng/helm/tooltip'
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import type { AlbumDetail } from '@release-maestro/core'
@@ -17,7 +20,7 @@ import { formatTotalDuration } from '../../shared/utils/formatting.utils'
     selector: 'app-album-detail-header',
     templateUrl: './album-detail-header.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent, RouterLink],
+    imports: [HlmBadge, HlmTooltip, HlmButton, IconComponent, RouterLink],
     host: { class: 'flex shrink-0 gap-5 px-4 pb-4 pt-3' },
 })
 export class AlbumDetailHeaderComponent {

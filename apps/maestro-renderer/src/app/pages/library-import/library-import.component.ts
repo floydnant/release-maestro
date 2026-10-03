@@ -2,6 +2,9 @@ import { NgClass } from '@angular/common'
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core'
 import { Router, RouterModule } from '@angular/router'
 import { LibraryFolderValidation, LibraryScanTerminalResult } from '@release-maestro/core'
+import { HlmAlert, HlmAlertDescription } from '@spartan-ng/helm/alert'
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmCard } from '@spartan-ng/helm/card'
 import { ElectronService } from '../../core/services'
 import { LibraryService } from '../../core/services/library.service'
 import { FolderListComponent } from '../../shared/components/folder-list/folder-list.component'
@@ -31,6 +34,10 @@ type ImportStep = 'pick' | 'scanning' | 'done'
         ImportMosaicComponent,
         FolderListComponent,
         NgClass,
+        HlmAlert,
+        HlmAlertDescription,
+        HlmButton,
+        HlmCard,
     ],
     templateUrl: './library-import.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,

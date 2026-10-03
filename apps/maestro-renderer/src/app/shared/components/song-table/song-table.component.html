@@ -1,5 +1,6 @@
 <div
     #scroller
+    hlmTable
     class="song-table | min-h-0 flex-1 overflow-auto outline-hidden"
     role="grid"
     tabindex="0"
@@ -33,7 +34,8 @@
         }
         @if (shown().has('cover')) {
             <span
-                class="shrink-0 border-b border-border-subtle"
+                hlmTableHead
+                class="h-auto shrink-0 border-b border-border-subtle px-0"
                 role="columnheader"
                 [style.width.px]="widths.cover"
             >
@@ -174,7 +176,8 @@
                 @let selected = isRowSelected(row, index);
 
                 <div
-                    class="song-table__row | flex items-center"
+                    hlmTableRow
+                    class="song-table__row | flex items-center border-0 aria-selected:bg-background-elevated aria-selected:hover:bg-background-elevated"
                     role="row"
                     [id]="rowElementId(index)"
                     [ngClass]="{

@@ -1,3 +1,7 @@
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmLabel } from '@spartan-ng/helm/label'
+import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select'
+import { HlmTooltip } from '@spartan-ng/helm/tooltip'
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { AlbumSortField, type AlbumSort } from '@release-maestro/core'
 import { IconComponent } from '../icon/icon.component'
@@ -37,7 +41,7 @@ const SORT_OPTIONS: SortOption[] = [
     selector: 'app-album-sort-bar',
     templateUrl: './album-sort-bar.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent],
+    imports: [HlmButton, HlmTooltip, HlmLabel, HlmNativeSelectImports, IconComponent],
     host: { class: 'flex shrink-0 items-center gap-2 px-4 py-2' },
 })
 export class AlbumSortBarComponent {
@@ -59,7 +63,8 @@ export class AlbumSortBarComponent {
         this.isAscending() ? 'Sorted ascending — sort descending' : 'Sorted descending — sort ascending',
     )
 
-    protected onFieldChange(event: Event): void {
-        this.sortField.emit((event.target as HTMLSelectElement).value as AlbumSortField)
+    protected onFieldChange(value: string | undefined | null): void {
+        const option = this.options.find(option => option.field === value)
+        if (option) this.sortField.emit(option.field)
     }
 }

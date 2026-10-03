@@ -143,7 +143,8 @@ test('keeps resolved genre links within one row and preserves the tag in a toolt
     const cell = page
         .getByRole('gridcell')
         .filter({ has: page.getByRole('link', { name: 'Deep Progressive House' }) })
-    await expect(cell).toHaveAttribute('title', 'Techno; Ambient; Deep Progressive House')
+    await cell.hover()
+    await expect(page.getByRole('tooltip')).toHaveText('Techno; Ambient; Deep Progressive House')
     const bounds = await cell.boundingBox()
     expect(bounds).not.toBeNull()
     for (const link of await cell.getByRole('link').all()) {

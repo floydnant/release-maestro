@@ -21,7 +21,9 @@
                         {{ feedState.error }}
                     </p>
 
-                    <button class="mt-3 btn-nkd-neutral" (click)="retryNotifier$.next()">Retry</button>
+                    <button hlmBtn variant="ghost" class="mt-3" type="button" (click)="retryNotifier$.next()">
+                        Retry
+                    </button>
                 </div>
             } @else if (feedState.status === 'caught-up') {
                 <div
@@ -78,8 +80,11 @@
                                     >
                                         @if (track.streamUrl) {
                                             <button
+                                                hlmBtn
+                                                variant="plain"
+                                                size="icon-xs"
                                                 type="button"
-                                                class="track-control | grid size-6 shrink-0 place-items-center rounded-sm text-content-secondary transition-colors"
+                                                class="track-control | grid shrink-0 place-items-center rounded-sm type-body-sm text-content-secondary"
                                                 [ngClass]="{
                                                     'hover:bg-action-quiet-hover hover:text-content-primary':
                                                         isCurrentTrack(track.streamUrl),
@@ -119,36 +124,37 @@
                                                 }
                                             </button>
                                             <button
+                                                hlmBtn
+                                                variant="plain"
+                                                size="none"
                                                 type="button"
-                                                class="track-seeker | relative flex min-w-0 grow items-center justify-between gap-2 rounded-sm py-1 text-left text-content-primary"
+                                                class="track-seeker | relative flex min-w-0 shrink grow items-center justify-between gap-2 rounded-sm px-0 py-1 text-left type-body-sm text-content-primary"
                                                 [attr.aria-label]="'Seek within ' + track.title"
+                                                [hlmTooltip]="track.title"
                                                 (mousedown)="$event.preventDefault()"
                                                 (click)="seekTrack($event, track.streamUrl)"
                                             >
-                                                <span class="truncate" [title]="track.title">{{
-                                                    track.title
-                                                }}</span>
+                                                <span class="truncate">{{ track.title }}</span>
                                                 <span class="shrink-0">
                                                     {{ track.duration ? formatDuration(track.duration) : '' }}
                                                 </span>
 
                                                 @if (isCurrentTrack(track.streamUrl)) {
                                                     <span
+                                                        hlmProgress
                                                         class="track-progress-bar | absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-border-subtle"
-                                                        role="progressbar"
                                                         [attr.aria-label]="track.title + ' playback progress'"
-                                                        aria-valuemin="0"
-                                                        [attr.aria-valuemax]="audioPlayer.duration() || 1"
-                                                        [attr.aria-valuenow]="audioPlayer.playerTime()"
-                                                        [attr.aria-valuetext]="
-                                                            formatDuration(audioPlayer.playerTime()) +
-                                                            ' of ' +
-                                                            formatDuration(audioPlayer.duration())
+                                                        [max]="audioPlayer.duration() || 1"
+                                                        [value]="
+                                                            (trackProgress(track.streamUrl) *
+                                                                audioPlayer.duration()) /
+                                                            100
                                                         "
+                                                        [getValueLabel]="playbackProgressLabel"
                                                     >
                                                         <span
-                                                            class="block h-full rounded-full bg-content-success transition-[width] duration-fast ease-standard"
-                                                            [style.width.%]="trackProgress(track.streamUrl)"
+                                                            hlmProgressIndicator
+                                                            class="bg-content-success transition-transform"
                                                         ></span>
                                                     </span>
                                                 }
@@ -159,7 +165,7 @@
                                                     {{ $index + 1 }}.
                                                 }
                                             </span>
-                                            <span class="min-w-0 grow truncate" [title]="track.title">{{
+                                            <span class="min-w-0 grow truncate" [hlmTooltip]="track.title">{{
                                                 track.title
                                             }}</span>
                                             <span class="shrink-0">
@@ -180,16 +186,19 @@
                         >
                             <div class="wrap-nicely overflow-x-hidden overflow-y-scroll">
                                 @if (feedItem.error; as error) {
-                                    <div class="error | mb-1.5 flex items-center gap-2">
-                                        <p class="text-content-danger">
+                                    <div
+                                        hlmAlert
+                                        variant="destructive"
+                                        class="error | mb-1.5 flex items-center gap-2 border-0 bg-transparent p-0"
+                                    >
+                                        <p class="translate-y-[3px] text-content-danger">
                                             <app-icon
                                                 name="error"
                                                 color="content.danger"
                                                 size="1.3rem"
-                                                class="translate-y-[3px]"
                                             ></app-icon>
                                         </p>
-                                        <p class="type-label-md text-content-danger">
+                                        <p hlmAlertDescription class="type-label-md">
                                             {{ error.message || 'Error loading feed item' }}
                                         </p>
                                     </div>
@@ -214,7 +223,7 @@
                                     }
                                     <span
                                         class="dates | text-content-muted"
-                                        [title]="
+                                        [hlmTooltip]="
                                             'released ' +
                                             (feedItem.data.releaseDate | date) +
                                             ', announced ' +
@@ -239,11 +248,13 @@
                                     @for (link of feedItem.data.links; track $index) {
                                         <li class="flex w-full">
                                             <a
+                                                hlmBtn
+                                                variant="muted"
                                                 [href]="link.url"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                class="flex max-w-full items-center gap-1.5 truncate rounded-lg bg-background-surface px-2 py-1 transition-colors duration-fast hover:bg-background-elevated not-hover:text-content-muted"
-                                                [title]="link.title + '\n' + link.url"
+                                                class="max-w-full justify-start gap-1.5 px-2 py-1 type-body-sm hover:text-content-primary"
+                                                [hlmTooltip]="link.title + '\n' + link.url"
                                             >
                                                 <img
                                                     class="favicon |"
@@ -268,9 +279,18 @@
 
                                     <div class="flex rounded-tl-xl text-xl">
                                         <button
-                                            class="-mr-2 flex items-center gap-2 p-2 text-content-muted transition-colors duration-fast hover:text-content-primary"
+                                            hlmBtn
+                                            variant="plain"
+                                            size="none"
+                                            class="feed-snooze | -mr-2 p-2 text-content-muted hover:text-content-primary"
+                                            type="button"
                                             (click)="toggleCurrentFeedItemSnoozedState()"
-                                            [title]="
+                                            [attr.aria-label]="
+                                                snoozedFeedItems.has(feedItem.id)
+                                                    ? 'Remove release snooze'
+                                                    : 'Snooze release'
+                                            "
+                                            [hlmTooltip]="
                                                 snoozedFeedItems.has(feedItem.id)
                                                     ? 'Click to un-snooze (don\'t show again)'
                                                     : 'Click to snooze (show again tomorrow)'
@@ -310,11 +330,14 @@
                                 </p>
                                 @if (feedItem.data.unsubscribeUrl) {
                                     <a
+                                        hlmBtn
+                                        variant="muted"
                                         [href]="feedItem.data.unsubscribeUrl"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="relative mt-2.5 btn-muted block text-center type-label-md not-hover:no-underline [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
-                                        [title]="feedItem.data.unsubscribeText"
+                                        class="relative mt-2.5 block w-full text-center [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
+                                        [attr.aria-label]="'Unfollow ' + feedItem.data.band.name"
+                                        [hlmTooltip]="feedItem.data.unsubscribeText"
                                     >
                                         <span class="opacity-0">Text</span>
                                         <span class="following | absolute inset-0 py-1.5">Following</span>
@@ -333,7 +356,7 @@
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 class="max-w-full truncate text-content-primary not-hover:no-underline"
-                                                [title]="link.text + '\n' + link.url"
+                                                [hlmTooltip]="link.text + '\n' + link.url"
                                             >
                                                 {{ link.text }}
                                             </a>
