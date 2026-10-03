@@ -1,3 +1,4 @@
+import { HlmButton } from '@spartan-ng/helm/button'
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core'
 import { toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, RouterLink } from '@angular/router'
@@ -26,7 +27,7 @@ const LOADING: DetailState = { status: 'loading' }
     selector: 'app-genre-detail',
     templateUrl: './genre-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
+    imports: [HlmButton, 
         RouterLink,
         TabBarComponent,
         EntitySongsComponent,

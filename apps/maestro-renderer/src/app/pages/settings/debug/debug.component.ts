@@ -2,6 +2,15 @@ import { JsonPipe } from '@angular/common'
 import { Component, computed, effect, inject, signal, ChangeDetectionStrategy } from '@angular/core'
 import { FormsModule } from '@angular/forms'
 import { LibraryScanPhase, LibraryScanStatus, SongMetadataUpdate } from '@release-maestro/core'
+import { HlmAlert, HlmAlertDescription } from '@spartan-ng/helm/alert'
+import { HlmBadge } from '@spartan-ng/helm/badge'
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmCard } from '@spartan-ng/helm/card'
+import { HlmCollapsibleImports } from '@spartan-ng/helm/collapsible'
+import { HlmField, HlmFieldDescription } from '@spartan-ng/helm/field'
+import { HlmInput } from '@spartan-ng/helm/input'
+import { HlmTextarea } from '@spartan-ng/helm/textarea'
+import { HlmTooltip } from '@spartan-ng/helm/tooltip'
 import { LibraryService } from '../../../core/services/library.service'
 import { MetadataService } from '../../../core/services/metadata.service'
 import {
@@ -29,7 +38,22 @@ const MAX_SCAN_LOG_ENTRIES = 200
 
 @Component({
     selector: 'app-debug',
-    imports: [FormsModule, JsonPipe, ProgressBarComponent],
+    imports: [
+        FormsModule,
+        JsonPipe,
+        ProgressBarComponent,
+        HlmAlert,
+        HlmAlertDescription,
+        HlmBadge,
+        HlmButton,
+        HlmCard,
+        HlmCollapsibleImports,
+        HlmField,
+        HlmFieldDescription,
+        HlmInput,
+        HlmTextarea,
+        HlmTooltip,
+    ],
     templateUrl: './debug.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: { class: 'block h-full' },
