@@ -123,7 +123,7 @@
                                                 hlmBtn
                                                 variant="ghost"
                                                 type="button"
-                                                class="track-seeker | relative h-auto min-w-0 grow justify-between rounded-sm px-0 py-1 text-left type-body-sm text-content-primary"
+                                                class="track-seeker | relative h-auto min-w-0 shrink grow justify-between rounded-sm px-0 py-1 text-left type-body-sm text-content-primary"
                                                 [attr.aria-label]="'Seek within ' + track.title"
                                                 [hlmTooltip]="track.title"
                                                 (mousedown)="$event.preventDefault()"
@@ -136,21 +136,20 @@
 
                                                 @if (isCurrentTrack(track.streamUrl)) {
                                                     <span
+                                                        hlmProgress
                                                         class="track-progress-bar | absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-border-subtle"
-                                                        role="progressbar"
                                                         [attr.aria-label]="track.title + ' playback progress'"
-                                                        aria-valuemin="0"
-                                                        [attr.aria-valuemax]="audioPlayer.duration() || 1"
-                                                        [attr.aria-valuenow]="audioPlayer.playerTime()"
-                                                        [attr.aria-valuetext]="
-                                                            formatDuration(audioPlayer.playerTime()) +
-                                                            ' of ' +
-                                                            formatDuration(audioPlayer.duration())
+                                                        [max]="audioPlayer.duration() || 1"
+                                                        [value]="
+                                                            (trackProgress(track.streamUrl) *
+                                                                audioPlayer.duration()) /
+                                                            100
                                                         "
+                                                        [getValueLabel]="playbackProgressLabel"
                                                     >
                                                         <span
-                                                            class="block h-full rounded-full bg-content-success transition-[width] duration-fast ease-standard"
-                                                            [style.width.%]="trackProgress(track.streamUrl)"
+                                                            hlmProgressIndicator
+                                                            class="bg-content-success transition-transform"
                                                         ></span>
                                                     </span>
                                                 }
@@ -182,16 +181,19 @@
                         >
                             <div class="wrap-nicely overflow-x-hidden overflow-y-scroll">
                                 @if (feedItem.error; as error) {
-                                    <div class="error | mb-1.5 flex items-center gap-2">
+                                    <div
+                                        hlmAlert
+                                        variant="destructive"
+                                        class="error | mb-1.5 flex items-center gap-2 border-0 bg-transparent p-0"
+                                    >
                                         <p class="text-content-danger">
                                             <app-icon
                                                 name="error"
                                                 color="content.danger"
                                                 size="1.3rem"
-                                                class="translate-y-[3px]"
                                             ></app-icon>
                                         </p>
-                                        <p class="type-label-md text-content-danger">
+                                        <p hlmAlertDescription>
                                             {{ error.message || 'Error loading feed item' }}
                                         </p>
                                     </div>
