@@ -1,5 +1,6 @@
 @if (album().coverPath) {
     <img
+        appRetryCoverAfterScan
         class="album-detail__cover | size-64 shrink-0 rounded-md object-cover"
         alt=""
         [src]="fileUrl(album().coverPath!)"
