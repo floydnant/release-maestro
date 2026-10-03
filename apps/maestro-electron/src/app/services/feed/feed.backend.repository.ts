@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gte, isNull, lt, notInArray, or, sql } from 'drizzle-orm'
 import { EmailVendor, FeedItemMaster } from '@release-maestro/core'
 import { DatabaseClient } from '../../database/database.client'
 import {
@@ -30,22 +30,25 @@ export class FeedBackendRepository {
         await this.db.db.insert(feedItemsTable).values(feedItemsToIngest).onConflictDoNothing()
     }
 
-    async listFeedItems(index: number, count: number): Promise<FeedItemMaster[]> {
+    async listFeedItems(index: number, count: number, excludedIds: string[] = []): Promise<FeedItemMaster[]> {
         const items = await this.db.db
             .select()
             .from(feedItemsTable)
             .where(
-                or(
-                    isNull(feedItemsTable.lastViewedAt),
-                    and(
-                        eq(feedItemsTable.isSnoozed, true),
-                        lt(feedItemsTable.lastViewedAt, new Date(Date.now() - FEED_ITEM_SNOOZE_TIME_MS)),
+                and(
+                    excludedIds.length > 0 ? notInArray(feedItemsTable.id, excludedIds) : undefined,
+                    or(
+                        isNull(feedItemsTable.lastViewedAt),
+                        and(
+                            eq(feedItemsTable.isSnoozed, true),
+                            lt(feedItemsTable.lastViewedAt, new Date(Date.now() - FEED_ITEM_SNOOZE_TIME_MS)),
+                        ),
                     ),
                 ),
             )
             .orderBy(desc(feedItemsTable.eventDate))
             .limit(count)
-            .offset(index * count)
+            .offset(index)
 
         return items as FeedItemMaster[] // TODO: Add proper schema validation
     }

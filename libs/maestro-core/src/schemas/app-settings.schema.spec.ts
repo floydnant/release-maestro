@@ -23,9 +23,27 @@ describe('appSettingsSchema (write validation)', () => {
         expect(() => appSettingsSchema.parse({ library: { onboardingSkipped: 'yes' } })).toThrow()
         expect(() => appSettingsSchema.parse({ library: 'not-an-object' })).toThrow()
     })
+
+    it('accepts either feed filter preference and rejects invalid writes', () => {
+        for (const hideUnplayableReleases of [true, false]) {
+            expect(appSettingsSchema.parse({ feed: { hideUnplayableReleases } }).feed).toEqual({
+                hideUnplayableReleases,
+            })
+        }
+        expect(() => appSettingsSchema.parse({ feed: { hideUnplayableReleases: 'false' } })).toThrow()
+    })
 })
 
 describe('storedAppSettingsSchema (tolerant read)', () => {
+    it('drops invalid feed preferences so consumers use the enabled default', () => {
+        expect(storedAppSettingsSchema.parse({ feed: { hideUnplayableReleases: 'false' } }).feed).toEqual({
+            hideUnplayableReleases: undefined,
+        })
+        expect(storedAppSettingsSchema.parse({ feed: 'corrupted' }).feed).toBeUndefined()
+        expect(storedAppSettingsSchema.parse({ feed: { hideUnplayableReleases: false } }).feed).toEqual({
+            hideUnplayableReleases: false,
+        })
+    })
     it('drops individually invalid fields instead of failing the read', () => {
         const parsed = storedAppSettingsSchema.parse({
             library: { folders: 'corrupted', onboardingSkipped: true },
