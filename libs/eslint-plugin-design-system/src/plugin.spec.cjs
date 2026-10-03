@@ -22,7 +22,7 @@ const templateRule = require('./rules/valid-template-classnames.cjs')
 const hostRule = require('./rules/valid-host-classnames.cjs')
 const { suggestClassName } = require('./lib/suggest.cjs')
 const { readComponentMetadata } = require('./lib/component-metadata.cjs')
-const { isTailwindClass, tailwindClassList } = require('./lib/tailwind-authority.cjs')
+const { createTailwindAuthority, isTailwindClass, tailwindClassList } = require('./lib/tailwind-authority.cjs')
 
 const FIXTURES = path.join(__dirname, 'fixtures')
 
@@ -789,18 +789,16 @@ describe('Tailwind authority cache', () => {
         const directory = mkdtempSync(path.join(FIXTURES, '.tailwind-cache-'))
         const stylesheet = path.join(directory, 'tailwind.css')
         const importedStylesheet = path.join(directory, 'tokens.css')
-        const config = path.join(directory, 'tailwind.config.cjs')
 
         /** @param {string} suffix */
         const writeAuthority = suffix => {
             writeFileSync(
                 stylesheet,
-                `@import 'tailwindcss';\n@import './tokens.css';\n@config './tailwind.config.cjs';\n@utility cache-root-${suffix} { display: block; }\n`,
+                `@import 'tailwindcss';\n@import './tokens.css';\n@utility cache-root-${suffix} { display: block; }\n`,
             )
-            writeFileSync(importedStylesheet, `@utility cache-import-${suffix} { display: block; }\n`)
             writeFileSync(
-                config,
-                `module.exports = { theme: { extend: { colors: { 'cache-config-${suffix}': '#000' } } } }\n`,
+                importedStylesheet,
+                `@theme { --color-cache-theme-${suffix}: #000; }\n@utility cache-import-${suffix} { display: block; }\n`,
             )
         }
 
@@ -808,15 +806,18 @@ describe('Tailwind authority cache', () => {
             writeAuthority('first')
             expect(isTailwindClass(stylesheet, 'cache-root-first')).toBe(true)
             expect(isTailwindClass(stylesheet, 'cache-import-first')).toBe(true)
-            expect(isTailwindClass(stylesheet, 'bg-cache-config-first')).toBe(true)
+            expect(isTailwindClass(stylesheet, 'bg-cache-theme-first')).toBe(true)
+            expect(createTailwindAuthority(stylesheet).themeVariableExists('--color-cache-theme-first')).toBe(true)
 
             writeAuthority('other')
             expect(isTailwindClass(stylesheet, 'cache-root-other')).toBe(true)
             expect(isTailwindClass(stylesheet, 'cache-import-other')).toBe(true)
-            expect(isTailwindClass(stylesheet, 'bg-cache-config-other')).toBe(true)
+            expect(isTailwindClass(stylesheet, 'bg-cache-theme-other')).toBe(true)
             expect(isTailwindClass(stylesheet, 'cache-root-first')).toBe(false)
             expect(isTailwindClass(stylesheet, 'cache-import-first')).toBe(false)
-            expect(isTailwindClass(stylesheet, 'bg-cache-config-first')).toBe(false)
+            expect(isTailwindClass(stylesheet, 'bg-cache-theme-first')).toBe(false)
+            expect(createTailwindAuthority(stylesheet).themeVariableExists('--color-cache-theme-first')).toBe(false)
+            expect(createTailwindAuthority(stylesheet).themeVariableExists('--color-cache-theme-other')).toBe(true)
         } finally {
             rmSync(directory, { recursive: true, force: true })
         }

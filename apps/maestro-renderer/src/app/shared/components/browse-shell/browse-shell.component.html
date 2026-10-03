@@ -1,11 +1,11 @@
 <header class="browse-shell__bar | flex shrink-0 flex-wrap items-center gap-3 px-4 py-3">
-    <h1 class="type-section-title mr-auto capitalize">{{ state().entityLabel }}</h1>
+    <h1 class="mr-auto type-section-title capitalize">{{ state().entityLabel }}</h1>
 
     <!-- The count sits left of the search rather than at the end of the bar: it is the
          one thing here whose width changes as you type, and at the end it pushed the
          search and everything beside it around on every keystroke. -->
     <p
-        class="type-body-sm shrink-0 text-content-secondary tabular-nums"
+        class="shrink-0 type-body-sm text-content-secondary tabular-nums"
         role="status"
         aria-label="Result count"
     >
@@ -74,7 +74,7 @@
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
             <app-icon name="error" size="28" color="content.danger"></app-icon>
             <p class="type-body-md text-content-primary">Could not load your {{ state().entityLabel }}</p>
-            <p class="type-body-sm max-w-md text-content-secondary">
+            <p class="max-w-md type-body-sm text-content-secondary">
                 {{ state().error || 'The library did not answer.' }}
             </p>
             <button type="button" class="btn-primary" (click)="retry.emit()">Try again</button>
@@ -89,13 +89,13 @@
                 <p class="type-body-md text-content-primary">
                     No {{ state().entityLabel }} match these filters
                 </p>
-                <p class="type-body-sm max-w-md text-content-secondary">
+                <p class="max-w-md type-body-sm text-content-secondary">
                     Try a broader search, or clear the filters to see everything again.
                 </p>
                 <button type="button" class="btn-neutral" (click)="clearFilters.emit()">Clear filters</button>
             } @else {
                 <p class="type-body-md text-content-primary">No {{ state().entityLabel }} yet</p>
-                <p class="type-body-sm max-w-md text-content-secondary">
+                <p class="max-w-md type-body-sm text-content-secondary">
                     Scan a library folder and your {{ state().entityLabel }} will show up here as they are
                     read.
                 </p>

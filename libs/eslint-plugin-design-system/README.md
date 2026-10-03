@@ -65,19 +65,22 @@ and non-class `HostBinding` decorators are ignored.
 There is no maintained allowlist. A class is known when **any** of these holds:
 
 1. **Tailwind generates CSS for it.** The rule asks Tailwind v4's design system against
-   `tailwind.config.js`, so variants, arbitrary values, container queries and the config's plugin
-   utilities (`glass`, `wrap-nicely`, `child-focus-ring`) are covered without restating any of them.
+   `src/styles.css` and its generated theme import, so variants, arbitrary values, container queries
+   and authored utilities (`glass`, `wrap-nicely`, `child-focus-ring`) are covered without restating
+   any of them.
    The only literal list in the plugin is `group`/`peer` (+ named forms), variant markers that
    legitimately emit no CSS.
 
     The question is deliberately "does this emit CSS", not "is this a known Tailwind name". The
-    config _replaces_ `spacing`, `borderRadius`, `boxShadow` and `opacity` with token scales that
-    have no `DEFAULT` key, so `rounded` and `shadow` are real Tailwind names that produce nothing.
+    generated theme clears the default spacing, radius, shadow, and opacity scales before publishing
+    the project tokens. It also removes the numeric spacing multiplier. Bare `rounded` and `shadow`
+    are real Tailwind names that produce nothing.
     A validator that checks names instead of output misses every one of them.
 
 2. **An authored stylesheet declares it.** Class selectors are harvested with PostCSS from
-   `src/styles.css` and everything it `@import`s — which is how `.type-*` from
-   `design-tokens.generated.css` and `.btn-*`, `.badge`, `.panel` become known.
+   `src/styles.css` and everything it `@import`s for ordinary authored classes. Generated `type-*`
+   and authored `btn-*`, `badge`, and `panel` use `@utility`, so Tailwind validates them through the
+   first path.
 
 3. **The component's own styles declare it**, resolved from the component's `styleUrl`/`styleUrls`
    and inline `styles:`, read through the TypeScript compiler API. Component-scoped classes are
@@ -234,9 +237,9 @@ had quietly papered over.
 | Class applied by a parent component's stylesheet or `::ng-deep` | **would be a false positive** — none exist in the renderer today                                                            |
 | Classes applied imperatively (`classList.add`)                  | **validated** when their type is a closed string-literal set; wider runtime strings are rejected                            |
 
-**Cache invalidation is the one real hazard.** Tailwind's context is built once per ESLint process
-and stylesheets are cached by mtime, but ESLint's own per-file cache is keyed on the file the class
-came from, not on the authorities. Editing `tailwind.config.js` or a global stylesheet does not
+**Cache invalidation is the one real hazard.** The plugin refreshes its Tailwind context when the
+stylesheet or an imported authority changes. ESLint's own per-file cache is keyed on the file the
+class came from, not on the authorities. Editing a generated theme or a global stylesheet does not
 invalidate it, so a long-lived editor server can hold a stale verdict until the template itself
 changes. A full `nx lint` run is unaffected because nx re-runs the process.
 

@@ -9,7 +9,7 @@
         <div class="size-full overflow-y-auto">
             <div class="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-8 py-16">
                 <h1 class="type-hero-title text-content-primary">Set up your music library</h1>
-                <p class="type-body-md mt-3 text-content-secondary">
+                <p class="mt-3 type-body-md text-content-secondary">
                     Choose the folders where your music lives. Release Maestro keeps them up to date from then
                     on.
                 </p>
@@ -53,7 +53,7 @@
         <div class="size-full overflow-y-auto">
             <div class="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-8 py-16">
                 <h1 class="type-hero-title text-content-primary">No audio files found</h1>
-                <p class="type-body-md mt-3 text-content-secondary">
+                <p class="mt-3 type-body-md text-content-secondary">
                     We couldn't find any supported audio files in the selected folders. Pick the folder(s)
                     that contain your music and try again.
                 </p>
@@ -89,7 +89,7 @@
                         <p class="text-content-success">
                             <app-icon name="success" color="content.success" size="2.5rem"></app-icon>
                         </p>
-                        <h1 class="type-hero-title mt-3 text-content-primary">Your library is ready</h1>
+                        <h1 class="mt-3 type-hero-title text-content-primary">Your library is ready</h1>
                     } @else if (terminalBanner(); as terminal) {
                         <h1 class="type-hero-title text-content-primary">
                             @if (terminal.outcome === 'cancelled') {
@@ -101,7 +101,7 @@
                     } @else {
                         <h1 class="type-hero-title text-content-primary">Importing your library</h1>
                         <p
-                            class="type-body-md mt-2 flex items-center justify-center gap-2 text-content-secondary"
+                            class="mt-2 flex items-center justify-center gap-2 type-body-md text-content-secondary"
                         >
                             @if (status.phase === 'discovering') {
                                 <app-progress-ring
@@ -126,47 +126,44 @@
 
                     <div class="mx-auto mt-6 grid max-w-xl grid-cols-4 gap-3">
                         <div class="text-center">
-                            <p class="type-section-title font-mono text-content-primary">
+                            <p class="type-section-title text-content-primary">
                                 {{ status.discovered }}
                             </p>
-                            <p class="type-label-sm mt-1 text-content-muted">Discovered</p>
+                            <p class="mt-1 type-label-sm text-content-muted">Discovered</p>
                         </div>
                         <div class="text-center">
-                            <p
-                                class="type-section-title font-mono text-content-primary"
-                                aria-label="Imported tracks"
-                            >
+                            <p class="type-section-title text-content-primary" aria-label="Imported tracks">
                                 {{ status.imported }}
                             </p>
-                            <p class="type-label-sm mt-1 text-content-muted">Imported</p>
+                            <p class="mt-1 type-label-sm text-content-muted">Imported</p>
                         </div>
                         <div class="text-center">
                             <p
-                                class="type-section-title font-mono"
+                                class="type-section-title"
                                 aria-label="Failed files count"
                                 [class.text-content-danger]="status.failedFiles > 0"
                                 [class.text-content-primary]="status.failedFiles === 0"
                             >
                                 {{ status.failedFiles }}
                             </p>
-                            <p class="type-label-sm mt-1 text-content-muted">Failed</p>
+                            <p class="mt-1 type-label-sm text-content-muted">Failed</p>
                         </div>
                         <div class="text-center">
                             <p
-                                class="type-section-title font-mono"
+                                class="type-section-title"
                                 [class.text-content-warning]="status.normalizationIssues > 0"
                                 [class.text-content-primary]="status.normalizationIssues === 0"
                             >
                                 {{ status.normalizationIssues }}
                             </p>
-                            <p class="type-label-sm mt-1 text-content-muted">With Issues</p>
+                            <p class="mt-1 type-label-sm text-content-muted">With Issues</p>
                         </div>
                     </div>
 
                     @if (step() === 'done') {
                         @if (unavailableFoldersText(); as unavailableText) {
                             <p
-                                class="type-body-sm mt-6 text-content-warning"
+                                class="mt-6 type-body-sm text-content-warning"
                                 aria-label="Unavailable folders"
                             >
                                 {{ unavailableText }}
@@ -181,7 +178,7 @@
                             </button>
                         </div>
                         @if (status.failedFiles > 0) {
-                            <p class="type-body-sm mt-4">
+                            <p class="mt-4 type-body-sm">
                                 <a class="text-content-action" routerLink="/settings/library"
                                     >View failed files</a
                                 >
@@ -189,11 +186,11 @@
                         }
                     } @else if (terminalBanner(); as terminal) {
                         @if (terminal.outcome === 'cancelled') {
-                            <p class="type-body-md mt-6 text-content-primary">
+                            <p class="mt-6 type-body-md text-content-primary">
                                 The next startup scan picks up where this one left off.
                             </p>
                         } @else {
-                            <p class="type-body-md mt-6 text-content-danger">
+                            <p class="mt-6 type-body-md text-content-danger">
                                 <app-icon
                                     name="error"
                                     color="content.danger"
@@ -214,7 +211,7 @@
                             </button>
                         </div>
                         @if (status.failedFiles > 0) {
-                            <p class="type-body-sm mt-3">
+                            <p class="mt-3 type-body-sm">
                                 <a class="text-content-action" routerLink="/settings/library"
                                     >View failed files</a
                                 >

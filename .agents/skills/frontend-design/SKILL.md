@@ -20,8 +20,8 @@ They may include context about the purpose, the audience, or technical constrain
 - **Tokens are generated.** Edit only the three source files —
   `design-tokens/foundations.json` (raw scales), `design-tokens/semantic.dark.json` (semantic names
   pointing at foundations), and `design-tokens/contrast-pairs.json` (the pairs whose contrast is
-  asserted). Everything named `*.generated.*` — `design-tokens/tailwind.generated.json`,
-  `src/styles/design-tokens.generated.css`, `src/app/shared/design-tokens.generated.ts`, and the
+  asserted). Everything named `*.generated.*` — `src/styles/design-tokens.generated.css`,
+  `src/app/shared/design-tokens.generated.ts`, and the
   electron copy — is written by `apps/maestro-renderer/tools/design-tokens.cjs`. Regenerate with `make design-tokens`; the renderer's build, lint, and test targets already depend on `design-tokens-check`, so a stale or
   contrast-failing token set fails those runs.
 - Use Tailwind utility classes by default, including the project's configured semantic tokens,

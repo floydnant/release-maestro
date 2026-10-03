@@ -5,9 +5,9 @@
     </div>
 }
 @if (!result().loaded && result().status === 'loading') {
-    <p class="type-body-sm p-8 text-content-secondary" role="status">Loading tracks…</p>
+    <p class="p-8 type-body-sm text-content-secondary" role="status">Loading tracks…</p>
 } @else if (result().loaded && result().total === 0) {
-    <p class="type-body-sm p-8 text-content-secondary">No tracks linked to this {{ entityName() }}</p>
+    <p class="p-8 type-body-sm text-content-secondary">No tracks linked to this {{ entityName() }}</p>
 } @else if (result().loaded) {
     <app-song-table
         [result]="result()"

@@ -139,7 +139,7 @@
                 @if (scanIndicator(); as scan) {
                     @if (scan.phase !== 'completed') {
                         <p
-                            class="scan-indicator | type-body-sm flex items-center gap-1 px-2 text-content-secondary"
+                            class="scan-indicator | flex items-center gap-1 px-2 type-body-sm text-content-secondary"
                         >
                             @if (scan.phase === 'reading') {
                                 <app-progress-ring

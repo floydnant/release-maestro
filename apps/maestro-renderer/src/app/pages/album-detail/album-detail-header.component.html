@@ -13,9 +13,9 @@
 }
 
 <div class="flex min-w-0 flex-col justify-end gap-1 pb-1">
-    <h1 class="album-title | type-hero-title truncate" [title]="album().title">{{ album().title }}</h1>
+    <h1 class="album-title | truncate type-hero-title" [title]="album().title">{{ album().title }}</h1>
 
-    <p class="album-artist | type-section-title min-w-0 truncate text-content-secondary">
+    <p class="album-artist | min-w-0 truncate type-section-title text-content-secondary">
         @if (album().albumArtists.length) {
             @for (artist of album().albumArtists; track artist.id; let last = $last) {
                 <a
@@ -36,7 +36,7 @@
     <!-- One line of facts, separated rather than laid out as a table: they are short,
          several are usually absent, and a label column of five rows for three values
          reads as a form rather than as a record sleeve. -->
-    <p class="type-body-sm flex min-w-0 flex-wrap items-center gap-x-2 text-content-muted">
+    <p class="flex min-w-0 flex-wrap items-center gap-x-2 type-body-sm text-content-muted">
         <span class="tabular-nums">{{ songCount() }} {{ songCountLabel() }}</span>
 
         @if (duration()) {

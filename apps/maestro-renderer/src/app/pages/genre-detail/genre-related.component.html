@@ -7,9 +7,9 @@
     </div>
 }
 @if (!result().loaded && result().status === 'loading') {
-    <p class="type-body-sm p-8 text-content-secondary" role="status">Loading {{ label().toLowerCase() }}…</p>
+    <p class="p-8 type-body-sm text-content-secondary" role="status">Loading {{ label().toLowerCase() }}…</p>
 } @else if (result().loaded && result().total === 0) {
-    <p class="type-body-sm p-8 text-content-secondary">No {{ label().toLowerCase() }} linked to this genre</p>
+    <p class="p-8 type-body-sm text-content-secondary">No {{ label().toLowerCase() }} linked to this genre</p>
 } @else if (result().loaded) {
     <app-catalog-list
         [label]="label()"
