@@ -1,4 +1,5 @@
 import { EmailVendor, type ExternalRefs } from '@release-maestro/core'
+import { sql } from 'drizzle-orm'
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export { ExternalRefKeys } from '@release-maestro/core'
@@ -174,6 +175,14 @@ export const songsTable = sqliteTable(
         modifiedAt: integer('modified_at', { mode: 'timestamp_ms' }).notNull(),
         createdAt: integer('created_at', { mode: 'timestamp_ms' }),
         addedAt: integer('added_at', { mode: 'timestamp_ms' }),
+        /** Scan chronology is independent of the filesystem-derived Added date. */
+        firstSeenAt: integer('first_seen_at', { mode: 'timestamp_ms' })
+            .notNull()
+            .default(sql`0`),
+        /** Includes successful probes of originals outside the configured folders. */
+        lastAvailableAt: integer('last_available_at', { mode: 'timestamp_ms' })
+            .notNull()
+            .default(sql`0`),
         fileFingerprint: text('file_fingerprint').notNull(),
         scannedFileFingerprint: text('scanned_file_fingerprint'),
         present: integer('present', { mode: 'boolean' }).notNull().default(true),
@@ -237,7 +246,7 @@ export const songsTable = sqliteTable(
         index('songs_present_idx').on(table.present),
         index('songs_file_fingerprint_idx').on(table.fileFingerprint),
         index('songs_content_hash_size_idx').on(table.contentHash, table.size),
-        index('songs_metadata_hash_size_idx').on(table.metadataHash, table.size),
+        index('songs_size_idx').on(table.size),
         index('songs_album_id_idx').on(table.albumId),
 
         // One index per sortable browse column. Browse queries move windows through an

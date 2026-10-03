@@ -101,8 +101,8 @@ export const albumIdentityKey = (metadata: SongMetadata): string =>
     })
 
 /**
- * A digest of the tag as it was read. Used with file size as the conservative
- * move-matching fallback for older missing songs without a content hash.
+ * A digest of the tag as it was read, including the resolved artwork location.
+ * Move matching uses content hashes or persisted tag fields instead.
  *
  * In particular it is **not** what decides whether a file is re-read. That is the file
  * fingerprint, plus {@link NORMALIZER_VERSION} and the Rust extractor revision for

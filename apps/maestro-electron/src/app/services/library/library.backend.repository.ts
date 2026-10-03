@@ -83,48 +83,66 @@ export class LibraryBackendRepository {
     /** Match only complete, unambiguous pairs after every discovery/deep-read batch. */
     findMovedSongCandidates(seenAt: Date): MovedSongCandidate[] {
         const candidates = new Map<string, MovedSongCandidate>()
-        for (const key of ['contentHash', 'metadataHash'] as const) {
-            const column = songsTable[key]
-            const groups = this.database.db
-                .select({ hash: column, size: songsTable.size })
-                .from(songsTable)
-                .where(isNotNull(column))
-                .groupBy(column, songsTable.size)
-                .having(
-                    and(
-                        eq(count(), 2),
-                        sql`sum(case when ${songsTable.lastSeenAt} = ${seenAt.getTime()} then 1 else 0 end) = 1`,
-                    ),
-                )
-                .all()
-            for (const group of groups) {
-                if (!group.hash) continue
-                const pair = this.database.db
+        const contentGroups = this.database.db
+            .select({ hash: songsTable.contentHash, size: songsTable.size })
+            .from(songsTable)
+            .where(isNotNull(songsTable.contentHash))
+            .groupBy(songsTable.contentHash, songsTable.size)
+            .having(
+                and(
+                    eq(count(), 2),
+                    sql`sum(case when ${songsTable.lastSeenAt} = ${seenAt.getTime()} then 1 else 0 end) = 1`,
+                ),
+            )
+            .all()
+        const consider = (pair: DbSong[], legacy: boolean) => {
+            if (pair.length != 2) return
+            const found = pair.find(song => song.lastSeenAt.getTime() == seenAt.getTime())
+            const missing = pair.find(song => song.lastSeenAt < seenAt)
+            if (!found || !missing || found.firstSeenAt <= missing.lastAvailableAt) return
+            // A failed read may leave a hash for an older version of this path.
+            if (pair.some(song => song.scannedFileFingerprint != song.fileFingerprint)) return
+            if (!found.contentHash || !found.present) return
+            if (
+                legacy &&
+                (missing.contentHash ||
+                    !missing.rawTitle?.trim() ||
+                    missing.rawTitle == missing.fileName ||
+                    !(missing.rawArtist?.trim() || missing.rawAlbumTitle?.trim()) ||
+                    !missing.duration)
+            )
+                return
+            if (!candidates.has(found.id)) candidates.set(found.id, { missing, found })
+        }
+        for (const group of contentGroups) {
+            if (!group.hash) continue
+            consider(
+                this.database.db
                     .select()
                     .from(songsTable)
-                    .where(and(eq(column, group.hash), eq(songsTable.size, group.size)))
-                    .all()
-                const found = pair.find(song => song.lastSeenAt.getTime() == seenAt.getTime())
-                const missing = pair.find(song => song.lastSeenAt < seenAt)
-                if (!found || !missing || !found.addedAt || found.addedAt <= missing.lastSeenAt) continue
-                // A failed read may leave a hash for an older version of this path.
-                if (pair.some(song => song.scannedFileFingerprint != song.fileFingerprint)) continue
-                if (!found.contentHash || !found.present) continue
-                if (key == 'metadataHash') {
-                    // Upgrade fallback: no content proof exists for an already-missing old row.
-                    // Require full tag equality, size, and identifying tags; never override a hash.
-                    if (
-                        missing.contentHash ||
-                        !missing.rawTitle?.trim() ||
-                        missing.rawTitle == missing.fileName ||
-                        !(missing.rawArtist?.trim() || missing.rawAlbumTitle?.trim()) ||
-                        !missing.duration
-                    )
-                        continue
-                }
-                if (!candidates.has(found.id)) candidates.set(found.id, { missing, found })
-            }
+                    .where(and(eq(songsTable.contentHash, group.hash), eq(songsTable.size, group.size)))
+                    .all(),
+                false,
+            )
         }
+        // Older missing rows have no byte hash. Group their persisted tags and audio properties,
+        // excluding artwork paths and user-editable references. Only inspect sizes needing this fallback.
+        const legacySizes = this.database.db
+            .select({ size: songsTable.size })
+            .from(songsTable)
+            .where(and(isNull(songsTable.contentHash), lt(songsTable.lastSeenAt, seenAt)))
+        const legacyGroups = new Map<string, DbSong[]>()
+        for (const song of this.database.db
+            .select()
+            .from(songsTable)
+            .where(inArray(songsTable.size, legacySizes))
+            .all()) {
+            const key = legacyMoveKey(song)
+            const group = legacyGroups.get(key) ?? []
+            group.push(song)
+            legacyGroups.set(key, group)
+        }
+        for (const pair of legacyGroups.values()) consider(pair, true)
         return [...candidates.values()]
     }
 
@@ -192,6 +210,7 @@ export class LibraryBackendRepository {
                     ...found,
                     id: missing.id,
                     addedAt: missing.addedAt,
+                    firstSeenAt: missing.firstSeenAt,
                     externalRefs: mergeExternalRefs([missing.externalRefs, found.externalRefs]),
                 })
                 .where(eq(songsTable.id, missing.id))
@@ -206,6 +225,14 @@ export class LibraryBackendRepository {
                     .run()
             }
         })
+    }
+
+    recordSongAvailable(id: string, availableAt: Date): void {
+        this.database.db
+            .update(songsTable)
+            .set({ lastAvailableAt: availableAt })
+            .where(eq(songsTable.id, id))
+            .run()
     }
 
     countOpenIssuesForReadSongs(seenAt: Date): number {
@@ -276,6 +303,7 @@ export class LibraryBackendRepository {
                     fileFingerprint: fingerprint,
                     present: true,
                     lastSeenAt: seenAt,
+                    lastAvailableAt: seenAt,
                 }
 
                 if (!existing) {
@@ -284,6 +312,7 @@ export class LibraryBackendRepository {
                             id: randomUUID(),
                             path: fact.path,
                             ...fileValues,
+                            firstSeenAt: seenAt,
                             addedAt: initialScan ? (fileValues.createdAt ?? seenAt) : seenAt,
                             title: titleFromFileName(fact.fileName),
                         })
@@ -999,3 +1028,32 @@ const metadataRevisionMismatch = (extractorVersion: string) =>
         isNull(songsTable.extractorVersion),
         ne(songsTable.extractorVersion, extractorVersion),
     )
+
+/** Legacy identity uses persisted tag values; file and artwork locations are deliberately absent. */
+const legacyMoveKey = (song: DbSong): string =>
+    stableHash({
+        size: song.size,
+        title: normalizeDisplayText(song.rawTitle),
+        artist: normalizeDisplayText(song.rawArtist),
+        album: normalizeDisplayText(song.rawAlbumTitle),
+        albumArtist: normalizeDisplayText(song.rawAlbumArtist),
+        genre: normalizeDisplayText(song.rawGenre),
+        label: normalizeDisplayText(song.rawRecordLabel),
+        catalogNumber: song.catalogNumber,
+        year: song.year,
+        track: song.trackNumber,
+        comment: song.comment,
+        musicalKey: song.musicalKey,
+        bpm: song.bpm,
+        energy: song.energy,
+        lyrics: song.lyrics,
+        date: song.date,
+        duration: song.duration,
+        overallBitrate: song.overallBitrate,
+        audioBitrate: song.audioBitrate,
+        sampleRate: song.sampleRate,
+        bitDepth: song.bitDepth,
+        channels: song.channels,
+        tagType: song.tagType,
+        codec: song.codec,
+    })

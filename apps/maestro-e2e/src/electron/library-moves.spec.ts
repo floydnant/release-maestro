@@ -84,6 +84,27 @@ const chooseFolder = async (electron: ElectronApplication, directory: string) =>
     }, directory)
 }
 
+const firstSong = (rows: Awaited<ReturnType<typeof songs>>) => {
+    const song = rows[0]
+    if (!song) throw new Error('Expected an imported track')
+    return song
+}
+
+const restorePaths = async (
+    original: Awaited<ReturnType<typeof songs>>,
+    renamedId: string,
+    renamedPath: string,
+    returned: string[],
+    newFolder: string,
+    storage: string,
+) => {
+    for (const song of original) {
+        const name = song.id === renamedId ? basename(renamedPath) : basename(song.path)
+        const from = returned.includes(name) ? newFolder : storage
+        await rename(join(from, name), song.path)
+    }
+}
+
 test('renames, folder moves and missing-first relocation preserve track IDs and Added dates', async ({}, testInfo) => {
     const library = await buildTaggedLibrary(testInfo)
     const relocated = await buildTaggedLibrary(testInfo, [])
@@ -103,20 +124,29 @@ test('renames, folder moves and missing-first relocation preserve track IDs and 
         rows.map(({ id, title, dateAdded }) => ({ id, title, dateAdded }))
     const identities = identity(original)
     expect(original).toHaveLength(6)
-    const first = original[0]
-    if (!first) throw new Error('Expected an imported track')
+    const first = firstSong(original)
 
-    const renamed = join(library, 'renamed.mp3')
+    let renamed = join(library, 'renamed.mp3')
     await rename(first.path, renamed)
     expect(await rescan(page)).toMatchObject({ new: 0, changed: 1, missing: 0 })
     expect(identity(await songs(page))).toEqual(identities)
     expect((await songs(page)).find(song => song.id === first.id)?.path).toBe(renamed)
 
-    const nested = join(library, 'nested')
+    await rename(renamed, join(library, 'RENAMED.mp3'))
+    renamed = join(library, 'RENAMED.mp3')
+    expect(await rescan(page)).toMatchObject({ new: 0, changed: 1, missing: 0 })
+    expect(identity(await songs(page))).toEqual(identities)
+
+    let nested = join(library, 'nested')
     await mkdir(nested)
-    for (const name of await readdir(library)) {
-        if (name.endsWith('.mp3')) await rename(join(library, name), join(nested, name))
+    for (const name of (await readdir(library)).filter(name => name.endsWith('.mp3'))) {
+        await rename(join(library, name), join(nested, name))
     }
+    expect(await rescan(page)).toMatchObject({ new: 0, changed: 6, missing: 0 })
+    expect(identity(await songs(page))).toEqual(identities)
+
+    await rename(nested, join(library, 'NESTED'))
+    nested = join(library, 'NESTED')
     expect(await rescan(page)).toMatchObject({ new: 0, changed: 6, missing: 0 })
     expect(identity(await songs(page))).toEqual(identities)
 
@@ -146,11 +176,7 @@ test('renames, folder moves and missing-first relocation preserve track IDs and 
     expect(await rescan(page)).toMatchObject({ new: 0, changed: 0, missing: 0 })
 
     // Return all files to their original paths, including the renamed one.
-    for (const song of original) {
-        const name = song.id === first.id ? basename(renamed) : basename(song.path)
-        const from = returned.includes(name) ? newFolder : storage
-        await rename(join(from, name), song.path)
-    }
+    await restorePaths(original, first.id, renamed, returned, newFolder, storage)
     expect(await rescan(page)).toMatchObject({ new: 0, missing: 0 })
     expect(await songs(page)).toEqual(original)
     await page.getByRole('link', { name: 'Tracks', exact: true }).click()
@@ -171,4 +197,32 @@ test('renames, folder moves and missing-first relocation preserve track IDs and 
     const afterRemoval = await songs(page)
     expect(afterRemoval.map(song => song.id).sort()).toEqual(copies.map(song => song.id).sort())
     expect(afterRemoval.find(song => song.id === first.id)?.present).toBe(false)
+})
+
+test('a copy first seen while its original folder is excluded keeps its own identity', async ({}, testInfo) => {
+    const library = await buildTaggedLibrary(testInfo)
+    const copiedLibrary = await buildTaggedLibrary(testInfo, [])
+    const appData = testInfo.outputPath('app-data')
+    await mkdir(appData, { recursive: true })
+    app = await launchReleaseMaestro(appData, testInfo)
+    const page = await app.firstWindow()
+    await chooseFolder(app, library)
+    await page.getByRole('button', { name: 'Add folders', exact: true }).click()
+    await page.getByRole('button', { name: 'Continue', exact: true }).click()
+    await page.getByRole('button', { name: 'Take me to my library' }).click()
+    const original = firstSong(await songs(page))
+    await copyFile(original.path, join(copiedLibrary, 'copy.mp3'))
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
+    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await page.getByTitle('Remove folder', { exact: true }).click()
+    await chooseFolder(app, copiedLibrary)
+    await page.getByRole('button', { name: 'Add folders…' }).click()
+    await rescan(page, 'Save and rescan')
+    const copies = await songs(page)
+    expect(copies).toHaveLength(7)
+    await rm(original.path)
+    await rescan(page)
+    expect(await songs(page)).toEqual(copies)
+    await rescan(page)
+    expect(await songs(page)).toEqual(copies)
 })
