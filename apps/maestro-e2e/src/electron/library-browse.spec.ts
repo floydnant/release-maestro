@@ -101,9 +101,7 @@ test('a scanned library is browsable, sortable and filterable end to end', async
         .toBeGreaterThan(0)
     // A two-name credit is one artist entity today (MAE-97 owns splitting), and the
     // table prints the tag verbatim rather than inventing a separator.
-    await expect(
-        page.getByRole('button', { name: 'Night Cartel & Aurora Fields', exact: true }),
-    ).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Night Cartel & Aurora Fields', exact: true })).toBeVisible()
 
     // Sorting runs in SQL against the real index.
     await page.getByRole('button', { name: 'Sort by BPM' }).click()

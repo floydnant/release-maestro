@@ -129,11 +129,12 @@ const SCROLL_PADDING_ROWS = 4
 
 let nextTableId = 0
 
-/** Which catalog entity a cell's link addresses. Filtering by it is the page's call. */
+/** Catalog entity kinds used by filter chips and track table requests. */
 export type EntityFilterKind = 'artist' | 'genre' | 'recordLabel' | 'album'
 
 export interface EntityFilterRequest {
-    kind: EntityFilterKind
+    /** Artist credits link directly to the artist page. */
+    kind: Exclude<EntityFilterKind, 'artist'>
     id: string
     name: string
 }

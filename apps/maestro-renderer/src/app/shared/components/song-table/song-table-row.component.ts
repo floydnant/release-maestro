@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { RouterLink } from '@angular/router'
-import type { ArtistCreditSegment, SongRow } from '@release-maestro/core'
+import type { SongRow } from '@release-maestro/core'
 import { isSelectionModifierHeld } from '../../browse/song-selection'
 import { fileUrl } from '../../utils/file-url.util'
 import { formatBpm, formatDateShort, formatDuration } from '../../utils/formatting.utils'
@@ -8,7 +8,6 @@ import { IconComponent } from '../icon/icon.component'
 import {
     DEFAULT_SONG_TABLE_COLUMNS,
     SONG_TABLE_COLUMN_WIDTHS,
-    type EntityFilterKind,
     type EntityFilterRequest,
     type SongTableColumn,
 } from './song-table.component'
@@ -53,22 +52,13 @@ export class SongTableRowComponent {
     entityFilter = output<EntityFilterRequest>()
     filterMissing = output<void>()
 
-    protected onArtistSegment(event: MouseEvent, segment: ArtistCreditSegment): void {
-        // The cell sits inside a row that also selects; a plain click on the link means
-        // the artist, not the row. With a selection modifier down it means the row, and
-        // the parent's mousedown handler has already dealt with it.
-        event.stopPropagation()
-        if (isSelectionModifierHeld(event)) return
-        this.entityFilter.emit({ kind: 'artist', id: segment.artistId, name: segment.creditedAs })
-    }
-
-    protected onEntity(event: MouseEvent, kind: EntityFilterKind, id: string, name: string): void {
+    protected onEntity(event: MouseEvent, kind: EntityFilterRequest['kind'], id: string, name: string): void {
         event.stopPropagation()
         if (isSelectionModifierHeld(event)) return
         this.entityFilter.emit({ kind, id, name })
     }
 
-    /** Let modified clicks select rows without following their album or genre links. */
+    /** Let modified clicks select rows without following their artist, album or genre links. */
     protected onDetailLink(event: MouseEvent): void {
         event.stopPropagation()
         if (isSelectionModifierHeld(event)) event.preventDefault()

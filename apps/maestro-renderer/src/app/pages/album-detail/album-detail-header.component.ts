@@ -11,10 +11,8 @@ import { formatTotalDuration } from '../../shared/utils/formatting.utils'
  * Presentational — an album in, links out, no service injection. It takes the domain
  * object rather than nine primitives destructured from it, per `angular-patterns`.
  *
- * **Every link out is a filtered track list**, not a detail page, because the artist
- * page (MAE-120) and the record label page do not exist yet. The link addresses the
- * right entity and works today; when those slices land, the `routerLink` here changes
- * and nothing else does.
+ * Artist links open the artist page. The record label still opens a filtered track
+ * list because its own detail page does not exist yet.
  */
 @Component({
     selector: 'app-album-detail-header',

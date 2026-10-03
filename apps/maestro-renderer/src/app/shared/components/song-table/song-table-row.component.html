@@ -85,14 +85,14 @@
     >
         @if (row().artistCredit.length) {
             @for (segment of row().artistCredit; track segment.artistId; let last = $last) {
-                <button
-                    type="button"
+                <a
                     tabindex="-1"
                     class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
-                    (click)="onArtistSegment($event, segment)"
+                    [routerLink]="['/artists', segment.artistId]"
+                    (click)="onDetailLink($event)"
                 >
                     {{ segment.creditedAs }}
-                </button>
+                </a>
                 @if (!last) {
                     <span>{{ segment.joinPhrase }}</span>
                 }

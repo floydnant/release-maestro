@@ -26,6 +26,7 @@ import {
     songsTable,
 } from '../../database/drizzle.schema'
 import { NORMALIZER_VERSION } from './library-normalization'
+import { LibraryBrowseRepository } from './library-browse.repository'
 import { LibraryBackendRepository } from './library.backend.repository'
 
 const fact = {
@@ -229,6 +230,62 @@ describe('LibraryBackendRepository', () => {
                 .all(),
         ).toHaveLength(1)
         expect(repository.countSongsNeedingMetadata()).toBe(0)
+    })
+
+    it('attributes artist references to the credit named by the tag', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        repository.processPrescanBatch([fact], scannedAt)
+        repository.ingestMetadata(
+            newSongFixture({
+                artist: 'Track Artist',
+                albumArtist: 'Album Artist',
+                albumTitle: 'Shared record',
+                extraMetadata: [
+                    ['MUSICBRAINZ_ARTIST_ID', 'track-id'],
+                    ['MusicBrainzReleaseArtistId', 'album-id'],
+                    ['DISCOGS_ARTIST_LINK', 'https://www.discogs.com/artist/123'],
+                ],
+            }),
+            fact,
+            scannedAt,
+        )
+
+        const artists = db.select().from(artistsTable).all()
+        const artistId = (name: string): string => {
+            const artist = artists.find(row => row.name === name)
+            if (!artist) throw new Error(`Missing artist ${name}`)
+            return artist.id
+        }
+        const browse = new LibraryBrowseRepository({ db })
+        expect(browse.getArtistDetail(artistId('Track Artist'))?.externalRefs).toEqual({
+            MUSICBRAINZ_ARTIST_ID: ['track-id'],
+            DISCOGS_ARTIST_LINK: ['https://www.discogs.com/artist/123'],
+        })
+        expect(browse.getArtistDetail(artistId('Album Artist'))?.externalRefs).toEqual({
+            MUSICBRAINZ_ARTIST_ID: ['album-id'],
+        })
+        expect(browse.getArtistDetail(artistId('Album Artist'))?.songCount).toBe(0)
+    })
+
+    it('replaces corrected artist references and removes deleted tags on a deep read', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        const original = newSongFixture({
+            artist: 'Original Artist',
+            extraMetadata: [['MUSICBRAINZ_ARTIST_ID', 'original-id']],
+        })
+        const corrected = newSongFixture({
+            artist: 'Correct Artist',
+            extraMetadata: [['MUSICBRAINZ_ARTIST_ID', 'correct-id']],
+        })
+        repository.ingestMetadata(original, fact, scannedAt)
+        repository.ingestMetadata(corrected, fact, scannedAt)
+        const artist = db.select().from(artistsTable).where(eq(artistsTable.name, 'Correct Artist')).get()!
+        const browse = new LibraryBrowseRepository({ db })
+        expect(browse.getArtistDetail(artist.id)?.externalRefs).toEqual({
+            MUSICBRAINZ_ARTIST_ID: ['correct-id'],
+        })
+        repository.ingestMetadata({ ...corrected, extraMetadata: [] }, fact, scannedAt)
+        expect(browse.getArtistDetail(artist.id)?.externalRefs).toEqual({})
     })
 
     it('reapplies a user-confirmed raw-name resolution in order', () => {

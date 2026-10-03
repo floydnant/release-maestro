@@ -12,9 +12,9 @@ context.
 
 - [Music library](./docs/contexts/music-library/CONTEXT.md) — scans the user's local music folders
   into the song database.
-  Backend `apps/maestro-electron/src/app/services/library`, UI `apps/maestro-renderer` (`/import`,
-  settings → library), contract `libs/maestro-core/src/schemas/library.schema.ts`, tag reading
-  `apps/metadata-engine`.
+  Backend `apps/maestro-electron/src/app/services/library`, UI `apps/maestro-renderer` (library browse,
+  `/import`, settings → library), contracts `libs/maestro-core/src/schemas/library.schema.ts` and
+  `libs/maestro-core/src/schemas/library-browse.schema.ts`, tag reading `apps/metadata-engine`.
 - [Release feed](./docs/contexts/release-feed/CONTEXT.md) — imports Bandcamp notifications and
   hydrates them into a browsable release feed.
   Backend `apps/maestro-electron/src/app/services/{email,feed}`, UI `apps/maestro-renderer` (feed

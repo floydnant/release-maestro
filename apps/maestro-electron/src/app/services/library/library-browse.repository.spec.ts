@@ -2,6 +2,7 @@ import {
     AlbumSortField,
     emptyAlbumQuery,
     emptySongQuery,
+    ExternalRefKeys,
     SongPresence,
     SongSortField,
     type AlbumQuery,
@@ -9,6 +10,7 @@ import {
     type SongQuery,
 } from '@release-maestro/core'
 import Database from 'better-sqlite3'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { existsSync } from 'fs'
@@ -140,6 +142,216 @@ describe('LibraryBrowseRepository', () => {
     })
 
     afterEach(() => sqlite.close())
+
+    describe('artists', () => {
+        beforeEach(() => {
+            db.insert(artistsTable)
+                .values([
+                    { id: 'a1', name: 'Aurora Fields', externalRefs: { MUSICBRAINZ_ARTIST_ID: ['mb-1'] } },
+                    { id: 'a2', name: 'Night Cartel' },
+                    { id: 'a3', name: 'Night Cartel & Aurora Fields' },
+                ])
+                .run()
+            db.insert(recordLabelsTable)
+                .values([
+                    { id: 'r1', name: 'Kosmische' },
+                    { id: 'r2', name: 'Hardwire' },
+                ])
+                .run()
+            seedAlbum({ id: 'own', title: 'Daybreak', recordLabelId: 'r1' })
+            seedAlbum({ id: 'guest', title: 'Afterglow', recordLabelId: 'r2' })
+            seedSong({ id: 's1', title: 'Dawn', albumId: 'own', year: 2019 })
+            seedSong({ id: 's2', title: 'Noon', albumId: 'own', year: 2020 })
+            seedSong({ id: 's3', title: 'Guest', albumId: 'guest', year: 2021 })
+            seedSong({ id: 's4', title: 'Together', albumId: 'guest', year: 2022 })
+            db.insert(albumArtistsTable)
+                .values([
+                    { albumId: 'own', artistId: 'a1', position: 0 },
+                    { albumId: 'guest', artistId: 'a2', position: 0 },
+                ])
+                .run()
+            db.insert(songArtistsTable)
+                .values([
+                    { songId: 's1', artistId: 'a1', position: 0 },
+                    { songId: 's2', artistId: 'a1', position: 0 },
+                    { songId: 's3', artistId: 'a1', position: 0 },
+                    { songId: 's4', artistId: 'a3', position: 0 },
+                ])
+                .run()
+        })
+
+        it('windows, filters and sorts artists with distinct credit counts', () => {
+            const query = { search: 'Aurora', sort: { field: 'name' as const, direction: 'asc' as const } }
+            const result = repository.queryArtists({ query, window: { offset: 0, limit: 1 } })
+            expect(result.total).toBe(2)
+            expect(result.rows).toEqual([
+                {
+                    id: 'a1',
+                    name: 'Aurora Fields',
+                    songCount: 3,
+                    albumCount: 1,
+                    firstYear: 2019,
+                    lastYear: 2021,
+                },
+            ])
+            expect(
+                repository.queryArtists({
+                    query: { ...query, sort: { field: 'name', direction: 'desc' } },
+                    window: { offset: 0, limit: 1 },
+                }).rows[0]?.id,
+            ).toBe('a3')
+        })
+
+        it('separates own albums from appearances and uses only own albums for record labels', () => {
+            db.update(songsTable)
+                .set({
+                    artistText: 'Aurora Fields',
+                    externalRefs: { MUSICBRAINZ_ARTIST_ID: ['mb-1'] },
+                })
+                .where(eq(songsTable.id, 's1'))
+                .run()
+            const detail = repository.getArtistDetail('a1')
+            expect(detail).toMatchObject({
+                albumCount: 1,
+                appearanceCount: 1,
+                recordLabelCount: 1,
+                externalRefs: { MUSICBRAINZ_ARTIST_ID: ['mb-1'] },
+            })
+            expect(repository.getArtistDetail('missing')).toBeNull()
+            const window = { offset: 0, limit: 10 }
+            const own = repository.queryAlbums({
+                query: albumQuery({ filter: { albumArtistIds: ['a1'] } }),
+                window,
+            })
+            const appearances = repository.queryAlbums({
+                query: albumQuery({ appearanceArtistId: 'a1' }),
+                window,
+            })
+            expect(titlesOf(own)).toEqual(['Daybreak'])
+            expect(titlesOf(appearances)).toEqual(['Afterglow'])
+            expect(repository.queryArtistRecordLabels('a1', window)).toEqual({
+                rows: [{ id: 'r1', name: 'Kosmische' }],
+                offset: 0,
+                total: 1,
+            })
+            seedSong({ id: 'albumless', title: 'Loose track' })
+            db.insert(songArtistsTable).values({ songId: 'albumless', artistId: 'a1', position: 0 }).run()
+            expect(repository.getArtistDetail('a1')?.appearanceCount).toBe(1)
+        })
+
+        it.each([ExternalRefKeys.MusicBrainzAlbumArtistId, ExternalRefKeys.MusicBrainzReleaseArtistId])(
+            'does not expose stored track-artist refs on a different album artist with %s',
+            albumArtistRefKey => {
+                db.update(albumsTable)
+                    .set({ artistText: 'Night Cartel' })
+                    .where(eq(albumsTable.id, 'guest'))
+                    .run()
+                db.update(songsTable)
+                    .set({
+                        artistText: 'Aurora Fields',
+                        externalRefs: {
+                            MUSICBRAINZ_ARTIST_ID: ['track-id'],
+                            [albumArtistRefKey]: ['album-id'],
+                            DISCOGS_ARTIST_LINK: ['https://www.discogs.com/artist/123'],
+                        },
+                    })
+                    .where(eq(songsTable.id, 's3'))
+                    .run()
+                db.update(artistsTable)
+                    .set({ externalRefs: { MUSICBRAINZ_ARTIST_ID: ['stale-track-id'] } })
+                    .where(eq(artistsTable.id, 'a2'))
+                    .run()
+
+                const detail = repository.getArtistDetail('a2')
+                expect(detail).toMatchObject({
+                    songCount: 0,
+                    albumCount: 1,
+                })
+                expect(detail?.externalRefs).toEqual({
+                    MUSICBRAINZ_ARTIST_ID: ['album-id'],
+                })
+            },
+        )
+
+        it('shows references for an artist resolved from a different raw credit', () => {
+            db.update(songsTable)
+                .set({
+                    artistText: 'Aurora Fields alias',
+                    externalRefs: {
+                        MUSICBRAINZ_ARTIST_ID: ['alias-track-id', 'second-track-id'],
+                        MUSICBRAINZ_RECORDING_ID: ['recording-id'],
+                    },
+                })
+                .where(eq(songsTable.id, 's1'))
+                .run()
+            db.update(songsTable)
+                .set({ externalRefs: { MUSICBRAINZ_ARTIST_ID: ['alias-track-id'] } })
+                .where(eq(songsTable.id, 's2'))
+                .run()
+            db.update(albumsTable)
+                .set({ artistText: 'Night Cartel alias' })
+                .where(eq(albumsTable.id, 'guest'))
+                .run()
+            db.update(songsTable)
+                .set({ externalRefs: { MUSICBRAINZ_ALBUM_ARTIST_ID: ['alias-album-id'] } })
+                .where(eq(songsTable.id, 's3'))
+                .run()
+
+            expect(repository.getArtistDetail('a1')?.externalRefs).toEqual({
+                MUSICBRAINZ_ARTIST_ID: ['alias-track-id', 'second-track-id'],
+            })
+            expect(repository.getArtistDetail('a2')?.externalRefs).toEqual({
+                MUSICBRAINZ_ARTIST_ID: ['alias-album-id'],
+            })
+        })
+
+        it('does not assign a shared raw credit reference to every resolved artist', () => {
+            db.update(songsTable)
+                .set({
+                    artistText: 'Night Cartel & Aurora Fields',
+                    externalRefs: { MUSICBRAINZ_ARTIST_ID: ['shared-id'] },
+                })
+                .where(eq(songsTable.id, 's4'))
+                .run()
+            db.insert(songArtistsTable).values({ songId: 's4', artistId: 'a1', position: 1 }).run()
+
+            expect(repository.getArtistDetail('a3')?.externalRefs).toEqual({})
+            expect(repository.getArtistDetail('a1')?.externalRefs).toEqual({})
+        })
+
+        it.each([ExternalRefKeys.MusicBrainzAlbumArtistId, ExternalRefKeys.MusicBrainzReleaseArtistId])(
+            'does not assign a shared album-artist reference to every resolved artist with %s',
+            albumArtistRefKey => {
+                db.update(albumsTable)
+                    .set({ artistText: 'Aurora Fields & Night Cartel' })
+                    .where(eq(albumsTable.id, 'own'))
+                    .run()
+                db.update(songsTable)
+                    .set({ externalRefs: { [albumArtistRefKey]: ['shared-album-id'] } })
+                    .where(eq(songsTable.id, 's1'))
+                    .run()
+                db.insert(albumArtistsTable).values({ albumId: 'own', artistId: 'a2', position: 1 }).run()
+
+                expect(repository.getArtistDetail('a1')?.externalRefs).toEqual({})
+                expect(repository.getArtistDetail('a2')?.externalRefs).toEqual({})
+            },
+        )
+
+        it("uses dated songs on own albums for an album-only artist's years", () => {
+            const result = repository.queryArtists({
+                query: { search: 'Night Cartel', sort: { field: 'name', direction: 'asc' } },
+                window: { offset: 0, limit: 10 },
+            })
+            expect(result.rows[0]).toMatchObject({
+                id: 'a2',
+                songCount: 0,
+                albumCount: 1,
+                firstYear: 2021,
+                lastYear: 2022,
+            })
+            expect(repository.getArtistDetail('a2')).toMatchObject({ firstYear: 2021, lastYear: 2022 })
+        })
+    })
 
     describe('genres', () => {
         beforeEach(() => {

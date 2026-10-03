@@ -30,14 +30,14 @@ import {
 } from '../../shared/components/song-table/song-table.component'
 
 @Component({
-    selector: 'app-genre-songs',
-    templateUrl: './genre-songs.component.html',
+    selector: 'app-artist-songs',
+    templateUrl: './artist-songs.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [SongTableComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
-export class GenreSongsComponent {
-    genreId = input.required<string>()
+export class ArtistSongsComponent {
+    artistId = input.required<string>()
     private route = inject(ActivatedRoute)
     private router = inject(Router)
     private service = inject(LibraryBrowseService)
@@ -47,7 +47,7 @@ export class GenreSongsComponent {
     protected query = computed<SongQuery>(
         () => ({
             ...songQueryFromParams(this.params()),
-            filter: { genreIds: [this.genreId()] },
+            filter: { artistIds: [this.artistId()] },
         }),
         { equal: sameQuery },
     )
@@ -93,10 +93,10 @@ export class GenreSongsComponent {
     }
     protected onEntity(request: EntityFilterRequest): void {
         const param = { album: 'album', genre: 'genre', recordLabel: 'recordLabel' }[request.kind]
-        this.router.navigate(['/tracks'], { queryParams: { genre: this.genreId(), [param]: request.id } })
+        this.router.navigate(['/tracks'], { queryParams: { artist: this.artistId(), [param]: request.id } })
     }
     protected onMissing(): void {
-        this.router.navigate(['/tracks'], { queryParams: { genre: this.genreId(), presence: 'missing' } })
+        this.router.navigate(['/tracks'], { queryParams: { artist: this.artistId(), presence: 'missing' } })
     }
     protected onRetry(): void {
         this.browse.retry()

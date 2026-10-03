@@ -21,7 +21,7 @@ for (const [key, value] of Object.entries(ExternalRefKeys)) {
  * stamped with an older version are re-read on the next scan; that is the only thing
  * that makes a normaliser change reach data already in the database.
  */
-export const NORMALIZER_VERSION = 1
+export const NORMALIZER_VERSION = 2
 
 export const normalizeDisplayText = (value: string | null | undefined): string | null => {
     const normalized = value?.trim().replace(/\s+/g, ' ')
@@ -178,6 +178,7 @@ export const relevantExternalRefsMap = {
         ExternalRefKeys.BeatportArtistUrl,
         ExternalRefKeys.BandcampArtistId,
     ],
+    albumArtists: [ExternalRefKeys.MusicBrainzReleaseArtistId, ExternalRefKeys.MusicBrainzAlbumArtistId],
     albums: [
         ExternalRefKeys.MusicBrainzReleaseId,
         ExternalRefKeys.MusicBrainzReleaseGroupId,

@@ -196,29 +196,17 @@ export class LibraryBackendRepository {
         return db.transaction(tx => {
             const getOrCreateArtist = (name: string): string => {
                 const existing = tx
-                    .select({ id: artistsTable.id, externalRefs: artistsTable.externalRefs })
+                    .select({ id: artistsTable.id })
                     .from(artistsTable)
                     .where(eq(artistsTable.name, name))
                     .get()
-                if (existing) {
-                    tx.update(artistsTable)
-                        .set({
-                            externalRefs: mergeExternalRefs([
-                                existing.externalRefs,
-                                filterExternalRefs(externalRefs, relevantExternalRefsMap.artists),
-                            ]),
-                        })
-                        .where(eq(artistsTable.id, existing.id))
-                        .run()
-                    return existing.id
-                }
+                if (existing) return existing.id
 
                 const id = randomUUID()
                 tx.insert(artistsTable)
                     .values({
                         id,
                         name,
-                        externalRefs: filterExternalRefs(externalRefs, relevantExternalRefsMap.artists),
                     })
                     .onConflictDoNothing()
                     .run()
@@ -451,7 +439,6 @@ export class LibraryBackendRepository {
                 .select({
                     id: songsTable.id,
                     lastSeenAt: songsTable.lastSeenAt,
-                    externalRefs: songsTable.externalRefs,
                     albumId: songsTable.albumId,
                 })
                 .from(songsTable)
@@ -501,7 +488,7 @@ export class LibraryBackendRepository {
                 codec: metadata.fileInfo?.codec ?? null,
                 metadataHash: metadataHash(metadata),
                 normalizerVersion: NORMALIZER_VERSION,
-                externalRefs: mergeExternalRefs([existingSong?.externalRefs, externalRefs]),
+                externalRefs,
                 albumId,
             } satisfies Omit<typeof songsTable.$inferInsert, 'id'>
 

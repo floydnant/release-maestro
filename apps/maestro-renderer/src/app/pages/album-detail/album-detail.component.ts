@@ -394,7 +394,6 @@ const offsetForRestore = (scrollTop: number | null): number =>
  * — see {@link AlbumDetailComponent.onEntityFilter}.
  */
 const TRACK_FILTER_PARAMS: Partial<Record<EntityFilterRequest['kind'], string>> = {
-    artist: 'artist',
     genre: 'genre',
     recordLabel: 'recordLabel',
 }

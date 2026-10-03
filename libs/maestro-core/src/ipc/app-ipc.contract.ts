@@ -1,4 +1,10 @@
 import type {
+    QueryArtistsRequest,
+    ArtistWindowResult,
+    GetArtistDetailRequest,
+    ArtistDetailResult,
+    QueryArtistRecordLabelsRequest,
+    ArtistRecordLabelWindowResult,
     QueryGenresRequest,
     GenreWindowResult,
     GetGenreDetailRequest,
@@ -112,6 +118,12 @@ export const MainIpcContract = defineIpcContract({
     [LibraryIpcChannel.getScanStatus]: defineIpcRequest<void, LibraryScanSnapshot>(),
 
     // library browsing (windowed read side, see ADR 0004)
+    [LibraryBrowseIpcChannel.queryArtists]: defineIpcRequest<QueryArtistsRequest, ArtistWindowResult>(),
+    [LibraryBrowseIpcChannel.getArtistDetail]: defineIpcRequest<GetArtistDetailRequest, ArtistDetailResult>(),
+    [LibraryBrowseIpcChannel.queryArtistRecordLabels]: defineIpcRequest<
+        QueryArtistRecordLabelsRequest,
+        ArtistRecordLabelWindowResult
+    >(),
     [LibraryBrowseIpcChannel.queryGenres]: defineIpcRequest<QueryGenresRequest, GenreWindowResult>(),
     [LibraryBrowseIpcChannel.getGenreDetail]: defineIpcRequest<GetGenreDetailRequest, GenreDetailResult>(),
     [LibraryBrowseIpcChannel.queryGenreRelated]: defineIpcRequest<
