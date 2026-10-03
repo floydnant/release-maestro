@@ -36,10 +36,17 @@ describe(DesignSystemComponent.name, () => {
         expect(element.textContent).toContain('background.canvas')
         expect(element.textContent).toContain('Contrast pairs')
         expect(element.textContent).toContain('content.primary')
-        expect(element.textContent).toContain('Shared UI components')
+        const componentHeadings = Array.from(element.querySelectorAll('h2')).filter(heading =>
+            heading.textContent?.includes('Components'),
+        )
+        expect(componentHeadings).toHaveLength(1)
+        expect(componentHeadings[0]?.textContent).toBe('Components')
+        expect(element.querySelector('section[aria-labelledby="components-heading"]')).toBeTruthy()
         expect(element.textContent).toContain('Preview folder import')
         expect(element.querySelector<HTMLSelectElement>('#shared-library-order')?.value).toBe('dateAdded')
         expect(element.querySelector('button[hlmBtn]')).toBeTruthy()
         expect(element.querySelector('input[hlmInput]')).toBeTruthy()
+        expect(element.textContent).toContain('Hydrated')
+        expect(element.textContent).toContain('Surfaces')
     })
 })

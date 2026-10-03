@@ -4,7 +4,8 @@
      Keep the native label tied to the sort restored from the URL. -->
 <hlm-native-select
     selectId="album-sort-field"
-    size="sm"
+    selectClass="py-0.5 pe-2 appearance-auto"
+    selectIconClass="hidden"
     [value]="sort().field"
     (valueChange)="onFieldChange($event)"
 >
@@ -18,7 +19,6 @@
 <button
     hlmBtn
     variant="ghost"
-    size="icon-sm"
     type="button"
     class="gap-1 px-1.5"
     [attr.aria-label]="directionLabel()"

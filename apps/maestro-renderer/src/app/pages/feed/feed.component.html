@@ -81,10 +81,14 @@
                                         @if (track.streamUrl) {
                                             <button
                                                 hlmBtn
-                                                variant="ghost"
+                                                variant="plain"
                                                 size="icon-xs"
                                                 type="button"
-                                                class="track-control | rounded-sm type-body-sm"
+                                                class="track-control | grid shrink-0 place-items-center rounded-sm type-body-sm text-content-secondary"
+                                                [ngClass]="{
+                                                    'hover:bg-action-quiet-hover hover:text-content-primary':
+                                                        isCurrentTrack(track.streamUrl),
+                                                }"
                                                 [attr.aria-label]="
                                                     isCurrentTrack(track.streamUrl) && audioPlayer.isLoading()
                                                         ? 'Loading ' + track.title
@@ -121,9 +125,10 @@
                                             </button>
                                             <button
                                                 hlmBtn
-                                                variant="ghost"
+                                                variant="plain"
+                                                size="none"
                                                 type="button"
-                                                class="track-seeker | relative h-auto min-w-0 shrink grow justify-between rounded-sm px-0 py-1 text-left type-body-sm text-content-primary"
+                                                class="track-seeker | relative flex min-w-0 shrink grow items-center justify-between gap-2 rounded-sm px-0 py-1 text-left type-body-sm text-content-primary"
                                                 [attr.aria-label]="'Seek within ' + track.title"
                                                 [hlmTooltip]="track.title"
                                                 (mousedown)="$event.preventDefault()"
@@ -186,14 +191,14 @@
                                         variant="destructive"
                                         class="error | mb-1.5 flex items-center gap-2 border-0 bg-transparent p-0"
                                     >
-                                        <p class="text-content-danger">
+                                        <p class="translate-y-[3px] text-content-danger">
                                             <app-icon
                                                 name="error"
                                                 color="content.danger"
                                                 size="1.3rem"
                                             ></app-icon>
                                         </p>
-                                        <p hlmAlertDescription>
+                                        <p hlmAlertDescription class="type-label-md">
                                             {{ error.message || 'Error loading feed item' }}
                                         </p>
                                     </div>
@@ -244,12 +249,11 @@
                                         <li class="flex w-full">
                                             <a
                                                 hlmBtn
-                                                variant="secondary"
-                                                size="sm"
+                                                variant="muted"
                                                 [href]="link.url"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                class="max-w-full justify-start"
+                                                class="max-w-full justify-start gap-1.5 px-2 py-1 type-body-sm hover:text-content-primary"
                                                 [hlmTooltip]="link.title + '\n' + link.url"
                                             >
                                                 <img
@@ -276,9 +280,9 @@
                                     <div class="flex rounded-tl-xl text-xl">
                                         <button
                                             hlmBtn
-                                            variant="ghost"
-                                            size="icon"
-                                            class="feed-snooze | -mr-2"
+                                            variant="plain"
+                                            size="none"
+                                            class="feed-snooze | -mr-2 p-2 text-content-muted hover:text-content-primary"
                                             type="button"
                                             (click)="toggleCurrentFeedItemSnoozedState()"
                                             [attr.aria-label]="
@@ -327,12 +331,11 @@
                                 @if (feedItem.data.unsubscribeUrl) {
                                     <a
                                         hlmBtn
-                                        variant="secondary"
-                                        size="sm"
+                                        variant="muted"
                                         [href]="feedItem.data.unsubscribeUrl"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="relative mt-2.5 w-full [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
+                                        class="relative mt-2.5 block w-full text-center [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
                                         [attr.aria-label]="'Unfollow ' + feedItem.data.band.name"
                                         [hlmTooltip]="feedItem.data.unsubscribeText"
                                     >
