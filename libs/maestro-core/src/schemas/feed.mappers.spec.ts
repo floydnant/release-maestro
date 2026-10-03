@@ -1,10 +1,11 @@
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Shared synthetic fixtures live in fixtures/, per docs/testing.md.
 import {
     fansBoughtMusicFeedItem,
     newReleaseEmail,
     scrapedBandcampAlbum,
 } from '../../../../fixtures/feed.fixture'
 import { BandcampFeedItem } from './feed.schema'
-import { mapBandcampReleaseFeedItemToHydratedFeedItem } from './feed.mappers'
+import { isUsefulUrlFromBandcampEmail, mapBandcampReleaseFeedItemToHydratedFeedItem } from './feed.mappers'
 
 describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
     it('hydrates fan purchases from the release page and preserves the notification origin', () => {
@@ -114,5 +115,52 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
         expect(result.data.unsubscribeUrl).toBe(unsubscribeUrl)
         expect(result.data.unsubscribeText).toBe('Unfollow Test Artist')
         expect(result.data.imageUrl).toBe('https://f4.bcbits.com/img/a123_16.jpg')
+    })
+
+    it.each([
+        'Unfollow Test Artist',
+        'Unsubscribe Test Artist',
+        '  Unfollow Test Artist',
+        'Details: Unfollow Test Artist',
+    ])('recognizes a final %s line without a trailing newline', text => {
+        const unsubscribeUrl = 'https://test.bandcamp.com/fan_unsubscribe?id=1'
+        const item: BandcampFeedItem = {
+            ...fansBoughtMusicFeedItem,
+            source: {
+                ...newReleaseEmail,
+                plainBody: `Release details\r\n${text}`,
+                type: 'EMAIL.BANDCAMP_NEW_RELEASE',
+                releaseUrl: fansBoughtMusicFeedItem.data.tralbumUrl,
+                releaseType: 'album',
+                links: [unsubscribeUrl],
+            },
+        }
+        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null)
+
+        const expected = 'Unsubscribe Test Artist' === text ? text : 'Unfollow Test Artist'
+        expect(result.data.unsubscribeText).toBe(expected)
+        expect(result.data.about).toContain(`<a href="${unsubscribeUrl}">${expected}</a>`)
+    })
+
+    it.each([
+        'https://f4.bcbits.com.evil.example/img/a123_9.jpg',
+        'https://evil.example/f4.bcbits.com/img/a123_9.jpg',
+        'https://f4.bcbits.com@evil.example/img/a123_9.jpg',
+        'not a URL',
+    ])('does not use %s as Bandcamp artwork', link => {
+        const item: BandcampFeedItem = {
+            ...fansBoughtMusicFeedItem,
+            source: {
+                ...newReleaseEmail,
+                type: 'EMAIL.BANDCAMP_NEW_RELEASE',
+                releaseUrl: fansBoughtMusicFeedItem.data.tralbumUrl,
+                releaseType: 'album',
+                links: [link],
+            },
+        }
+        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null)
+
+        expect(result.data.imageUrl).toBeUndefined()
+        expect(isUsefulUrlFromBandcampEmail(link)).toBe(true)
     })
 })
