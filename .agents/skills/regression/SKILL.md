@@ -27,9 +27,10 @@ Use the parent's resolved base and scope when supplied. Otherwise establish them
 ## 2. Read the contracts the diff touches
 
 Read changed code and its version at the fixed point. Follow affected callers, indirect consumers,
-persisted data, configuration, and failure paths beyond the diff. For a change crossing a process,
-package, external contract, persistence, or async lifecycle, follow
-`.agents/skills/blast-radius/SKILL.md` for tracing. Keep this review read-only; the parent owns probes
+persisted data, configuration, and failure paths beyond the diff. Load
+`.agents/skills/blast-radius/SKILL.md` only for a credible risk of consequential downstream breakage,
+not merely because a change crosses a boundary. Skip the skill for low-risk changes.
+Keep this review read-only; the parent owns probes
 and verification. Load the contracts the change is supposed to honor:
 
 - `CONTEXT-MAP.md` and the relevant `docs/contexts/*/CONTEXT.md` for the pillar being changed.

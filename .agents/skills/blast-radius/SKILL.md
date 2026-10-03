@@ -1,6 +1,6 @@
 ---
 name: blast-radius
-description: Trace what a proposed or completed code change could break beyond its diff, then test the key assumption that makes it safe. Use when asked for blast radius, downstream impact, or what else a change could break, including during code review.
+description: Trace what a proposed or completed code change could break beyond its diff, then test the key assumption that makes it safe. Use when asked for blast radius, downstream impact, or what else a change could break, or when code review identifies a credible risk of consequential downstream breakage.
 ---
 
 # Blast radius

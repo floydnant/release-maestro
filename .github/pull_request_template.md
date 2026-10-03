@@ -36,8 +36,9 @@ Optional. Keep only what a reviewer cannot read off the diff: a trade-off you ch
 what you rejected, a risk worth watching, a follow-up you left open, a decision that
 belongs in an ADR. Delete this section when there is nothing to say.
 
-For consequential effects beyond the edited files, use `.agents/skills/blast-radius/SKILL.md`.
-Add a `# Blast radius` section and name what could break, the evidence that supports the safety claim, and anything still unproven.
+Use `.agents/skills/blast-radius/SKILL.md` only for a credible risk of consequential breakage beyond the edited files.
+Skip the skill and section for low-risk changes. Add a Blast radius section only when it gives the reviewer useful information.
+Name the affected behavior, the evidence, and any unresolved risk. Omit routine assurances.
 
 Other sections worth adding when they apply: screenshots or a recording for a visible
 change, a migration or rollout note, a breaking change and what callers must do.

@@ -141,8 +141,9 @@ the concrete effect. Write `None.` when an axis has no findings.
 **Regression brief.** Follow `.agents/skills/regression/SKILL.md`. Inspect read-only; the parent owns
 verification evidence and checks. Report behavioral regressions, correctness defects, unrelated
 changes, useful intentional-change context, and unproven risks. Require a reachable failing input
-or sequence for each defect. For effects crossing a process, package, persisted data, external
-contract, or async lifecycle, trace indirect consumers using `.agents/skills/blast-radius/SKILL.md`.
+or sequence for each defect. Trace affected consumers as needed. Load
+`.agents/skills/blast-radius/SKILL.md` only when there is a credible risk of consequential downstream
+breakage. Crossing a boundary alone does not require the skill; skip it for low-risk changes.
 Use the separate subsections defined by the regression skill. Keep the report under 500 words.
 
 If observables, subscriptions, or flattening operators changed, call that out in the Regression
