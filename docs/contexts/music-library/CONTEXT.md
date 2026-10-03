@@ -215,8 +215,8 @@ songs on albums credited to the artist through `album_artists`. Track and album 
 separate credit rules. A range does not claim the artist worked in every intervening year. With no
 tagged year, the UI says "Years unknown".
 
-A record label's years active are the earliest and latest non-null year among its albums and the
-songs on them.
+A record label's years active are the earliest and latest non-null year among its albums and songs
+carrying its record-label tag.
 
 **Released on record labels**:
 The distinct record labels of albums credited to an artist through `album_artists`. An album where
