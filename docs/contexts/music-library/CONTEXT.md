@@ -109,6 +109,8 @@ A unique rename confirmed by an absent original directory entry, waiting for a c
 identity merging. The destination stores the original song ID. Later renames and returns to the
 original path can reuse that evidence after a failed scan. All intermediate paths must be absent
 before merging. Observed coexistence discards the pending relationship and keeps separate songs.
+A discovered path that never completes a metadata read has no identity evidence. Its missing
+discovery row remains separate if the file moves again before a successful read.
 
 **Missing**:
 A song in the database whose file was not seen by the last complete discovery. `present` means "the
