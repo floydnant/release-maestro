@@ -319,11 +319,11 @@ test('retagging moves songs between albums and keeps record-label clicks consist
     await page.getByRole('link', { name: 'Tracks' }).click()
     const dawn = page.getByRole('row').filter({ hasText: 'Dawn' })
     await expect(dawn).toContainText('Daybreak revised')
-    await dawn.getByRole('button', { name: 'New record label', exact: true }).click()
-    await expect.poll(rowTitles).toEqual(expect.arrayContaining(['Dawn', 'Noon']))
-    await expect(
-        page.getByRole('status', { name: 'Result count' }).filter({ hasText: '2 tracks' }),
-    ).toBeVisible()
+    await dawn.getByRole('link', { name: 'New record label', exact: true }).click()
+    await expect(page).toHaveURL(/\/record-labels\/[^/?]+$/)
+    await expect(page.getByRole('heading', { name: 'New record label', exact: true })).toBeVisible()
+    await expect.poll(async () => (await rowTitles()).sort()).toEqual(['Dawn', 'Noon'])
+    await expect(page.getByRole('link', { name: 'Tracks 2', exact: true })).toBeVisible()
     await page.getByRole('link', { name: 'Albums', exact: true }).click()
     await expect(
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '4 albums' }),
