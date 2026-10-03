@@ -60,6 +60,11 @@ test.describe('shared UI components', () => {
         const tracks = options.getByRole('option', { name: 'Tracks', exact: true })
         const albums = options.getByRole('option', { name: 'Albums', exact: true })
         await expect(tracks).toHaveAttribute('aria-selected', 'true')
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+        await expect(trigger).toHaveAttribute(
+            'aria-activedescendant',
+            await tracks.evaluate(option => option.id),
+        )
         await trigger.press('ArrowDown')
 
         const highlightColor = await page.evaluate(() => {
@@ -86,7 +91,19 @@ test.describe('shared UI components', () => {
 
         await trigger.press('Enter')
         await expect(options).toBeVisible()
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+        await expect(trigger).toHaveAttribute(
+            'aria-activedescendant',
+            await albums.evaluate(option => option.id),
+        )
         await trigger.press('ArrowDown')
+        const artists = options.getByRole('option', { name: 'Artists', exact: true })
+        await expect(artists).toHaveCSS('background-color', highlightColor)
+        await expect(trigger).toHaveAttribute(
+            'aria-activedescendant',
+            await artists.evaluate(option => option.id),
+        )
+        await expect(artists).toHaveAttribute('aria-selected', 'false')
         await trigger.press('Escape')
         await expect(options).toBeHidden()
         await expect(trigger).toHaveText('Albums')
