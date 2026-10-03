@@ -3,8 +3,17 @@ import { BandcampFeedItem, HydratedBandcampReleaseFeedItem } from './feed.schema
 import { ScrapedLinkMetadata } from './web-scraping.schema'
 
 const BANDCAMP_FAN_UNSUBSCRIBE_PATH = 'fan_unsubscribe'
+const isBandcampArtworkUrl = (link: string): boolean => {
+    try {
+        const url = new URL(link)
+        return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname === 'f4.bcbits.com'
+    } catch {
+        return false
+    }
+}
+
 export const isUsefulUrlFromBandcampEmail = (link: string): boolean =>
-    !link.includes('f4.bcbits.com') &&
+    !isBandcampArtworkUrl(link) &&
     !link.includes('https://bandcamp.com/img/email/bc-logo-small-2.gif') &&
     !link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH)
 
@@ -40,8 +49,8 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
                     .replace(/(\s{2,}\?\s*)|(\s*\?\s{2,})/g, '\n')
                     .replace(/�/g, '')
                     .replace(
-                        /((Unfollow|Unsubscribe) .+)(?=\n)/i,
-                        `<a href="${sourceLinks.find(link => link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH))}">$1</a>`,
+                        /(Unfollow|Unsubscribe) [^\r\n]+/i,
+                        `<a href="${sourceLinks.find(link => link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH))}">$&</a>`,
                     )
                     .replace(/check it out here/i, match => `<a href="${data.tralbumUrl}">${match}</a>`)
                     .trim()
@@ -56,11 +65,10 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
             }),
             unsubscribeUrl: sourceLinks.find(link => link.includes(BANDCAMP_FAN_UNSUBSCRIBE_PATH)) || null,
             unsubscribeText:
-                newRelease?.plainBody.match(/((Unfollow|Unsubscribe) .+)(?=\n)/i)?.[0].replace(/�/g, '') ||
+                newRelease?.plainBody.match(/(Unfollow|Unsubscribe) [^\r\n]+/i)?.[0].replace(/�/g, '') ||
                 'Unfollow',
             imageUrl:
-                tralbum?.artworkUrl ||
-                sourceLinks.find(link => link.includes('f4.bcbits.com'))?.replace('_9.jpg', '_16.jpg'),
+                tralbum?.artworkUrl || sourceLinks.find(isBandcampArtworkUrl)?.replace('_9.jpg', '_16.jpg'),
             iframeUrl: tralbum?.id
                 ? `https://bandcamp.com/EmbeddedPlayer/${releaseType}=${tralbum.id}/size=large/bgcol=999999/linkcol=0687f5`
                 : null,
