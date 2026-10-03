@@ -15,7 +15,7 @@ export class HlmTableContainer {
  * Directive to apply Shadcn-like styling to a <table> element.
  */
 @Directive({
-    selector: 'table[hlmTable]',
+    selector: 'table[hlmTable],div[hlmTable][role=grid]',
     host: { 'data-slot': 'table' },
 })
 export class HlmTable {
@@ -73,7 +73,7 @@ export class HlmTFoot {
  * within an HlmTable context.
  */
 @Directive({
-    selector: 'tr[hlmTr],tr[hlmTableRow]',
+    selector: 'tr[hlmTr],tr[hlmTableRow],[hlmTableRow][role=row]',
     host: { 'data-slot': 'table-row' },
 })
 export class HlmTr {
@@ -91,7 +91,7 @@ export class HlmTr {
  * within an HlmTable context.
  */
 @Directive({
-    selector: 'th[hlmTh],th[hlmTableHead]',
+    selector: 'th[hlmTh],th[hlmTableHead],[hlmTableHead][role=columnheader]',
     host: { 'data-slot': 'table-head' },
 })
 export class HlmTh {
@@ -105,7 +105,7 @@ export class HlmTh {
  * within an HlmTable context.
  */
 @Directive({
-    selector: 'td[hlmTd],td[hlmTableCell]',
+    selector: 'td[hlmTd],td[hlmTableCell],[hlmTableCell][role=gridcell]',
     host: { 'data-slot': 'table-cell' },
 })
 export class HlmTd {

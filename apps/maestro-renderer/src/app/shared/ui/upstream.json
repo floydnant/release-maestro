@@ -32,6 +32,14 @@
         "Button preserves native static tabindex and accepts dynamic tabindex input",
         "TemplateRef dialog service rendering with implicit context",
         "Field description inputs forwarded to native controls",
-        "Select highlight follows Brain data-highlighted state"
+        "Select highlight follows Brain data-highlighted state",
+        "Role-qualified table presentation selectors for the existing windowed ARIA grid",
+        "Two-arc SVG spinner preserves original geometry, colors and ambient motion",
+        "Content-sized controls and plain button/alert variants preserve existing appearance",
+        "Native textarea rows and explicit field spacing preserve original form layout",
+        "Tooltips use a 600ms delay and wrap within 24rem and the viewport",
+        "Pinned Brain tooltip patch captures nested scroll and dismisses pending or hovered overlays",
+        "Navigation button variant follows aria-current for native route links",
+        "Inline link buttons can shrink with their containing row"
     ]
 }

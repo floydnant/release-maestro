@@ -22,6 +22,33 @@ Shared defaults use the existing generated semantic tokens, system typography an
 interaction states. Adjust those defaults here when several callers need the same change. Product
 templates use Tailwind for layout and domain-specific composition.
 
+Preserve existing control geometry when adopting these components. Regular buttons use the original
+`px-3 py-1.5` padding and content height. Inputs and textareas keep native sizing. Explicit icon sizes
+are for controls whose established layout uses those sizes. A click target that has no button
+appearance uses `variant="plain" size="none"`, with its existing layout and typography. Seeking
+targets and sortable headings must not acquire hover backgrounds.
+
+Sidebar links use the `navigation` button variant. Angular's `RouterLinkActive` sets
+`aria-current="page"`, and the shared variant supplies the active appearance. The `link` variant
+allows inline links to shrink inside bounded library cells.
+
+History controls use the `history` variant. Only pointer hover fills their background; keyboard
+focus keeps the focus ring without that fill.
+
+The track grid composes the role-qualified table directives with its existing windowing and row
+layout. Scan progress keeps its outcome segments and circular geometry inside `HlmProgress`;
+indeterminate work uses `HlmSpinner`. Feed playback composes the same progress primitives inside
+the seek button.
+
+`HlmSpinner` retains the application's two-arc SVG, requested diameter, stroke and colors, and
+ambient rotation. Its per-ring rotation offsets require the scoped animation stylesheet.
+
+Tooltips wait 600ms, wrap long paths, and fit within 24rem and the viewport. Brain 1.5.0 has a pinned
+patch in `patches/@spartan-ng__brain@1.5.0.patch`: capture document scroll and dismiss the tooltip,
+including pending displays and retained content hover. Its original window listener misses nested
+scroll panels. Review and remove this patch when an upstream upgrade fixes that behavior; rerun the
+tooltip lifecycle checks before replacing it.
+
 Grid row actions use `tabindex="-1"` so the grid retains its keyboard focus model. Helm preserves
 the native static attribute and exposes `[tabindex]` for dynamic values. Disabled buttons receive
 `-1`; enabling restores the caller value. Use the directive input for a dynamic tabindex because
