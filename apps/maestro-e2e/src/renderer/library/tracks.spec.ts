@@ -49,6 +49,18 @@ const rowSelection = (page: Page, titles: string[]): Promise<(string | null)[]> 
     Promise.all(titles.map(title => rowByTitle(page, title).getAttribute('aria-selected')))
 
 test.describe('rendering a window', () => {
+    test('keeps virtual rows at 40px with all row controls outside the tab order', async ({ page }) => {
+        await openTracks(page)
+        for (const title of ['Dawn', 'Dusk', 'Void']) {
+            const row = rowByTitle(page, title)
+            await expect(row).toBeVisible()
+            await expect.poll(() => row.evaluate(element => element.getBoundingClientRect().height)).toBe(40)
+            for (const control of await row.getByRole('link').or(row.getByRole('button')).all()) {
+                await expect(control).toHaveAttribute('tabindex', '-1')
+            }
+        }
+    })
+
     test('shows the tracks in the window and the total of the whole library', async ({ page }) => {
         await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 1_204 }).build())
 

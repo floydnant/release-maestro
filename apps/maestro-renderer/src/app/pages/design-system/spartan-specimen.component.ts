@@ -6,6 +6,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card'
 import { HlmDialogImports } from '@spartan-ng/helm/dialog'
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu'
 import { HlmInputImports } from '@spartan-ng/helm/input'
+import { HlmLabel } from '@spartan-ng/helm/label'
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
 import { HlmSelectImports } from '@spartan-ng/helm/select'
@@ -21,6 +22,7 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
         HlmDialogImports,
         HlmDropdownMenuImports,
         HlmInputImports,
+        HlmLabel,
         HlmNativeSelectImports,
         HlmProgressImports,
         HlmSelectImports,
