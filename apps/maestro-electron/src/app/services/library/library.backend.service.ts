@@ -73,8 +73,14 @@ export class LibraryBackendService {
                     if (abortSignal?.aborted) return
                     const { extractorVersion } = await this.metadata.ping()
                     if (abortSignal?.aborted) return
-                    const metadataReadTotal = this.repository.countSongsNeedingMetadata(scanStartedAt, extractorVersion)
-                    const refreshTotal = this.repository.countSongsNeedingVersionRefresh(scanStartedAt, extractorVersion)
+                    const metadataReadTotal = this.repository.countSongsNeedingMetadata(
+                        scanStartedAt,
+                        extractorVersion,
+                    )
+                    const refreshTotal = this.repository.countSongsNeedingVersionRefresh(
+                        scanStartedAt,
+                        extractorVersion,
+                    )
                     let metadataReadDone = 0
                     let afterPath: string | null = null
 
@@ -140,6 +146,7 @@ export class LibraryBackendService {
                         })
                     }
                 } finally {
+                    this.repository.invalidateCoexistingMoves(scanStartedAt)
                     // Positive proof of coexistence survives failures and cancellation too.
                     // Only applying moves depends on a complete scan; losing this evidence could
                     // incorrectly merge a known copy after its original disappears before retry.
@@ -148,10 +155,18 @@ export class LibraryBackendService {
                             this.repository.recordSongAvailable(probe.songId, scanStartedAt)
                     }
                     for (const candidate of this.repository.findMovedSongCandidates(scanStartedAt)) {
-                        const location = await compareLocations(candidate.missing.path, candidate.found.path)
-                        if (location == 'copy')
-                            this.repository.recordSongAvailable(candidate.missing.id, scanStartedAt)
-                        if (location == 'moved') moves.push(candidate)
+                        let proven = true
+                        for (const previous of [candidate.missing, ...(candidate.intermediate ?? [])]) {
+                            if (previous.id == candidate.found.id) continue
+                            const location = await compareLocations(previous.path, candidate.found.path)
+                            if (location == 'copy')
+                                this.repository.recordSongAvailable(previous.id, scanStartedAt)
+                            if (location != 'moved') proven = false
+                        }
+                        if (proven) {
+                            this.repository.recordPendingMove(candidate)
+                            moves.push(candidate)
+                        }
                     }
                 }
 
