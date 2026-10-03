@@ -69,15 +69,22 @@ export class LibraryBackendService {
                 //    its files as missing).
                 if (abortSignal?.aborted) return
                 const missing = prescanErrors == 0 ? this.repository.markNotSeenPresent(scanStartedAt) : 0
-                const metadataReadTotal = this.repository.countSongsNeedingMetadata()
+                const { extractorVersion } = await this.metadata.ping()
+                if (abortSignal?.aborted) return
+                const metadataReadTotal = this.repository.countSongsNeedingMetadata(extractorVersion)
+                const refreshTotal = this.repository.countSongsNeedingVersionRefresh(extractorVersion)
                 let metadataReadDone = 0
                 let ingested = 0
                 let afterPath: string | null = null
 
-                subscriber.next({ phase: 'started', total: metadataReadTotal })
+                subscriber.next({ phase: 'started', total: metadataReadTotal, refreshTotal })
 
                 while (!abortSignal?.aborted) {
-                    const facts = this.repository.listSongsNeedingMetadata(afterPath, DEEP_READ_BATCH_SIZE)
+                    const facts = this.repository.listSongsNeedingMetadata(
+                        afterPath,
+                        DEEP_READ_BATCH_SIZE,
+                        extractorVersion,
+                    )
                     if (facts.length == 0) break
                     const lastFact = facts[facts.length - 1]
                     if (!lastFact) break
@@ -100,6 +107,7 @@ export class LibraryBackendService {
                                     update.metadata,
                                     fact,
                                     new Date(),
+                                    extractorVersion,
                                 )
                                 ingested += 1
                                 subscriber.next(update)
@@ -131,6 +139,9 @@ export class LibraryBackendService {
                 }
 
                 if (abortSignal?.aborted) return
+                // A cancelled scan may have ingested a song before it stopped. A later
+                // scan must collect entities left behind even when it reads no files.
+                this.repository.removeUnusedCatalogEntities()
 
                 subscriber.next({
                     phase: 'completed',

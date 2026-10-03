@@ -183,6 +183,7 @@ export class LibraryScanService {
                         failureStage = 'read'
                         status.phase = 'reading'
                         status.readTotal = update.total
+                        status.refreshTotal = update.refreshTotal
                         break
                     case 'progress':
                         status.readDone = update.done

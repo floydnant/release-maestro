@@ -1,6 +1,6 @@
 import { PrescanFileFact, SongMetadata } from '@release-maestro/core'
 import { randomUUID } from 'crypto'
-import { and, asc, count, eq, gt, inArray, isNull, lt, max, ne, or } from 'drizzle-orm'
+import { and, asc, count, eq, gt, inArray, isNull, lt, max, ne, or, sql } from 'drizzle-orm'
 import { DatabaseClient } from '../../database/database.client'
 import {
     albumArtistsTable,
@@ -36,7 +36,7 @@ import {
 
 /**
  * Change-detection tallies for one prescan batch. The deep-read queue is NOT
- * derived from this — `listSongsNeedingMetadata` (fingerprint mismatch in the DB)
+ * derived from this — `listSongsNeedingMetadata` (fingerprint or revision mismatch in the DB)
  * is the sole source, which also makes interrupted scans resumable.
  */
 export interface PrescanBatchComparison {
@@ -140,8 +140,12 @@ export class LibraryBackendRepository {
             .run().changes
     }
 
-    listSongsNeedingMetadata(afterPath: string | null, limit: number): PrescanFileFact[] {
-        const pendingCondition = songsNeedingMetadata()
+    listSongsNeedingMetadata(
+        afterPath: string | null,
+        limit: number,
+        extractorVersion: string,
+    ): PrescanFileFact[] {
+        const pendingCondition = songsNeedingMetadata(extractorVersion)
         const where = afterPath
             ? and(eq(songsTable.present, true), pendingCondition, gt(songsTable.path, afterPath))
             : and(eq(songsTable.present, true), pendingCondition)
@@ -168,18 +172,39 @@ export class LibraryBackendRepository {
             }))
     }
 
-    countSongsNeedingMetadata(): number {
+    countSongsNeedingMetadata(extractorVersion: string): number {
         return (
             this.database.db
                 .select({ count: count(songsTable.id) })
                 .from(songsTable)
-                .where(and(eq(songsTable.present, true), songsNeedingMetadata()))
+                .where(and(eq(songsTable.present, true), songsNeedingMetadata(extractorVersion)))
+                .get()?.count ?? 0
+        )
+    }
+
+    countSongsNeedingVersionRefresh(extractorVersion: string): number {
+        return (
+            this.database.db
+                .select({ count: count(songsTable.id) })
+                .from(songsTable)
+                .where(
+                    and(
+                        eq(songsTable.present, true),
+                        eq(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
+                        metadataRevisionMismatch(extractorVersion),
+                    ),
+                )
                 .get()?.count ?? 0
         )
     }
 
     /** @returns the number of normalization issues left OPEN on the song after ingest. */
-    ingestMetadata(metadata: SongMetadata, fact: PrescanFileFact, scannedAt: Date): number {
+    ingestMetadata(
+        metadata: SongMetadata,
+        fact: PrescanFileFact,
+        scannedAt: Date,
+        extractorVersion: string,
+    ): number {
         const db = this.database.db
         const rawArtist = metadata.artist
         const rawAlbumArtist = metadata.albumArtist
@@ -488,6 +513,7 @@ export class LibraryBackendRepository {
                 codec: metadata.fileInfo?.codec ?? null,
                 metadataHash: metadataHash(metadata),
                 normalizerVersion: NORMALIZER_VERSION,
+                extractorVersion,
                 externalRefs,
                 albumId,
             } satisfies Omit<typeof songsTable.$inferInsert, 'id'>
@@ -626,6 +652,41 @@ export class LibraryBackendRepository {
             return openIssues
         })
     }
+
+    removeUnusedCatalogEntities(): void {
+        this.database.db.transaction(tx => {
+            // A re-read can move the last song off an album. Drop empty albums first
+            // so their artist and record label links do not keep obsolete entities alive.
+            tx.run(sql`DELETE FROM albums WHERE NOT EXISTS (
+                SELECT 1 FROM songs WHERE songs.album_id = albums.id
+            )`)
+            // Keep user-confirmed resolutions even if the tag no longer appears.
+            tx.run(sql`DELETE FROM artist_raw_names WHERE confirmed_by_user = 0 AND raw_text NOT IN (
+                SELECT raw_artist FROM songs WHERE raw_artist IS NOT NULL
+                UNION SELECT raw_album_artist FROM songs WHERE raw_album_artist IS NOT NULL
+            )`)
+            tx.run(sql`DELETE FROM genre_raw_names WHERE confirmed_by_user = 0 AND raw_text NOT IN (
+                SELECT raw_genre FROM songs WHERE raw_genre IS NOT NULL
+            )`)
+            tx.run(sql`DELETE FROM artists WHERE NOT EXISTS (
+                SELECT 1 FROM song_artists WHERE song_artists.artist_id = artists.id
+            ) AND NOT EXISTS (
+                SELECT 1 FROM album_artists WHERE album_artists.artist_id = artists.id
+            ) AND NOT EXISTS (
+                SELECT 1 FROM artist_raw_name_artists WHERE artist_raw_name_artists.artist_id = artists.id
+            )`)
+            tx.run(sql`DELETE FROM genres WHERE NOT EXISTS (
+                SELECT 1 FROM song_genres WHERE song_genres.genre_id = genres.id
+            ) AND NOT EXISTS (
+                SELECT 1 FROM genre_raw_name_genres WHERE genre_raw_name_genres.genre_id = genres.id
+            )`)
+            tx.run(sql`DELETE FROM record_labels WHERE NOT EXISTS (
+                SELECT 1 FROM albums WHERE albums.record_label_id = record_labels.id
+            ) AND NOT EXISTS (
+                SELECT 1 FROM songs WHERE songs.record_label_text = record_labels.name
+            )`)
+        })
+    }
 }
 
 /**
@@ -636,14 +697,22 @@ export class LibraryBackendRepository {
  * reach the other.
  *
  * A file qualifies when it has never been read, when the file itself changed, or when
- * it was last read by an older revision of the normalizer. That last clause is what
- * lets a change in how a column is derived reach rows already in the database: nothing
+ * it was last read by an older revision of the normalizer or Rust extractor. Those clauses
+ * let a changed rule reach rows already in the database: nothing
  * happens on disk, so the fingerprint alone would skip them forever.
  */
-const songsNeedingMetadata = () =>
+const songsNeedingMetadata = (extractorVersion: string) =>
     or(
         isNull(songsTable.scannedFileFingerprint),
         ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
+        metadataRevisionMismatch(extractorVersion),
+    )
+
+/** Both the read queue and its refresh subtotal use the same revision rule. */
+const metadataRevisionMismatch = (extractorVersion: string) =>
+    or(
         isNull(songsTable.normalizerVersion),
         ne(songsTable.normalizerVersion, NORMALIZER_VERSION),
+        isNull(songsTable.extractorVersion),
+        ne(songsTable.extractorVersion, extractorVersion),
     )
