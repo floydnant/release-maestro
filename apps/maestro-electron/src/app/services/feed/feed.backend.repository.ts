@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNull, lt, notInArray, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm'
 import { EmailVendor, FeedItemMaster } from '@release-maestro/core'
 import { DatabaseClient } from '../../database/database.client'
 import {
@@ -36,7 +36,9 @@ export class FeedBackendRepository {
             .from(feedItemsTable)
             .where(
                 and(
-                    excludedIds.length > 0 ? notInArray(feedItemsTable.id, excludedIds) : undefined,
+                    excludedIds.length > 0
+                        ? sql`${feedItemsTable.id} not in (select value from json_each(${JSON.stringify(excludedIds)}))`
+                        : undefined,
                     or(
                         isNull(feedItemsTable.lastViewedAt),
                         and(
