@@ -1,10 +1,10 @@
 <div class="settings-item |">
     <p class="type-label-sm text-content-muted uppercase">Apple Mail</p>
-    <h1 class="type-section-title mt-1 text-content-primary">Mailbox import</h1>
-    <label class="type-label-md mt-6 block text-content-primary" for="setting-mailboxName-input"
+    <h1 class="mt-1 type-section-title text-content-primary">Mailbox import</h1>
+    <label class="mt-6 block type-label-md text-content-primary" for="setting-mailboxName-input"
         >Mailbox Name</label
     >
-    <p class="description | type-body-sm mt-1 text-content-muted" id="setting-mailboxName-description">
+    <p class="description | mt-1 type-body-sm text-content-muted" id="setting-mailboxName-description">
         The name of the mailbox to import from Apple Mail.
     </p>
 
@@ -25,7 +25,7 @@
 
 <div class="email-import | mt-8 max-w-2xl">
     <h2 class="type-section-title text-content-primary">Import</h2>
-    <p class="type-body-sm mt-1 text-content-muted" id="email-import-description">
+    <p class="mt-1 type-body-sm text-content-muted" id="email-import-description">
         New emails are imported when the app starts and when you return to it, at most once an hour. Import
         now to check the mailbox right away.
     </p>
@@ -48,7 +48,7 @@
     @if (importUpdate(); as update) {
         @if (update.phase === 'started' || update.phase === 'processing') {
             <div class="email-import-progress | mt-3 flex flex-wrap items-center gap-3">
-                <p class="type-body-sm flex items-center gap-2 text-content-secondary">
+                <p class="flex items-center gap-2 type-body-sm text-content-secondary">
                     <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
                     @if (update.phase === 'processing') {
                         Importing emails {{ update.current }}/{{ update.total }}
@@ -66,7 +66,7 @@
     <!-- Only the result is announced: progress would be read out again for every email -->
     <p
         #importStatus
-        class="email-import-result | type-body-sm mt-3 focus-visible:outline-2 focus-visible:outline-border-focus"
+        class="email-import-result | mt-3 type-body-sm focus-visible:outline-2 focus-visible:outline-border-focus"
         tabindex="-1"
         role="status"
         aria-label="Last email import"

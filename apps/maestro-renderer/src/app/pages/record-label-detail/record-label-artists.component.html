@@ -5,9 +5,9 @@
     </div>
 }
 @if (!result().loaded && result().status === 'loading') {
-    <p class="type-body-sm p-8 text-content-secondary" role="status">Loading artists…</p>
+    <p class="p-8 type-body-sm text-content-secondary" role="status">Loading artists…</p>
 } @else if (result().loaded && result().total === 0) {
-    <p class="type-body-sm p-8 text-content-secondary">No artists linked to this record label</p>
+    <p class="p-8 type-body-sm text-content-secondary">No artists linked to this record label</p>
 } @else if (result().loaded) {
     <app-catalog-list
         label="Artists"

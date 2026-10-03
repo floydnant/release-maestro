@@ -83,3 +83,33 @@ test('a reachable folder with no supported files still shows the empty-folder re
 
     await expect(page.getByRole('heading', { name: 'No audio files found' })).toBeVisible()
 })
+
+test('the import dropzone and counters retain their token typography', async ({ page }) => {
+    const status: LibraryScanStatus = {
+        ...completedStatus({ discovered: 12, imported: 3, readTotal: 12, readsAttempted: 3 }),
+        phase: 'reading',
+        finishedAt: null,
+        terminal: null,
+    }
+    await createRendererScenario(
+        page,
+        scenarioBuilder()
+            .settings({ library: { folders: [] }, emailPluginConfig: {} })
+            .handler('library:pick-folders', { kind: 'resolve', value: ['/music'] })
+            .handler('library:validate-folders', { kind: 'resolve', value: [] })
+            .handler('library:start-scan', { kind: 'resolve', value: status })
+            .build(),
+        '/import',
+    )
+    await expect(page.getByText('Drop folders here')).toHaveCSS('font-weight', '400')
+    await page.getByRole('button', { name: 'Add folders', exact: true }).click()
+    await expect(page.getByText('/music', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByRole('heading', { name: 'Importing your library' })).toBeVisible()
+    await expect(page.getByLabel('Imported tracks')).toHaveText('3')
+    const family = await page
+        .getByRole('heading', { name: 'Importing your library' })
+        .evaluate(element => getComputedStyle(element).fontFamily)
+    await expect(page.getByLabel('Imported tracks')).toHaveCSS('font-family', family)
+    await expect(page.getByLabel('Failed files count')).toHaveCSS('font-family', family)
+})

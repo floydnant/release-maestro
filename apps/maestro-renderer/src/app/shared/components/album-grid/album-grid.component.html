@@ -108,11 +108,11 @@
                                          whatever is in it — which is what lets one
                                          measurement of this block stand for every tile. -->
                                     <span #tileText class="album-tile__text | flex min-w-0 flex-col">
-                                        <span class="type-body-sm truncate text-content-primary">
+                                        <span class="truncate type-body-sm text-content-primary">
                                             {{ album.title }}
                                         </span>
                                         <span
-                                            class="type-body-sm truncate"
+                                            class="truncate type-body-sm"
                                             [ngClass]="{
                                                 'text-content-secondary': album.albumArtistText,
                                                 'text-content-muted': !album.albumArtistText,
@@ -120,7 +120,7 @@
                                         >
                                             {{ album.albumArtistText || '—' }}
                                         </span>
-                                        <span class="type-label-sm truncate text-content-muted tabular-nums">
+                                        <span class="truncate type-label-sm text-content-muted tabular-nums">
                                             @if (album.year) {
                                                 {{ album.year }} ·
                                             }

@@ -1,7 +1,7 @@
 <!-- Hides at once on the import route, without waiting out the phase's dwell -->
 @if (hidden() ? null : view(); as import) {
     @if (import.phase === 'started' || import.phase === 'processing') {
-        <p class="email-import-indicator | type-body-sm flex items-center gap-1 px-2 text-content-secondary">
+        <p class="email-import-indicator | flex items-center gap-1 px-2 type-body-sm text-content-secondary">
             <app-progress-ring
                 [mode]="import.phase === 'processing' ? 'progress' : 'spinning'"
                 [diameter]="25"

@@ -1,19 +1,8 @@
 @import 'tailwindcss' source(none);
 @import './styles/design-tokens.generated.css';
 
-@config '../tailwind.config.js';
 @source './**/*.html';
 @source './**/*.ts';
-
-@theme static {
-    --duration-instant: var(--foundation-motion-duration-instant);
-    --duration-fast: var(--foundation-motion-duration-fast);
-    --duration-moderate: var(--foundation-motion-duration-moderate);
-    --duration-slow: var(--foundation-motion-duration-slow);
-    --duration-ambient: var(--foundation-motion-duration-ambient);
-    --ease-standard: var(--foundation-motion-easing-standard);
-    --ease-emphasized: var(--foundation-motion-easing-emphasized);
-}
 
 @custom-variant hover {
     @media (hover: hover) {
