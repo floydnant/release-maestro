@@ -18,8 +18,8 @@
             (click)="browse.emit()"
         >
             <app-icon name="folder" size="1.75rem" class="text-content-muted"></app-icon>
-            <span class="type-body-md mt-1 font-semibold text-content-primary">Drop folders here</span>
-            <span class="type-body-sm -mt-2 text-content-muted">or click to browse</span>
+            <span class="mt-1 type-body-md text-content-primary">Drop folders here</span>
+            <span class="-mt-2 type-body-sm text-content-muted">or click to browse</span>
         </button>
     } @else {
         <div
@@ -36,7 +36,7 @@
                     <li class="folder-row | group flex items-center gap-3 px-4 py-3 transition-colors">
                         <app-icon name="folder" size="1.1rem" class="shrink-0 text-content-muted"></app-icon>
                         <div class="min-w-0 grow">
-                            <p class="type-body-md flex min-w-0" [hlmTooltip]="folder">
+                            <p class="flex min-w-0 type-body-md" [hlmTooltip]="folder">
                                 <span class="truncate text-content-muted">{{ folderParent(folder) }}</span
                                 ><span class="truncate font-semibold text-content-primary">{{
                                     folderName(folder)
@@ -81,7 +81,7 @@
                     class="dropzone-overlay | pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-[color-mix(in_srgb,var(--color-status-info-background)_70%,transparent)] text-content-info backdrop-blur-xs"
                 >
                     <app-icon name="folderFilled" size="1.25rem"></app-icon>
-                    <span class="type-body-md font-semibold">Drop to add</span>
+                    <span class="type-body-md">Drop to add</span>
                 </div>
             }
         </div>

@@ -35,7 +35,7 @@
         @if (shown().has('cover')) {
             <span
                 hlmTableHead
-                class="shrink-0 px-0 border-b border-border-subtle"
+                class="shrink-0 border-b border-border-subtle px-0"
                 role="columnheader"
                 [style.width.px]="widths.cover"
             >
@@ -177,7 +177,7 @@
 
                 <div
                     hlmTableRow
-                    class="song-table__row | border-0 flex items-center aria-selected:bg-background-elevated aria-selected:hover:bg-background-elevated"
+                    class="song-table__row | flex items-center border-0 aria-selected:bg-background-elevated aria-selected:hover:bg-background-elevated"
                     role="row"
                     [id]="rowElementId(index)"
                     [ngClass]="{

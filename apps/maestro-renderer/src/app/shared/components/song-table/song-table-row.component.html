@@ -65,10 +65,12 @@
     >
         @if (!row().present) {
             <button
-            hlmBtn variant="ghost" size="icon-sm"
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
                 type="button"
                 tabindex="-1"
-                class="p-0 grid size-5 shrink-0 place-items-center rounded-sm hover:bg-action-quiet-hover"
+                class="grid size-5 shrink-0 place-items-center rounded-sm p-0 hover:bg-action-quiet-hover"
                 aria-label="Missing — show only missing tracks"
                 hlmTooltip="Missing — this file is no longer where the library saw it. Show only missing tracks."
                 (click)="onMissingBadge($event)"
@@ -91,9 +93,10 @@
         @if (row().artistCredit.length) {
             @for (segment of row().artistCredit; track segment.artistId; let last = $last) {
                 <a
-            hlmBtn variant="link"
-                tabindex="-1"
-                    class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline h-auto p-0 inline-block type-body-sm"
+                    hlmBtn
+                    variant="link"
+                    tabindex="-1"
+                    class="inline-block h-auto max-w-full truncate rounded-sm p-0 align-middle type-body-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                     [routerLink]="['/artists', segment.artistId]"
                     (click)="onDetailLink($event)"
                 >
@@ -119,9 +122,10 @@
     >
         @if (row().albumId && row().albumTitle) {
             <a
-            hlmBtn variant="link"
+                hlmBtn
+                variant="link"
                 tabindex="-1"
-                class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline h-auto p-0 type-body-sm"
+                class="inline-block h-auto max-w-full truncate rounded-sm p-0 align-middle type-body-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                 [routerLink]="['/albums', row().albumId]"
                 (click)="onDetailLink($event)"
             >
@@ -143,9 +147,10 @@
     >
         @for (genre of row().genres; track genre.id; let last = $last) {
             <a
-            hlmBtn variant="link"
+                hlmBtn
+                variant="link"
                 tabindex="-1"
-                class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary no-underline underline-offset-2 hover:text-content-action hover:underline h-auto p-0 type-body-sm"
+                class="inline-block h-auto max-w-full truncate rounded-sm p-0 align-middle type-body-sm text-content-secondary no-underline underline-offset-2 hover:text-content-action hover:underline"
                 [routerLink]="['/genres', genre.id]"
                 (click)="onDetailLink($event)"
             >
@@ -214,9 +219,10 @@
     >
         @if (row().recordLabelId && row().recordLabelText) {
             <a
-            hlmBtn variant="link"
+                hlmBtn
+                variant="link"
                 tabindex="-1"
-                class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline h-auto p-0 type-body-sm"
+                class="inline-block h-auto max-w-full truncate rounded-sm p-0 align-middle type-body-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
                 [routerLink]="['/record-labels', row().recordLabelId]"
                 (click)="onDetailLink($event)"
             >

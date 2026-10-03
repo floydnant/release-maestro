@@ -46,7 +46,8 @@ const recordLabelLinks = (recordLabel: RecordLabelDetail): ExternalLink[] => {
     selector: 'app-record-label-detail',
     templateUrl: './record-label-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [HlmButton, 
+    imports: [
+        HlmButton,
         RouterLink,
         TabBarComponent,
         EntitySongsComponent,
