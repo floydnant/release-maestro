@@ -17,7 +17,7 @@
                     <p class="text-content-danger">
                         <app-icon name="error" color="content.danger" size="3rem"></app-icon>
                     </p>
-                    <p class="type-label-md mt-2 text-center text-content-danger">
+                    <p class="mt-2 text-center type-label-md text-content-danger">
                         {{ feedState.error }}
                     </p>
 
@@ -30,7 +30,7 @@
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
                     <p class="type-section-title text-content-primary">No new releases</p>
-                    <p class="type-body-sm mt-2 text-content-muted">
+                    <p class="mt-2 type-body-sm text-content-muted">
                         You're all caught up! Check back later for new releases.
                     </p>
                 </div>
@@ -39,7 +39,7 @@
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
                     <p class="type-section-title text-content-primary">No new releases</p>
-                    <p class="type-body-sm mt-2 text-content-muted">
+                    <p class="mt-2 type-body-sm text-content-muted">
                         It looks like you haven't set up your feed yet. Go to
                         <a class="" routerLink="/settings">settings</a>
                         to get started.
@@ -71,7 +71,7 @@
                             >
                                 @for (track of feedItem.data.tracks; track $index) {
                                     <li
-                                        class="track | type-body-sm relative flex min-h-6 items-center gap-1"
+                                        class="track | relative flex min-h-6 items-center gap-1 type-body-sm"
                                         [attr.data-track-index]="$index"
                                         [ngClass]="{
                                             'text-content-muted': !track.streamUrl,
@@ -84,7 +84,7 @@
                                                 variant="ghost"
                                                 size="icon-xs"
                                                 type="button"
-                                                class="track-control | type-body-sm rounded-sm"
+                                                class="track-control | rounded-sm type-body-sm"
                                                 [attr.aria-label]="
                                                     isCurrentTrack(track.streamUrl) && audioPlayer.isLoading()
                                                         ? 'Loading ' + track.title
@@ -123,15 +123,13 @@
                                                 hlmBtn
                                                 variant="ghost"
                                                 type="button"
-                                                class="track-seeker | type-body-sm relative h-auto min-w-0 grow justify-between rounded-sm px-0 py-1 text-left text-content-primary"
+                                                class="track-seeker | relative h-auto min-w-0 grow justify-between rounded-sm px-0 py-1 text-left type-body-sm text-content-primary"
                                                 [attr.aria-label]="'Seek within ' + track.title"
                                                 [hlmTooltip]="track.title"
                                                 (mousedown)="$event.preventDefault()"
                                                 (click)="seekTrack($event, track.streamUrl)"
                                             >
-                                                <span class="truncate">{{
-                                                    track.title
-                                                }}</span>
+                                                <span class="truncate">{{ track.title }}</span>
                                                 <span class="shrink-0">
                                                     {{ track.duration ? formatDuration(track.duration) : '' }}
                                                 </span>
@@ -209,7 +207,7 @@
                                         {{ feedItem.data.releaseName }}
                                     </a>
                                 </h1>
-                                <p class="type-body-sm mt-1">
+                                <p class="mt-1 type-body-sm">
                                     @if (feedItem.data.artist) {
                                         <span class="artist | text-content-secondary select-text">
                                             by {{ feedItem.data.artist }}
@@ -234,12 +232,12 @@
                                 </p>
 
                                 <p
-                                    class="about | type-body-sm mt-6 text-content-secondary select-text"
+                                    class="about | mt-6 type-body-sm text-content-secondary select-text"
                                     [innerHTML]="feedItem.data.about | safe: 'html'"
                                 ></p>
 
                                 <!-- @TODO: abstract this into a <link-meta-previews /> -->
-                                <ul class="links | type-body-sm mt-5 flex flex-wrap gap-1">
+                                <ul class="links | mt-5 flex flex-wrap gap-1 type-body-sm">
                                     @for (link of feedItem.data.links; track $index) {
                                         <li class="flex w-full">
                                             <a
@@ -318,7 +316,7 @@
                                         alt="Label image for {{ feedItem.data.band.name }}"
                                     />
                                 }
-                                <p class="type-label-md mt-2 text-content-primary select-text">
+                                <p class="mt-2 type-label-md text-content-primary select-text">
                                     {{ feedItem.data.band.name }}
                                 </p>
                                 <p class="type-body-sm text-content-muted select-text">
@@ -341,13 +339,11 @@
                                         <span class="unfollow | absolute inset-0 py-1.5">Unfollow</span>
                                     </a>
                                 }
-                                <p
-                                    class="type-body-sm mt-2.5 text-content-secondary select-text"
-                                >
+                                <p class="mt-2.5 type-body-sm text-content-secondary select-text">
                                     {{ feedItem.data.band.bio }}
                                 </p>
 
-                                <ul class="label-links | type-body-sm mt-2.5">
+                                <ul class="label-links | mt-2.5 type-body-sm">
                                     @for (link of feedItem.data.band.links; track $index) {
                                         <li class="truncate leading-5">
                                             <a

@@ -2,7 +2,12 @@
 
 <!-- Helm applies the value to its inner select after the projected options render.
      Keep the native label tied to the sort restored from the URL. -->
-<hlm-native-select selectId="album-sort-field" size="sm" [value]="sort().field" (valueChange)="onFieldChange($event)">
+<hlm-native-select
+    selectId="album-sort-field"
+    size="sm"
+    [value]="sort().field"
+    (valueChange)="onFieldChange($event)"
+>
     @for (option of options; track option.field) {
         <option hlmNativeSelectOption [value]="option.field">
             {{ option.label }}
@@ -11,8 +16,10 @@
 </hlm-native-select>
 
 <button
-            hlmBtn variant="ghost" size="icon-sm"
-                type="button"
+    hlmBtn
+    variant="ghost"
+    size="icon-sm"
+    type="button"
     class="gap-1 px-1.5"
     [attr.aria-label]="directionLabel()"
     [hlmTooltip]="directionLabel()"

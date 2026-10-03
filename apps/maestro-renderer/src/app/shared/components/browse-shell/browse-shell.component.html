@@ -35,9 +35,10 @@
             <!-- Our own clear affordance. The native one is a WebKit-drawn control that
                  ignores the token set entirely, so it is suppressed in styles.css. -->
             <button
-            hlmBtn variant="ghost"
+                hlmBtn
+                variant="ghost"
                 type="button"
-                class="absolute top-1/2 right-0 -translate-y-1/2 size-7 p-0 grid place-items-center text-content-muted hover:text-content-primary"
+                class="size-7 absolute top-1/2 right-0 grid -translate-y-1/2 place-items-center p-0 text-content-muted hover:text-content-primary"
                 aria-label="Clear search"
                 (click)="onClearSearch()"
             >
@@ -53,13 +54,18 @@
 @if (filters().chips.length || filters().hasFilter) {
     <div class="browse-shell__chips | flex shrink-0 flex-wrap items-center gap-2 px-4 py-2">
         @for (chip of filters().chips; track chip.kind + chip.id) {
-            <span hlmBadge variant="secondary" class="relative gap-1 border-border-subtle bg-background-surface pr-[1.75rem]">
+            <span
+                hlmBadge
+                variant="secondary"
+                class="relative gap-1 border-border-subtle bg-background-surface pr-[1.75rem]"
+            >
                 <span class="text-content-muted">{{ chip.kindLabel }}</span>
                 {{ chip.name }}
                 <button
-            hlmBtn variant="ghost"
-                type="button"
-                    class="absolute inset-y-0 right-0 h-auto p-0 flex items-center rounded-full px-1.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
+                    hlmBtn
+                    variant="ghost"
+                    type="button"
+                    class="absolute inset-y-0 right-0 flex h-auto items-center rounded-full p-0 px-1.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
                     [attr.aria-label]="'Remove ' + chip.kindLabel + ' filter ' + chip.name"
                     (click)="chipRemove.emit(chip)"
                 >
@@ -68,8 +74,7 @@
             </span>
         }
 
-        <button hlmBtn variant="ghost"
-                type="button" (click)="clearFilters.emit()">Clear all</button>
+        <button hlmBtn variant="ghost" type="button" (click)="clearFilters.emit()">Clear all</button>
     </div>
 }
 
@@ -81,8 +86,7 @@
             <p class="max-w-md type-body-sm text-content-secondary">
                 {{ state().error || 'The library did not answer.' }}
             </p>
-            <button hlmBtn variant="default"
-                type="button" (click)="retry.emit()">Try again</button>
+            <button hlmBtn variant="default" type="button" (click)="retry.emit()">Try again</button>
         </div>
     } @else if (isInitialLoad()) {
         <div class="flex flex-1 items-center justify-center p-8" role="status">
@@ -97,16 +101,16 @@
                 <p class="max-w-md type-body-sm text-content-secondary">
                     Try a broader search, or clear the filters to see everything again.
                 </p>
-                <button hlmBtn variant="secondary"
-                type="button" (click)="clearFilters.emit()">Clear filters</button>
+                <button hlmBtn variant="secondary" type="button" (click)="clearFilters.emit()">
+                    Clear filters
+                </button>
             } @else {
                 <p class="type-body-md text-content-primary">No {{ state().entityLabel }} yet</p>
                 <p class="max-w-md type-body-sm text-content-secondary">
                     Scan a library folder and your {{ state().entityLabel }} will show up here as they are
                     read.
                 </p>
-                <a hlmBtn variant="default"
-                routerLink="/settings/library">Library settings</a>
+                <a hlmBtn variant="default" routerLink="/settings/library">Library settings</a>
             }
         </div>
     } @else {

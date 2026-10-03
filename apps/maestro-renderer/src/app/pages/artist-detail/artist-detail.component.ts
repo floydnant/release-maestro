@@ -48,7 +48,8 @@ const artistLinks = (artist: ArtistDetail): ExternalLink[] => [
     selector: 'app-artist-detail',
     templateUrl: './artist-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [HlmButton, 
+    imports: [
+        HlmButton,
         RouterLink,
         TabBarComponent,
         EntityAlbumsComponent,

@@ -14,12 +14,11 @@
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
             <app-icon name="unavailableAlbum" size="28" color="content.muted"></app-icon>
             <p class="type-body-md text-content-primary">This album is no longer in your library</p>
-            <p class="type-body-sm max-w-md text-content-secondary">
+            <p class="max-w-md type-body-sm text-content-secondary">
                 A rescan can re-key an album when its tags change, which leaves a link like this one pointing
                 at nothing.
             </p>
-            <a hlmBtn variant="default"
-                routerLink="/albums">Back to albums</a>
+            <a hlmBtn variant="default" routerLink="/albums">Back to albums</a>
         </div>
     }
 
@@ -27,9 +26,8 @@
         <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
             <app-icon name="error" size="28" color="content.danger"></app-icon>
             <p class="type-body-md text-content-primary">Could not load this album</p>
-            <p class="type-body-sm max-w-md text-content-secondary">The library did not answer.</p>
-            <a hlmBtn variant="secondary"
-                routerLink="/albums">Back to albums</a>
+            <p class="max-w-md type-body-sm text-content-secondary">The library did not answer.</p>
+            <a hlmBtn variant="secondary" routerLink="/albums">Back to albums</a>
         </div>
     }
 
@@ -48,11 +46,10 @@
                 <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
                     <app-icon name="error" size="28" color="content.danger"></app-icon>
                     <p class="type-body-md text-content-primary">Could not load this album’s tracks</p>
-                    <p class="type-body-sm max-w-md text-content-secondary">
+                    <p class="max-w-md type-body-sm text-content-secondary">
                         {{ result().error || 'The library did not answer.' }}
                     </p>
-                    <button hlmBtn variant="default"
-                type="button" (click)="onRetry()">Try again</button>
+                    <button hlmBtn variant="default" type="button" (click)="onRetry()">Try again</button>
                 </div>
             } @else if (!songWindowMatchesAlbum()) {
                 <div class="flex flex-1 items-center justify-center p-8" role="status">
@@ -63,7 +60,7 @@
                      old album row remains. Missing songs still belong to their album. -->
                 <div class="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
                     <p class="type-body-md text-content-primary">No tracks linked to this album</p>
-                    <p class="type-body-sm max-w-md text-content-secondary">
+                    <p class="max-w-md type-body-sm text-content-secondary">
                         Their tags changed, so the library moved them to another album during a later scan.
                     </p>
                 </div>
