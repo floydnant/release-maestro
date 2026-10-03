@@ -311,7 +311,7 @@ describe('LibraryBrowseRepository at library scale', () => {
         )
         expect(plan).toContain('record_labels_name_key')
         expect(plan).not.toMatch(/TEMP B-TREE/i)
-        expect(repository.queryRecordLabels(request)).toMatchObject({ offset: 3, total: 17 })
+        expect(repository.queryRecordLabels(request)).toMatchObject({ offset: 3, total: 22 })
     })
 
     it('orders record label artists through the name index', () => {

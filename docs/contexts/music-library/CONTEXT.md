@@ -218,9 +218,11 @@ Nothing in the triage or Linear sense of "label" belongs to this context.
 
 **Record label membership**:
 An album belongs to a record label through `albums.recordLabelId`, never through `recordLabelText`.
-A song belongs through its album. The record label's artists are the album artists of its albums
-plus the artists credited on songs of those albums, each counted once, including through missing
-songs. An album artist with no song credit there opens their albums on that record label rather than
+A song belongs through its own `recordLabelText`, matched to the record label's name. This includes
+songs without albums and songs whose tags disagree with their album. Song counts and song years
+use that same membership. The record label's artists are the album artists of its albums plus the
+artists credited on its songs, each counted once, including through missing songs.
+An album artist with no song credit there opens their albums on that record label rather than
 its tracks.
 _Avoid_: label roster, signed artists
 
