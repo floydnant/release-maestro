@@ -31,13 +31,13 @@ export class AlbumDetailHeaderComponent {
     songCount = input.required<number>()
     songCountLabel = input.required<string>()
 
-    protected trackCountText = computed(() => {
+    protected songCountText = computed(() => {
         const count = this.songCount()
         const total = this.album().trackTotal
         return total != null && total != count ? `${count}/${total}` : String(count)
     })
-    protected trackCountLabel = computed(() =>
-        this.trackCountText().includes('/') ? 'tracks' : this.songCountLabel(),
+    protected displayedSongCountLabel = computed(() =>
+        this.songCountText().includes('/') ? 'tracks' : this.songCountLabel(),
     )
 
     protected readonly fileUrl = fileUrl
