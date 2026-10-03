@@ -37,6 +37,11 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
             emailReceivedAt: new Date(source.dateReceived),
             isEmailRead: source.isRead,
             emailId: source.messageId,
+            fanNames:
+                source.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'
+                    ? (source.purchases?.find(purchase => purchase.tralbumUrl === data.tralbumUrl)
+                          ?.fanNames ?? [])
+                    : [],
             releaseName: tralbum?.title || newRelease?.subject || data.tralbumUrl,
             band: tralbum?.band || null,
             artist: tralbum?.artist || null,

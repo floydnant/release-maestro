@@ -52,6 +52,7 @@ export type HydratedBandcampReleaseFeedItem = {
         emailReceivedAt: Date
         isEmailRead: boolean
         emailId: string
+        fanNames: string[]
         releaseName: string
         band: BandData | null
         artist: string | null

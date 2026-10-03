@@ -25,6 +25,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
                 releaseName: 'First Release',
                 artist: 'Test Artist',
                 emailId: fansBoughtMusicFeedItem.source.messageId,
+                fanNames: ['Adam Pitts'],
                 emailReceivedAt: fansBoughtMusicFeedItem.eventDate,
                 isEmailRead: true,
                 about: 'An album bought by a fan.',
@@ -51,6 +52,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
         )
 
         expect(result.data.releaseType).toBe('track')
+        expect(result.data.fanNames).toEqual(['Maya', 'River & Rain'])
         expect(result.data.iframeUrl).toContain('/track=123/')
     })
 
@@ -66,6 +68,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
                 releaseUrl: fansBoughtMusicFeedItem.data.tralbumUrl,
                 releaseName: fansBoughtMusicFeedItem.data.tralbumUrl,
                 releaseType: 'album',
+                fanNames: ['Adam Pitts'],
                 about: '',
                 links: [],
                 unsubscribeUrl: null,
@@ -73,6 +76,24 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
                 tracks: [],
             },
         })
+    })
+
+    it('hydrates older fan purchases that were stored without buyer attribution', () => {
+        const oldItem: BandcampFeedItem = {
+            ...fansBoughtMusicFeedItem,
+            source: {
+                type: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
+                messageId: 'older-fan-email',
+                dateReceived: '2026-10-01T21:40:12Z',
+                isRead: false,
+                tralbumUrls: [fansBoughtMusicFeedItem.data.tralbumUrl],
+            },
+        }
+
+        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(oldItem, null, null, null)
+
+        expect(result.sourceType).toBe('EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC')
+        expect(result.data.fanNames).toEqual([])
     })
 
     it('retains new-release email fallbacks, links, artwork, and unsubscribe actions', () => {
