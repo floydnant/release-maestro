@@ -1,0 +1,226 @@
+[
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-3pq3-5fj3-cg6v",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-44g4-m2mj-wpvx",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-4hqw-qxg8-jxx2",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-542g-h47m-68v8",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-9fr6-4gfg-395g",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-c29m-xwm3-cm6r",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-j8rh-479h-cp32",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-m8m8-qj5v-23w3",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-mghh-pgcx-3jjj",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-r4gj-5m52-g5wh",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-vh66-26gq-q6x8",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "axios",
+        "version": "1.18.1",
+        "ecosystem": "npm",
+        "id": "GHSA-x97p-jq2g-jp4f",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx HTTP client dependency. Adapter, proxy, redirect, and prototype-pollution advisories need an upstream update or a tested override. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "basic-ftp",
+        "version": "5.3.1",
+        "ecosystem": "npm",
+        "id": "GHSA-c475-qrg2-pj4r",
+        "expires": "2026-11-02",
+        "reason": "Existing proxy/PAC dependency under Bandcamp/Puppeteer. Untrusted FTP directory listings can trigger CPU exhaustion. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "brace-expansion",
+        "version": "5.0.8",
+        "ecosystem": "npm",
+        "id": "GHSA-6j4f-fj2g-mc7p",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx glob dependency. Crafted glob patterns can exhaust CPU, memory, or the stack. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "brace-expansion",
+        "version": "5.0.8",
+        "ecosystem": "npm",
+        "id": "GHSA-q2hr-2g5m-vwhr",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx glob dependency. Crafted glob patterns can exhaust CPU, memory, or the stack. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "brace-expansion",
+        "version": "5.0.8",
+        "ecosystem": "npm",
+        "id": "GHSA-qhr7-859c-m2p7",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx glob dependency. Crafted glob patterns can exhaust CPU, memory, or the stack. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "brace-expansion",
+        "version": "5.0.8",
+        "ecosystem": "npm",
+        "id": "GHSA-rgw5-rvv9-x895",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx glob dependency. Crafted glob patterns can exhaust CPU, memory, or the stack. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "brace-expansion",
+        "version": "5.0.9",
+        "ecosystem": "npm",
+        "id": "GHSA-6j4f-fj2g-mc7p",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx glob dependency. Crafted glob patterns can exhaust CPU, memory, or the stack. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "brace-expansion",
+        "version": "5.0.9",
+        "ecosystem": "npm",
+        "id": "GHSA-q2hr-2g5m-vwhr",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx glob dependency. Crafted glob patterns can exhaust CPU, memory, or the stack. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "brace-expansion",
+        "version": "5.0.9",
+        "ecosystem": "npm",
+        "id": "GHSA-qhr7-859c-m2p7",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx glob dependency. Crafted glob patterns can exhaust CPU, memory, or the stack. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "braces",
+        "version": "3.0.3",
+        "ecosystem": "npm",
+        "id": "GHSA-vfj7-8cjw-p6xm",
+        "expires": "2026-11-02",
+        "reason": "Existing watcher and glob dependency. Deeply nested patterns can exhaust the stack. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "esbuild",
+        "version": "0.18.20",
+        "ecosystem": "npm",
+        "id": "GHSA-67mh-4wv8-2f99",
+        "expires": "2026-11-02",
+        "reason": "Existing drizzle-kit loader dependency. The advisory concerns its development HTTP server. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "extract-zip",
+        "version": "2.0.1",
+        "ecosystem": "npm",
+        "id": "GHSA-7pqw-9j4j-h8q3",
+        "expires": "2026-11-02",
+        "reason": "Existing Puppeteer dependency under bandcamp-fetch. Browser archive extraction can write through unsafe symlinks. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "extract-zip",
+        "version": "2.0.1",
+        "ecosystem": "npm",
+        "id": "GHSA-jmr9-qjv8-65gv",
+        "expires": "2026-11-02",
+        "reason": "Existing Puppeteer dependency under bandcamp-fetch. Browser archive extraction can write through unsafe symlinks. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "http-cache-semantics",
+        "version": "4.2.0",
+        "ecosystem": "npm",
+        "id": "GHSA-ch52-4w7c-c8xp",
+        "expires": "2026-11-02",
+        "reason": "Existing Electron download client dependency. Shared HTTP caching can disclose responses. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "serialize-javascript",
+        "version": "6.0.2",
+        "ecosystem": "npm",
+        "id": "GHSA-5c6j-r48x-rmvq",
+        "expires": "2026-11-02",
+        "reason": "Existing nx-electron build dependency. Crafted objects can cause code injection or CPU exhaustion during serialization. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "serialize-javascript",
+        "version": "6.0.2",
+        "ecosystem": "npm",
+        "id": "GHSA-qj8w-gfj5-8c6v",
+        "expires": "2026-11-02",
+        "reason": "Existing nx-electron build dependency. Crafted objects can cause code injection or CPU exhaustion during serialization. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "smol-toml",
+        "version": "1.6.1",
+        "ecosystem": "npm",
+        "id": "GHSA-7w5x-hrqm-74c2",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx TOML parser dependency. Malformed TOML can exhaust CPU. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    }
+]

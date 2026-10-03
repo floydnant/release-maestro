@@ -1,0 +1,50 @@
+name: 'Security'
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+    schedule:
+        - cron: '23 6 * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    dependencies:
+        name: Dependency vulnerabilities
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+            - uses: ./.github/actions/setup-node
+              with:
+                  install-command: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Scan dependency vulnerabilities
+              run: make security
+            - name: Upload vulnerability reports
+              if: always()
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: dependency-vulnerabilities
+                  path: dist/security/*.json
+                  if-no-files-found: ignore
+
+    sbom:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+            - uses: ./.github/actions/setup-node
+              with:
+                  install-command: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Fetch locked Rust crates
+              run: cargo fetch --locked --manifest-path apps/metadata-engine/Cargo.toml
+            - name: Generate dependency inventories
+              run: make sbom
+            - name: Upload source SBOMs
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: source-sbom
+                  path: dist/security/
+                  if-no-files-found: error
