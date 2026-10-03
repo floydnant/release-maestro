@@ -191,12 +191,7 @@ export class LibraryBackendRepository {
                     and(
                         eq(songsTable.present, true),
                         eq(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
-                        or(
-                            isNull(songsTable.normalizerVersion),
-                            ne(songsTable.normalizerVersion, NORMALIZER_VERSION),
-                            isNull(songsTable.extractorVersion),
-                            ne(songsTable.extractorVersion, extractorVersion),
-                        ),
+                        metadataRevisionMismatch(extractorVersion),
                     ),
                 )
                 .get()?.count ?? 0
@@ -710,6 +705,12 @@ const songsNeedingMetadata = (extractorVersion: string) =>
     or(
         isNull(songsTable.scannedFileFingerprint),
         ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
+        metadataRevisionMismatch(extractorVersion),
+    )
+
+/** Both the read queue and its refresh subtotal use the same revision rule. */
+const metadataRevisionMismatch = (extractorVersion: string) =>
+    or(
         isNull(songsTable.normalizerVersion),
         ne(songsTable.normalizerVersion, NORMALIZER_VERSION),
         isNull(songsTable.extractorVersion),
