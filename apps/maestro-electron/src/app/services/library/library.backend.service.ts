@@ -77,6 +77,15 @@ export class LibraryBackendService {
                     })
 
                     if (abortSignal?.aborted) return
+                    await this.queueMissingCovers(scanStartedAt, abortSignal, (path, error) => {
+                        errors += 1
+                        subscriber.next({
+                            phase: 'itemError',
+                            path,
+                            error: error instanceof Error ? error.message : String(error),
+                        })
+                    })
+                    if (abortSignal?.aborted) return
                     const { extractorVersion } = await this.metadata.ping()
                     if (abortSignal?.aborted) return
                     const metadataReadTotal = this.repository.countSongsNeedingMetadata(
@@ -242,6 +251,51 @@ export class LibraryBackendService {
                 error => subscriber.error(error),
             )
         })
+    }
+
+    private async queueMissingCovers(
+        seenAt: Date,
+        abortSignal: AbortSignal | undefined,
+        onError: (path: string, error: unknown) => void,
+    ): Promise<void> {
+        let afterPath: string | null = null
+        while (!abortSignal?.aborted) {
+            const songs = this.repository.listSeenSongCovers(seenAt, afterPath, DEEP_READ_BATCH_SIZE)
+            const lastSong = songs.at(-1)
+            if (lastSong === undefined) return
+            afterPath = lastSong.path
+            const coverPaths = [...new Set(songs.map(song => song.coverPath))]
+            const inspectionErrors = new Map<string, unknown>()
+            const missing = await Promise.all(
+                coverPaths.map(async coverPath => {
+                    try {
+                        return (await stat(coverPath)).isFile() ? [] : [coverPath]
+                    } catch (error) {
+                        if (
+                            typeof error === 'object' &&
+                            error !== null &&
+                            'code' in error &&
+                            (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+                        ) {
+                            return [coverPath]
+                        }
+                        inspectionErrors.set(coverPath, error)
+                        return []
+                    }
+                }),
+            )
+            if (abortSignal?.aborted) return
+            for (const song of songs) {
+                if (inspectionErrors.has(song.coverPath)) {
+                    onError(song.path, inspectionErrors.get(song.coverPath))
+                }
+            }
+            const missingCoverPaths = new Set(missing.flat())
+            this.repository.queueSongsWithMissingCovers(
+                seenAt,
+                songs.filter(song => missingCoverPaths.has(song.coverPath)).map(song => song.path),
+            )
+        }
     }
 
     private readAndIngestBatch(

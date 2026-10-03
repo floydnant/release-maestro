@@ -54,8 +54,9 @@ _Avoid_: crawl, walk, indexing
 
 **Deep read**:
 The second scan phase. Reads full tags and cover art for files seen by the current discovery that
-still need metadata. A changed fingerprint, missing content hash, or changed metadata revision
-queues a read, including work left unfinished by an earlier scan.
+still need metadata. A changed fingerprint, missing content hash, changed metadata revision, or
+unavailable cached cover queues a read, including work left unfinished by an earlier scan.
+
 _Avoid_: full scan, tag scan
 
 **Metadata revision**:
