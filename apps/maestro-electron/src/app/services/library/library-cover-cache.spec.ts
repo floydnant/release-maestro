@@ -1,5 +1,5 @@
 import { fromPartial } from '@total-typescript/shoehorn'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { stat } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -15,6 +15,7 @@ import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
 import { MetadataBackendService } from '../metadata/metadata.backend.service'
 import { LibraryBackendRepository } from './library.backend.repository'
 import { LibraryBackendService } from './library.backend.service'
+import { songsTable } from '../../database/drizzle.schema'
 
 jest.mock('fs/promises', () => ({
     ...jest.requireActual('fs/promises'),
@@ -25,8 +26,15 @@ describe('library cover cache recovery', () => {
     let database: ReturnType<typeof createMigratedTestDatabase>
     let cacheDir: string
     let repository: LibraryBackendRepository
+    let extractorVersion: string
+    const pendingCount = () =>
+        repository.countSongsNeedingMetadata(
+            database.db.select().from(songsTable).get()?.lastSeenAt ?? new Date(0),
+            extractorVersion,
+        )
 
     beforeEach(() => {
+        extractorVersion = 'test-extractor'
         database = createMigratedTestDatabase()
         cacheDir = mkdtempSync(join(tmpdir(), 'maestro-cover-cache-'))
         repository = new LibraryBackendRepository(database.client)
@@ -48,7 +56,7 @@ describe('library cover cache recovery', () => {
         const metadata = newSongFixture({ path, fileName: fact.fileName, coverPath, albumTitle: path })
         const seenAt = repository.nextScanSeenAt()
         repository.processPrescanBatch([fact], seenAt)
-        if (ingested) repository.ingestMetadata(metadata, fact, seenAt)
+        if (ingested) repository.ingestMetadata(metadata, fact, seenAt, extractorVersion)
         return { fact, metadata }
     }
 
@@ -67,6 +75,7 @@ describe('library cover cache recovery', () => {
         const service = new LibraryBackendService(
             repository,
             fromPartial<MetadataBackendService>({
+                ping: async () => ({ protocolVersion: 1, engineVersion: '0.1.0', extractorVersion }),
                 prescan: () =>
                     from<MetadataPrescanUpdate[]>([
                         { phase: 'batch', items: discovered.map(song => song.fact) },
@@ -82,7 +91,7 @@ describe('library cover cache recovery', () => {
         const coverPath = join(cacheDir, 'cover.png')
         writeFileSync(coverPath, 'cover bytes')
         const song = seedSong('/music/song.flac', coverPath)
-        expect(repository.countSongsNeedingMetadata()).toBe(0)
+        expect(pendingCount()).toBe(0)
 
         rmSync(deletion === 'directory' ? cacheDir : coverPath, { recursive: true })
         const { service, readFiles } = scanService([song])
@@ -91,9 +100,9 @@ describe('library cover cache recovery', () => {
 
         expect(existsSync(coverPath)).toBe(true)
         expect(readFiles).toHaveBeenCalledWith([song.fact.path], undefined)
-        expect(updates).toContainEqual({ phase: 'started', total: 1 })
+        expect(updates).toContainEqual({ phase: 'started', total: 1, refreshTotal: 0 })
         expect(updates.at(-1)).toMatchObject({ phase: 'completed', unchanged: 1, changed: 0, count: 1 })
-        expect(repository.countSongsNeedingMetadata()).toBe(0)
+        expect(pendingCount()).toBe(0)
 
         await firstValueFrom(service.scan(['/music']).pipe(toArray()))
         expect(readFiles).toHaveBeenCalledTimes(1)
@@ -138,11 +147,11 @@ describe('library cover cache recovery', () => {
 
         const failed = await firstValueFrom(service.scan(['/music']).pipe(toArray()))
         expect(failed.at(-1)).toMatchObject({ errors: 1, count: 0 })
-        expect(repository.countSongsNeedingMetadata()).toBe(1)
+        expect(pendingCount()).toBe(1)
 
         await firstValueFrom(service.scan(['/music']).pipe(toArray()))
         expect(existsSync(coverPath)).toBe(true)
-        expect(repository.countSongsNeedingMetadata()).toBe(0)
+        expect(pendingCount()).toBe(0)
     })
 
     it('recovers covers across bounded windows', async () => {
@@ -154,10 +163,10 @@ describe('library cover cache recovery', () => {
         const updates = await firstValueFrom(service.scan(['/music']).pipe(toArray()))
 
         expect(readFiles.mock.calls.map(([paths]) => paths.length)).toEqual([100, 1])
-        expect(updates).toContainEqual({ phase: 'started', total: 101 })
+        expect(updates).toContainEqual({ phase: 'started', total: 101, refreshTotal: 0 })
         expect(updates.at(-1)).toMatchObject({ count: 101, unchanged: 101 })
         expect(songs.every(song => existsSync(song.metadata.coverPath!))).toBe(true)
-        expect(repository.countSongsNeedingMetadata()).toBe(0)
+        expect(pendingCount()).toBe(0)
     })
 
     it('reports cover inspection errors and still imports unrelated songs', async () => {
@@ -173,5 +182,45 @@ describe('library cover cache recovery', () => {
         expect(readFiles).toHaveBeenCalledWith(['/music/new.flac'], undefined)
         expect(updates).toContainEqual({ phase: 'itemError', path: '/music/covered.flac', error: 'locked' })
         expect(updates.at(-1)).toMatchObject({ phase: 'completed', count: 1, errors: 1 })
+    })
+
+    it('preserves identity through a rename, extractor upgrade and deleted cover', async () => {
+        const oldPath = join(cacheDir, 'original.flac')
+        const newPath = join(cacheDir, 'renamed.flac')
+        const coverPath = join(cacheDir, 'cover.png')
+        writeFileSync(oldPath, 'audio bytes')
+        writeFileSync(coverPath, 'cover bytes')
+        const song = seedSong(oldPath, coverPath)
+        const original = database.db.select().from(songsTable).get()
+        renameSync(oldPath, newPath)
+        rmSync(coverPath)
+        extractorVersion = 'next-extractor'
+        const moved = {
+            fact: { ...song.fact, path: newPath, fileName: 'renamed.flac' },
+            metadata: { ...song.metadata, path: newPath, fileName: 'renamed.flac' },
+        }
+        const { service, readFiles } = scanService([moved])
+        await firstValueFrom(service.scan([cacheDir]).pipe(toArray()))
+        expect(database.db.select().from(songsTable).all()).toEqual([
+            expect.objectContaining({
+                id: original?.id,
+                addedAt: original?.addedAt,
+                path: newPath,
+                extractorVersion,
+            }),
+        ])
+        expect(existsSync(coverPath)).toBe(true)
+        await firstValueFrom(service.scan([cacheDir]).pipe(toArray()))
+        expect(readFiles).toHaveBeenCalledTimes(1)
+    })
+
+    it('reads an unchanged song once when both the extractor and cover need refresh', async () => {
+        const song = seedSong('/music/song.flac', join(cacheDir, 'missing.png'))
+        extractorVersion = 'next-extractor'
+        const { service, readFiles } = scanService([song])
+        await firstValueFrom(service.scan(['/music']).pipe(toArray()))
+        await firstValueFrom(service.scan(['/music']).pipe(toArray()))
+        expect(readFiles).toHaveBeenCalledTimes(1)
+        expect(database.db.select().from(songsTable).get()?.extractorVersion).toBe(extractorVersion)
     })
 })
