@@ -74,15 +74,16 @@ user-confirmed raw-name resolutions remain even without songs.
 
 **Reconciliation**:
 Matching moved songs to their existing identity, then marking songs absent (`present = false`) when
-discovery did not see them. Runs after deep read. Skipped when the scan was cancelled or discovery
-reported errors — see ADR 0003. Read failures also defer move matching until a complete retry.
+discovery did not see them. Runs after deep read. Move application and absence marking stop when the scan was cancelled or discovery
+reported errors — see ADR 0003. Read failures also defer moves until a complete retry. Successful
+probes still retain proof that excluded originals coexist with copies, even on failed or cancelled scans.
 _Avoid_: pruning, cleanup, deletion
 
 **Moved song**:
 A previously imported file discovered at a different path, including a renamed file. A unique match
 keeps the original song ID, Added date, external references, and dismissed normalization issues.
-It is reported as changed rather than new when first discovered at the new path. Unchanged rescans
-can also repair a unique missing/present pair left by an earlier interrupted or pre-upgrade scan.
+It is reported as changed, including moves repaired on retry. Unchanged rescans can also repair a
+unique missing/present pair left by an earlier interrupted scan with known discovery history.
 
 **Content hash**:
 A SHA-256 digest of all file bytes, read by the metadata engine during deep read. It identifies
@@ -95,7 +96,10 @@ songs need a scan at their original location before content matching is possible
 
 Move matching requires exactly one unseen song and one seen song with the matching identity. The
 destination must have first appeared after the original was last confirmed available. These scan
-timestamps are separate from the Added date. Availability includes discovery and successful probes
+timestamps are separate from the Added date. First discovery is unknown for pre-upgrade rows; those
+rows cannot act as destinations in automatic matching. Their future moves still match newly discovered
+destinations. Existing legacy duplicates remain separate because past coexistence cannot be reconstructed.
+Availability includes discovery and successful probes
 of excluded originals, so known copies stay distinct after either disappears. The original directory
 entry must no longer exist; case-only renames resolve to the destination and also count as moves. Known copies, ambiguous matches, changed bytes with known hashes, and inconclusive
 filesystem errors retain separate rows. Moving and editing tags together is not a byte-identical move.

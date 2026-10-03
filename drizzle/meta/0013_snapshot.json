@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a4d03926-b71f-4d38-897f-e5d7c6519e86",
+  "id": "cfa99125-f0aa-4de6-b521-4ef2a1270d84",
   "prevId": "f27652dc-482f-43b8-9c0f-8eac657bc410",
   "tables": {
     "album_artists": {
@@ -1204,9 +1204,8 @@
           "name": "first_seen_at",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "0"
+          "notNull": false,
+          "autoincrement": false
         },
         "last_available_at": {
           "name": "last_available_at",
