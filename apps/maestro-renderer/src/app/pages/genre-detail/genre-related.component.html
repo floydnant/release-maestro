@@ -3,7 +3,8 @@
         <p class="type-body-sm text-content-secondary">
             Could not load {{ label().toLowerCase() }} for this genre
         </p>
-        <button type="button" class="btn-neutral" (click)="onRetry()">Try again</button>
+        <button hlmBtn variant="secondary"
+                type="button" (click)="onRetry()">Try again</button>
     </div>
 }
 @if (!result().loaded && result().status === 'loading') {

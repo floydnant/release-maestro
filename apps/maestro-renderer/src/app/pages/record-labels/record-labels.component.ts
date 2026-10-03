@@ -1,3 +1,4 @@
+import { HlmButton } from '@spartan-ng/helm/button'
 import {
     ChangeDetectionStrategy,
     Component,
@@ -30,7 +31,7 @@ import {
     selector: 'app-record-labels',
     templateUrl: './record-labels.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [BrowseShellComponent, CatalogListComponent, IconComponent],
+    imports: [HlmButton, BrowseShellComponent, CatalogListComponent, IconComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class RecordLabelsComponent {

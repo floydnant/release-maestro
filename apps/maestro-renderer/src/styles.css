@@ -53,71 +53,6 @@
     hyphens: auto;
 }
 
-@utility active-link {
-    &:where(a) {
-        @apply bg-action-secondary text-action-primary-content shadow-sm hover:bg-action-secondary-hover;
-    }
-}
-
-@utility btn {
-    @apply inline-flex cursor-default items-center justify-center rounded-lg px-3 py-1.5 transition-colors duration-fast ease-standard disabled:bg-action-primary-disabled disabled:text-content-muted;
-    font-family: var(--type-label-md-family);
-    font-size: var(--type-label-md-size);
-    font-weight: var(--type-label-md-weight);
-    line-height: var(--type-label-md-line-height);
-    letter-spacing: var(--type-label-md-letter-spacing);
-}
-
-@utility btn-neutral {
-    @apply btn bg-action-secondary text-action-secondary-content hover:bg-action-secondary-hover active:bg-action-secondary-pressed;
-}
-
-@utility btn-nkd-neutral {
-    @apply btn text-content-secondary hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed;
-}
-
-@utility btn-muted {
-    @apply btn bg-background-surface text-content-muted hover:bg-background-elevated hover:text-content-secondary;
-}
-
-@utility btn-primary {
-    @apply btn bg-action-primary text-action-primary-content shadow-sm hover:bg-action-primary-hover active:bg-action-primary-pressed;
-}
-
-@utility btn-danger {
-    @apply btn border border-status-danger-border bg-status-danger-background text-status-danger-content hover:bg-status-danger-hover;
-}
-
-@utility btn-nkd-danger {
-    @apply btn text-content-danger hover:bg-status-danger-background;
-}
-
-@utility input {
-    @apply rounded-lg border border-border-default bg-background-canvas px-3 py-1 text-content-primary placeholder-content-muted;
-    font-family: var(--type-body-md-family);
-    font-size: var(--type-body-md-size);
-    font-weight: var(--type-body-md-weight);
-    line-height: var(--type-body-md-line-height);
-    letter-spacing: var(--type-body-md-letter-spacing);
-}
-
-@utility badge {
-    @apply inline-flex items-center rounded-full border border-border-subtle bg-background-surface px-3 py-1 text-content-secondary;
-    font-family: var(--type-label-sm-family);
-    font-size: var(--type-label-sm-size);
-    font-weight: var(--type-label-sm-weight);
-    line-height: var(--type-label-sm-line-height);
-    letter-spacing: var(--type-label-sm-letter-spacing);
-}
-
-@utility panel {
-    @apply rounded-xl border border-border-subtle bg-background-surface shadow-md;
-}
-
-@utility surface-elevated {
-    @apply rounded-xl border border-border-default bg-background-elevated shadow-lg;
-}
-
 html,
 body {
     margin: 0;
@@ -155,7 +90,7 @@ body {
 }
 
 @layer components {
-    a:not(:where([hlmBtn], [class*='btn'])) {
+    a:not([hlmBtn]) {
         @apply cursor-default text-content-action underline;
         text-underline-offset: 0.18em;
     }
