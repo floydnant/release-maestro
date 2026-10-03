@@ -94,7 +94,7 @@ move matching requires unique matching stored tags, audio properties, and size, 
 title and artist or album tags. Artwork paths and user-added external references are excluded. That fallback is an inference, not proof of equal audio bytes. Untagged older missing
 songs need a scan at their original location before content matching is possible.
 
-Move matching requires exactly one unseen song and one seen song with the matching identity. The
+Move matching requires one original identity and exactly one seen path with the matching identity. The
 destination must have first appeared after the original was last confirmed available. These scan
 timestamps are separate from the Added date. First discovery is unknown for pre-upgrade rows; those
 rows cannot act as destinations in automatic matching. Their future moves still match newly discovered
@@ -103,6 +103,12 @@ Availability includes discovery and successful probes
 of excluded originals, so known copies stay distinct after either disappears. The original directory
 entry must no longer exist; case-only renames resolve to the destination and also count as moves. Known copies, ambiguous matches, changed bytes with known hashes, and inconclusive
 filesystem errors retain separate rows. Moving and editing tags together is not a byte-identical move.
+
+**Pending move**:
+A unique rename confirmed by an absent original directory entry, waiting for a complete scan before
+identity merging. The destination stores the original song ID. Later renames and returns to the
+original path can reuse that evidence after a failed scan. All intermediate paths must be absent
+before merging. Observed coexistence discards the pending relationship and keeps separate songs.
 
 **Missing**:
 A song in the database whose file was not seen by the last complete discovery. `present` means "the

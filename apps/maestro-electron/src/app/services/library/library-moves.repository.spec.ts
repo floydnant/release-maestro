@@ -3,7 +3,7 @@ import { basename } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
-import { normalizationIssuesTable, songsTable } from '../../database/drizzle.schema'
+import { albumsTable, normalizationIssuesTable, songsTable } from '../../database/drizzle.schema'
 import { LibraryBackendRepository } from './library.backend.repository'
 
 describe('moved songs', () => {
@@ -22,7 +22,7 @@ describe('moved songs', () => {
     })
     const discover = (songs: SongMetadata[], seenAt: Date) => {
         repository.processPrescanBatch(songs.map(fact), seenAt)
-        for (const song of songs) repository.ingestMetadata(song, fact(song), seenAt)
+        for (const song of songs) repository.ingestMetadata(song, fact(song), seenAt, 'test-extractor')
     }
     const finish = (seenAt: Date) => {
         for (const candidate of repository.findMovedSongCandidates(seenAt)) {
@@ -95,12 +95,12 @@ describe('moved songs', () => {
     it('keeps discovery chronology separate from Added after an interrupted initial import', () => {
         const oldSong = metadata('/music/original.mp3')
         repository.processPrescanBatch([fact(oldSong)], first, true)
-        repository.ingestMetadata(oldSong, fact(oldSong), first)
+        repository.ingestMetadata(oldSong, fact(oldSong), first, 'test-extractor')
         const original = rows()[0]
         if (!original) throw new Error('Expected an imported song')
         const moved = metadata('/music/renamed.mp3')
         repository.processPrescanBatch([fact(moved)], next, true)
-        repository.ingestMetadata(moved, fact(moved), next)
+        repository.ingestMetadata(moved, fact(moved), next, 'test-extractor')
         finish(next)
         expect(rows()).toEqual([
             expect.objectContaining({
@@ -244,5 +244,24 @@ describe('moved songs', () => {
                 expect.objectContaining({ id: issue.id, entityId: original.id, status: 'DISMISSED' }),
             ),
         )
+    })
+
+    it('recomputes the album cover after removing the old path', () => {
+        discover([metadata('/old/song.mp3', { albumTitle: 'Album', coverPath: '/aaa.jpg' })], first)
+        discover([metadata('/new/song.mp3', { albumTitle: 'Album', coverPath: '/zzz.jpg' })], next)
+        expect(database.db.select().from(albumsTable).get()?.coverPath).toBe('/aaa.jpg')
+        finish(next)
+        expect(database.db.select().from(albumsTable).get()?.coverPath).toBe('/zzz.jpg')
+    })
+
+    it('removes an empty old album when a moved file gets a new album from the extractor', () => {
+        discover([metadata('/old/song.mp3', { albumTitle: 'Old album' })], first)
+        const identity = rows()[0]?.id
+        discover([metadata('/new/song.mp3', { albumTitle: 'Corrected album' })], next)
+        finish(next)
+        expect(rows()[0]?.id).toBe(identity)
+        expect(database.db.select().from(albumsTable).all()).toEqual([
+            expect.objectContaining({ title: 'Corrected album' }),
+        ])
     })
 })

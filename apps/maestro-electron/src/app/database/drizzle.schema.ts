@@ -225,6 +225,8 @@ export const songsTable = sqliteTable(
 
         metadataHash: text('metadata_hash'),
         contentHash: text('content_hash'),
+        // A proven rename whose identity merge is waiting for a complete scan.
+        moveOriginId: text('move_origin_id'),
         /**
          * Which revision of the normaliser produced this row's derived columns. Null
          * for rows written before the column existed, which is why a version mismatch
