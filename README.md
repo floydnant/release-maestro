@@ -14,7 +14,7 @@ These links become available after the first release finishes building:
 
 - [macOS, Apple Silicon and Intel](https://github.com/floydnant/release-maestro/releases/latest/download/Release-Maestro-macOS-universal.dmg)
 - [Windows, x64](https://github.com/floydnant/release-maestro/releases/latest/download/Release-Maestro-Windows-x64.exe)
-- [Linux, x64](https://github.com/floydnant/release-maestro/releases/latest/download/Release-Maestro-Linux-x64.AppImage)
+- [Linux, x64](https://github.com/floydnant/release-maestro/releases/latest/download/Release-Maestro-Linux-x86_64.AppImage)
 
 ## Tech Stack
 

@@ -440,3 +440,9 @@ caching disabled.
 
 GitHub CI still needs to verify this change on Linux and Windows. No application
 release was created during verification.
+
+The first Linux CI build exposed an architecture-name difference. Electron-builder
+expands the AppImage `${arch}` macro to `x86_64`, although the runner and build
+architecture are `x64`. The installer collector, fixture, and README link now
+use the generated `Release-Maestro-Linux-x86_64.AppImage` filename. The build
+itself succeeded before collection rejected the old expected name.

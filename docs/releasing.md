@@ -59,7 +59,7 @@ changes invalidate the Electron build and packaging caches.
 | ------------------------------ | ------------------------------------------------------------------------------- |
 | macOS, Apple Silicon and Intel | `Release-Maestro-macOS-universal.dmg` and `Release-Maestro-macOS-universal.zip` |
 | Windows, x64                   | `Release-Maestro-Windows-x64.exe`                                               |
-| Linux, x64                     | `Release-Maestro-Linux-x64.AppImage`                                            |
+| Linux, x64                     | `Release-Maestro-Linux-x86_64.AppImage`                                         |
 
 Asset names stay the same between versions. Use
 `https://github.com/floydnant/release-maestro/releases/latest/download/<asset>`
