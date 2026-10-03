@@ -1,3 +1,4 @@
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Shared synthetic fixtures live in fixtures/, per docs/testing.md.
 import { fansBoughtMusicEmail, newReleaseEmail } from '../../../../../../fixtures/feed.fixture'
 import { parseBandcampEmail } from './bandcamp.email-parser'
 
