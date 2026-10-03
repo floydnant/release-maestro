@@ -1,6 +1,6 @@
 import { PrescanFileFact, SongMetadata } from '@release-maestro/core'
 import { randomUUID } from 'crypto'
-import { and, asc, count, eq, gt, inArray, isNull, lt, max, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gt, inArray, isNull, lt, max, min, ne, or, sql } from 'drizzle-orm'
 import { DatabaseClient } from '../../database/database.client'
 import {
     albumArtistsTable,
@@ -56,7 +56,7 @@ const issueFingerprint = (issue: NormalizationIssue): string =>
     })
 
 export class LibraryBackendRepository {
-    constructor(private readonly database: DatabaseClient) {}
+    constructor(private readonly database: Pick<DatabaseClient, 'db'>) {}
 
     nextScanSeenAt(): Date {
         const latest = this.database.db
@@ -425,7 +425,7 @@ export class LibraryBackendRepository {
                     year,
                     date: normalizeDisplayText(metadata.date),
                     catalogNumber: normalizeDisplayText(metadata.catalogNumber),
-                    coverPath: metadata.coverPath,
+                    // Cover art is recomputed from every member after the song upsert.
                     externalRefs: mergeExternalRefs([
                         existingAlbum?.externalRefs,
                         filterExternalRefs(externalRefs, relevantExternalRefsMap.albums),
@@ -529,34 +529,29 @@ export class LibraryBackendRepository {
                     .run()
             }
 
-            // `albums.date_added` is denormalized so the grid can sort on it (ADR 0004,
-            // ADR 0005), which makes it this transaction's job to keep true. Both ends of
-            // a move are recomputed: re-tagging a file can re-key its album, and doing
-            // only the new one would leave the old dated by a song it no longer has.
-            //
-            // Recomputed rather than adjusted, because an adjustment has to be right
-            // about whether this song was already on the album — and it is not, when a
-            // re-read leaves the album unchanged. The `MAX` runs over
-            // `songs_album_id_idx`, which is cheap and cannot drift.
-            //
-            // An album is as new as the most recent file on it, so ripping the rest of a
-            // part-ripped record brings the whole thing back to the top rather than
-            // leaving it where its oldest track put it. `null` when no song on the album
-            // carries a creation time.
+            // Recompute both ends of a move in the song transaction (ADR 0005).
+            // Missing songs still belong to their album. MIN ignores absent artwork
+            // and chooses the same content-addressed cover regardless of read order.
             for (const affectedAlbumId of new Set(
                 [existingSong?.albumId, albumId].filter((id): id is string => id != null),
             )) {
-                tx.update(albumsTable)
-                    .set({
-                        dateAdded:
-                            tx
-                                .select({ value: max(songsTable.createdAt) })
-                                .from(songsTable)
-                                .where(eq(songsTable.albumId, affectedAlbumId))
-                                .get()?.value ?? null,
+                const members = tx
+                    .select({
+                        count: count(),
+                        dateAdded: max(songsTable.createdAt),
+                        coverPath: min(songsTable.coverPath),
                     })
-                    .where(eq(albumsTable.id, affectedAlbumId))
-                    .run()
+                    .from(songsTable)
+                    .where(eq(songsTable.albumId, affectedAlbumId))
+                    .get()
+                if (!members || members.count == 0) {
+                    tx.delete(albumsTable).where(eq(albumsTable.id, affectedAlbumId)).run()
+                } else {
+                    tx.update(albumsTable)
+                        .set({ dateAdded: members.dateAdded, coverPath: members.coverPath })
+                        .where(eq(albumsTable.id, affectedAlbumId))
+                        .run()
+                }
             }
 
             tx.delete(songArtistsTable).where(eq(songArtistsTable.songId, songId)).run()

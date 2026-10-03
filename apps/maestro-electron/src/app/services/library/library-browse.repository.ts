@@ -381,15 +381,15 @@ export class LibraryBrowseRepository {
             .all()
         const songs = this.database.db
             .select({
-                recordLabelId: albumsTable.recordLabelId,
+                recordLabelId: recordLabelsTable.id,
                 songCount: countDistinct(songsTable.id),
                 firstYear: sql<number | null>`min(${songsTable.year})`,
                 lastYear: sql<number | null>`max(${songsTable.year})`,
             })
-            .from(albumsTable)
-            .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
-            .where(inArray(albumsTable.recordLabelId, ids))
-            .groupBy(albumsTable.recordLabelId)
+            .from(recordLabelsTable)
+            .innerJoin(songsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
+            .where(inArray(recordLabelsTable.id, ids))
+            .groupBy(recordLabelsTable.id)
             .all()
         const albumArtists = this.database.db
             .select({ recordLabelId: albumsTable.recordLabelId, artistId: albumArtistsTable.artistId })
@@ -397,11 +397,11 @@ export class LibraryBrowseRepository {
             .innerJoin(albumArtistsTable, eq(albumArtistsTable.albumId, albumsTable.id))
             .where(inArray(albumsTable.recordLabelId, ids))
         const songArtists = this.database.db
-            .select({ recordLabelId: albumsTable.recordLabelId, artistId: songArtistsTable.artistId })
-            .from(albumsTable)
-            .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
+            .select({ recordLabelId: recordLabelsTable.id, artistId: songArtistsTable.artistId })
+            .from(recordLabelsTable)
+            .innerJoin(songsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
             .innerJoin(songArtistsTable, eq(songArtistsTable.songId, songsTable.id))
-            .where(inArray(albumsTable.recordLabelId, ids))
+            .where(inArray(recordLabelsTable.id, ids))
         // UNION ALL plus a distinct count: a plain UNION makes SQLite merge both branches in artist
         // order, which it gets by scanning all of album_artists instead of seeking the albums.
         const members = unionAll(albumArtists, songArtists).as('record_label_artist_members')
@@ -414,7 +414,7 @@ export class LibraryBrowseRepository {
         const bySong = new Map(songs.map(row => [row.recordLabelId, row]))
         const byArtist = new Map(artistCounts.map(row => [row.recordLabelId, row.artistCount]))
         return (id: string) => {
-            // Years span the albums and the songs on them, since either can carry the only tagged year.
+            // Years span the label’s albums and songs; either can carry the only tagged year.
             const years = [byAlbum.get(id), bySong.get(id)]
                 .flatMap(row => [row?.firstYear, row?.lastYear])
                 .filter((year): year is number => year != null)
@@ -429,7 +429,7 @@ export class LibraryBrowseRepository {
     }
 
     /**
-     * Album artists of the record label's albums plus artists credited on songs of those albums.
+     * Album artists of the record label's albums plus artists credited on songs tagged with the label.
      * UNION ALL, so it can repeat an artist: `IN` ignores repeats, and counts go through `countDistinct`.
      */
     private recordLabelArtistIds(recordLabelId: string) {
@@ -440,10 +440,10 @@ export class LibraryBrowseRepository {
             .where(eq(albumsTable.recordLabelId, recordLabelId))
         const songArtists = this.database.db
             .select({ artistId: songArtistsTable.artistId })
-            .from(albumsTable)
-            .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
+            .from(recordLabelsTable)
+            .innerJoin(songsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
             .innerJoin(songArtistsTable, eq(songArtistsTable.songId, songsTable.id))
-            .where(eq(albumsTable.recordLabelId, recordLabelId))
+            .where(eq(recordLabelsTable.id, recordLabelId))
         return unionAll(albumArtists, songArtists)
     }
 
@@ -477,12 +477,12 @@ export class LibraryBrowseRepository {
                 ? []
                 : this.database.db
                       .selectDistinct({ artistId: songArtistsTable.artistId })
-                      .from(albumsTable)
-                      .innerJoin(songsTable, eq(songsTable.albumId, albumsTable.id))
+                      .from(recordLabelsTable)
+                      .innerJoin(songsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
                       .innerJoin(songArtistsTable, eq(songArtistsTable.songId, songsTable.id))
                       .where(
                           and(
-                              eq(albumsTable.recordLabelId, recordLabelId),
+                              eq(recordLabelsTable.id, recordLabelId),
                               inArray(
                                   songArtistsTable.artistId,
                                   rows.map(row => row.id),
@@ -575,11 +575,11 @@ export class LibraryBrowseRepository {
                 genreId: songGenresTable.genreId,
                 songCount: count(),
                 albumCount: countDistinct(songsTable.albumId),
-                recordLabelCount: countDistinct(albumsTable.recordLabelId),
+                recordLabelCount: countDistinct(recordLabelsTable.id),
             })
             .from(songGenresTable)
             .innerJoin(songsTable, eq(songGenresTable.songId, songsTable.id))
-            .leftJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
+            .leftJoin(recordLabelsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
             .where(inArray(songGenresTable.genreId, genreIds))
             .groupBy(songGenresTable.genreId)
             .all()
@@ -645,8 +645,7 @@ export class LibraryBrowseRepository {
                     .selectDistinct({ id: recordLabelsTable.id })
                     .from(songGenresTable)
                     .innerJoin(songsTable, eq(songGenresTable.songId, songsTable.id))
-                    .innerJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
-                    .innerJoin(recordLabelsTable, eq(albumsTable.recordLabelId, recordLabelsTable.id))
+                    .innerJoin(recordLabelsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
                     .where(eq(songGenresTable.genreId, query.genreId))
             default: {
                 const unhandled: never = query.kind
@@ -716,8 +715,8 @@ export class LibraryBrowseRepository {
     }
 
     /**
-     * The window's rows: 17 columns, the album left-join behind cover art and the
-     * record label, and the filter's `WHERE`.
+     * The window's rows, with album cover fallback and the song's record label.
+     * Resolve the record label from the same text used for display and ordering.
      *
      * The album join is `LEFT` on purpose — a song need not belong to one, and an
      * inner join would silently drop every album-less song out of the library.
@@ -741,7 +740,7 @@ export class LibraryBrowseRepository {
                 discTotal: songsTable.discTotal,
                 trackTotal: songsTable.trackTotal,
                 genreText: songsTable.genreText,
-                recordLabelId: albumsTable.recordLabelId,
+                recordLabelId: recordLabelsTable.id,
                 recordLabelText: songsTable.recordLabelText,
                 year: songsTable.year,
                 bpm: songsTable.bpm,
@@ -751,6 +750,7 @@ export class LibraryBrowseRepository {
             })
             .from(songsTable)
             .leftJoin(albumsTable, eq(songsTable.albumId, albumsTable.id))
+            .leftJoin(recordLabelsTable, eq(songsTable.recordLabelText, recordLabelsTable.name))
             .where(this.songConditions(query))
             .orderBy(...this.songOrdering(query.sort))
             .limit(limit)
@@ -821,22 +821,17 @@ export class LibraryBrowseRepository {
         const albumIds = nonEmpty(query.filter.albumIds)
         if (albumIds) conditions.push(inArray(songsTable.albumId, albumIds))
 
-        // A song reaches its record label through its album — `songs` carries the
-        // record label only as denormalized text, and text is never what a filter
-        // addresses.
+        // Entity IDs still address the filter, but membership follows the song's
+        // own tag, including album-less songs and older rows with album drift.
         const recordLabelIds = nonEmpty(query.filter.recordLabelIds)
         if (recordLabelIds) {
             conditions.push(
-                exists(
+                inArray(
+                    songsTable.recordLabelText,
                     this.database.db
-                        .select({ value: albumsTable.id })
-                        .from(albumsTable)
-                        .where(
-                            and(
-                                eq(albumsTable.id, songsTable.albumId),
-                                inArray(albumsTable.recordLabelId, recordLabelIds),
-                            ),
-                        ),
+                        .select({ name: recordLabelsTable.name })
+                        .from(recordLabelsTable)
+                        .where(inArray(recordLabelsTable.id, recordLabelIds)),
                 ),
             )
         }

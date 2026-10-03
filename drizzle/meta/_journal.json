@@ -85,6 +85,13 @@
       "when": 1791037608575,
       "tag": "0011_mae-123-disc-and-track-totals",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791037709274,
+      "tag": "0012_reconcile-album-fields",
+      "breakpoints": true
     }
   ]
 }
