@@ -365,6 +365,51 @@ describe('LibraryBrowseRepository', () => {
     })
 
     describe('record labels', () => {
+        it.each([null, 'other-album'])(
+            'uses the song label for detail statistics and artist credits with album %s',
+            albumId => {
+                db.insert(recordLabelsTable)
+                    .values([
+                        { id: 'actual', name: 'Actual Records' },
+                        { id: 'other', name: 'Other Records' },
+                    ])
+                    .run()
+                db.insert(artistsTable).values({ id: 'artist', name: 'Artist' }).run()
+                if (albumId)
+                    seedAlbum({ id: albumId, title: 'Old album', recordLabelId: 'other', year: 1990 })
+                seedSong({
+                    id: 'song',
+                    title: 'Song',
+                    albumId,
+                    recordLabelText: 'Actual Records',
+                    year: 2022,
+                    present: false,
+                })
+                db.insert(songArtistsTable).values({ songId: 'song', artistId: 'artist', position: 0 }).run()
+                expect(repository.getRecordLabelDetail('actual')).toMatchObject({
+                    songCount: 1,
+                    artistCount: 1,
+                    albumCount: 0,
+                    firstYear: 2022,
+                    lastYear: 2022,
+                })
+                expect(
+                    repository.queryRecordLabelArtists({
+                        recordLabelId: 'actual',
+                        window: { offset: 0, limit: 10 },
+                    }),
+                ).toMatchObject({
+                    total: 1,
+                    rows: [{ id: 'artist', hasSongCredits: true, hasAlbumCredits: false }],
+                })
+                expect(repository.getRecordLabelDetail('other')).toMatchObject({
+                    songCount: 0,
+                    artistCount: 0,
+                    albumCount: albumId ? 1 : 0,
+                })
+            },
+        )
+
         it('windows names and derives distinct stats from linked albums and songs', () => {
             db.insert(recordLabelsTable)
                 .values([
@@ -384,7 +429,7 @@ describe('LibraryBrowseRepository', () => {
             db.insert(albumArtistsTable)
                 .values({ albumId: 'album2', artistId: 'album-artist', position: 0 })
                 .run()
-            seedSong({ id: 'song1', title: 'First', albumId: 'album1', recordLabelText: 'Wrong text' })
+            seedSong({ id: 'song1', title: 'First', albumId: 'album1', recordLabelText: '100% Records' })
             seedSong({
                 id: 'song2',
                 title: 'Second',
@@ -495,7 +540,7 @@ describe('LibraryBrowseRepository', () => {
             seedAlbum({ id: 'album1', title: 'Own album', recordLabelId: 'label' })
             seedAlbum({ id: 'album2', title: 'Appearance', recordLabelId: 'label' })
             db.insert(albumArtistsTable).values({ albumId: 'album1', artistId: 'artist', position: 0 }).run()
-            seedSong({ id: 'song', title: 'Track', albumId: 'album2' })
+            seedSong({ id: 'song', title: 'Track', albumId: 'album2', recordLabelText: 'Kosmische' })
             db.insert(songArtistsTable).values({ songId: 'song', artistId: 'artist', position: 0 }).run()
 
             expect(
@@ -510,8 +555,20 @@ describe('LibraryBrowseRepository', () => {
             db.insert(recordLabelsTable).values({ id: 'a', name: 'Kosmische' }).run()
             seedAlbum({ id: 'undated', title: 'Undated', recordLabelId: 'a' })
             seedAlbum({ id: 'dated', title: 'Dated', recordLabelId: 'a', year: 2015 })
-            seedSong({ id: 'song1', title: 'Early', albumId: 'undated', year: 2011 })
-            seedSong({ id: 'song2', title: 'Late', albumId: 'undated', year: 2013 })
+            seedSong({
+                id: 'song1',
+                title: 'Early',
+                albumId: 'undated',
+                year: 2011,
+                recordLabelText: 'Kosmische',
+            })
+            seedSong({
+                id: 'song2',
+                title: 'Late',
+                albumId: 'undated',
+                year: 2013,
+                recordLabelText: 'Kosmische',
+            })
             seedSong({ id: 'song3', title: 'Untagged', albumId: 'dated' })
             expect(repository.getRecordLabelDetail('a')).toMatchObject({ firstYear: 2011, lastYear: 2015 })
         })
