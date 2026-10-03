@@ -17,7 +17,7 @@ security-policy-check: ## Validate vulnerability exceptions and their expiry dat
 sbom: ## Generate repository and runtime CycloneDX SBOMs in dist/security
 	node tools/security/cli.mjs sbom
 sbom-release: ## Generate source and artifact SBOMs for an existing package (ARTIFACT_DIR=path)
-	node tools/security/cli.mjs sbom '$(ARTIFACT_DIR)'
+	node tools/security/cli.mjs sbom "$(ARTIFACT_DIR)"
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
