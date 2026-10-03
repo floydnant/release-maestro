@@ -18,7 +18,7 @@ export const buttonVariants = cva(
                     'bg-action-secondary text-action-secondary-content hover:bg-action-secondary-hover active:bg-action-secondary-pressed',
                 ghost: 'text-content-secondary hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed',
                 history:
-                    'text-content-secondary hoverable:[&:hover:not(:disabled)]:bg-action-quiet-hover hoverable:[&:hover:not(:disabled)]:text-content-primary',
+                    'text-content-secondary pointer-hover:bg-action-quiet-hover pointer-hover:text-content-primary',
                 plain: '',
                 muted: 'bg-background-surface text-content-muted hover:bg-background-elevated hover:text-content-secondary',
                 navigation:
