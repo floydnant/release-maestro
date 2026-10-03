@@ -129,16 +129,6 @@ const SCROLL_PADDING_ROWS = 4
 
 let nextTableId = 0
 
-/** Catalog entity kinds used by filter chips and track table requests. */
-export type EntityFilterKind = 'artist' | 'genre' | 'recordLabel' | 'album'
-
-export interface EntityFilterRequest {
-    /** Artist credits link directly to the artist page. */
-    kind: Exclude<EntityFilterKind, 'artist'>
-    id: string
-    name: string
-}
-
 @Component({
     selector: 'app-song-table',
     templateUrl: './song-table.component.html',
@@ -178,7 +168,6 @@ export class SongTableComponent {
 
     sortChange = output<SongSortField>()
     viewportChange = output<BrowseWindow>()
-    entityFilter = output<EntityFilterRequest>()
     /**
      * Scope the list to missing tracks.
      *

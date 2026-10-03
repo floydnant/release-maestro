@@ -5,8 +5,8 @@ import type { GenreDetail, GenreRelatedKind } from '@release-maestro/core'
 import { catchError, defer, map, merge, of, startWith, Subject, switchMap } from 'rxjs'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
 import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
-import { GenreSongsComponent } from './genre-songs.component'
-import { GenreAlbumsComponent } from './genre-albums.component'
+import { EntitySongsComponent } from '../../shared/components/entity-songs/entity-songs.component'
+import { EntityAlbumsComponent } from '../../shared/components/entity-albums/entity-albums.component'
 import { GenreRelatedComponent } from './genre-related.component'
 import { TabBarComponent, type Tab } from '../../shared/components/tab-bar/tab-bar.component'
 
@@ -26,7 +26,13 @@ const LOADING: DetailState = { status: 'loading' }
     selector: 'app-genre-detail',
     templateUrl: './genre-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, TabBarComponent, GenreSongsComponent, GenreRelatedComponent, GenreAlbumsComponent],
+    imports: [
+        RouterLink,
+        TabBarComponent,
+        EntitySongsComponent,
+        GenreRelatedComponent,
+        EntityAlbumsComponent,
+    ],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class GenreDetailComponent {

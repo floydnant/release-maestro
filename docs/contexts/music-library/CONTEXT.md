@@ -161,6 +161,9 @@ songs on albums credited to the artist through `album_artists`. Track and album 
 separate credit rules. A range does not claim the artist worked in every intervening year. With no
 tagged year, the UI says "Years unknown".
 
+A record label's years active are the earliest and latest non-null year among its albums and the
+songs on them.
+
 **Released on record labels**:
 The distinct record labels of albums credited to an artist through `album_artists`. An album where
 the artist only has a song credit belongs under "Appears on" and does not add its record label here.
@@ -178,6 +181,14 @@ call it a **record label** everywhere upstream — the same split as _discovery_
 the metadata-engine boundary.
 
 Nothing in the triage or Linear sense of "label" belongs to this context.
+
+**Record label membership**:
+An album belongs to a record label through `albums.recordLabelId`, never through `recordLabelText`.
+A song belongs through its album. The record label's artists are the album artists of its albums
+plus the artists credited on songs of those albums, each counted once, including through missing
+songs. An album artist with no song credit there opens their albums on that record label rather than
+its tracks.
+_Avoid_: label roster, signed artists
 
 **Genre text** (`genreText`):
 The normalized whole genre tag displayed on a song. Ingest currently does not split compound tags:
@@ -198,6 +209,10 @@ of those albums. Each entity is counted once, including relationships through mi
 _Avoid_: similar genres, recommendations, album-artist membership
 
 ## Browsing
+
+Artist, album, genre, and record label links on tracks and album headers open the corresponding
+detail page using resolved entity IDs. A record label name without an entity ID remains plain text.
+Browse filters and missing-track badges explicitly narrow a track list.
 
 The architecture is [ADR 0004](../../adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md),
 and the terms it defines are not repeated here. One word is worth pinning because the

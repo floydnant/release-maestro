@@ -45,7 +45,6 @@ import {
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import {
     SongTableComponent,
-    type EntityFilterRequest,
     type SongTableColumn,
 } from '../../shared/components/song-table/song-table.component'
 import { AlbumDetailHeaderComponent } from './album-detail-header.component'
@@ -315,25 +314,6 @@ export class AlbumDetailComponent {
 
     protected selection = this.selection_.asReadonly()
 
-    /**
-     * An entity link in a track row narrows the *track list* to that entity.
-     *
-     * Neither the artist page (MAE-120) nor the record label page exists yet, so a link
-     * that claims to address an artist has to resolve to the one surface that can show
-     * them: `/tracks` filtered to that entity. It addresses the right entity, it works,
-     * and it becomes a `routerLink` in one place when those slices land — which is
-     * exactly what happened to the album link once this page existed.
-     *
-     * The album kind is deliberately not handled: every row here is this album, so the
-     * link would navigate to the page it is already on.
-     */
-    protected onEntityFilter(request: EntityFilterRequest): void {
-        const param = TRACK_FILTER_PARAMS[request.kind]
-        if (!param) return
-
-        this.router.navigate(['/tracks'], { queryParams: { [param]: request.id } })
-    }
-
     protected onFilterMissing(): void {
         this.router.navigate(['/tracks'], {
             queryParams: { album: this.albumId(), presence: 'missing' },
@@ -388,12 +368,3 @@ export class AlbumDetailComponent {
 /** Where a window has to start for a remembered scroll position to be inside it. */
 const offsetForRestore = (scrollTop: number | null): number =>
     scrollTop == null ? 0 : listWindowOffsetAt(scrollTop)
-
-/**
- * Which track-list query param addresses each entity kind. `album` is absent on purpose
- * — see {@link AlbumDetailComponent.onEntityFilter}.
- */
-const TRACK_FILTER_PARAMS: Partial<Record<EntityFilterRequest['kind'], string>> = {
-    genre: 'genre',
-    recordLabel: 'recordLabel',
-}

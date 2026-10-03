@@ -10,7 +10,7 @@ import {
 } from '@angular/core'
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
-import type { BrowseWindow, ArtistQuery } from '@release-maestro/core'
+import type { BrowseWindow, RecordLabelQuery } from '@release-maestro/core'
 import { debounceTime, filter, Subject } from 'rxjs'
 import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
@@ -27,13 +27,13 @@ import {
 } from '../../shared/components/catalog-list/catalog-list.component'
 
 @Component({
-    selector: 'app-artists',
-    templateUrl: './artists.component.html',
+    selector: 'app-record-labels',
+    templateUrl: './record-labels.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [BrowseShellComponent, CatalogListComponent, IconComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
-export class ArtistsComponent {
+export class RecordLabelsComponent {
     private route = inject(ActivatedRoute)
     private router = inject(Router)
     private service = inject(LibraryBrowseService)
@@ -41,11 +41,11 @@ export class ArtistsComponent {
     private list = viewChild(CatalogListComponent)
     private params = toSignal(this.route.queryParams, { initialValue: {} })
     protected query = computed(() => nameQueryFromParams(this.params()), { equal: sameNameQuery })
-    protected restoreScrollTop = linkedSignal<ArtistQuery, number | null>({
+    protected restoreScrollTop = linkedSignal<RecordLabelQuery, number | null>({
         source: this.query,
         computation: () => untracked(() => this.history.scrollRestore()),
     })
-    protected viewport = linkedSignal<ArtistQuery, BrowseWindow>({
+    protected viewport = linkedSignal<RecordLabelQuery, BrowseWindow>({
         source: this.query,
         computation: (_query, previous) => ({
             offset: untracked(() => listWindowOffsetAt(this.restoreScrollTop() ?? 0)),
@@ -56,26 +56,27 @@ export class ArtistsComponent {
         query: this.query,
         viewport: this.viewport,
         sameQuery: sameNameQuery,
-        entityLabel: 'artists',
+        entityLabel: 'record labels',
         refresh: libraryBrowseRefresh(),
-        fetchWindow: (query, window) => this.service.queryArtists(query, window),
+        fetchWindow: (query, window) => this.service.queryRecordLabels(query, window),
     })
     protected result = computed(() => ({
         ...this.browse.result(),
         rows: this.browse.result().rows.map(row => ({
             ...row,
-            link: ['/artists', row.id],
+            link: ['/record-labels', row.id],
             columns: [
-                countColumn(row.songCount, 'track', 'tracks'),
                 countColumn(row.albumCount, 'album', 'albums'),
+                countColumn(row.songCount, 'track', 'tracks'),
+                countColumn(row.artistCount, 'artist', 'artists'),
                 yearsColumn(row),
             ],
         })),
     }))
     protected shellState = computed(() => ({
         ...this.browse.result(),
-        entityLabel: 'artists',
-        entityLabelSingular: 'artist',
+        entityLabel: 'record labels',
+        entityLabelSingular: 'record label',
     }))
     protected filters = computed(() => ({ search: this.query().search, chips: [], hasFilter: false }))
     private search$ = new Subject<string>()
@@ -112,7 +113,7 @@ export class ArtistsComponent {
         this.restoreScrollTop.set(null)
         this.history.consumeScrollRestore()
     }
-    private patchQuery(query: ArtistQuery): void {
+    private patchQuery(query: RecordLabelQuery): void {
         this.router.navigate([], {
             relativeTo: this.route,
             queryParams: nameQueryToParams(query),

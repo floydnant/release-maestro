@@ -25,6 +25,9 @@ export const LibraryBrowseIpcChannel = {
     queryGenres: 'library:query-genres',
     getGenreDetail: 'library:get-genre-detail',
     queryGenreRelated: 'library:query-genre-related',
+    queryRecordLabels: 'library:query-record-labels',
+    getRecordLabelDetail: 'library:get-record-label-detail',
+    queryRecordLabelArtists: 'library:query-record-label-artists',
     querySongs: 'library:query-songs',
     describeSongFilter: 'library:describe-song-filter',
     queryAlbums: 'library:query-albums',
@@ -471,11 +474,16 @@ export const emptySongSelection = (query: SongQuery): SongSelection => ({
     included: [],
 })
 
-/** Genres are ordered by their unique, indexed name. Counts are derived after windowing. */
-export interface GenreQuery {
+/**
+ * Genres, artists and record labels are listed by their unique, indexed name. Counts are derived
+ * after windowing.
+ */
+export interface NameSortedQuery {
     search: string
     sort: { field: 'name'; direction: SortDirection }
 }
+
+export type GenreQuery = NameSortedQuery
 
 export interface GenreRow extends CatalogEntityRef {
     songCount: number
@@ -509,11 +517,7 @@ export interface QueryGenreRelatedRequest {
 }
 export type GenreRelatedWindowResult = BrowseWindowResult<CatalogEntityRef>
 
-// Artists are listed by indexed name; counts are computed only for the visible window.
-export interface ArtistQuery {
-    search: string
-    sort: { field: 'name'; direction: SortDirection }
-}
+export type ArtistQuery = NameSortedQuery
 export interface ArtistRow extends CatalogEntityRef {
     songCount: number
     albumCount: number
@@ -539,3 +543,33 @@ export interface QueryArtistRecordLabelsRequest {
     window: BrowseWindow
 }
 export type ArtistRecordLabelWindowResult = BrowseWindowResult<CatalogEntityRef>
+
+export type RecordLabelQuery = NameSortedQuery
+export interface RecordLabelRow extends CatalogEntityRef {
+    albumCount: number
+    songCount: number
+    artistCount: number
+    firstYear: number | null
+    lastYear: number | null
+}
+export interface QueryRecordLabelsRequest {
+    query: RecordLabelQuery
+    window: BrowseWindow
+}
+export type RecordLabelWindowResult = BrowseWindowResult<RecordLabelRow>
+export interface GetRecordLabelDetailRequest {
+    recordLabelId: string
+}
+export interface RecordLabelDetail extends RecordLabelRow {
+    externalRefs: ExternalRefs
+}
+export type RecordLabelDetailResult = RecordLabelDetail | null
+export interface QueryRecordLabelArtistsRequest {
+    recordLabelId: string
+    window: BrowseWindow
+}
+export interface RecordLabelArtistRow extends CatalogEntityRef {
+    hasSongCredits: boolean
+    hasAlbumCredits: boolean
+}
+export type RecordLabelArtistsWindowResult = BrowseWindowResult<RecordLabelArtistRow>

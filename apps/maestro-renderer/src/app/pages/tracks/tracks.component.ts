@@ -50,11 +50,7 @@ import {
     type BrowseFilterState,
     type BrowseShellState,
 } from '../../shared/components/browse-shell/browse-shell.component'
-import {
-    SongTableComponent,
-    type EntityFilterKind,
-    type EntityFilterRequest,
-} from '../../shared/components/song-table/song-table.component'
+import { SongTableComponent } from '../../shared/components/song-table/song-table.component'
 
 /**
  * The track list.
@@ -84,6 +80,8 @@ const TRACK_LABEL = 'track'
 
 /** Availability rides in the same chip list as the entity filters, under its own kind. */
 const PRESENCE_CHIP_KIND = 'presence'
+
+type EntityFilterKind = 'artist' | 'genre' | 'recordLabel' | 'album'
 
 const CHIP_KINDS: { kind: EntityFilterKind; kindLabel: string; field: keyof SongFilter }[] = [
     { kind: 'artist', kindLabel: 'Artist', field: 'artistIds' },
@@ -335,28 +333,6 @@ export class TracksComponent {
         this.patchQuery({
             ...this.query(),
             filter: { ...this.query().filter, presence: SongPresence.missing },
-        })
-    }
-
-    /**
-     * A cell's entity link narrows the list to that entity.
-     *
-     * MAE-118 asks for each artist segment to link "to its artist", and the artist
-     * detail page is MAE-120 — it does not exist yet. Filtering is the honest form of
-     * that link today: it addresses the artist *entity*, works, and re-points to a
-     * detail route in one place when slices 2–5 land.
-     */
-    protected onEntityFilter(request: EntityFilterRequest): void {
-        const field = CHIP_KINDS.find(chipKind => chipKind.kind == request.kind)?.field
-        if (!field) return
-
-        const current = this.query().filter[field]
-        const existing = Array.isArray(current) ? current : []
-        if (existing.includes(request.id)) return
-
-        this.patchQuery({
-            ...this.query(),
-            filter: { ...this.query().filter, [field]: [...existing, request.id] },
         })
     }
 

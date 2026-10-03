@@ -12,33 +12,47 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router } from '@angular/router'
 import type { AlbumQuery, AlbumSortField, BrowseWindow } from '@release-maestro/core'
-import { HistoryService } from '../../core/services/history.service'
-import { LibraryBrowseService } from '../../core/services/library-browse.service'
+import { HistoryService } from '../../../core/services/history.service'
+import { LibraryBrowseService } from '../../../core/services/library-browse.service'
 import {
     albumQueryFromParams,
     albumQueryToParams,
     nextAlbumSort,
     sameAlbumQuery,
-} from '../../shared/browse/album-query-params'
-import { createBrowseQuery } from '../../shared/browse/browse-query'
-import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
+} from '../../browse/album-query-params'
+import { createBrowseQuery } from '../../browse/browse-query'
+import { libraryBrowseRefresh } from '../../browse/library-browse-refresh'
 import {
     AlbumGridComponent,
     estimatedAlbumWindowOffsetAt,
     initialWindowLimit,
-} from '../../shared/components/album-grid/album-grid.component'
-import { AlbumSortBarComponent } from '../../shared/components/album-grid/album-sort-bar.component'
+} from '../album-grid/album-grid.component'
+import { AlbumSortBarComponent } from '../album-grid/album-sort-bar.component'
+
+export type EntityAlbumsKind = 'genre' | 'recordLabel' | 'artist' | 'artistAppearances'
+
+/** How each detail page scopes its albums. An artist's appearances are albums it is not an album artist of. */
+const KINDS: Record<
+    EntityAlbumsKind,
+    { name: string; scope: (id: string) => Pick<AlbumQuery, 'filter' | 'appearanceArtistId'> }
+> = {
+    genre: { name: 'genre', scope: id => ({ filter: { genreIds: [id] } }) },
+    recordLabel: { name: 'record label', scope: id => ({ filter: { recordLabelIds: [id] } }) },
+    artist: { name: 'artist', scope: id => ({ filter: { albumArtistIds: [id] } }) },
+    artistAppearances: { name: 'artist', scope: id => ({ filter: {}, appearanceArtistId: id }) },
+}
 
 @Component({
-    selector: 'app-artist-albums',
-    templateUrl: './artist-albums.component.html',
+    selector: 'app-entity-albums',
+    templateUrl: './entity-albums.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [AlbumGridComponent, AlbumSortBarComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
-export class ArtistAlbumsComponent {
-    artistId = input.required<string>()
-    appearsOn = input(false)
+export class EntityAlbumsComponent {
+    entityId = input.required<string>()
+    kind = input.required<EntityAlbumsKind>()
+    protected entityName = computed(() => KINDS[this.kind()].name)
     private service = inject(LibraryBrowseService)
     private route = inject(ActivatedRoute)
     private router = inject(Router)
@@ -48,8 +62,7 @@ export class ArtistAlbumsComponent {
     protected query = computed<AlbumQuery>(
         () => ({
             ...albumQueryFromParams(this.params()),
-            filter: this.appearsOn() ? {} : { albumArtistIds: [this.artistId()] },
-            appearanceArtistId: this.appearsOn() ? this.artistId() : undefined,
+            ...KINDS[this.kind()].scope(this.entityId()),
         }),
         { equal: sameAlbumQuery },
     )

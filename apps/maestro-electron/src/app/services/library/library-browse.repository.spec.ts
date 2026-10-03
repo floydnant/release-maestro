@@ -5,6 +5,7 @@ import {
     ExternalRefKeys,
     SongPresence,
     SongSortField,
+    type ExternalRefs,
     type AlbumQuery,
     type QueryAlbumsRequest,
     type SongQuery,
@@ -48,6 +49,7 @@ type SongSeed = {
     albumId?: string | null
     genreText?: string | null
     recordLabelText?: string | null
+    externalRefs?: ExternalRefs
     year?: number | null
     bpm?: number | null
     musicalKey?: string | null
@@ -95,6 +97,7 @@ describe('LibraryBrowseRepository', () => {
                 albumId: seed.albumId ?? null,
                 genreText: seed.genreText ?? null,
                 recordLabelText: seed.recordLabelText ?? null,
+                externalRefs: seed.externalRefs ?? {},
                 year: seed.year ?? null,
                 bpm: seed.bpm ?? null,
                 musicalKey: seed.musicalKey ?? null,
@@ -350,6 +353,159 @@ describe('LibraryBrowseRepository', () => {
                 lastYear: 2022,
             })
             expect(repository.getArtistDetail('a2')).toMatchObject({ firstYear: 2021, lastYear: 2022 })
+        })
+    })
+
+    describe('record labels', () => {
+        it('windows names and derives distinct stats from linked albums and songs', () => {
+            db.insert(recordLabelsTable)
+                .values([
+                    { id: 'a', name: '100% Records', externalRefs: { MUSICBRAINZ_LABEL_ID: ['mb-1'] } },
+                    { id: 'b', name: 'Other Records' },
+                ])
+                .run()
+            db.insert(artistsTable)
+                .values([
+                    { id: 'artist', name: 'Artist' },
+                    { id: 'album-artist', name: 'Album artist' },
+                ])
+                .run()
+            seedAlbum({ id: 'album1', title: 'One', recordLabelId: 'a', year: 2018 })
+            seedAlbum({ id: 'album2', title: 'Two', recordLabelId: 'a', year: 2024 })
+            seedAlbum({ id: 'album3', title: 'Other', recordLabelId: 'b', year: 2020 })
+            db.insert(albumArtistsTable)
+                .values({ albumId: 'album2', artistId: 'album-artist', position: 0 })
+                .run()
+            seedSong({ id: 'song1', title: 'First', albumId: 'album1', recordLabelText: 'Wrong text' })
+            seedSong({
+                id: 'song2',
+                title: 'Second',
+                albumId: 'album2',
+                recordLabelText: '100% Records',
+                externalRefs: { MUSICBRAINZ_LABEL_ID: ['mb-1'] },
+                present: false,
+            })
+            db.insert(songArtistsTable)
+                .values([
+                    { songId: 'song1', artistId: 'artist', position: 0 },
+                    { songId: 'song2', artistId: 'artist', position: 0 },
+                ])
+                .run()
+            const recordLabelQuery = { search: '', sort: { field: 'name', direction: 'asc' } } as const
+            expect(
+                repository.queryRecordLabels({ query: recordLabelQuery, window: { offset: 0, limit: 1 } }),
+            ).toEqual({
+                offset: 0,
+                total: 2,
+                rows: [
+                    {
+                        id: 'a',
+                        name: '100% Records',
+                        albumCount: 2,
+                        songCount: 2,
+                        artistCount: 2,
+                        firstYear: 2018,
+                        lastYear: 2024,
+                    },
+                ],
+            })
+            expect(
+                repository.queryRecordLabels({
+                    query: { ...recordLabelQuery, search: '%' },
+                    window: { offset: 0, limit: 10 },
+                }).total,
+            ).toBe(1)
+            expect(
+                repository.queryRecordLabels({
+                    query: { ...recordLabelQuery, sort: { field: 'name', direction: 'desc' } },
+                    window: { offset: 0, limit: 1 },
+                }).rows[0]?.id,
+            ).toBe('b')
+            expect(repository.getRecordLabelDetail('a')?.externalRefs).toEqual({
+                MUSICBRAINZ_LABEL_ID: ['mb-1'],
+            })
+            expect(repository.getRecordLabelDetail('missing')).toBeNull()
+            expect(
+                repository.queryRecordLabelArtists({ recordLabelId: 'a', window: { offset: 0, limit: 2 } }),
+            ).toEqual({
+                offset: 0,
+                total: 2,
+                rows: [
+                    {
+                        id: 'album-artist',
+                        name: 'Album artist',
+                        hasSongCredits: false,
+                        hasAlbumCredits: true,
+                    },
+                    { id: 'artist', name: 'Artist', hasSongCredits: true, hasAlbumCredits: false },
+                ],
+            })
+            expect(
+                repository
+                    .querySongs({
+                        query: query({ filter: { recordLabelIds: ['a'] } }),
+                        window: { offset: 0, limit: 10 },
+                    })
+                    .rows.map(row => row.id)
+                    .sort(),
+            ).toEqual(['song1', 'song2'])
+        })
+
+        it('uses current song tags for record label links after references change or disappear', () => {
+            db.insert(recordLabelsTable)
+                .values({
+                    id: 'label',
+                    name: 'Kosmische',
+                    externalRefs: { BANDCAMP_LABEL_URL: ['https://old.bandcamp.com'] },
+                })
+                .run()
+            seedSong({
+                id: 'song',
+                title: 'Track',
+                recordLabelText: 'Kosmische',
+                externalRefs: { BANDCAMP_LABEL_URL: ['https://new.bandcamp.com'] },
+            })
+            expect(repository.getRecordLabelDetail('label')?.externalRefs).toEqual({
+                BANDCAMP_LABEL_URL: ['https://new.bandcamp.com'],
+            })
+
+            db.update(songsTable)
+                .set({ externalRefs: { BEATPORT_LABEL_URL: ['https://www.beatport.com/label/kosmische'] } })
+                .where(eq(songsTable.id, 'song'))
+                .run()
+            expect(repository.getRecordLabelDetail('label')?.externalRefs).toEqual({
+                BEATPORT_LABEL_URL: ['https://www.beatport.com/label/kosmische'],
+            })
+
+            db.update(songsTable).set({ externalRefs: {} }).where(eq(songsTable.id, 'song')).run()
+            expect(repository.getRecordLabelDetail('label')?.externalRefs).toEqual({})
+        })
+
+        it('marks artists with both album and song credits on a record label', () => {
+            db.insert(recordLabelsTable).values({ id: 'label', name: 'Kosmische' }).run()
+            db.insert(artistsTable).values({ id: 'artist', name: 'Both credits' }).run()
+            seedAlbum({ id: 'album1', title: 'Own album', recordLabelId: 'label' })
+            seedAlbum({ id: 'album2', title: 'Appearance', recordLabelId: 'label' })
+            db.insert(albumArtistsTable).values({ albumId: 'album1', artistId: 'artist', position: 0 }).run()
+            seedSong({ id: 'song', title: 'Track', albumId: 'album2' })
+            db.insert(songArtistsTable).values({ songId: 'song', artistId: 'artist', position: 0 }).run()
+
+            expect(
+                repository.queryRecordLabelArtists({
+                    recordLabelId: 'label',
+                    window: { offset: 0, limit: 10 },
+                }).rows,
+            ).toEqual([{ id: 'artist', name: 'Both credits', hasSongCredits: true, hasAlbumCredits: true }])
+        })
+
+        it('takes years from song tags when an album has no year of its own', () => {
+            db.insert(recordLabelsTable).values({ id: 'a', name: 'Kosmische' }).run()
+            seedAlbum({ id: 'undated', title: 'Undated', recordLabelId: 'a' })
+            seedAlbum({ id: 'dated', title: 'Dated', recordLabelId: 'a', year: 2015 })
+            seedSong({ id: 'song1', title: 'Early', albumId: 'undated', year: 2011 })
+            seedSong({ id: 'song2', title: 'Late', albumId: 'undated', year: 2013 })
+            seedSong({ id: 'song3', title: 'Untagged', albumId: 'dated' })
+            expect(repository.getRecordLabelDetail('a')).toMatchObject({ firstYear: 2011, lastYear: 2015 })
         })
     })
 

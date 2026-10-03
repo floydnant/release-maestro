@@ -1,14 +1,15 @@
-import type { GenreQuery } from '@release-maestro/core'
+import type { NameSortedQuery } from '@release-maestro/core'
 import { firstValue, type ReadonlyParams } from './query-params.utils'
 
-export const genreQueryFromParams = (params: ReadonlyParams): GenreQuery => ({
+/** URL state shared by the name-sorted catalog lists: genres, artists and record labels. */
+export const nameQueryFromParams = (params: ReadonlyParams): NameSortedQuery => ({
     search: firstValue(params['q']) ?? '',
     sort: { field: 'name', direction: firstValue(params['dir']) == 'desc' ? 'desc' : 'asc' },
 })
-export const genreQueryToParams = (query: GenreQuery) => ({
+export const nameQueryToParams = (query: NameSortedQuery) => ({
     q: query.search || null,
     sort: null,
     dir: query.sort.direction == 'asc' ? null : query.sort.direction,
 })
-export const sameGenreQuery = (left: GenreQuery, right: GenreQuery): boolean =>
+export const sameNameQuery = (left: NameSortedQuery, right: NameSortedQuery): boolean =>
     left.search == right.search && left.sort.direction == right.sort.direction

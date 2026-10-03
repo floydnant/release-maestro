@@ -8,7 +8,6 @@ import { IconComponent } from '../icon/icon.component'
 import {
     DEFAULT_SONG_TABLE_COLUMNS,
     SONG_TABLE_COLUMN_WIDTHS,
-    type EntityFilterRequest,
     type SongTableColumn,
 } from './song-table.component'
 
@@ -49,16 +48,9 @@ export class SongTableRowComponent {
 
     protected shown = computed(() => new Set(this.columns()))
 
-    entityFilter = output<EntityFilterRequest>()
     filterMissing = output<void>()
 
-    protected onEntity(event: MouseEvent, kind: EntityFilterRequest['kind'], id: string, name: string): void {
-        event.stopPropagation()
-        if (isSelectionModifierHeld(event)) return
-        this.entityFilter.emit({ kind, id, name })
-    }
-
-    /** Let modified clicks select rows without following their artist, album or genre links. */
+    /** Let modified clicks select rows without following their entity links. */
     protected onDetailLink(event: MouseEvent): void {
         event.stopPropagation()
         if (isSelectionModifierHeld(event)) event.preventDefault()

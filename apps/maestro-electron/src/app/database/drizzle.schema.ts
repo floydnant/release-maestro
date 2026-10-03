@@ -90,6 +90,7 @@ export const recordLabelsTable = sqliteTable(
     {
         id: text('id').primaryKey(),
         name: text('name').notNull(),
+        /** Legacy data may retain obsolete refs; record label detail derives links from song tags. */
         externalRefs: text('external_refs', { mode: 'json' }).$type<ExternalRefs>().notNull().default({}),
     },
     table => [uniqueIndex('record_labels_name_key').on(table.name)],

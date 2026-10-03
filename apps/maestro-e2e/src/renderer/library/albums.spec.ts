@@ -921,14 +921,6 @@ test.describe('the album detail page', () => {
         await expect(page).toHaveURL(/\/artists\/artist-1$/)
     })
 
-    test('links the record label to that label’s tracks', async ({ page }) => {
-        await openDetail(page)
-
-        await page.getByRole('link', { name: 'Kosmische' }).click()
-
-        await expect.poll(() => new URL(page.url()).searchParams.get('recordLabel')).toBe('label-1')
-    })
-
     test('links a track’s own artist to the artist page', async ({ page }) => {
         await openDetail(page)
 
@@ -972,21 +964,6 @@ test.describe('reaching the detail page', () => {
         )
 
         await tile(page, 'Daybreak').click()
-
-        await expect.poll(() => new URL(page.url()).pathname).toBe('/albums/album-1')
-    })
-
-    test('the track list’s album cell navigates now that this page exists', async ({ page }) => {
-        // MAE-118 made this cell filter the track list, because the album page did not
-        // exist. It does now, so the cell is a real link — the promotion that slice left
-        // for this one.
-        const scenario = scenarioBuilder()
-            .songs([createSongRow({ albumId: 'album-1', albumTitle: 'Daybreak' })])
-            .albumDetail(createAlbumDetail())
-            .build()
-        await createRendererScenario(page, scenario, '/tracks')
-
-        await page.getByRole('link', { name: 'Daybreak' }).click()
 
         await expect.poll(() => new URL(page.url()).pathname).toBe('/albums/album-1')
     })

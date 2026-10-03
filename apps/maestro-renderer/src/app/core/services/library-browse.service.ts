@@ -4,6 +4,10 @@ import type {
     ArtistDetailResult,
     ArtistRecordLabelWindowResult,
     GenreQuery,
+    RecordLabelQuery,
+    RecordLabelWindowResult,
+    RecordLabelDetailResult,
+    RecordLabelArtistsWindowResult,
     GenreWindowResult,
     GenreDetailResult,
     GenreRelatedQuery,
@@ -73,6 +77,34 @@ export class LibraryBrowseService {
             return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
         return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryArtistRecordLabels, {
             artistId,
+            window,
+        })
+    }
+
+    queryRecordLabels(query: RecordLabelQuery, window: BrowseWindow): Promise<RecordLabelWindowResult> {
+        if (!this.electronService.isElectron)
+            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryRecordLabels, {
+            query,
+            window,
+        })
+    }
+
+    getRecordLabelDetail(recordLabelId: string): Promise<RecordLabelDetailResult> {
+        if (!this.electronService.isElectron) return Promise.resolve(null)
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.getRecordLabelDetail, {
+            recordLabelId,
+        })
+    }
+
+    queryRecordLabelArtists(
+        recordLabelId: string,
+        window: BrowseWindow,
+    ): Promise<RecordLabelArtistsWindowResult> {
+        if (!this.electronService.isElectron)
+            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+        return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.queryRecordLabelArtists, {
+            recordLabelId,
             window,
         })
     }
