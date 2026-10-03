@@ -1,4 +1,5 @@
 import { Observable } from 'rxjs'
+import { stat } from 'node:fs/promises'
 import {
     LibraryScanUpdate,
     MetadataPrescanUpdate,
@@ -63,16 +64,11 @@ export class LibraryBackendService {
                     })
                 })
 
-                // Absent-file reconciliation only runs when it is provably safe:
-                //  - not cancelled (a cancelled discovery has not seen every file), and
-                //  - discovery had no errors (an unreadable subtree must not mark
-                //    its files as missing).
                 if (abortSignal?.aborted) return
-                const missing = prescanErrors == 0 ? this.repository.markNotSeenPresent(scanStartedAt) : 0
                 const { extractorVersion } = await this.metadata.ping()
                 if (abortSignal?.aborted) return
-                const metadataReadTotal = this.repository.countSongsNeedingMetadata(extractorVersion)
-                const refreshTotal = this.repository.countSongsNeedingVersionRefresh(extractorVersion)
+                const metadataReadTotal = this.repository.countSongsNeedingMetadata(scanStartedAt, extractorVersion)
+                const refreshTotal = this.repository.countSongsNeedingVersionRefresh(scanStartedAt, extractorVersion)
                 let metadataReadDone = 0
                 let ingested = 0
                 let afterPath: string | null = null
@@ -81,6 +77,7 @@ export class LibraryBackendService {
 
                 while (!abortSignal?.aborted) {
                     const facts = this.repository.listSongsNeedingMetadata(
+                        scanStartedAt,
                         afterPath,
                         DEEP_READ_BATCH_SIZE,
                         extractorVersion,
@@ -106,7 +103,7 @@ export class LibraryBackendService {
                                 const openIssues = this.repository.ingestMetadata(
                                     update.metadata,
                                     fact,
-                                    new Date(),
+                                    new Date(Math.max(Date.now(), scanStartedAt.getTime())),
                                     extractorVersion,
                                 )
                                 ingested += 1
@@ -142,6 +139,30 @@ export class LibraryBackendService {
                 // A cancelled scan may have ingested a song before it stopped. A later
                 // scan must collect entities left behind even when it reads no files.
                 this.repository.removeUnusedCatalogEntities()
+
+                // A complete scan is needed to distinguish moves from copies in later batches.
+                // Failed/cancelled reads leave their discovery rows for the next scan to retry.
+                if (errors == 0 && prescanErrors == 0) {
+                    const moves = []
+                    for (const candidate of this.repository.findMovedSongCandidates(scanStartedAt)) {
+                        const absent = await pathIsAbsent(candidate.missing.path)
+                        if (abortSignal?.aborted) return
+                        if (absent) moves.push(candidate)
+                    }
+                    for (const candidate of moves) {
+                        this.repository.reconcileMovedSong(candidate)
+                        if (candidate.found.addedAt?.getTime() == scanStartedAt.getTime()) {
+                            newCount -= 1
+                            changed += 1
+                        }
+                    }
+                    if (moves.length > 0) {
+                        normalizationIssues = this.repository.countOpenIssuesForReadSongs(scanStartedAt)
+                        subscriber.next({ phase: 'normalization', normalizationIssues })
+                    }
+                }
+                // Retain the ADR 0003 guard: discovery errors are not proof of absence.
+                const missing = prescanErrors == 0 ? this.repository.markNotSeenPresent(scanStartedAt) : 0
 
                 subscriber.next({
                     phase: 'completed',
@@ -186,5 +207,20 @@ export class LibraryBackendService {
                     complete: () => (terminalError ? reject(terminalError) : resolve()),
                 })
         })
+    }
+}
+
+/** An excluded but reachable original is a copy, not a move. Permission failures are inconclusive. */
+const pathIsAbsent = async (path: string): Promise<boolean> => {
+    try {
+        await stat(path)
+        return false
+    } catch (error) {
+        return (
+            typeof error == 'object' &&
+            error != null &&
+            'code' in error &&
+            (error.code == 'ENOENT' || error.code == 'ENOTDIR')
+        )
     }
 }

@@ -59,9 +59,30 @@ interrupted scan resumable.
 _Avoid_: full scan, tag scan
 
 **Reconciliation**:
-Marking songs absent (`present = false`) when discovery did not see them. Skipped when the scan was
-cancelled, since a cancelled discovery has not seen every file — see ADR 0003.
+Matching moved songs to their existing identity, then marking songs absent (`present = false`) when
+discovery did not see them. Runs after deep read. Skipped when the scan was cancelled or discovery
+reported errors — see ADR 0003. Read failures also defer move matching until a complete retry.
 _Avoid_: pruning, cleanup, deletion
+
+**Moved song**:
+A previously imported file discovered at a different path, including a renamed file. A unique match
+keeps the original song ID, Added date, external references, and dismissed normalization issues.
+It is reported as changed rather than new when first discovered at the new path. Unchanged rescans
+can also repair a unique missing/present pair left by an earlier interrupted or pre-upgrade scan.
+
+**Content hash**:
+A SHA-256 digest of all file bytes, read by the metadata engine during deep read. It identifies
+byte-identical files independently of their paths and filesystem timestamps. It differs from the
+file fingerprint, which includes the path and decides whether another deep read is needed.
+Existing reachable songs receive a content hash on their next scan. For older songs already missing,
+move matching requires a unique full-metadata-hash and size match with identifying title and artist
+or album tags. That fallback is an inference, not proof of equal audio bytes. Untagged older missing
+songs need a scan at their original location before content matching is possible.
+
+Move matching requires exactly one unseen song and one seen song with the matching identity. The
+destination must have first appeared after the original was last seen, and the original path must
+no longer exist. Known copies, ambiguous matches, changed bytes with known hashes, and inconclusive
+filesystem errors retain separate rows. Moving and editing tags together is not a byte-identical move.
 
 **Missing**:
 A song in the database whose file was not seen by the last complete discovery. `present` means "the

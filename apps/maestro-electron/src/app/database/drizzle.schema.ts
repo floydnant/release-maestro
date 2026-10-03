@@ -217,6 +217,7 @@ export const songsTable = sqliteTable(
         codec: text('codec'),
 
         metadataHash: text('metadata_hash'),
+        contentHash: text('content_hash'),
         /**
          * Which revision of the normaliser produced this row's derived columns. Null
          * for rows written before the column existed, which is why a version mismatch
@@ -235,6 +236,8 @@ export const songsTable = sqliteTable(
         uniqueIndex('songs_path_key').on(table.path),
         index('songs_present_idx').on(table.present),
         index('songs_file_fingerprint_idx').on(table.fileFingerprint),
+        index('songs_content_hash_size_idx').on(table.contentHash, table.size),
+        index('songs_metadata_hash_size_idx').on(table.metadataHash, table.size),
         index('songs_album_id_idx').on(table.albumId),
 
         // One index per sortable browse column. Browse queries move windows through an

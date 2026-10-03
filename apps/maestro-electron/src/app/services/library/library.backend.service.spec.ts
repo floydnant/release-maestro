@@ -1,7 +1,11 @@
 import { firstValueFrom, from, Observable, Subject, toArray } from 'rxjs'
 import { fromPartial } from '@total-typescript/shoehorn'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { MetadataPrescanUpdate, MetadataScanUpdate, PrescanFileFact } from '@release-maestro/core'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
+import { MovedSongCandidate } from './library.backend.repository'
 import { LibraryBackendService } from './library.backend.service'
 
 const EXTRACTOR_VERSION = '1111111111111111'
@@ -16,6 +20,9 @@ const fact: PrescanFileFact = {
 const newRepositoryMock = () => ({
     nextScanSeenAt: jest.fn(() => new Date('2026-06-15T10:00:00Z')),
     processPrescanBatch: jest.fn(() => ({ unchanged: 0, changed: 0, new: 1 })),
+    findMovedSongCandidates: jest.fn((): MovedSongCandidate[] => []),
+    reconcileMovedSong: jest.fn(),
+    countOpenIssuesForReadSongs: jest.fn(() => 0),
     markNotSeenPresent: jest.fn(() => 2),
     countSongsNeedingMetadata: jest.fn(() => 1),
     countSongsNeedingVersionRefresh: jest.fn(() => 0),
@@ -56,9 +63,9 @@ describe('LibraryBackendService', () => {
 
         expect(repository.processPrescanBatch).toHaveBeenCalledWith([fact], scanSeenAt, false)
         expect(repository.markNotSeenPresent).toHaveBeenCalledWith(scanSeenAt)
-        expect(repository.countSongsNeedingMetadata).toHaveBeenCalledWith(EXTRACTOR_VERSION)
-        expect(repository.countSongsNeedingVersionRefresh).toHaveBeenCalledWith(EXTRACTOR_VERSION)
-        expect(repository.listSongsNeedingMetadata).toHaveBeenCalledWith(null, 100, EXTRACTOR_VERSION)
+        expect(repository.countSongsNeedingMetadata).toHaveBeenCalledWith(scanSeenAt, EXTRACTOR_VERSION)
+        expect(repository.countSongsNeedingVersionRefresh).toHaveBeenCalledWith(scanSeenAt, EXTRACTOR_VERSION)
+        expect(repository.listSongsNeedingMetadata).toHaveBeenCalledWith(scanSeenAt, null, 100, EXTRACTOR_VERSION)
         expect(metadataService.readFiles).toHaveBeenCalledWith([fact.path], undefined)
         expect(repository.ingestMetadata).toHaveBeenCalledWith(
             metadata,
@@ -112,6 +119,7 @@ describe('LibraryBackendService', () => {
         // Discovery was incomplete — nothing may be flagged missing.
         expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
         expect(repository.removeUnusedCatalogEntities).toHaveBeenCalledTimes(1)
+        expect(repository.findMovedSongCandidates).not.toHaveBeenCalled()
         const completed = updates.find(update => update.phase === 'completed')
         expect(completed).toMatchObject({ missing: 0, errors: 1 })
     })
@@ -144,9 +152,80 @@ describe('LibraryBackendService', () => {
         const updates = await updatesPromise
 
         expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
+        expect(repository.findMovedSongCandidates).not.toHaveBeenCalled()
         expect(metadataService.readFiles).not.toHaveBeenCalled()
         // A cancelled scan produces no `completed` update — the caller derives
         // the cancelled outcome from the abort signal.
         expect(updates.some(update => update.phase === 'completed')).toBe(false)
     })
+
+    it.each(['completed', 'failed', 'cancelled'] as const)(
+        'waits for deep reads before reconciling: %s',
+        outcome => {
+            const repository = newRepositoryMock()
+            const read$ = new Subject<MetadataScanUpdate>()
+            const abort = new AbortController()
+            const metadataService = fromPartial<MetadataBackendService>({
+                prescan: () =>
+                    from<MetadataPrescanUpdate[]>([
+                        { phase: 'batch', items: [fact] },
+                        { phase: 'completed', count: 1, errors: 0 },
+                    ]),
+                readFiles: () => read$,
+            })
+            const service = new LibraryBackendService(
+                fromPartial<LibraryBackendRepository>(repository),
+                metadataService,
+            )
+            const result = firstValueFrom(service.scan(['/music'], abort.signal).pipe(toArray()))
+            return Promise.resolve().then(async () => {
+                expect(repository.findMovedSongCandidates).not.toHaveBeenCalled()
+                expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
+                if (outcome === 'failed')
+                    read$.next({ phase: 'itemError', path: fact.path, error: 'read failed' })
+                if (outcome === 'cancelled') abort.abort()
+                read$.complete()
+                await result
+                expect(repository.findMovedSongCandidates).toHaveBeenCalledTimes(
+                    outcome === 'completed' ? 1 : 0,
+                )
+                expect(repository.markNotSeenPresent).toHaveBeenCalledTimes(outcome === 'cancelled' ? 0 : 1)
+            })
+        },
+    )
+
+    it.each([true, false])(
+        'only merges when the original path no longer exists: original exists %s',
+        async exists => {
+            const directory = await mkdtemp(join(tmpdir(), 'maestro-move-'))
+            try {
+                const oldPath = join(directory, 'old.mp3')
+                if (exists) await writeFile(oldPath, 'original')
+                const repository = newRepositoryMock()
+                repository.countSongsNeedingMetadata.mockReturnValue(0)
+                repository.listSongsNeedingMetadata.mockReset().mockReturnValue([])
+                const candidate = fromPartial<MovedSongCandidate>({
+                    missing: { path: oldPath },
+                    found: { addedAt: repository.nextScanSeenAt() },
+                })
+                repository.findMovedSongCandidates.mockReturnValue([candidate])
+                const metadataService = fromPartial<MetadataBackendService>({
+                    prescan: () =>
+                        from<MetadataPrescanUpdate[]>([
+                            { phase: 'batch', items: [fact] },
+                            { phase: 'completed', count: 1, errors: 0 },
+                        ]),
+                })
+                const service = new LibraryBackendService(
+                    fromPartial<LibraryBackendRepository>(repository),
+                    metadataService,
+                )
+                const updates = await firstValueFrom(service.scan([directory]).pipe(toArray()))
+                expect(repository.reconcileMovedSong).toHaveBeenCalledTimes(exists ? 0 : 1)
+                expect(updates.at(-1)).toMatchObject({ new: exists ? 1 : 0, changed: exists ? 0 : 1 })
+            } finally {
+                await rm(directory, { recursive: true, force: true })
+            }
+        },
+    )
 })
