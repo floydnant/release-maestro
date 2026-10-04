@@ -85,6 +85,9 @@ A previously imported file discovered at a different path, including a renamed f
 keeps the original song ID, Added date, external references, and dismissed normalization issues.
 It is reported as changed, including moves repaired on retry. Unchanged rescans can also repair a
 unique missing/present pair left by an earlier interrupted scan with known discovery history.
+Unavailable source volumes do not prove a move, even after their folders leave settings. The app
+recognizes standard external-volume roots; custom Unix mount locations need additional volume
+evidence to distinguish disconnection from path removal.
 
 **Content hash**:
 A SHA-256 digest of all file bytes, read by the metadata engine during deep read. It identifies
