@@ -7,9 +7,9 @@ import {
 } from '@release-maestro/core'
 import { fromPartial } from '@total-typescript/shoehorn'
 import { eq } from 'drizzle-orm'
-import { copyFile, mkdtemp, rename, rm, writeFile, symlink } from 'node:fs/promises'
+import { copyFile, mkdtemp, rename, rm, writeFile, symlink, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, join, parse } from 'node:path'
 import { firstValueFrom, from, Observable, toArray } from 'rxjs'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
@@ -17,6 +17,11 @@ import { songsTable } from '../../database/drizzle.schema'
 import { MetadataBackendService } from '../metadata/metadata.backend.service'
 import { LibraryBackendRepository } from './library.backend.repository'
 import { LibraryBackendService } from './library.backend.service'
+
+jest.mock('node:fs/promises', () => ({
+    ...jest.requireActual('node:fs/promises'),
+    stat: jest.fn(jest.requireActual('node:fs/promises').stat),
+}))
 
 describe('move reconciliation across scan retries', () => {
     let directory: string
@@ -101,6 +106,7 @@ describe('move reconciliation across scan retries', () => {
         repository.ingestMetadata(original, fact(original), new Date(10_000), 'test-extractor')
     })
     afterEach(async () => {
+        jest.mocked(stat).mockReset().mockImplementation(jest.requireActual('node:fs/promises').stat)
         database.sqlite.close()
         await rm(directory, { recursive: true, force: true })
     })
@@ -113,6 +119,49 @@ describe('move reconciliation across scan retries', () => {
         expect(rows()).toHaveLength(2)
         expect(rows().find(song => song.path == original.path)?.id).toBe(identity?.id)
     })
+
+    it('preserves a case-only rename of the same symlink entry', async () => {
+        const identity = rows()[0]!
+        const target = join(directory, 'target.mp3')
+        await rename(original.path, target)
+        await symlink(target, original.path)
+        const renamed = join(directory, 'ORIGINAL.mp3')
+        await rename(original.path, renamed)
+        found = { ...original, path: renamed, fileName: 'ORIGINAL.mp3' }
+        await firstValueFrom(scanner('clean'))
+        expect(rows()).toEqual([
+            expect.objectContaining({ id: identity.id, addedAt: identity.addedAt, path: renamed }),
+        ])
+    })
+
+    it.each(['absent', 'empty mount directory'] as const)(
+        'does not absorb a backup from an excluded source volume that is %s',
+        async state => {
+            const identity = rows()[0]!
+            await rm(original.path)
+            const volume = process.platform == 'win32' ? 'Z:\\' : '/Volumes/maestro-offline-volume'
+            const offlinePath = join(volume, 'excluded', 'original.mp3')
+            database.db
+                .update(songsTable)
+                .set({ path: offlinePath })
+                .where(eq(songsTable.id, identity.id))
+                .run()
+            const actualStat = jest.requireActual('node:fs/promises').stat
+            jest.mocked(stat).mockImplementation(path => {
+                if (String(path) == volume || String(path) == parse(volume).dir) {
+                    if (state == 'absent' || process.platform == 'win32') {
+                        return Promise.reject(Object.assign(new Error('offline'), { code: 'ENOENT' }))
+                    }
+                    return Promise.resolve(fromPartial({ dev: 1, isDirectory: () => true }))
+                }
+                return actualStat(path)
+            })
+            await firstValueFrom(scanner('clean'))
+            expect(rows()).toHaveLength(2)
+            expect(rows().find(song => song.id == identity.id)?.path).toBe(offlinePath)
+            expect(jest.mocked(stat)).toHaveBeenCalledWith(volume)
+        },
+    )
 
     it('does not absorb a backup while the configured original folder is unavailable', async () => {
         const identity = rows()[0]

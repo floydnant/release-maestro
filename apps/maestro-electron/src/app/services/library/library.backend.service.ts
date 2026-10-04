@@ -1,6 +1,6 @@
 import { Observable } from 'rxjs'
 import { readdir, stat, lstat } from 'node:fs/promises'
-import { basename, dirname, relative, isAbsolute } from 'node:path'
+import { basename, dirname, relative, isAbsolute, parse, join } from 'node:path'
 import {
     LibraryScanUpdate,
     MetadataPrescanUpdate,
@@ -287,20 +287,29 @@ const compareLocations = async (
         })
     )
         return 'unknown'
+    const volume = sourceVolumeRoot(original)
+    if (volume) {
+        try {
+            const root = await stat(volume)
+            if (!root.isDirectory()) return 'unknown'
+            // A removable Unix mount can leave an empty directory after unmounting.
+            if (process.platform != 'win32' && root.dev == (await stat(dirname(volume))).dev) {
+                return 'unknown'
+            }
+        } catch {
+            return 'unknown'
+        }
+    }
     const entry = await lstat(original).catch(error => (isAbsent(error) ? 'absent' : 'unknown'))
     if (entry == 'absent') return 'moved'
     if (entry == 'unknown') return 'unknown'
-    if (entry.isSymbolicLink()) return 'copy'
-    const before = await stat(original).catch(error => (isAbsent(error) ? 'absent' : 'unknown'))
-    if (before == 'absent') return 'unknown'
-    if (before == 'unknown') return 'unknown'
     try {
-        const after = await stat(found)
+        const after = await lstat(found)
         if (
             original.toLowerCase() == found.toLowerCase() &&
-            before.ino != 0 &&
-            before.ino == after.ino &&
-            before.dev == after.dev
+            entry.ino != 0 &&
+            entry.ino == after.ino &&
+            entry.dev == after.dev
         ) {
             // realpath preserves input casing on macOS. Directory entries reveal the actual spelling.
             // Independent hardlinks and symlinks still have their own entry and remain copies.
@@ -312,6 +321,18 @@ const compareLocations = async (
     } catch {
         return 'unknown'
     }
+}
+
+/** Standard external-volume roots remain relevant after their folder leaves settings. */
+const sourceVolumeRoot = (path: string): string | null => {
+    if (process.platform == 'win32') return parse(path).root || null
+    const parts = path.split('/')
+    if (parts[1] == 'Volumes' || parts[1] == 'mnt') return parts[2] ? join('/', parts[1], parts[2]) : null
+    if (parts[1] == 'media') return parts[3] ? join('/', ...parts.slice(1, 4)) : null
+    if (parts[1] == 'run' && parts[2] == 'media') {
+        return parts[4] ? join('/', ...parts.slice(1, 5)) : null
+    }
+    return null
 }
 
 const isAbsent = (error: unknown): boolean =>
