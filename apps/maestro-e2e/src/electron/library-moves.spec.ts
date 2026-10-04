@@ -216,7 +216,7 @@ test('a copy keeps its identity after a partial import excludes its original fol
     await writeFile(unreadable, 'invalid audio bytes')
     await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await page.getByRole('link', { name: 'Library', exact: true }).click()
-    await page.getByTitle('Remove folder', { exact: true }).click()
+    await page.getByRole('button', { name: 'Remove folder', exact: true }).click()
     await chooseFolder(app, copiedLibrary)
     await page.getByRole('button', { name: 'Add folders…' }).click()
     await rescan(page, 'Save and rescan', 1)

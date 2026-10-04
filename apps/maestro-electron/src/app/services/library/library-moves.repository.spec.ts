@@ -1,3 +1,5 @@
+import { newPrescanFactFixture } from '../../../test/fixtures/prescan-fact.fixture'
+import { LibraryBrowseRepository } from './library-browse.repository'
 import { PrescanFileFact, SongMetadata } from '@release-maestro/core'
 import { basename } from 'node:path'
 import { eq } from 'drizzle-orm'
@@ -13,13 +15,7 @@ describe('moved songs', () => {
     const next = new Date(20_000)
     const metadata = (path: string, overrides: Partial<SongMetadata> = {}) =>
         newSongFixture({ path, fileName: basename(path), artist: 'Artist', duration: 120, ...overrides })
-    const fact = (song: SongMetadata): PrescanFileFact => ({
-        path: song.path,
-        fileName: song.fileName,
-        size: 1_024,
-        modifiedAt: 1_000,
-        createdAt: 500,
-    })
+    const fact = (song: SongMetadata): PrescanFileFact => newPrescanFactFixture(song.path, { size: 1024 })
     const discover = (songs: SongMetadata[], seenAt: Date) => {
         repository.processPrescanBatch(songs.map(fact), seenAt)
         for (const song of songs) repository.ingestMetadata(song, fact(song), seenAt, 'test-extractor')
@@ -78,6 +74,36 @@ describe('moved songs', () => {
         finish(next)
         expect(rows()).toEqual([expect.objectContaining({ id: original.id, contentHash: 'a'.repeat(64) })])
     })
+
+    it.each([true, false])(
+        'only omits new disc fields when the original has pre-upgrade evidence: %s',
+        legacy => {
+            discover([metadata('/music/original.mp3')], first)
+            const original = rows()[0]
+            if (!original) throw new Error('Expected original song')
+            database.db
+                .update(songsTable)
+                .set({ contentHash: null, firstSeenAt: legacy ? null : first })
+                .run()
+            repository.markNotSeenPresent(new Date(15_000))
+            discover(
+                [metadata('/external/original.mp3', { discNumber: 1, discTotal: 2, trackTotal: 12 })],
+                next,
+            )
+            finish(next)
+            if (legacy)
+                expect(rows()).toEqual([
+                    expect.objectContaining({
+                        id: original.id,
+                        addedAt: original.addedAt,
+                        path: '/external/original.mp3',
+                        discNumber: 1,
+                        trackTotal: 12,
+                    }),
+                ])
+            else expect(rows()).toHaveLength(2)
+        },
+    )
 
     it('repairs a unique missing/present pair left by an interrupted scan without another deep read', () => {
         discover([metadata('/music/original.mp3')], first)
@@ -249,9 +275,17 @@ describe('moved songs', () => {
     it('recomputes the album cover after removing the old path', () => {
         discover([metadata('/old/song.mp3', { albumTitle: 'Album', coverPath: '/aaa.jpg' })], first)
         discover([metadata('/new/song.mp3', { albumTitle: 'Album', coverPath: '/zzz.jpg' })], next)
-        expect(database.db.select().from(albumsTable).get()?.coverPath).toBe('/aaa.jpg')
+        expect(
+            new LibraryBrowseRepository(database.client).getAlbumDetail(
+                database.db.select().from(albumsTable).get()?.id ?? '',
+            )?.coverPath,
+        ).toBe('/aaa.jpg')
         finish(next)
-        expect(database.db.select().from(albumsTable).get()?.coverPath).toBe('/zzz.jpg')
+        expect(
+            new LibraryBrowseRepository(database.client).getAlbumDetail(
+                database.db.select().from(albumsTable).get()?.id ?? '',
+            )?.coverPath,
+        ).toBe('/zzz.jpg')
     })
 
     it('removes an empty old album when a moved file gets a new album from the extractor', () => {

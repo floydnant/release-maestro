@@ -1,3 +1,4 @@
+import { newPrescanFactFixture } from '../../../test/fixtures/prescan-fact.fixture'
 import {
     MetadataPrescanUpdate,
     MetadataScanUpdate,
@@ -5,7 +6,8 @@ import {
     SongMetadata,
 } from '@release-maestro/core'
 import { fromPartial } from '@total-typescript/shoehorn'
-import { copyFile, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
+import { eq } from 'drizzle-orm'
+import { copyFile, mkdtemp, rename, rm, writeFile, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { firstValueFrom, from, Observable, toArray } from 'rxjs'
@@ -22,13 +24,7 @@ describe('move reconciliation across scan retries', () => {
     let repository: LibraryBackendRepository
     let original: SongMetadata
     let found: SongMetadata
-    const fact = (song: SongMetadata): PrescanFileFact => ({
-        path: song.path,
-        fileName: basename(song.path),
-        size: 8,
-        modifiedAt: 1_000,
-        createdAt: 500,
-    })
+    const fact = (song: SongMetadata): PrescanFileFact => newPrescanFactFixture(song.path, { size: 8 })
     const rows = () => database.db.select().from(songsTable).all()
     const scanner = (
         outcome:
@@ -42,6 +38,8 @@ describe('move reconciliation across scan retries', () => {
         abort = new AbortController(),
         modifiedAt = 1_000,
         alsoSeen: SongMetadata[] = [],
+        failedFact?: PrescanFileFact,
+        unavailableFolders: string[] = [],
     ) =>
         new LibraryBackendService(
             repository,
@@ -54,7 +52,14 @@ describe('move reconciliation across scan retries', () => {
                 prescan: () => {
                     if (outcome === 'cancel discovery') abort.abort()
                     return from<MetadataPrescanUpdate[]>([
-                        { phase: 'batch', items: [{ ...fact(found), modifiedAt }, ...alsoSeen.map(fact)] },
+                        {
+                            phase: 'batch',
+                            items: [
+                                { ...fact(found), modifiedAt },
+                                ...alsoSeen.map(fact),
+                                ...(failedFact ? [failedFact] : []),
+                            ],
+                        },
                         ...(outcome === 'discovery error'
                             ? [{ phase: 'itemError' as const, path: '/locked', error: 'EACCES' }]
                             : []),
@@ -70,14 +75,18 @@ describe('move reconciliation across scan retries', () => {
                         }
                         subscriber.next({ phase: 'item', metadata: found })
                         if (outcome === 'read error')
-                            subscriber.next({ phase: 'itemError', path: '/broken', error: 'read failed' })
+                            subscriber.next({
+                                phase: 'itemError',
+                                path: failedFact?.path ?? '/broken',
+                                error: 'read failed',
+                            })
                         if (outcome === 'cancelled') abort.abort()
                         if (outcome === 'fatal') subscriber.error(new Error('sidecar disconnected'))
                         else subscriber.complete()
                     }),
             }),
         )
-            .scan([directory], abort.signal)
+            .scan([directory], abort.signal, false, unavailableFolders)
             .pipe(toArray())
 
     beforeEach(async () => {
@@ -94,6 +103,59 @@ describe('move reconciliation across scan retries', () => {
     afterEach(async () => {
         database.sqlite.close()
         await rm(directory, { recursive: true, force: true })
+    })
+
+    it('does not merge an original path that is a dangling symlink', async () => {
+        const identity = rows()[0]
+        await rm(original.path)
+        await symlink(join(directory, 'absent-target'), original.path)
+        await firstValueFrom(scanner('clean'))
+        expect(rows()).toHaveLength(2)
+        expect(rows().find(song => song.path == original.path)?.id).toBe(identity?.id)
+    })
+
+    it('does not absorb a backup while the configured original folder is unavailable', async () => {
+        const identity = rows()[0]
+        if (!identity) throw new Error('Expected original song')
+        await rm(original.path)
+        const offline = join(directory, 'offline')
+        database.db
+            .update(songsTable)
+            .set({ path: join(offline, 'original.mp3') })
+            .where(eq(songsTable.id, identity.id))
+            .run()
+        await firstValueFrom(scanner('clean', new AbortController(), 1_000, [], undefined, [offline]))
+        expect(rows()).toHaveLength(2)
+        expect(rows().find(song => song.id == identity.id)?.path).toBe(join(offline, 'original.mp3'))
+    })
+
+    it.each([
+        'different size',
+        'known different hash',
+        'same size unknown',
+        'same size same hash',
+        'changed known hash',
+    ] as const)('reconciles only when failed read evidence cannot hide a copy: %s', async evidence => {
+        const identity = rows()[0]
+        if (!identity) throw new Error('Expected original song')
+        await rm(original.path)
+        const broken = {
+            ...original,
+            path: join(directory, 'broken.mp3'),
+            fileName: 'broken.mp3',
+            contentHash: evidence == 'same size same hash' ? original.contentHash : 'b'.repeat(64),
+        }
+        const brokenFact = { ...fact(broken), size: evidence == 'different size' ? 9 : 8 }
+        if (evidence != 'different size' && evidence != 'same size unknown') {
+            repository.processPrescanBatch([brokenFact], new Date(10_001))
+            repository.ingestMetadata(broken, brokenFact, new Date(10_001), 'older-extractor')
+        }
+        if (evidence == 'changed known hash') brokenFact.modifiedAt += 1
+        await firstValueFrom(scanner('read error', new AbortController(), 1_000, [], brokenFact))
+        const canMerge = evidence == 'different size' || evidence == 'known different hash'
+        expect(rows()).toHaveLength(canMerge ? 2 : 3)
+        expect(rows().find(song => song.id == identity.id)?.path).toBe(canMerge ? found.path : original.path)
+        expect(rows().find(song => song.id == identity.id)?.addedAt).toEqual(identity.addedAt)
     })
 
     it.each([

@@ -63,7 +63,7 @@ describe('LibraryScanService', () => {
         const status = await service.startScan('startup')
 
         // The unplugged drive is dropped from the walk, not treated as fatal.
-        expect(backend.scan).toHaveBeenCalledWith(['/music'], expect.anything(), true)
+        expect(backend.scan).toHaveBeenCalledWith(['/music'], expect.anything(), true, ['/usb/drive'])
         expect(status.phase).toBe('discovering')
         expect(status.scannedFolders).toEqual(['/music'])
         expect(status.unavailableFolders).toEqual(['/usb/drive'])
@@ -78,7 +78,7 @@ describe('LibraryScanService', () => {
         const status = await service.startScan('startup')
 
         // An empty walk discovers nothing, which is what marks everything missing.
-        expect(backend.scan).toHaveBeenCalledWith([], expect.anything(), true)
+        expect(backend.scan).toHaveBeenCalledWith([], expect.anything(), true, ['/usb/drive'])
         expect(status.scannedFolders).toEqual([])
         expect(status.unavailableFolders).toEqual(['/usb/drive'])
     })
@@ -98,7 +98,7 @@ describe('LibraryScanService', () => {
 
         const status = await service.startScan('startup')
 
-        expect(backend.scan).toHaveBeenCalledWith(['/music'], expect.anything(), true)
+        expect(backend.scan).toHaveBeenCalledWith(['/music'], expect.anything(), true, [])
         expect(status.scannedFolders).toEqual(['/music'])
     })
 
@@ -127,7 +127,7 @@ describe('LibraryScanService', () => {
         expect(second.scanId).not.toBe(running.scanId)
         expect(second.phase).toBe('discovering')
         expect(backend.scan).toHaveBeenCalledTimes(2)
-        expect(backend.scan).toHaveBeenLastCalledWith(['/other'], expect.anything(), true)
+        expect(backend.scan).toHaveBeenLastCalledWith(['/other'], expect.anything(), true, [])
     })
 
     it('a cancel during folder validation is not lost', async () => {
@@ -199,7 +199,7 @@ describe('LibraryScanService', () => {
 
         updates$ = new Subject<LibraryScanUpdate>()
         await service.startScan('manual', ['/music'])
-        expect(backend.scan).toHaveBeenLastCalledWith(['/music'], expect.anything(), false)
+        expect(backend.scan).toHaveBeenLastCalledWith(['/music'], expect.anything(), false, [])
     })
 
     it('publishes the final classification after discovery paths reconcile as moves', async () => {
@@ -265,6 +265,6 @@ describe('LibraryScanService', () => {
 
         expect(second.phase).toBe('discovering')
         expect(backend.scan).toHaveBeenCalledTimes(2)
-        expect(backend.scan).toHaveBeenLastCalledWith(['/music'], expect.anything(), true)
+        expect(backend.scan).toHaveBeenLastCalledWith(['/music'], expect.anything(), true, [])
     })
 })
