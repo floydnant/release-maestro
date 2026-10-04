@@ -9,6 +9,10 @@ import {
     MetadataWorkerMessage,
 } from '@release-maestro/core'
 import { PROVIDER_DESTROY } from '../../utils/dependency-injection.util'
+import { createMainLogger, isDebugLoggingEnabled, writeDiagnosticEntry } from '../../logging/logger'
+import { diagnosticEntry } from '@release-maestro/core'
+
+const log = createMainLogger('metadata-worker')
 
 type EventListener = (event: MetadataEvent) => void
 
@@ -23,7 +27,7 @@ interface PendingRequest {
  * protocol over its stdio:
  * - stdin  ← requests (one compact JSON object per line)
  * - stdout → responses / events (parsed line-by-line, correlated by request id)
- * - stderr → diagnostic logs (forwarded to the console)
+ * - stderr → structured diagnostic logs (written by the main process)
  *
  * The worker handles one operation at a time; this class simply correlates each
  * response/event back to its originating request id. The process is spawned lazily
@@ -32,36 +36,94 @@ interface PendingRequest {
 export class SidecarProcessService {
     private process: ChildProcessWithoutNullStreams | null = null
     private readline: Interface | null = null
+    private stderrReadline: Interface | null = null
     private readonly pending = new Map<string, PendingRequest>()
 
     constructor(private readonly binaryPath: string) {}
 
     private ensureStarted(): ChildProcessWithoutNullStreams {
-        if (this.process && this.process.exitCode == null && !this.process.killed) {
+        if (
+            this.process &&
+            this.process.exitCode == null &&
+            this.process.signalCode == null &&
+            !this.process.killed
+        ) {
             return this.process
         }
 
-        const child = spawn(this.binaryPath, ['--jsonl'], { stdio: ['pipe', 'pipe', 'pipe'] })
+        // 'exit' can precede 'close'. A new request may arrive while the old
+        // streams still drain, so settle its requests before replacing the child.
+        if (this.process) {
+            this.rejectPendingRequests(new Error('metadata-engine exited before its streams closed'))
+        }
+
+        const child = spawn(
+            this.binaryPath,
+            ['--jsonl', '--log-level', isDebugLoggingEnabled() ? 'debug' : 'info'],
+            { stdio: ['pipe', 'pipe', 'pipe'] },
+        )
         this.process = child
+        log.info('worker.started', { pid: child.pid ?? 0 })
 
         this.readline = createInterface({ input: child.stdout })
         this.readline.on('line', line => this.handleLine(line))
 
-        child.stderr.on('data', (chunk: Buffer) => {
-            const text = chunk.toString().trimEnd()
-            if (text) console.error(`[metadata-engine] ${text}`)
-        })
+        this.stderrReadline = createInterface({ input: child.stderr })
+        this.stderrReadline.on('line', line => this.handleStderrLine(line))
 
-        child.on('error', error =>
-            this.handleExit(new Error(`metadata-engine failed to start: ${error.message}`)),
-        )
-        child.on('exit', (code, signal) => {
+        child.on('error', error => {
+            log.error('worker.process.error', error)
+            if (this.process !== child) return
+            this.handleExit(new Error(`metadata-engine failed to start: ${error.message}`))
+        })
+        child.on('close', (code, signal) => {
+            if (this.process !== child) return
+            const fields = { exitCode: code ?? -1, signal: signal ?? 'none' }
+            if (code === 0) log.info('worker.exited', fields)
+            else log.warn('worker.exited', fields)
             this.handleExit(
                 new Error(`metadata-engine exited (code=${code ?? 'null'}, signal=${signal ?? 'null'})`),
             )
         })
 
         return child
+    }
+
+    private handleStderrLine(line: string): void {
+        if (!line.trim()) return
+        try {
+            const record: unknown = JSON.parse(line)
+            if (record && typeof record === 'object' && 'level' in record && 'fields' in record) {
+                const level = String(record.level).toLowerCase()
+                const fields = record.fields
+                if (!fields || typeof fields !== 'object') throw new Error('Invalid worker log fields')
+                const values = fields as Record<string, unknown>
+                const event = typeof values['message'] === 'string' ? values['message'] : 'worker.message'
+                const details = {
+                    ...(typeof values['error'] === 'string' ? { errorMessage: values['error'] } : {}),
+                    ...(typeof values['request_id'] === 'string' ? { requestId: values['request_id'] } : {}),
+                }
+                writeDiagnosticEntry(
+                    diagnosticEntry(
+                        level === 'error'
+                            ? 'error'
+                            : level === 'warn'
+                              ? 'warn'
+                              : level === 'debug' || level === 'trace'
+                                ? 'debug'
+                                : 'info',
+                        'metadata-worker',
+                        event,
+                        details,
+                    ),
+                    'worker',
+                )
+                return
+            }
+        } catch {
+            // Panic output and older workers can write plain stderr. The shared sanitizer removes paths.
+        }
+        log.warn('worker.stderr.unstructured', { lineLength: line.length })
     }
 
     private handleLine(line: string): void {
@@ -72,7 +134,9 @@ export class SidecarProcessService {
         try {
             message = JSON.parse(trimmed) as MetadataWorkerMessage
         } catch {
-            console.error(`[metadata-engine] unparseable protocol line: ${trimmed}`)
+            log.error('worker.protocol.invalid-json', new Error('Invalid worker protocol JSON'), {
+                lineLength: trimmed.length,
+            })
             return
         }
 
@@ -92,7 +156,16 @@ export class SidecarProcessService {
     private handleExit(error: Error): void {
         this.readline?.close()
         this.readline = null
+        this.stderrReadline?.close()
+        this.stderrReadline = null
         this.process = null
+
+        this.rejectPendingRequests(error)
+    }
+
+    private rejectPendingRequests(error: Error): void {
+        if (this.pending.size === 0) return
+        log.error('worker.request.interrupted', error, { pendingRequests: this.pending.size })
 
         // Fail any in-flight requests so callers don't hang forever.
         for (const [, pending] of this.pending) pending.reject(error)
@@ -145,6 +218,8 @@ export class SidecarProcessService {
     stop(): void {
         this.readline?.close()
         this.readline = null
+        this.stderrReadline?.close()
+        this.stderrReadline = null
         for (const [, pending] of this.pending) {
             pending.reject(new Error('metadata-engine is shutting down'))
         }

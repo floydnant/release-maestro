@@ -80,7 +80,10 @@ describe('quit IPC', () => {
         mockIpcMain.emit('quit', {}, 23)
         await exited
 
-        expect(consoleError).toHaveBeenCalledWith('Error during cleanup:', failure)
+        expect(consoleError).toHaveBeenCalledWith(
+            '[main:app-shutdown] app.cleanup.failed',
+            expect.objectContaining({ errorName: 'Error', errorMessage: 'database cleanup failed' }),
+        )
         expect(consoleError).toHaveBeenCalledTimes(1)
         expect(mockExit).toHaveBeenCalledWith(23)
     })

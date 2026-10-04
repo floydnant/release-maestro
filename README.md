@@ -99,6 +99,7 @@ There is no repo-wide typecheck target; `build` is the type gate for app code. S
   glossaries in [docs/contexts/](docs/contexts/), and which projects each context spans
 - [docs/adr/](docs/adr/) — architectural decisions and the reasoning behind non-obvious ones
 - [docs/testing.md](docs/testing.md) — test layers, E2E conventions, fixtures
+- [docs/logging.md](docs/logging.md) — local logs, event conventions, and diagnostics export
 
 ## Projects
 

@@ -2,12 +2,15 @@
 // import { autoUpdater } from 'electron-updater'
 // import { dialog, MessageBoxOptions } from 'electron'
 import App from '../app'
+import { createMainLogger } from '../logging/logger'
+
+const log = createMainLogger('updates')
 
 export default class UpdateEvents {
     // initialize auto update service - must be invoked only in production
     static initAutoUpdateService() {
         if (!App.isDevelopmentMode()) {
-            console.log('Initializing auto update service...\n')
+            log.info('updates.initialize.started')
 
             // TODO: Uncomment when electron-updater is installed
             // Configure update server (GitHub Releases by default)
@@ -22,7 +25,7 @@ export default class UpdateEvents {
         if (!App.isDevelopmentMode()) {
             // TODO: Uncomment when electron-updater is installed
             // autoUpdater.checkForUpdatesAndNotify()
-            console.log('Auto-updater not configured yet')
+            log.info('updates.not-configured')
         }
     }
 }

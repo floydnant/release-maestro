@@ -1,4 +1,7 @@
+import { createMainLogger } from '../logging/logger'
 import { DiProviderNotFoundException } from './dependency-injection.exceptions'
+
+const log = createMainLogger('dependency-injection')
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyConstructor<TInstance> = new (...args: any[]) => TInstance
@@ -69,15 +72,14 @@ export class DiContainer {
      */
     async get<TValue extends object>(injectionToken: InjectionToken<TValue>): Promise<TValue> {
         if (this.config.debugLogs) {
-            console.group(`Retrieving '${injectionToken.name}'`)
+            log.debug('di.resolve.started', { provider: injectionToken.name })
         }
 
         // check current scope's cache
         const cachedValue = this.getValue(injectionToken)
         if (cachedValue) {
             if (this.config.debugLogs) {
-                console.debug(`Found cached value for '${injectionToken.name}'`)
-                console.groupEnd()
+                log.debug('di.resolve.cached', { provider: injectionToken.name })
             }
 
             return cachedValue as TValue
@@ -89,12 +91,8 @@ export class DiContainer {
             const value = await this.initProvider(provider)
             this.instances.set(injectionToken, value)
 
-            if (this.config.debugLogs) console.groupEnd()
-
             return value as TValue
         }
-
-        if (this.config.debugLogs) console.groupEnd()
 
         throw new DiProviderNotFoundException(injectionToken)
     }
@@ -110,12 +108,10 @@ export class DiContainer {
         provider: Provider<InjectionToken<TValue>>,
     ): Promise<TValue> {
         if (this.config.debugLogs) {
-            console.group(`Instantiating '${provider.provide.name}'`)
+            log.debug('di.provider.initialize.started', { provider: provider.provide.name })
         }
 
         if (isValueProvider(provider)) {
-            if (this.config.debugLogs) console.groupEnd()
-
             return provider.useValue
         }
 
@@ -126,7 +122,9 @@ export class DiContainer {
             await initFn.call(value)
         }
 
-        if (this.config.debugLogs) console.groupEnd()
+        if (this.config.debugLogs) {
+            log.debug('di.provider.initialize.completed', { provider: provider.provide.name })
+        }
 
         return value
     }
@@ -143,7 +141,7 @@ export class DiContainer {
         if (provider) return provider as Provider<InjectionToken<TValue>>
 
         if (this.config.debugLogs) {
-            console.debug(`No provider for '${injectionToken.name}' in the current scope`)
+            log.debug('di.provider.missing', { provider: injectionToken.name })
         }
 
         return undefined
@@ -154,20 +152,16 @@ export class DiContainer {
 
         if (existingProviderIndex == -1) {
             if (this.config.debugLogs) {
-                console.debug(
-                    `Tried overriding '${provider.provide.name}' but no existing provider was found. Adding`,
-                    provider,
-                    'instead.',
-                )
+                log.debug('di.provider.override-added', { provider: provider.provide.name })
             }
 
             this.config.providers.unshift(provider)
             return this
         }
 
-        const [originalProvider] = this.config.providers.splice(existingProviderIndex, 1, provider)
+        this.config.providers.splice(existingProviderIndex, 1, provider)
         if (this.config.debugLogs) {
-            console.debug('Overridden provider', originalProvider, 'with', provider)
+            log.debug('di.provider.overridden', { provider: provider.provide.name })
         }
 
         return this
@@ -175,7 +169,7 @@ export class DiContainer {
 
     async destroy(injectionToken: InjectionToken<object>): Promise<void> {
         if (this.config.debugLogs) {
-            console.debug(`Destroying '${injectionToken.name}'`)
+            log.debug('di.provider.destroy.started', { provider: injectionToken.name })
         }
 
         const instance = this.instances.get(injectionToken)
@@ -196,11 +190,11 @@ export class DiContainer {
     }
 
     async destroyAll(): Promise<void> {
-        if (this.config.debugLogs) console.group('Destroying all instances')
+        if (this.config.debugLogs) log.debug('di.destroy-all.started')
 
         await Promise.all(Array.from(this.instances.keys()).map(token => this.destroy(token)))
         await Promise.all(this.globalOnDestroyFns.map(fn => fn()))
 
-        if (this.config.debugLogs) console.groupEnd()
+        if (this.config.debugLogs) log.debug('di.destroy-all.completed')
     }
 }

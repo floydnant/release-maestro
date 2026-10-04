@@ -101,6 +101,13 @@ export const appRoutes: Route[] = [
         component: SettingsComponent,
         children: [
             {
+                path: 'diagnostics',
+                loadComponent: () =>
+                    import('./pages/settings/diagnostics/diagnostics.component').then(
+                        m => m.DiagnosticsComponent,
+                    ),
+            },
+            {
                 path: 'library',
                 loadComponent: () =>
                     import('./pages/settings/library/library-settings.component').then(

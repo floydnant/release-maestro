@@ -15,6 +15,7 @@ import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startW
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { FeedService } from '../../core/services/feed.service'
+import { createRendererLogger } from '../../core/logging/logger'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
 import { IntersectionDirective } from '../../shared/directives/intersection.directive'
@@ -27,6 +28,7 @@ import {
 
 const NUM_PREFETCH_ITEMS = 5
 const SEEK_BY_SECONDS = 30
+const log = createRendererLogger('feed')
 
 const getUserFacingErrorMessage = (error: unknown) => {
     if (typeof error == 'string') return error
@@ -109,10 +111,9 @@ export class FeedComponent {
                         )
                         const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
                         if (items.length != newItems.length) {
-                            console.warn(
-                                'Duplicate feed items detected:',
-                                items.filter(item => this.loadedFeedItemIds.has(item.id)),
-                            )
+                            log.warn('feed.items.duplicate', {
+                                count: items.length - newItems.length,
+                            })
                         }
                         newItems.forEach(item => this.loadedFeedItemIds.add(item.id))
 
@@ -124,7 +125,7 @@ export class FeedComponent {
                             items: [],
                         }
                     } catch (error) {
-                        console.error('Error loading feed state', error)
+                        log.error('feed.load.failed', error)
 
                         return {
                             status: 'error',
@@ -180,7 +181,7 @@ export class FeedComponent {
             if (feedItem.type == 'BANDCAMP.TRALBUM') {
                 const streamUrl = feedItem.data.tracks?.find(track => track.streamUrl)?.streamUrl
                 if (!streamUrl) {
-                    console.warn('No stream URL found for release:', feedItem)
+                    log.warn('feed.release.missing-stream', { itemId: feedItem.id })
                 } else {
                     // @TODO: also check if a different track but from the same feed item is playing
                     if (this.audioPlayer.currentUrl() == streamUrl) {
@@ -204,7 +205,7 @@ export class FeedComponent {
         // (bc user might scroll through the feed quickly)
         this.feedService
             .markFeedItemViewed(feedItem.id, feedItem.type, this.snoozedFeedItems.has(feedItem.id))
-            .catch(err => console.error(`Failed to mark feed item ${feedItem.id} as viewed:`, err))
+            .catch(err => log.error('feed.item.mark-viewed.failed', err, { itemId: feedItem.id }))
     }
     viewedFeedItems = new Set<string>()
     snoozedFeedItems = new Set<string>()
@@ -214,7 +215,6 @@ export class FeedComponent {
         event?.preventDefault()
         const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
-            console.warn('No current feed item to snooze')
             return
         }
 
@@ -292,7 +292,6 @@ export class FeedComponent {
 
         const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
-            console.log('No current feed item')
             return
         }
         if (currentFeedItem.type == 'BANDCAMP.TRALBUM') {
@@ -300,14 +299,12 @@ export class FeedComponent {
                 track => track.streamUrl == this.audioPlayer.currentUrl(),
             )
             if (currentPlayingTrackIndex == -1) {
-                console.log('No current playing track')
                 return
             }
             const nextPlayableTrack = currentFeedItem.data.tracks.find(
                 (track, index) => index > currentPlayingTrackIndex && !!track.streamUrl,
             )
             if (!nextPlayableTrack) {
-                console.log('No next track to play, scrolling down')
                 this.scrollDown()
                 return
             }
@@ -330,7 +327,6 @@ export class FeedComponent {
 
         const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
-            console.warn('No current feed item')
             return
         }
         if (currentFeedItem.type == 'BANDCAMP.TRALBUM') {
@@ -338,7 +334,6 @@ export class FeedComponent {
                 track => track.streamUrl == this.audioPlayer.currentUrl(),
             )
             if (currentPlayingTrackIndex == -1) {
-                console.log('No current playing track')
                 return
             }
 
@@ -350,7 +345,6 @@ export class FeedComponent {
                 }
             }
             if (prevPlayableTrackIndex == -1) {
-                console.log('No prev track to play, scrolling up')
                 this.scrollUp()
                 return
             }
@@ -368,17 +362,16 @@ export class FeedComponent {
 
         const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
-            console.warn('No current feed item to open in browser')
             return
         }
         if (currentFeedItem.type == 'BANDCAMP.TRALBUM') {
             const url = currentFeedItem.data.releaseUrl
             if (!url) {
-                console.warn('No current release url')
+                log.warn('feed.release.missing-url', { itemId: currentFeedItem.id })
                 return
             }
             this.electronService.openUrl(url).catch(err => {
-                console.error('Failed to open url in browser:', err)
+                log.error('feed.release.open-url.failed', err, { itemId: currentFeedItem.id })
             })
         } else {
             assertUnreachable(currentFeedItem.type, `Unhandled feed item type:`)
@@ -388,7 +381,6 @@ export class FeedComponent {
     scrollCurrentTrackIntoView() {
         const currentFeedItem = this.getFeedItems()[this.currentFeedIndex()]
         if (!currentFeedItem) {
-            console.log('No current feed item')
             return
         }
         if (currentFeedItem.type == 'BANDCAMP.TRALBUM') {
@@ -396,7 +388,6 @@ export class FeedComponent {
                 track => track.streamUrl == this.audioPlayer.currentUrl(),
             )
             if (currentPlayingTrackIndex == -1) {
-                console.log('No current playing track')
                 return
             }
             const currentTrackElement = this.feedEntries()[
@@ -408,7 +399,7 @@ export class FeedComponent {
                     const trackRect = currentTrackElement.getBoundingClientRect()
                     const parentRect = currentTrackElement?.parentElement?.getBoundingClientRect()
                     if (!parentRect) {
-                        console.warn('Parent element not found for current track element')
+                        log.warn('feed.track.parent-missing')
                     }
 
                     const isVisible =
@@ -418,7 +409,7 @@ export class FeedComponent {
                     }
                 }, 100)
             } else {
-                console.warn('Current track element not found in the DOM')
+                log.warn('feed.track.element-missing')
             }
         } else {
             assertUnreachable(currentFeedItem.type, `Unhandled feed item type:`)

@@ -13,7 +13,6 @@ import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
 import { TranslateService } from '@ngx-translate/core'
 import { filter, map } from 'rxjs'
-import { webEnv } from '../environments/environment'
 import { ElectronService } from './core/services'
 import { EmailImportIndicatorComponent } from './email-import-indicator.component'
 import { WebAudioPlayer } from './core/services/audio-player.service'
@@ -24,6 +23,9 @@ import { SettingsService } from './core/settings/settings.service'
 import { IconComponent } from './shared/components/icon/icon.component'
 import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
 import { MinDwellPacer } from './shared/utils/min-dwell-pacer'
+import { createRendererLogger } from './core/logging/logger'
+
+const log = createRendererLogger('app')
 
 /** Compact model the title bar renders for a background scan. */
 type ScanIndicatorView =
@@ -129,7 +131,7 @@ export class AppComponent {
     autoImportEmails() {
         if (!this.isElectron) return
         this.feedService.triggerEmailImport('auto').catch(err => {
-            console.error('Failed to trigger auto email import:', err)
+            log.error('feed.auto-import.trigger-failed', err)
         })
     }
 
@@ -152,19 +154,19 @@ export class AppComponent {
 
     minimizeWindow() {
         this.electronService.minimizeWindow().catch(err => {
-            console.error('Failed to minimize window:', err)
+            log.error('window.minimize.failed', err)
         })
     }
 
     toggleMaximizeWindow() {
         this.electronService.toggleMaximizeWindow().catch(err => {
-            console.error('Failed to toggle window maximize state:', err)
+            log.error('window.maximize-toggle.failed', err)
         })
     }
 
     closeWindow() {
         this.electronService.closeWindow().catch(err => {
-            console.error('Failed to close window:', err)
+            log.error('window.close.failed', err)
         })
     }
 
@@ -216,14 +218,7 @@ export class AppComponent {
 
     constructor() {
         this.translate.setFallbackLang('en')
-        console.log('webEnv', webEnv)
-
-        if (this.electronService.isElectron) {
-            console.log('Run in electron')
-            console.log('Electron ipcRenderer', this.electronService.ipcRenderer)
-        } else {
-            console.log('Run in browser')
-        }
+        log.info('renderer.ready', { mode: this.electronService.isElectron ? 'desktop' : 'browser' })
         this.autoImportEmails()
 
         // Feed the pacer the desired indicator whenever the scan status or route changes.

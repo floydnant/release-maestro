@@ -1,3 +1,6 @@
+import { createMainLogger } from './logging/logger'
+
+const log = createMainLogger('app-shutdown')
 let cleanup: Promise<void> | null = null
 
 /** All exit routes drain the import before closing its dependencies, at most once. */
@@ -8,7 +11,7 @@ export function cleanupApplication(): Promise<void> {
         const importService = await diContainer.get(EmailImportService)
         await importService.stop()
         await diContainer.destroyAll()
-    })().catch(error => console.error('Error during cleanup:', error))
+    })().catch(error => log.error('app.cleanup.failed', error))
 
     return cleanup
 }

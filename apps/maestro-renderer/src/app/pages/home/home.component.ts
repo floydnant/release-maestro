@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core'
+import { Component, ChangeDetectionStrategy } from '@angular/core'
 import { TranslatePipe } from '@ngx-translate/core'
 
 @Component({
@@ -8,8 +8,4 @@ import { TranslatePipe } from '@ngx-translate/core'
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [TranslatePipe],
 })
-export class HomeComponent implements OnInit {
-    ngOnInit(): void {
-        console.log('HomeComponent INIT')
-    }
-}
+export class HomeComponent {}

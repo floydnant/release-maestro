@@ -49,8 +49,6 @@ describe(WebAudioPlayer.name, () => {
 
         TestBed.configureTestingModule({})
         player = TestBed.inject(WebAudioPlayer)
-        jest.spyOn(player, 'logInfo').mockImplementation()
-        jest.spyOn(player, 'logError').mockImplementation()
     })
 
     afterEach(() => {

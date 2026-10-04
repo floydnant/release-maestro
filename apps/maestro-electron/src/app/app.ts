@@ -6,6 +6,9 @@ import { showMainWindow } from './app-window'
 import { developmentAppName, rendererAppName, rendererAppPort } from './constants'
 import { nativeWindowBackgroundColor } from './design-tokens.generated'
 import { configurePermissionPolicy } from './permissions'
+import { createMainLogger } from './logging/logger'
+
+const log = createMainLogger('app')
 
 const isSafeExternalUrl = (url: string) => {
     try {
@@ -30,7 +33,7 @@ const openUrlInNativeBrowser = (url: string) => {
     if (!isSafeExternalUrl(url)) return
 
     void shell.openExternal(url).catch(error => {
-        console.error('Failed to open URL in the native browser:', error)
+        log.error('external-url.open.failed', error)
     })
 }
 
@@ -72,7 +75,7 @@ export default class App {
         try {
             await App.initializeServices()
         } catch (error) {
-            console.error('Failed to initialize services:', error)
+            log.error('services.initialize.failed', error)
         }
 
         if (rendererAppName) {
@@ -96,7 +99,7 @@ export default class App {
             const { LibraryScanService } = await import('./services/library/library-scan.service')
             const scanService = await diContainer.get(LibraryScanService)
             await scanService.startScan('startup')
-        })().catch(error => console.error('Failed to start library startup scan:', error))
+        })().catch(error => log.error('library.startup-scan.failed', error))
     }
 
     private static async initializeServices() {
@@ -113,7 +116,7 @@ export default class App {
         const { EmailImportService } = await import('./services/feed/email-import.service')
         await diContainer.get(EmailImportService)
 
-        console.log('Services initialized successfully')
+        log.info('services.initialize.completed')
     }
 
     private static onActivate() {

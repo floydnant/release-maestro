@@ -4,9 +4,12 @@ import * as fs from 'fs/promises'
 import { join } from 'path'
 import { createInterface } from 'readline'
 import { Observable, Subject } from 'rxjs'
-import { Email, EmailImportStreamPacket, emailSchema } from '@release-maestro/core'
+import { Email, EmailImportStreamPacket, diagnosticErrorSummary, emailSchema } from '@release-maestro/core'
 import { appPaths } from '../../app-env'
+import { createMainLogger } from '../../logging/logger'
 import type { EmailImporterPlugin } from './email.backend.repository'
+
+const log = createMainLogger('apple-mail')
 
 const validateEmail = (data: unknown): Email | null => {
     const result = emailSchema.safeParse(data)
@@ -50,13 +53,26 @@ export const formatAppleScriptDate = (date: Date): string =>
     `${date.getFullYear()}-${padTwoDigits(date.getMonth() + 1)}-${padTwoDigits(date.getDate())}` +
     `T${padTwoDigits(date.getHours())}:${padTwoDigits(date.getMinutes())}:${padTwoDigits(date.getSeconds())}`
 
+class AppleMailExportError extends Error {
+    readonly code = 'APPLE_MAIL_EXPORT_FAILED'
+
+    constructor(
+        message: string,
+        readonly exitCode: number | null,
+    ) {
+        super(message)
+        this.name = 'AppleMailExportError'
+    }
+}
+
 const toExportError = (exitCode: number | null, unhandledOutput: string[]): Error => {
     const mailError = unhandledOutput
         .map(line => line.match(/Mail got an error: (.+)/)?.[1])
         .find(message => message !== undefined)
 
-    return new Error(
+    return new AppleMailExportError(
         `[AppleMailImporter] ${mailError ?? unhandledOutput.at(-1) ?? `osascript exited with code ${exitCode}`}`,
+        exitCode,
     )
 }
 
@@ -72,7 +88,7 @@ const isMailRunning = (): Promise<boolean> =>
     runAppleScript('application "Mail" is running').then(
         output => output !== 'false',
         error => {
-            console.error('[AppleMailImporter] Could not tell whether Mail is running:', error)
+            log.errorEvent('apple-mail.running-check.failed', diagnosticErrorSummary(error))
             return true
         },
     )
@@ -80,7 +96,7 @@ const isMailRunning = (): Promise<boolean> =>
 const quitMail = (): Promise<void> =>
     runAppleScript('if application "Mail" is running then tell application "Mail" to quit').then(
         () => undefined,
-        error => console.error('[AppleMailImporter] Could not quit Mail:', error),
+        error => log.errorEvent('apple-mail.quit.failed', diagnosticErrorSummary(error)),
     )
 
 export class AppleMailRepository implements EmailImporterPlugin {
@@ -115,13 +131,12 @@ export class AppleMailRepository implements EmailImporterPlugin {
                     handledLines = handledLines
                         .then(() => this.handleExportLine(line, result$, unhandledOutput, abortSignal))
                         .catch((error: unknown) => {
-                            console.error('[AppleMailImporter] ', error)
+                            log.errorEvent('apple-mail.export-line.failed', diagnosticErrorSummary(error))
                             lineFailure ??= error instanceof Error ? error : new Error(String(error))
                         })
                 })
-                childProcess.stdout.on('data', data => {
-                    console.log('[AppleMailImporter] ', String(data).replace(/\n$/, ''))
-                })
+                // Drain script output. It can contain message text and must not enter diagnostics.
+                childProcess.stdout.resume()
 
                 let isSettled = false
                 /** `getError` runs once every line is handled, so it sees all of the script's output. */
@@ -137,19 +152,14 @@ export class AppleMailRepository implements EmailImporterPlugin {
 
                         // An aborted export completes rather than errors: the user asked it to stop
                         if (error && !abortSignal.aborted) {
-                            console.error('[AppleMailImporter] ', error.message)
+                            log.errorEvent('apple-mail.export.failed', diagnosticErrorSummary(error))
                             result$.error(error)
                         } else {
                             result$.complete()
                         }
 
                         fs.rm(exportPath, { recursive: true }).catch(err => {
-                            console.error(
-                                '[AppleMailImporter] Error removing export directory',
-                                exportPath,
-                                ':',
-                                err,
-                            )
+                            log.errorEvent('apple-mail.export-cleanup.failed', diagnosticErrorSummary(err))
                         })
                     })
                 }
@@ -184,7 +194,7 @@ export class AppleMailRepository implements EmailImporterPlugin {
         if (abortSignal.aborted) return
         const match = line.match(/^(Processed|Failed) email (\d+)\/(\d+): (.*)$/)
         if (!match) {
-            console.error('[AppleMailImporter] ', line)
+            log.warn('apple-mail.script-output.unrecognized', { lineLength: line.length })
             unhandledOutput.push(line)
             return
         }
@@ -192,7 +202,6 @@ export class AppleMailRepository implements EmailImporterPlugin {
         const [, outcome, current, total, filePath] = match
         const progress = { current: Number(current), total: Number(total) }
         if (outcome === 'Failed' || !filePath) {
-            console.warn('[AppleMailImporter] Message left for the next import:', line)
             result$.next({ ...progress, email: null })
             return
         }
@@ -214,7 +223,6 @@ export class AppleMailRepository implements EmailImporterPlugin {
             } catch (error: unknown) {
                 if (abortSignal.aborted) return
                 if (attempt === 3) {
-                    console.warn('[AppleMailImporter] Message left for the next import:', filePath, error)
                     result$.next({ ...progress, email: null })
                 }
             }

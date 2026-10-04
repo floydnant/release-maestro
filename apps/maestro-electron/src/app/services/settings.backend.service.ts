@@ -1,9 +1,12 @@
 import { AppSettings, appSettingsSchema, storedAppSettingsSchema } from '@release-maestro/core'
 import { PersistentStore } from '../utils/persistent-store.util'
+import { createMainLogger } from '../logging/logger'
+
+const log = createMainLogger('settings')
 
 export class SettingsBackendService {
     constructor(readonly store: PersistentStore<AppSettings>) {
-        console.log('[SettingsBackendService] initialized with:', this.store.path, this.store.store)
+        log.info('settings.loaded')
     }
 
     /** Read the store through the tolerant schema — invalid fields are dropped, never thrown. */

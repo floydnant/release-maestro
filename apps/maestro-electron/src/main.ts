@@ -7,6 +7,12 @@ import { app, BrowserWindow } from 'electron'
 import App from './app/app'
 import { developmentAppName } from './app/constants'
 import { cleanupApplication } from './app/app-shutdown'
+import { createMainLogger, initializeLogging } from './app/logging/logger'
+import './app/logging/logging.events'
+
+initializeLogging()
+const log = createMainLogger('app')
+log.info('app.start', { version: app.getVersion(), platform: process.platform, packaged: app.isPackaged })
 
 if (developmentAppName) app.setName(developmentAppName)
 
@@ -35,7 +41,10 @@ app.on('before-quit', event => {
     if (cleanupComplete) return
     event.preventDefault()
 
+    log.info('app.shutdown.started')
+
     quitCleanup ??= cleanupApplication().finally(() => {
+        log.info('app.shutdown.completed')
         cleanupComplete = true
         app.quit()
     })

@@ -216,14 +216,42 @@ describe('LibraryScanService', () => {
 
     it('a stream error terminates as failed with a structured error', async () => {
         const status = await service.startScan('onboarding', ['/music'])
+        const errorLog = jest.spyOn(console, 'error').mockImplementation()
 
-        updates$.error(new Error('engine exploded'))
+        updates$.error(new Error('SQLITE_FULL: database or disk is full'))
 
         expect(status.phase).toBe('failed')
         expect(status.terminal).toMatchObject({
             outcome: 'failed',
-            error: { code: 'SCAN_ERROR', message: 'engine exploded' },
+            error: { code: 'SCAN_ERROR', message: 'SQLITE_FULL: database or disk is full' },
         })
+        expect(errorLog).toHaveBeenCalledWith(
+            '[main:library-scan] library.scan.finished',
+            expect.objectContaining({
+                errorCode: 'SCAN_ERROR',
+                errorMessage: 'SQLITE_FULL: database or disk is full',
+            }),
+        )
+        errorLog.mockRestore()
+    })
+
+    it('keeps a private database path out of the failed scan log', async () => {
+        const status = await service.startScan('onboarding', ['/music'])
+        const errorLog = jest.spyOn(console, 'error').mockImplementation()
+        const message = 'SQLITE_CANTOPEN: unable to open /Users/alice/Private Music/db.sqlite'
+
+        updates$.error(new Error(message))
+
+        expect(status.terminal?.error?.message).toBe(message)
+        expect(errorLog).toHaveBeenCalledWith(
+            '[main:library-scan] library.scan.finished',
+            expect.objectContaining({
+                errorCode: 'SCAN_ERROR',
+                errorMessage: 'SQLITE_CANTOPEN: unable to open [path]',
+            }),
+        )
+        expect(JSON.stringify(errorLog.mock.calls)).not.toContain('Private Music')
+        errorLog.mockRestore()
     })
 
     it('bumps the revision monotonically with every mutation', async () => {

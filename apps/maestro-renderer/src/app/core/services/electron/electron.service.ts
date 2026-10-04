@@ -57,4 +57,16 @@ export class ElectronService {
     async closeWindow() {
         await this.ipcRenderer.invoke('window-close')
     }
+
+    async getDiagnosticsPreview(): Promise<string[]> {
+        return this.ipcRenderer.invoke('diagnostics:preview')
+    }
+
+    async openDiagnosticsFolder(): Promise<void> {
+        await this.ipcRenderer.invoke('diagnostics:open-folder')
+    }
+
+    async exportDiagnostics(): Promise<string | null> {
+        return this.ipcRenderer.invoke('diagnostics:export')
+    }
 }

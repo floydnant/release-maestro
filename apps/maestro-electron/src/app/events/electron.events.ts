@@ -7,6 +7,9 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { asAppIpcMain } from '@release-maestro/core'
 import { environment } from '../../environments/environment'
 import { cleanupApplication } from '../app-shutdown'
+import { createMainLogger } from '../logging/logger'
+
+const log = createMainLogger('ipc')
 
 const ipc = asAppIpcMain(ipcMain)
 
@@ -18,7 +21,7 @@ export default class ElectronEvents {
 
 // Retrieve app version
 ipc.handle('get-app-version', () => {
-    console.log(`Fetching application version... [v${environment.version}]`)
+    log.debug('app.version.requested')
 
     return environment.version
 })

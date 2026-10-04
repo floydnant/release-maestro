@@ -21,13 +21,27 @@
                     >Apple Mail</a
                 >
             </li>
+            @if (showDesignSystem) {
+                <li>
+                    <a
+                        routerLink="debug"
+                        routerLinkActive="active-link"
+                        class="mt-px btn-nkd-neutral block w-full text-left"
+                    >
+                        Debug
+                    </a>
+                </li>
+            }
+        </ul>
+        <p class="mt-4 mb-3 type-label-sm text-content-muted">Support</p>
+        <ul>
             <li>
                 <a
-                    routerLink="debug"
+                    routerLink="diagnostics"
                     routerLinkActive="active-link"
-                    class="mt-px btn-nkd-neutral block w-full text-left"
+                    class="btn-nkd-neutral block w-full text-left"
                 >
-                    Debug
+                    Diagnostics
                 </a>
             </li>
         </ul>

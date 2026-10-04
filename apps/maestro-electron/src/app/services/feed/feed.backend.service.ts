@@ -1,5 +1,6 @@
 import { bufferCount, concatMap, filter, materialize, merge, Observable, switchMap } from 'rxjs'
 import {
+    diagnosticErrorSummary,
     BandcampEmailFeedSourceItem,
     BandcampFeedItem,
     EmailImportProgress,
@@ -18,6 +19,7 @@ import {
 import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
+import { createMainLogger } from '../../logging/logger'
 import { FeedBackendRepository } from './feed.backend.repository'
 
 /**
@@ -27,6 +29,7 @@ import { FeedBackendRepository } from './feed.backend.repository'
  * creating duplicate feed items.
  */
 const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
+const log = createMainLogger('feed')
 
 const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): BandcampFeedItem | null => {
     if (email.type == 'EMAIL.BANDCAMP_NEW_RELEASE') {
@@ -64,7 +67,7 @@ export class FeedBackendService {
     ) {}
 
     async triggerEmailImport(abortSignal: AbortSignal): Promise<Observable<EmailImportProgress>> {
-        console.log('Running email import...')
+        log.debug('feed.import.pipeline.started')
 
         const importStartedAt = new Date()
         let totalProcessed = 0
@@ -108,7 +111,7 @@ export class FeedBackendService {
                 bufferCount(50),
                 concatMap(async emailPackets => {
                     totalProcessed += emailPackets.length
-                    console.log('Processing batch of emails:', emailPackets.length)
+                    log.debug('feed.import.batch', { emailCount: emailPackets.length })
 
                     for (const { email } of emailPackets) {
                         if (!email) {
@@ -148,7 +151,10 @@ export class FeedBackendService {
                             await this.feedBackendRepository
                                 .advanceEmailImportCheckpoint(vendor, mailboxName, coveredUntil)
                                 .catch(error =>
-                                    console.error('Failed to save the email import checkpoint:', error),
+                                    log.errorEvent(
+                                        'feed.import.checkpoint.failed',
+                                        diagnosticErrorSummary(error),
+                                    ),
                                 )
                         }
 
@@ -164,7 +170,10 @@ export class FeedBackendService {
                         }
                     }
                     if (notification.kind == 'E') {
-                        console.error('Error during email import:', notification.error)
+                        log.errorEvent(
+                            'feed.import.pipeline.failed',
+                            diagnosticErrorSummary(notification.error),
+                        )
 
                         return {
                             phase: 'error' as const,
@@ -193,14 +202,14 @@ export class FeedBackendService {
                 : null
 
         if (!item.data.tralbumUrl) {
-            console.warn('No tralbum link found:', item)
+            log.warn('feed.release.missing-link')
 
             return mapBandcampReleaseFeedItemToHydratedFeedItem(
                 item,
                 null,
                 sourceLinks &&
                     (await this.webScrapingService.getLinkMetaDataBatch(sourceLinks).catch(err => {
-                        console.error('Failed to scrape links', err)
+                        log.error('feed.links.scrape.failed', err)
                         return null
                     })),
                 null,
@@ -212,15 +221,17 @@ export class FeedBackendService {
                         error instanceof BandcampApiFailedToFetchTralbumException ||
                         error instanceof BandcampApiMalformedTralbumDataException
                     ) {
-                        console.log(error)
+                        log.warn('feed.release.scrape.recoverable', {
+                            errorName: error.name,
+                        })
                         return { isError: true as const, error }
                     }
-                    console.error('Failed to load tralbum:', item.data.tralbumUrl, error)
+                    log.error('feed.release.load.failed', error)
                     throw error
                 }),
                 sourceLinks &&
                     (await this.webScrapingService.getLinkMetaDataBatch(sourceLinks).catch(err => {
-                        console.error('Failed to scrape links', err)
+                        log.error('feed.links.scrape.failed', err)
                         return null
                     })),
             ])
@@ -238,14 +249,14 @@ export class FeedBackendService {
     }
 
     async hydrateFeed(items: BandcampFeedItem[]): Promise<HydratedFeedItem[]> {
-        console.log('Hydrating feed items')
+        log.debug('feed.hydrate.started', { itemCount: items.length })
         const promises = items.map(async item => {
             if (item.type == 'BANDCAMP.TRALBUM') return await this.hydrateBandcampFeedItem(item)
 
             return assertUnreachable(item.type as never, 'Unhandled feed item type:')
         })
         const hydratedFeedItems = await Promise.all(promises)
-        console.log('Hydrated', hydratedFeedItems.length, 'feed items')
+        log.debug('feed.hydrate.completed', { itemCount: hydratedFeedItems.length })
 
         return hydratedFeedItems
     }
