@@ -119,7 +119,7 @@ metadata-engine boundary.
 _Avoid_: `track` in identifiers except the tagged `trackNumber` and `trackTotal`; file, item, entry as synonyms for song
 
 **Track number** and **track total** are deliberate exceptions: `trackNumber` names a tagged position,
-and `trackTotal` names the tagged total for a disc. Counts of library rows use `songCount`.
+and A file's `trackTotal` names its tagged total for one disc; an album's total is derived. Counts of library rows use `songCount`.
 Do not rename the tag fields to `songNumber` or `songTotal`.
 
 The track number is **always the tag and never a position in a list**. A file with no track number is `null`, and
@@ -137,9 +137,15 @@ The tagged disc position of a song within an album. Album track lists order by d
 track number. A missing disc number stays `null`; the app does not infer one from file order.
 
 **Disc total** / **track total**:
-The tagged number of discs in an album and tracks on one disc. Album detail uses the sum of known
-per-disc track totals when every disc has one. If the loaded song count differs from that sum, the
-header shows a fraction such as "5/8 tracks". Disc sections use the same count format.
+A file's tagged disc count and track count on one disc. Zero values mean unknown. An album's track
+total is derived from these tags. A single disc uses the largest tagged total; multiple discs sum
+known per-disc totals only when every represented disc has one. Unassigned songs make that sum
+unknown, since they may belong to a numbered disc. Tags do not invent totals for absent discs.
+
+**Disc section**:
+A contiguous group of tracks from one tagged disc in an album track list. Multidisc evidence is a
+numbered disc beyond one or a tagged disc total beyond one. Untagged tracks remain an unknown group;
+untagged tracks mixed with disc one alone do not establish a second disc.
 
 **Album**:
 A group of songs issued together. **One word in code and in copy alike** — `albums`, `albumId`,

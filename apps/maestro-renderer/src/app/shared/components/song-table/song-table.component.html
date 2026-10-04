@@ -178,8 +178,6 @@
                     role="row"
                     [id]="rowElementId(index)"
                     [ngClass]="{
-                        'row-selected | bg-background-elevated': selected,
-                        'row-hover | hover:bg-background-surface': !selected,
                         'row-missing | opacity-70': !row.present,
                         'justify-center': !groupAt().has(index),
                         'justify-end': groupAt().has(index),
@@ -188,7 +186,6 @@
                     [attr.aria-rowindex]="index + 2"
                     [attr.aria-selected]="selected"
                     [attr.aria-label]="rowLabel(row, groupLabelAt(index))"
-                    (mousedown)="onRowPointerDown($event, index, row)"
                 >
                     @if (groupAt().get(index); as group) {
                         <div
@@ -199,7 +196,15 @@
                             <span class="font-mono text-content-muted">{{ group.summary }}</span>
                         </div>
                     }
-                    <div class="song-table__cells | flex h-10 w-full items-center" role="presentation">
+                    <div
+                        class="song-table__cells | flex h-10 w-full items-center"
+                        role="presentation"
+                        [ngClass]="{
+                            'row-selected | bg-background-elevated': selected,
+                            'row-hover | hover:bg-background-surface': !selected,
+                        }"
+                        (mousedown)="onRowPointerDown($event, index, row)"
+                    >
                         <app-song-table-row
                             [row]="row"
                             [selected]="selected"
