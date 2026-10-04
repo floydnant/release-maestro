@@ -247,6 +247,15 @@
                                 <ul class="links | mt-5 flex flex-wrap gap-1 type-body-sm">
                                     @for (link of feedItem.data.links; track $index) {
                                         <li class="flex w-full">
+                                            <ng-template #linkTemplate>
+                                                <div class="type-body-sm">
+                                                    {{ link.title }}
+
+                                                    <p class="mt-1 text-xs text-content-secondary">
+                                                        {{ link.url }}
+                                                    </p>
+                                                </div>
+                                            </ng-template>
                                             <a
                                                 hlmBtn
                                                 variant="muted"
@@ -254,7 +263,7 @@
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 class="max-w-full justify-start gap-1.5 px-2 py-1 type-body-sm hover:text-content-primary"
-                                                [hlmTooltip]="link.title + '\n' + link.url"
+                                                [hlmTooltip]="linkTemplate"
                                             >
                                                 <img
                                                     class="favicon |"
