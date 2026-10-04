@@ -4,7 +4,7 @@
 //! Transport:
 //! - stdin:  one `request` JSON object per line
 //! - stdout: one `response` / `event` JSON object per line (protocol messages ONLY)
-//! - stderr: human/diagnostic logs ONLY
+//! - stderr: structured diagnostic logs ONLY
 //!
 //! Runtime model (v1): one active operation at a time. A second operation while
 //! one is running is rejected with a structured `BUSY` error. While active,
@@ -34,13 +34,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::{debug, error, info, warn, Level};
+use tracing_subscriber::EnvFilter;
 
 const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_PRESCAN_BATCH_SIZE: usize = 200;
 
 fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    for arg in &args {
+    let mut args = std::env::args().skip(1);
+    let mut log_level = Level::INFO;
+    let mut unknown_args = Vec::new();
+    while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => return print_help(),
             "--version" | "-V" => {
@@ -49,10 +53,26 @@ fn main() {
             }
             // Accepted no-op flags. The worker always speaks JSONL over stdio.
             "--jsonl" => {}
-            other if other.starts_with("--log-level") => {}
-            other => eprintln!("Ignoring unknown argument: {other}"),
+            "--log-level" => {
+                log_level = args
+                    .next()
+                    .and_then(|level| level.parse().ok())
+                    .unwrap_or(Level::INFO);
+            }
+            other => unknown_args.push(other.to_string()),
         }
     }
+
+    tracing_subscriber::fmt()
+        .json()
+        .with_writer(std::io::stderr)
+        .with_env_filter(EnvFilter::new(format!("metadata_engine={log_level}")))
+        .init();
+
+    for arg in unknown_args {
+        warn!(argument = %arg, "engine.unknown-argument");
+    }
+    info!(version = ENGINE_VERSION, "engine.started");
 
     run_loop();
 }
@@ -87,7 +107,7 @@ impl Emitter {
         let line = match serde_json::to_string(value) {
             Ok(line) => line,
             Err(error) => {
-                eprintln!("Failed to serialize protocol message: {error}");
+                error!(%error, "protocol.serialize-failed");
                 return;
             }
         };
@@ -177,7 +197,7 @@ fn run_loop() {
         let line = match line {
             Ok(line) => line,
             Err(error) => {
-                eprintln!("stdin read error: {error}");
+                error!(%error, "protocol.stdin-read-failed");
                 break;
             }
         };
@@ -196,6 +216,7 @@ fn run_loop() {
                 continue;
             }
         };
+        debug!(request_id = %request.id, method = %request.method, "protocol.request-received");
 
         // Reap a finished scan so a new operation isn't wrongly rejected as BUSY.
         if active
@@ -693,6 +714,6 @@ fn prescan_fact(path: &Path, metadata: &std::fs::Metadata) -> Option<PrescanFile
 
 fn ensure_cache_dir(dir: &str) {
     if let Err(error) = std::fs::create_dir_all(dir) {
-        eprintln!("Failed to create cover art cache dir '{dir}': {error}");
+        error!(%error, "metadata.cover-art.cache-dir-failed");
     }
 }

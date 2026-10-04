@@ -20,6 +20,9 @@ import { LibraryFoldersService } from '../services/library/library-folders.servi
 import { LibraryScanService } from '../services/library/library-scan.service'
 import { MetadataBackendService } from '../services/metadata/metadata.backend.service'
 import { SettingsBackendService } from '../services/settings.backend.service'
+import { createMainLogger } from '../logging/logger'
+
+const log = createMainLogger('ipc')
 
 const ipc = asAppIpcMain(ipcMain)
 
@@ -76,7 +79,7 @@ ipc.handle('load-feed', async (_event, { index, count }) => {
     const feedService = await diContainer.get(FeedBackendService)
 
     return await feedService.loadFeed(index, count).catch(err => {
-        console.error('Error loading feed:', err)
+        log.error('feed.load.failed', err)
 
         if (err instanceof Error) {
             return {
@@ -99,7 +102,7 @@ ipc.handle('has-feed', async () => {
     const feedService = await diContainer.get(FeedBackendService)
 
     return await feedService.hasFeed().catch(err => {
-        console.error('Error checking if feed exists:', err)
+        log.error('feed.exists-check.failed', err)
         return false
     })
 })

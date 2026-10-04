@@ -3,9 +3,12 @@ import { EventEmitter } from 'node:events'
 const mockApp = Object.assign(new EventEmitter(), {
     quit: jest.fn(),
     setName: jest.fn(),
+    getVersion: () => 'test',
+    isPackaged: false,
 })
 const mockStop = jest.fn<Promise<void>, []>()
 const mockDestroyAll = jest.fn<Promise<void>, []>()
+const mockLogError = jest.fn()
 const mockGet = jest.fn(async () => ({ stop: mockStop }))
 
 jest.mock('dotenv/config', () => ({}))
@@ -33,6 +36,11 @@ jest.mock('./app/events/update.events', () => ({
 }))
 jest.mock('./app/di', () => ({ diContainer: { get: mockGet, destroyAll: mockDestroyAll } }))
 jest.mock('./app/services/feed/email-import.service', () => ({ EmailImportService: class {} }))
+jest.mock('./app/logging/logging.events', () => ({}))
+jest.mock('./app/logging/logger', () => ({
+    initializeLogging: jest.fn(),
+    createMainLogger: () => ({ info: jest.fn(), error: mockLogError }),
+}))
 
 describe('main-process shutdown', () => {
     beforeEach(() => {
@@ -114,7 +122,6 @@ describe('main-process shutdown', () => {
         await import('./main')
         const failure = new Error('database cleanup failed')
         mockDestroyAll.mockRejectedValue(failure)
-        const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined)
         const quitRequested = new Promise<void>(resolve => {
             mockApp.quit.mockImplementation(resolve)
         })
@@ -122,7 +129,6 @@ describe('main-process shutdown', () => {
         mockApp.emit('before-quit', { preventDefault: jest.fn() })
         await quitRequested
 
-        expect(consoleError).toHaveBeenCalledWith('Error during cleanup:', failure)
-        consoleError.mockRestore()
+        expect(mockLogError).toHaveBeenCalledWith('app.cleanup.failed', failure)
     })
 })

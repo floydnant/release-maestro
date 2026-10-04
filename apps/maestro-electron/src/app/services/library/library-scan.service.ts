@@ -15,6 +15,7 @@ import {
 import { BrowserWindow } from 'electron'
 import { PersistentStore } from '../../utils/persistent-store.util'
 import { SettingsBackendService } from '../settings.backend.service'
+import { createMainLogger } from '../../logging/logger'
 import { LibraryFoldersService } from './library-folders.service'
 import { LibraryBackendService } from './library.backend.service'
 
@@ -28,6 +29,7 @@ const BROADCAST_INTERVAL_MS = 200
 const SNAPSHOT_ALBUM_LIMIT = 200
 /** Cap on per-file failure *details*; the failure counts always stay exact. */
 const FAILURE_DETAIL_LIMIT = 1_000
+const log = createMainLogger('library-scan')
 
 export interface LibraryScanState extends Record<string, unknown> {
     lastScan?: LibraryLastScanInfo | null
@@ -77,7 +79,7 @@ export class LibraryScanService {
          */
         private readonly stateStore: PersistentStore<LibraryScanState>,
     ) {
-        console.log('[LibraryScanService] state store path:', this.stateStore.path)
+        log.debug('library.scan-state.loaded')
     }
 
     get isScanning(): boolean {
@@ -119,6 +121,12 @@ export class LibraryScanService {
             // reconciliation — an empty selection must never mark songs missing.
             return status
         }
+
+        log.info('library.scan.started', {
+            scanId: status.scanId,
+            trigger,
+            folderCount: configuredFolders.length,
+        })
 
         // Assigned before the first await: `isScanning` already reports this scan, so
         // a Cancel arriving during validation has to reach *this* scan's controller.
@@ -350,6 +358,16 @@ export class LibraryScanService {
             error: details.error,
         }
         status.terminal = terminal
+        log.info('library.scan.finished', {
+            scanId: status.scanId,
+            trigger: status.trigger,
+            outcome,
+            durationMs: status.finishedAt - status.startedAt,
+            discovered: status.discovered,
+            imported: status.imported,
+            failedFiles: status.failedFiles,
+            unavailableFolders: status.unavailableFolders.length,
+        })
         this.touch(status)
     }
 

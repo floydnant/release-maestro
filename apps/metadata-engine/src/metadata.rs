@@ -878,10 +878,7 @@ pub fn read_song_metadata_v2(
                     ImageFormat::from_lofty_mimetype(mime.clone()).map(|format| format.extension())
                 });
                 if file_ext.is_none() {
-                    eprintln!(
-                        "Unsupported or missing MIME type for cover art: {:?}",
-                        cover.mime_type()
-                    );
+                    tracing::debug!("metadata.cover-art.unsupported-mime");
                     return None;
                 }
 
@@ -907,7 +904,7 @@ pub fn read_song_metadata_v2(
                 match fs::write(cover_path.clone(), cover.data()) {
                     Ok(_) => Some(cover_path),
                     Err(err) => {
-                        eprintln!("Failed to write cover art: {:?}", err);
+                        tracing::warn!(error = %err, "metadata.cover-art.write-failed");
                         None
                     }
                 }

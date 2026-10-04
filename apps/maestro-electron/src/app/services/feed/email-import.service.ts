@@ -7,11 +7,13 @@ import {
 import { BrowserWindow } from 'electron'
 import { lastValueFrom, tap } from 'rxjs'
 import { PersistentStore } from '../../utils/persistent-store.util'
+import { createMainLogger } from '../../logging/logger'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { FeedBackendService } from './feed.backend.service'
 
 /** How long after an import starts before an auto import runs again. */
 export const EMAIL_AUTO_IMPORT_INTERVAL_MS = 1000 * 60 * 60
+const log = createMainLogger('email-import')
 
 export interface EmailImportState extends Record<string, unknown> {
     /** When the last import started, in ms since the epoch. */
@@ -39,6 +41,7 @@ const broadcastToAllWindows: BroadcastProgress = update => {
 }
 
 interface RunningImport {
+    startedAt: number
     /** Mutable: a manual request takes over the reporting of a running auto import. */
     trigger: EmailImportTrigger
     abortController: AbortController
@@ -93,14 +96,16 @@ export class EmailImportService {
         if (trigger === 'auto' && !this.isAutoImportDue()) return Promise.resolve()
 
         const started: RunningImport = {
+            startedAt: this.now(),
             trigger,
             abortController: new AbortController(),
             mailboxName: this.mailboxName(),
             latest: { phase: 'started' },
         }
         this.running = started
+        log.info('feed.import.started', { trigger })
         this.settled = this.run(started)
-            .catch(error => console.error('Email import failed to report:', error))
+            .catch(error => log.error('feed.import.reporting-failed', error))
             .finally(() => {
                 this.running = null
             })
@@ -136,6 +141,20 @@ export class EmailImportService {
     private report(running: RunningImport, progress: EmailImportProgress): void {
         running.latest = progress
         this.broadcast({ ...progress, trigger: running.trigger })
+        const fields = { trigger: running.trigger, durationMs: this.now() - running.startedAt }
+        if (progress.phase === 'completed') {
+            log.info('feed.import.completed', {
+                ...fields,
+                processed: progress.totalProcessed,
+                imported: progress.totalImported,
+                newlyImported: progress.newlyImported,
+                skipped: progress.skippedEmails ?? 0,
+            })
+        } else if (progress.phase === 'cancelled') {
+            log.info('feed.import.cancelled', fields)
+        } else if (progress.phase === 'error') {
+            log.warn('feed.import.failed', fields)
+        }
     }
 
     private async run(running: RunningImport): Promise<void> {
@@ -147,7 +166,7 @@ export class EmailImportService {
             const progress$ = await this.feed.triggerEmailImport(running.abortController.signal)
             await lastValueFrom(progress$.pipe(tap(report)), { defaultValue: undefined })
         } catch (error) {
-            console.error('Error during email import:', error)
+            log.error('feed.import.run.failed', error, { trigger: running.trigger })
             report({
                 phase: 'error',
                 errorMessage: error instanceof Error ? error.message : 'Unknown error during email import',

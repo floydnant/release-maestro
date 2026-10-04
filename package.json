@@ -30,6 +30,7 @@
         "conf": "15.1.0",
         "dotenv": "18.0.4",
         "drizzle-orm": "0.45.3",
+        "electron-log": "5.4.4",
         "env-paths": "4.0.0",
         "ng-primitives": "0.131.0",
         "rxjs": "7.8.2",

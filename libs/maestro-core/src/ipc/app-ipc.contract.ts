@@ -29,6 +29,7 @@ import type {
  */
 import type { WebContents } from 'electron'
 import type { AppSettings } from '../schemas/app-settings.schema'
+import type { DiagnosticEntry } from '../logging/diagnostic-log'
 import type { EmailImportProgressUpdate, EmailImportTrigger } from '../schemas/email.schema'
 import type { HydratedFeedItem } from '../schemas/feed.schema'
 import {
@@ -81,6 +82,10 @@ export const MainIpcContract = defineIpcContract({
     'open-url': defineIpcRequest<string>(),
     /** Show a file or folder in the OS file manager (Finder / Explorer), selected. */
     'reveal-in-file-manager': defineIpcRequest<string>(),
+    'diagnostics:log': defineIpcEvent<DiagnosticEntry>(),
+    'diagnostics:preview': defineIpcRequest<void, string[]>(),
+    'diagnostics:open-folder': defineIpcRequest(),
+    'diagnostics:export': defineIpcRequest<void, string | null>(),
     quit: defineIpcEvent<number>(),
 
     // settings

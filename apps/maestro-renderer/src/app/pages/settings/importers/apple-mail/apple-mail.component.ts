@@ -9,8 +9,11 @@ import {
 } from '@angular/core'
 import { FormsModule } from '@angular/forms'
 import { FeedService } from '../../../../core/services/feed.service'
+import { createRendererLogger } from '../../../../core/logging/logger'
 import { SettingsService } from '../../../../core/settings/settings.service'
 import { ProgressRingComponent } from '../../../../shared/components/progress-ring/progress-ring.component'
+
+const log = createRendererLogger('apple-mail-settings')
 
 @Component({
     selector: 'app-apple-mail',
@@ -71,7 +74,7 @@ export class AppleMailImporterComponent {
     importNow(): void {
         if (!this.canImport()) return
         this.feedService.triggerEmailImport('manual').catch(err => {
-            console.error('Failed to trigger email import:', err)
+            log.error('feed.manual-import.trigger-failed', err)
         })
     }
 

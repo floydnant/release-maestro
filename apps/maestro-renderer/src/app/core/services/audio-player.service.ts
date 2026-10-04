@@ -1,5 +1,8 @@
 import { Injectable, signal } from '@angular/core'
 import { Subject } from 'rxjs'
+import { createRendererLogger } from '../logging/logger'
+
+const log = createRendererLogger('audio-player')
 
 @Injectable({ providedIn: 'root' })
 export class WebAudioPlayer {
@@ -35,24 +38,12 @@ export class WebAudioPlayer {
         })
         this.audioElem.addEventListener('error', e => {
             this.isLoading.set(false)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            switch ((e.target as any)?.error.code) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                case (e.target as any)?.error.MEDIA_ERR_ABORTED:
-                    break
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                case (e.target as any)?.error.MEDIA_ERR_NETWORK:
-                    this.logError('A network error caused the audio download to fail.')
-                    break
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                case (e.target as any)?.error.MEDIA_ERR_DECODE:
-                    this.logError('The audio playback was aborted due to a decoding issue.')
-                    break
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                case (e.target as any)?.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                    this.logError(
-                        'The audio could not be loaded, either because network failed or due to an issue with the format.',
-                    )
+            const mediaError = (e.target as HTMLAudioElement | null)?.error
+            switch (mediaError?.code) {
+                case mediaError?.MEDIA_ERR_NETWORK:
+                case mediaError?.MEDIA_ERR_DECODE:
+                case mediaError?.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                    log.warn('audio.media.failed', { errorCode: mediaError.code })
                     break
                 default:
                     break
@@ -88,7 +79,7 @@ export class WebAudioPlayer {
     }
 
     playSource(url: string, seekPercent = 0) {
-        this.logInfo('Playing source', url)
+        log.debug('audio.source.selected')
 
         // const convertedPath = convertFileSrc(source.path).replace("?", "%3F");
 
@@ -110,7 +101,7 @@ export class WebAudioPlayer {
         this.isLoading.set(true)
         this.audioElem.play().catch(err => {
             if (requestId == this.playRequestId) this.isLoading.set(false)
-            this.logError('Failed to play audio:', err)
+            log.error('audio.play.failed', err)
         })
 
         this.playerTime.set(this.audioElem.currentTime)
@@ -135,14 +126,5 @@ export class WebAudioPlayer {
     private updateDuration() {
         const duration = this.audioElem.duration
         this.duration.set(Number.isFinite(duration) && duration > 0 ? duration : 0)
-    }
-
-    logInfo(message: string, ...args: unknown[]) {
-        // @TODO: Use proper logging
-        console.log(`[${WebAudioPlayer.name.replace(/^_/, '')}] ` + message, ...args)
-    }
-    logError(message: string, ...args: unknown[]) {
-        // @TODO: Use proper logging
-        console.error(`[${WebAudioPlayer.name.replace(/^_/, '')}] ` + message, ...args)
     }
 }

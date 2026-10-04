@@ -4,8 +4,11 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import fs from 'fs/promises'
 import { join } from 'path'
 import { appPaths } from '../app-env'
+import { createMainLogger } from '../logging/logger'
 import { PROVIDER_DESTROY, PROVIDER_INIT } from '../utils/dependency-injection.util'
 import * as schema from './drizzle.schema'
+
+const log = createMainLogger('database')
 
 export class DatabaseClient {
     private _sqlite: Database.Database | null = null
@@ -22,14 +25,14 @@ export class DatabaseClient {
         try {
             await this.initialize()
         } catch (error) {
-            console.error('Failed to initialize database:', error)
+            log.error('database.initialize.failed', error)
         }
     }
     async [PROVIDER_DESTROY]() {
         try {
             await this.disconnect()
         } catch (error) {
-            console.error('Error disconnecting from database:', error)
+            log.error('database.disconnect.failed', error)
         }
     }
 
@@ -46,7 +49,7 @@ export class DatabaseClient {
         if (!exists) {
             await fs.mkdir(appPaths.data, { recursive: true })
         }
-        console.log(`Initializing database at: ${dbPath}`)
+        log.info('database.initialize.started', { newDatabase: !exists })
 
         this._sqlite = new Database(dbPath)
         this._sqlite.pragma('foreign_keys = ON')
@@ -70,10 +73,11 @@ export class DatabaseClient {
 
         try {
             const migrationsPath = join(appPaths.resources, 'drizzle')
-            console.log('Running database migrations from:', migrationsPath)
+            log.info('database.migrations.started')
             migrate(this._db, { migrationsFolder: migrationsPath })
+            log.info('database.migrations.completed')
         } catch (error) {
-            console.error('Failed to run migrations:', error)
+            log.error('database.migrations.failed', error)
             throw error
         }
     }
