@@ -287,7 +287,7 @@ const compareLocations = async (
         })
     )
         return 'unknown'
-    const volume = sourceVolumeRoot(original)
+    const volume = await sourceVolumeRoot(original)
     if (volume) {
         try {
             const root = await stat(volume)
@@ -324,11 +324,20 @@ const compareLocations = async (
 }
 
 /** Standard external-volume roots remain relevant after their folder leaves settings. */
-const sourceVolumeRoot = (path: string): string | null => {
+const sourceVolumeRoot = async (path: string): Promise<string | null> => {
     if (process.platform == 'win32') return parse(path).root || null
     const parts = path.split('/')
     if (parts[1] == 'Volumes' || parts[1] == 'mnt') return parts[2] ? join('/', parts[1], parts[2]) : null
-    if (parts[1] == 'media') return parts[3] ? join('/', ...parts.slice(1, 4)) : null
+    if (parts[1] == 'media' && parts[2]) {
+        const directRoot = join('/', 'media', parts[2])
+        try {
+            // Linux desktops use both /media/<volume> and /media/<user>/<volume>.
+            if ((await stat(directRoot)).dev != (await stat('/media')).dev) return directRoot
+        } catch {
+            return directRoot
+        }
+        return parts[3] ? join('/', ...parts.slice(1, 4)) : directRoot
+    }
     if (parts[1] == 'run' && parts[2] == 'media') {
         return parts[4] ? join('/', ...parts.slice(1, 5)) : null
     }

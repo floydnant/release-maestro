@@ -163,6 +163,33 @@ describe('move reconciliation across scan retries', () => {
         },
     )
 
+    const unixVolumeTest = process.platform == 'win32' ? it.skip : it
+    unixVolumeTest.each(['/media/USB', '/media/user/USB'])(
+        'reconciles a move from a mounted source volume at %s',
+        async volume => {
+            const identity = rows()[0]!
+            await rm(original.path)
+            database.db
+                .update(songsTable)
+                .set({ path: join(volume, 'Music', 'original.mp3') })
+                .where(eq(songsTable.id, identity.id))
+                .run()
+            const actualStat = jest.requireActual('node:fs/promises').stat
+            jest.mocked(stat).mockImplementation(path => {
+                const name = String(path)
+                if (name == volume) return Promise.resolve(fromPartial({ dev: 2, isDirectory: () => true }))
+                if (name == '/media' || name == '/media/user') {
+                    return Promise.resolve(fromPartial({ dev: 1, isDirectory: () => true }))
+                }
+                return actualStat(path)
+            })
+            await firstValueFrom(scanner('clean'))
+            expect(rows()).toEqual([
+                expect.objectContaining({ id: identity.id, addedAt: identity.addedAt, path: found.path }),
+            ])
+        },
+    )
+
     it('does not absorb a backup while the configured original folder is unavailable', async () => {
         const identity = rows()[0]
         if (!identity) throw new Error('Expected original song')
