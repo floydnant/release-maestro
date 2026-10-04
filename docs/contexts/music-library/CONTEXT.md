@@ -119,7 +119,7 @@ metadata-engine boundary.
 _Avoid_: `track` in identifiers except the tagged `trackNumber` and `trackTotal`; file, item, entry as synonyms for song
 
 **Track number** and **track total** are deliberate exceptions: `trackNumber` names a tagged position,
-and A file's `trackTotal` names its tagged total for one disc; an album's total is derived. Counts of library rows use `songCount`.
+and a file's `trackTotal` names its tagged total for one disc; an album's total is derived. Counts of library rows use `songCount`.
 Do not rename the tag fields to `songNumber` or `songTotal`.
 
 The track number is **always the tag and never a position in a list**. A file with no track number is `null`, and
