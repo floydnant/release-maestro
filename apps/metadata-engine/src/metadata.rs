@@ -95,6 +95,12 @@ pub struct FileInfo {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub struct CoverError {
+    pub path: String,
+    pub message: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SongMetadata {
     pub content_hash: String,
@@ -103,6 +109,8 @@ pub struct SongMetadata {
     pub album_title: Option<String>,
     pub album_artist: Option<String>,
     pub cover_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover_error: Option<CoverError>,
     pub year: Option<i32>,
     pub track: Option<u16>,
     pub disc_number: Option<u16>,
@@ -185,10 +193,6 @@ pub enum ReadSongMetadataError {
     FileNameMissing {
         path: String,
     },
-    CoverArtCacheWriteFailed {
-        path: String,
-        message: String,
-    },
 }
 
 impl fmt::Display for ReadSongMetadataError {
@@ -209,12 +213,6 @@ impl fmt::Display for ReadSongMetadataError {
             }
             ReadSongMetadataError::FileNameMissing { path: _ } => {
                 write!(formatter, "Failed to read file name")
-            }
-            ReadSongMetadataError::CoverArtCacheWriteFailed { path, message } => {
-                write!(
-                    formatter,
-                    "Failed to cache cover art at '{path}': {message}"
-                )
             }
             ReadSongMetadataError::NotAnAudioFile { path: _, extension } => {
                 let extension = extension.as_deref().unwrap_or("none");
@@ -635,22 +633,6 @@ pub fn read_song_metadata_v2(
     file_path: &Path,
     cover_art_cache_dir: String,
 ) -> Result<SongMetadata, ReadSongMetadataError> {
-    read_song_metadata(file_path, cover_art_cache_dir, false)
-}
-
-/// A scan must retain pending metadata when artwork cannot be cached.
-pub fn read_song_metadata_for_scan(
-    file_path: &Path,
-    cover_art_cache_dir: String,
-) -> Result<SongMetadata, ReadSongMetadataError> {
-    read_song_metadata(file_path, cover_art_cache_dir, true)
-}
-
-fn read_song_metadata(
-    file_path: &Path,
-    cover_art_cache_dir: String,
-    require_cached_cover: bool,
-) -> Result<SongMetadata, ReadSongMetadataError> {
     let path = file_path.to_string_lossy().into_owned();
     let metadata = fs::metadata(file_path).map_err(|error| match error.kind() {
         io::ErrorKind::NotFound => ReadSongMetadataError::FileNotFound { path: path.clone() },
@@ -940,6 +922,7 @@ fn read_song_metadata(
         apply_tag(tag, false);
     }
 
+    let mut cover_error = None;
     let cover_path = tagged_file
         .primary_tag()
         .and_then(|tag| tag.pictures().first())
@@ -952,7 +935,7 @@ fn read_song_metadata(
                     "Unsupported or missing MIME type for cover art: {:?}",
                     cover.mime_type()
                 );
-                return Ok(None);
+                return None;
             }
 
             // Content-addressed filename: derived from the image bytes
@@ -972,23 +955,17 @@ fn read_song_metadata(
             if fs::metadata(&cover_path).is_ok_and(|metadata| {
                 metadata.is_file() && metadata.len() == cover.data().len() as u64
             }) {
-                return Ok(Some(cover_path));
+                return Some(cover_path);
             }
 
             if let Err(error) = fs::write(&cover_path, cover.data()) {
-                if require_cached_cover {
-                    return Err(ReadSongMetadataError::CoverArtCacheWriteFailed {
-                        path: cover_path,
-                        message: error.to_string(),
-                    });
-                }
-                // A completed tag edit must still return its metadata and final path.
-                eprintln!("Failed to write cover art: {error}");
-                return Ok(None);
+                cover_error = Some(CoverError {
+                    path: cover_path.clone(),
+                    message: error.to_string(),
+                });
             }
-            Ok(Some(cover_path))
+            Some(cover_path)
         })
-        .transpose()?
         .flatten()
         .or_else(|| {
             Path::new(&path)
@@ -1035,6 +1012,7 @@ fn read_song_metadata(
         duration: Some(file_info.duration),
         file_info: Some(file_info),
         cover_path,
+        cover_error,
         comment,
         musical_key: key,
         bpm,
@@ -1199,6 +1177,7 @@ mod tests {
             album_title: None,
             album_artist: None,
             cover_path: None,
+            cover_error: None,
             year: None,
             track: None,
             disc_number: Some(2),

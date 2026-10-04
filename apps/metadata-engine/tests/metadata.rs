@@ -175,7 +175,7 @@ fn reads_independently_authored_metadata_across_formats_and_legacy_aliases() {
 }
 
 #[test]
-fn cover_cache_write_failure_is_an_item_error_and_can_retry() {
+fn cover_cache_write_failure_retains_metadata_and_can_retry() {
     let library = Library::new();
     let mut engine = Engine::new();
     let case = cases()
@@ -190,22 +190,23 @@ fn cover_cache_write_failure_is_an_item_error_and_can_retry() {
     std::fs::write(&cache, b"blocked").unwrap();
     let params = json!({"paths": [path], "coverArtCacheDir": cache});
     let failed = engine.exchange("read_files", params.clone());
-    let error = failed
+    let item = failed
         .iter()
-        .find(|message| message["event"] == "item_error")
-        .expect("cache write failure must not return coverless metadata");
-    assert_eq!(error["data"]["path"], path.to_str().unwrap());
-    assert!(error["data"]["error"]
-        .as_str()
-        .unwrap()
-        .contains("cover art"));
-    assert_eq!(failed.last().unwrap()["result"]["count"], 0);
+        .find(|message| message["event"] == "item")
+        .expect("cache failures must retain readable audio metadata");
+    assert_eq!(item["data"]["metadata"]["contentHash"], original["contentHash"]);
+    assert_eq!(item["data"]["metadata"]["coverPath"], original["coverPath"]);
+    assert_eq!(item["data"]["metadata"]["coverError"]["path"], original["coverPath"]);
+    assert!(item["data"]["metadata"]["coverError"]["message"].is_string());
+    assert!(!failed.iter().any(|message| message["event"] == "item_error"));
+    assert_eq!(failed.last().unwrap()["result"]["count"], 1);
 
     let mut write_params = library.params(&path);
     write_params["update"] = json!({"title": "Saved with blocked cache"});
     let written = engine.request("write_tags", write_params);
     assert_eq!(written["title"], "Saved with blocked cache");
-    assert_eq!(written["coverPath"], Value::Null);
+    assert_eq!(written["coverPath"], original["coverPath"]);
+    assert!(written["coverError"].is_object());
 
     std::fs::remove_file(&cache).unwrap();
     let retried = engine.exchange("read_files", params);
@@ -214,6 +215,7 @@ fn cover_cache_write_failure_is_an_item_error_and_can_retry() {
         .find(|message| message["event"] == "item")
         .unwrap();
     assert_eq!(item["data"]["metadata"]["coverPath"], original["coverPath"]);
+    assert!(item["data"]["metadata"]["coverError"].is_null());
     assert_eq!(
         std::fs::read(item["data"]["metadata"]["coverPath"].as_str().unwrap()).unwrap(),
         std::fs::read(fixtures().join("cover.png")).unwrap()
