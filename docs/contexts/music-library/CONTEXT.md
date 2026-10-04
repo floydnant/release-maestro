@@ -54,8 +54,8 @@ _Avoid_: crawl, walk, indexing
 
 **Deep read**:
 The second scan phase. Reads full tags and cover art for files seen by the current discovery that
-still need metadata. A changed fingerprint or metadata revision queues a read, including work left
-unfinished by an earlier scan.
+still need metadata. A changed fingerprint, missing content hash, or changed metadata revision
+queues a read, including work left unfinished by an earlier scan.
 _Avoid_: full scan, tag scan
 
 **Metadata revision**:
@@ -75,7 +75,8 @@ user-confirmed raw-name resolutions remain even without songs.
 **Reconciliation**:
 Matching moved songs to their existing identity, then marking songs absent (`present = false`) when
 discovery did not see them. Runs after deep read. Move application and absence marking stop when the scan was cancelled or discovery
-reported errors — see ADR 0003. Read failures also defer moves until a complete retry. Successful
+reported errors, see ADR 0003. Read failures defer moves when they could hide another matching file.
+A different discovered size or a valid different content hash can prove a read failure unrelated. Successful
 probes still retain proof that excluded originals coexist with copies, even on failed or cancelled scans.
 _Avoid_: pruning, cleanup, deletion
 
@@ -89,10 +90,11 @@ unique missing/present pair left by an earlier interrupted scan with known disco
 A SHA-256 digest of all file bytes, read by the metadata engine during deep read. It identifies
 byte-identical files independently of their paths and filesystem timestamps. It differs from the
 file fingerprint, which includes the path and decides whether another deep read is needed.
-Existing reachable songs receive a content hash on their next scan. For older songs already missing,
-move matching requires unique matching stored tags, audio properties, and size, with identifying
-title and artist or album tags. Artwork paths and user-added external references are excluded. That fallback is an inference, not proof of equal audio bytes. Untagged older missing
-songs need a scan at their original location before content matching is possible.
+Existing reachable songs receive a content hash on their next scan. Older missing songs can match
+unique stored tags, audio properties, and size. Fields their historical extraction could not populate
+do not supply identity evidence. Artwork paths and user-added external references are excluded.
+This fallback is an inference, not proof of equal audio bytes. Untagged legacy songs need a scan at
+their original location before content matching is possible.
 
 Move matching requires one original identity and exactly one seen path with the matching identity. The
 destination must have first appeared after the original was last confirmed available. These scan
@@ -101,7 +103,8 @@ rows cannot act as destinations in automatic matching. Their future moves still 
 destinations. Existing legacy duplicates remain separate because past coexistence cannot be reconstructed.
 Availability includes discovery and successful probes
 of excluded originals, so known copies stay distinct after either disappears. The original directory
-entry must no longer exist; case-only renames resolve to the destination and also count as moves. Known copies, ambiguous matches, changed bytes with known hashes, and inconclusive
+entry must no longer exist. Originals under known unavailable folders retain their identity, since
+absence there cannot distinguish a move from a backup copy. Case-only renames resolve to the destination and also count as moves. Known copies, ambiguous matches, changed bytes with known hashes, and inconclusive
 filesystem errors retain separate rows. Moving and editing tags together is not a byte-identical move.
 
 **Pending move**:

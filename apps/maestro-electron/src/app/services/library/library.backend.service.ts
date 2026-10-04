@@ -1,6 +1,6 @@
 import { Observable } from 'rxjs'
-import { readdir, stat } from 'node:fs/promises'
-import { basename, dirname } from 'node:path'
+import { readdir, stat, lstat } from 'node:fs/promises'
+import { basename, dirname, relative, isAbsolute } from 'node:path'
 import {
     LibraryScanUpdate,
     MetadataPrescanUpdate,
@@ -18,7 +18,12 @@ export class LibraryBackendService {
         private readonly metadata: MetadataBackendService,
     ) {}
 
-    scan(paths: string[], abortSignal?: AbortSignal, initialScan = false): Observable<LibraryScanUpdate> {
+    scan(
+        paths: string[],
+        abortSignal?: AbortSignal,
+        initialScan = false,
+        unavailableFolders: string[] = [],
+    ): Observable<LibraryScanUpdate> {
         return new Observable<LibraryScanUpdate>(subscriber => {
             const run = async () => {
                 const scanStartedAt = this.repository.nextScanSeenAt()
@@ -32,6 +37,7 @@ export class LibraryBackendService {
                 let ingested = 0
                 const changedPaths = new Set<string>()
                 const moves: MovedSongCandidate[] = []
+                const failedReads = new Map<string, ReturnType<LibraryBackendRepository['getReadIdentity']>>()
 
                 try {
                     await new Promise<void>((resolve, reject) => {
@@ -104,6 +110,7 @@ export class LibraryBackendService {
                                 const fact = factsByPath.get(update.metadata.path)
                                 if (!fact) {
                                     errors += 1
+                                    failedReads.set(update.metadata.path, null)
                                     subscriber.next({
                                         phase: 'itemError',
                                         path: update.metadata.path,
@@ -132,6 +139,7 @@ export class LibraryBackendService {
                                     total: metadataReadTotal,
                                 })
                             } else if (update.phase == 'itemError') {
+                                failedReads.set(update.path, this.repository.getReadIdentity(update.path))
                                 errors += 1
                                 metadataReadDone += 1
                                 subscriber.next(update)
@@ -151,14 +159,24 @@ export class LibraryBackendService {
                     // Only applying moves depends on a complete scan; losing this evidence could
                     // incorrectly merge a known copy after its original disappears before retry.
                     for (const probe of this.repository.findAvailabilityProbes(scanStartedAt)) {
-                        if ((await compareLocations(probe.originalPath, probe.foundPath)) == 'copy')
+                        if (
+                            (await compareLocations(
+                                probe.originalPath,
+                                probe.foundPath,
+                                unavailableFolders,
+                            )) == 'copy'
+                        )
                             this.repository.recordSongAvailable(probe.songId, scanStartedAt)
                     }
                     for (const candidate of this.repository.findMovedSongCandidates(scanStartedAt)) {
                         let proven = true
-                        for (const previous of [candidate.missing, ...(candidate.intermediate ?? [])]) {
+                        for (const previous of [candidate.original, ...(candidate.intermediate ?? [])]) {
                             if (previous.id == candidate.found.id) continue
-                            const location = await compareLocations(previous.path, candidate.found.path)
+                            const location = await compareLocations(
+                                previous.path,
+                                candidate.found.path,
+                                unavailableFolders,
+                            )
                             if (location == 'copy')
                                 this.repository.recordSongAvailable(previous.id, scanStartedAt)
                             if (location != 'moved') proven = false
@@ -172,10 +190,22 @@ export class LibraryBackendService {
 
                 if (abortSignal?.aborted) return
 
-                // A complete scan is needed to distinguish moves from copies in later batches.
-                // Failed/cancelled reads leave their discovery rows for the next scan to retry.
-                if (errors == 0 && prescanErrors == 0) {
+                // Discovery must complete. Read failures defer only candidates whose
+                // uniqueness they could invalidate. Cancelled scans never apply moves.
+                if (prescanErrors == 0) {
                     for (const candidate of moves) {
+                        // Unknown or changed same-size files can hide another candidate.
+                        if (
+                            [...failedReads.values()].some(
+                                identity =>
+                                    identity == null ||
+                                    (identity.size == candidate.found.size &&
+                                        (candidate.original.contentHash == null ||
+                                            identity.contentHash == null ||
+                                            identity.contentHash == candidate.found.contentHash)),
+                            )
+                        )
+                            continue
                         this.repository.reconcileMovedSong(candidate)
                         if (candidate.found.firstSeenAt?.getTime() == scanStartedAt.getTime()) {
                             newCount -= 1
@@ -242,9 +272,27 @@ export class LibraryBackendService {
 }
 
 /** Distinguish an independent original from case aliases on case-insensitive filesystems. */
-const compareLocations = async (original: string, found: string): Promise<'moved' | 'copy' | 'unknown'> => {
+const compareLocations = async (
+    original: string,
+    found: string,
+    unavailableFolders: string[],
+): Promise<'moved' | 'copy' | 'unknown'> => {
+    if (
+        unavailableFolders.some(folder => {
+            const child = relative(folder, original)
+            return (
+                child == '' ||
+                (!isAbsolute(child) && child != '..' && !child.startsWith('../') && !child.startsWith('..\\'))
+            )
+        })
+    )
+        return 'unknown'
+    const entry = await lstat(original).catch(error => (isAbsent(error) ? 'absent' : 'unknown'))
+    if (entry == 'absent') return 'moved'
+    if (entry == 'unknown') return 'unknown'
+    if (entry.isSymbolicLink()) return 'copy'
     const before = await stat(original).catch(error => (isAbsent(error) ? 'absent' : 'unknown'))
-    if (before == 'absent') return 'moved'
+    if (before == 'absent') return 'unknown'
     if (before == 'unknown') return 'unknown'
     try {
         const after = await stat(found)

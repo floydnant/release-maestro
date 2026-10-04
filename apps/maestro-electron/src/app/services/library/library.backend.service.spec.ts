@@ -38,6 +38,7 @@ const newRepositoryMock = () => ({
     recordSongAvailable: jest.fn(),
     countOpenIssuesForReadSongs: jest.fn(() => 0),
     markNotSeenPresent: jest.fn(() => 2),
+    getReadIdentity: jest.fn(() => null),
     countSongsNeedingMetadata: jest.fn(() => 1),
     countSongsNeedingVersionRefresh: jest.fn(() => 0),
     listSongsNeedingMetadata: jest.fn().mockReturnValueOnce([fact]).mockReturnValueOnce([]),
@@ -238,7 +239,7 @@ describe('LibraryBackendService', () => {
                 repository.countSongsNeedingMetadata.mockReturnValue(0)
                 repository.listSongsNeedingMetadata.mockReset().mockReturnValue([])
                 const candidate = fromPartial<MovedSongCandidate>({
-                    missing: { id: 'original', path: oldPath },
+                    original: { id: 'original', path: oldPath },
                     found: { path: foundPath, firstSeenAt: repository.nextScanSeenAt() },
                 })
                 repository.findMovedSongCandidates.mockReturnValue([candidate])
@@ -298,7 +299,7 @@ describe('LibraryBackendService', () => {
                 repository.listSongsNeedingMetadata.mockReset().mockReturnValue([])
                 repository.findMovedSongCandidates.mockReturnValue([
                     fromPartial<MovedSongCandidate>({
-                        missing: { id: 'original', path: oldPath },
+                        original: { id: 'original', path: oldPath },
                         found: { path: foundPath, firstSeenAt: repository.nextScanSeenAt() },
                     }),
                 ])
