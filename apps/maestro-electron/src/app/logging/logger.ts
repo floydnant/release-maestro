@@ -8,6 +8,7 @@ import {
 import { app, ipcMain } from 'electron'
 import electronLog from 'electron-log/main'
 import { randomUUID } from 'node:crypto'
+import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -37,6 +38,17 @@ export function initializeLogging(): void {
 
     electronLog.transports.file.resolvePathFn = () => diagnosticLogFiles()[1]
     electronLog.transports.file.maxSize = LOG_SIZE_BYTES
+    electronLog.transports.file.archiveLogFn = file => {
+        try {
+            renameSync(file.path, diagnosticLogFiles()[0])
+        } catch {
+            // A locked backup must not add electron-log's text marker or partial JSON records.
+            const retainedBytes = Math.min(Math.round(electronLog.transports.file.maxSize / 4), 256 * 1024)
+            const tail = readFileSync(file.path).subarray(-retainedBytes)
+            const completeLines = tail.subarray(tail.indexOf(0x0a) + 1, tail.lastIndexOf(0x0a) + 1)
+            writeFileSync(file.path, completeLines, { flag: 'w', mode: 0o600 })
+        }
+    }
     electronLog.transports.file.level = isDebugLoggingEnabled() ? 'debug' : 'info'
     electronLog.transports.file.writeOptions = { encoding: 'utf8', flag: 'a', mode: 0o600 }
     electronLog.transports.file.format = ({ message }) => [
@@ -56,6 +68,9 @@ export function initializeLogging(): void {
     })
     process.on('uncaughtExceptionMonitor', error => {
         createMainLogger('process').error('process.uncaught-exception', error)
+    })
+    process.on('unhandledRejection', (reason: unknown) => {
+        createMainLogger('process').error('process.unhandled-rejection', reason)
     })
     app.on('render-process-gone', (_event, _webContents, details) => {
         createMainLogger('electron').error('renderer.process-gone', new Error(details.reason), {
@@ -105,5 +120,15 @@ export async function readDiagnosticLines(): Promise<string[]> {
             }
         }),
     )
-    return files.flatMap(text => text.split('\n').filter(Boolean))
+    return files.flatMap(text =>
+        text.split('\n').filter(line => {
+            // Earlier rotation fallbacks and interrupted writes can leave malformed records.
+            try {
+                JSON.parse(line)
+                return true
+            } catch {
+                return false
+            }
+        }),
+    )
 }

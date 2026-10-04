@@ -38,6 +38,14 @@ test('keeps renderer and worker events in a local log and exports them', async (
         await electron.ipcRenderer.invoke('metadata:ping')
     })
 
+    await electronApp.evaluate(() => {
+        setImmediate(() => {
+            void Promise.reject(
+                new Error('diagnostics test rejection at /Users/alice/Private Music/file.flac'),
+            )
+        })
+    })
+
     await expect
         .poll(async () => {
             const content = await readFile(logPath, 'utf8').catch(() => '')
@@ -52,6 +60,7 @@ test('keeps renderer and worker events in a local log and exports them', async (
                 expect.objectContaining({ source: 'main', event: 'app.start' }),
                 expect.objectContaining({ source: 'renderer', event: 'diagnostics.preview.refreshed' }),
                 expect.objectContaining({ source: 'worker', event: 'engine.started' }),
+                expect.objectContaining({ source: 'main', event: 'process.unhandled-rejection' }),
             ]),
         )
 
@@ -71,6 +80,10 @@ test('keeps renderer and worker events in a local log and exports them', async (
     const exported = (await readFile(exportPath, 'utf8')).trim().split('\n')
     if (process.platform !== 'win32') expect((await stat(exportPath)).mode & 0o777).toBe(0o600)
     expect(exported.map(line => JSON.parse(line) as { event: string })).toEqual(
-        expect.arrayContaining([expect.objectContaining({ event: 'diagnostics.exported' })]),
+        expect.arrayContaining([
+            expect.objectContaining({ event: 'diagnostics.exported' }),
+            expect.objectContaining({ event: 'process.unhandled-rejection' }),
+        ]),
     )
+    expect(exported.join('\n')).not.toContain('Private Music')
 })

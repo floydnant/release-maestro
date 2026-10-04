@@ -5,11 +5,18 @@ The Electron main process writes diagnostic events to `appPaths.log/main.log`. T
 their own `.app-data.dev/log` directory. `RELEASE_MAESTRO_APP_DATA_DIR` overrides that root for
 tests and isolated instances.
 
+If the backup cannot be replaced, rotation keeps complete recent records from the last 256 KiB
+of the current file. Preview and export skip malformed lines left by older rotations or interrupted
+writes.
+
 The main process owns the file writer. `createMainLogger` writes main-process events, and the typed
 `diagnostics:log` IPC channel accepts renderer events. `createRendererLogger` writes every event to
 the browser console before sending it to main. The web build keeps the console sink. The Rust
 metadata worker writes JSON diagnostics to stderr; the main process reads them one line at a time.
 The worker's stdout remains reserved for the JSONL request protocol.
+
+Unhandled main-process promise rejections and uncaught exceptions pass through the shared sanitizer
+before reaching the diagnostic file.
 
 Production files contain `info`, `warn`, and `error` events. Development files also contain `debug`.
 Set `RELEASE_MAESTRO_LOG_LEVEL=debug` to include debug events in a packaged app and the Rust worker.
