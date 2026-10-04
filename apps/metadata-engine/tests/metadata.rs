@@ -1,9 +1,6 @@
 mod support;
 
-use lofty::{
-    config::WriteOptions,
-    tag::{ItemKey, Tag, TagExt, TagType},
-};
+use lofty::tag::ItemKey;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -35,6 +32,9 @@ enum MetadataField {
     AlbumArtist,
     Genre,
     Track,
+    DiscNumber,
+    DiscTotal,
+    TrackTotal,
     Comment,
     Lyrics,
     MusicalKey,
@@ -83,20 +83,17 @@ fn cases() -> Vec<Fixture> {
 }
 
 #[test]
-fn reads_disc_and_track_totals_from_tags() {
+fn reads_vorbis_slash_pairs() {
     let library = Library::new();
-    let path = library.copy("vardae-invocacion-del-cielo.flac");
-    let mut tag = Tag::new(TagType::VorbisComments);
-    tag.insert_text(ItemKey::DiscNumber, "2".to_string());
-    tag.insert_text(ItemKey::DiscTotal, "3".to_string());
-    tag.insert_text(ItemKey::TrackTotal, "8".to_string());
-    tag.save_to_path(&path, WriteOptions::new().remove_others(false))
-        .unwrap();
-
-    let metadata = Engine::new().request("read_file", library.params(&path));
-    assert_eq!(metadata["discNumber"], 2);
-    assert_eq!(metadata["discTotal"], 3);
-    assert_eq!(metadata["trackTotal"], 8);
+    let mut engine = Engine::new();
+    for extension in ["flac", "ogg", "opus"] {
+        let path = library.copy(&format!("numbers-pairs.{extension}"));
+        let metadata = engine.request("read_file", library.params(&path));
+        assert_eq!(metadata["track"], 3, "{extension}");
+        assert_eq!(metadata["trackTotal"], 12, "{extension}");
+        assert_eq!(metadata["discNumber"], 1, "{extension}");
+        assert_eq!(metadata["discTotal"], 2, "{extension}");
+    }
 }
 
 fn assert_fields(actual: &Value, expected: &Value, context: &str) {

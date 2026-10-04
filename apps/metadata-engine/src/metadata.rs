@@ -770,7 +770,8 @@ pub fn read_song_metadata_v2(
                         .value()
                         .to_owned()
                         .into_string()
-                        .and_then(|s| s.parse::<u16>().ok());
+                        .and_then(|s| s.parse::<u16>().ok())
+                        .filter(|number| *number > 0);
                 }
             }
             ItemKey::DiscNumber => {
@@ -779,7 +780,8 @@ pub fn read_song_metadata_v2(
                         .value()
                         .to_owned()
                         .into_string()
-                        .and_then(|s| s.parse::<u16>().ok());
+                        .and_then(|s| s.parse::<u16>().ok())
+                        .filter(|number| *number > 0);
                 }
             }
             ItemKey::DiscTotal => {
@@ -788,7 +790,8 @@ pub fn read_song_metadata_v2(
                         .value()
                         .to_owned()
                         .into_string()
-                        .and_then(|s| s.parse::<u16>().ok());
+                        .and_then(|s| s.parse::<u16>().ok())
+                        .filter(|number| *number > 0);
                 }
             }
             ItemKey::TrackTotal => {
@@ -797,7 +800,8 @@ pub fn read_song_metadata_v2(
                         .value()
                         .to_owned()
                         .into_string()
-                        .and_then(|s| s.parse::<u16>().ok());
+                        .and_then(|s| s.parse::<u16>().ok())
+                        .filter(|number| *number > 0);
                 }
             }
             ItemKey::CatalogNumber => {

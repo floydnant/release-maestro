@@ -374,8 +374,6 @@ export const createSongRow = (overrides: Partial<SongRow> = {}): SongRow => {
         albumTitle: 'Daybreak',
         trackNumber: 1,
         discNumber: null,
-        discTotal: null,
-        trackTotal: null,
         genreText: 'Ambient',
         genres: [{ id: 'genre-1', name: 'Ambient' }],
         recordLabelId: 'label-1',

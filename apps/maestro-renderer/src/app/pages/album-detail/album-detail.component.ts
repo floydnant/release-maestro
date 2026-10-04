@@ -1,3 +1,5 @@
+import type { BrowseResult } from '../../shared/browse/browse-query'
+import { formatTrackCount } from '../../shared/utils/formatting.utils'
 import {
     ChangeDetectionStrategy,
     Component,
@@ -17,6 +19,7 @@ import {
     type BrowseWindow,
     type SongQuery,
     type SongSort,
+    type SongRow,
 } from '@release-maestro/core'
 import {
     auditTime,
@@ -70,7 +73,6 @@ const SCAN_REFETCH_INTERVAL_MS = 1_500
 const INITIAL_WINDOW_LIMIT = 60
 
 const TRACKS_LABEL = 'tracks'
-const TRACK_LABEL = 'track'
 
 /** Album is one word in code and in copy alike, so the route param is `albumId`. */
 export const ALBUM_ID_PARAM = 'albumId'
@@ -223,7 +225,7 @@ export class AlbumDetailComponent {
                 discNumber: group.discNumber,
                 startIndex: startIndex,
                 label: group.discNumber == null ? 'Disc unknown' : `Disc ${group.discNumber}`,
-                summary: `${group.songCount}${group.trackTotal != null && group.trackTotal != group.songCount ? `/${group.trackTotal}` : ''} ${group.songCount == 1 && (group.trackTotal == null || group.trackTotal == group.songCount) ? 'track' : 'tracks'}`,
+                summary: formatTrackCount(group.songCount, group.trackTotal),
             }
             startIndex += group.songCount
             return section
@@ -271,7 +273,40 @@ export class AlbumDetailComponent {
         fetchWindow: (query, window) => this.browseService.querySongs(query, window),
     })
 
-    protected result = this.browse.result
+    // Detail and song windows settle independently. Retain one consistent pair while
+    // a same-query refresh is in flight, so headings never collapse beneath retained rows.
+    private groupedWindow = linkedSignal({
+        source: () => ({
+            query: this.query(),
+            album: this.album(),
+            groups: this.orderedDiscGroups(),
+            result: this.browse.result(),
+        }),
+        computation: (
+            { query, album, groups, result },
+            previous,
+        ): { result: BrowseResult<SongRow>; groups: readonly SongTableGroup[] } => {
+            if (!album || result.rows.some(song => song.albumId != album.id)) return { result, groups: [] }
+            const matches = groups.every((group, position) =>
+                result.rows.every((song, rowIndex) => {
+                    const index = result.offset + rowIndex
+                    const nextStart = groups[position + 1]?.startIndex ?? Number.POSITIVE_INFINITY
+                    return (
+                        index < group.startIndex || index >= nextStart || song.discNumber == group.discNumber
+                    )
+                }),
+            )
+            if (matches) return { result, groups }
+            if (previous && sameQuery(previous.source.query, query)) {
+                return {
+                    ...previous.value,
+                    result: { ...previous.value.result, status: result.status, error: result.error },
+                }
+            }
+            return { result, groups: [] }
+        },
+    })
+    protected result = computed(() => this.groupedWindow().result)
 
     /**
      * Whether the retained browse window can be shown beneath the current album header.
@@ -298,24 +333,7 @@ export class AlbumDetailComponent {
         this.songWindowMatchesAlbum() ? this.result().total : (this.album()?.songCount ?? 0),
     )
 
-    protected songCountLabel = computed(() => (this.headerSongCount() == 1 ? TRACK_LABEL : TRACKS_LABEL))
-
-    protected discGroups = computed<readonly SongTableGroup[]>(() => {
-        const album = this.album()
-        if (!album) return []
-        const groups = this.orderedDiscGroups()
-        const result = this.result()
-        if (result.rows.some(song => song.albumId != album.id)) return []
-        return groups.every((group, position) =>
-            result.rows.every((song, rowIndex) => {
-                const index = result.offset + rowIndex
-                const nextStart = groups[position + 1]?.startIndex ?? Number.POSITIVE_INFINITY
-                return index < group.startIndex || index >= nextStart || song.discNumber == group.discNumber
-            }),
-        )
-            ? groups
-            : []
-    })
+    protected discGroups = computed(() => this.groupedWindow().groups)
 
     /**
      * This page's columns, which differ from the default in both directions.

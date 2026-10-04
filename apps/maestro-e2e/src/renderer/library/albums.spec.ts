@@ -827,6 +827,11 @@ test.describe('the album detail page', () => {
         await expect(page.getByText('Disc 1')).toBeVisible()
         await expect(page.getByText('Disc 2')).toBeVisible()
         await expect(page.getByText('1/3 tracks')).toBeVisible()
+        await expect(page.getByRole('row', { name: 'Disc 2, 1/3 tracks, Third' })).toBeVisible()
+        await page.getByText('Disc 2', { exact: true }).click()
+        await expect(page.getByRole('status', { name: 'Selection', exact: true })).toHaveText(
+            '0 of 3 tracks selected',
+        )
         await expect(page.getByRole('row', { name: 'Disc 1, Second' })).toBeVisible()
         await expect
             .poll(() =>
@@ -839,6 +844,86 @@ test.describe('the album detail page', () => {
             )
             .toEqual([64, 40, 64])
     })
+
+    for (const firstResponse of ['detail', 'window']) {
+        test(`retains disc geometry when ${firstResponse} refresh responds first`, async ({ page }) => {
+            const initial = createAlbumDetail({
+                songCount: 3,
+                discGroups: [
+                    { discNumber: 1, songCount: 2, trackTotal: 3, startIndex: 0 },
+                    { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 2 },
+                ],
+            })
+            const rows = [
+                createSongRow({ id: 'first', title: 'First', discNumber: 1 }),
+                createSongRow({ id: 'second', title: 'Second', discNumber: 1 }),
+                createSongRow({ id: 'third', title: 'Third', discNumber: 2 }),
+            ]
+            const controller = await openDetail(
+                page,
+                scenarioBuilder().albumDetail(initial).songs(rows).build(),
+            )
+            await expect(page.getByText('Disc 2', { exact: true })).toBeVisible()
+            await controller.setHandler('library:get-album-detail', { kind: 'pending' })
+            await controller.setHandler('library:query-songs', { kind: 'pending' })
+            const baseline = (await controller.calls('library:query-songs')).length
+            await controller.emit('library:scan-status', {
+                status: {
+                    scanId: 10,
+                    revision: 1,
+                    trigger: 'manual',
+                    phase: 'reading',
+                    scannedFolders: ['/music'],
+                    unavailableFolders: [],
+                    startedAt: 1,
+                    finishedAt: null,
+                    discovered: 4,
+                    new: 1,
+                    changed: 0,
+                    unchanged: 3,
+                    readDone: 0,
+                    readTotal: 1,
+                    refreshTotal: 0,
+                    imported: 0,
+                    failedFiles: 0,
+                    normalizationIssues: 0,
+                    terminal: null,
+                },
+                newAlbums: [],
+            })
+            await expect
+                .poll(async () => (await controller.calls('library:query-songs')).length)
+                .toBeGreaterThan(baseline)
+            const nextDetail = {
+                ...initial,
+                songCount: 4,
+                discGroups: [
+                    { discNumber: 1, songCount: 3, trackTotal: 3, startIndex: 0 },
+                    { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 3 },
+                ],
+            }
+            const nextWindow = {
+                offset: 0,
+                total: 4,
+                rows: [
+                    ...rows.slice(0, 2),
+                    createSongRow({ id: 'new', title: 'New track', discNumber: 1 }),
+                    rows[2],
+                ],
+            }
+            await controller.resolvePending(
+                firstResponse == 'detail' ? 'library:get-album-detail' : 'library:query-songs',
+                firstResponse == 'detail' ? nextDetail : nextWindow,
+            )
+            await expect(page.getByText('Disc 2', { exact: true })).toBeVisible()
+            await controller.resolvePending(
+                firstResponse == 'detail' ? 'library:query-songs' : 'library:get-album-detail',
+                firstResponse == 'detail' ? nextWindow : nextDetail,
+            )
+            await expect(page.getByRole('row', { name: /New track/ })).toBeVisible()
+            await expect(page.getByText('Disc 2', { exact: true })).toBeVisible()
+        })
+    }
 
     test('keeps disc sections when tracks sort in descending order', async ({ page }) => {
         const controller = await createRendererScenario(

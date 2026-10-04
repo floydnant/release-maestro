@@ -218,8 +218,6 @@ export interface SongRow {
      */
     trackNumber: number | null
     discNumber: number | null
-    discTotal: number | null
-    trackTotal: number | null
     genreText: string | null
     genres: CatalogEntityRef[]
     recordLabelId: string | null

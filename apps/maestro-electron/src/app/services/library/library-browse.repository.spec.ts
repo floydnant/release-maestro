@@ -1318,6 +1318,46 @@ describe('LibraryBrowseRepository', () => {
             expect(repository.getAlbumDetail('album-gone')).toBeNull()
         })
 
+        it('counts mixed untagged and disc-one songs as one disc', () => {
+            seedAlbum({ id: 'one-disc', title: 'One disc' })
+            for (let index = 0; index < 8; index++) {
+                seedSong({
+                    id: `single-${index}`,
+                    title: `Track ${index}`,
+                    albumId: 'one-disc',
+                    discNumber: index % 2 ? 1 : null,
+                    discTotal: 1,
+                    trackTotal: 8,
+                })
+            }
+            expect(repository.getAlbumDetail('one-disc')).toMatchObject({
+                songCount: 8,
+                trackTotal: 8,
+                discGroups: [],
+            })
+        })
+
+        it('does not count an unknown bucket as another tagged disc total', () => {
+            seedAlbum({ id: 'unknown-disc', title: 'Unknown disc' })
+            seedSong({
+                id: 'known',
+                title: 'Known',
+                albumId: 'unknown-disc',
+                discNumber: 2,
+                discTotal: 2,
+                trackTotal: 8,
+            })
+            seedSong({
+                id: 'unknown',
+                title: 'Unknown',
+                albumId: 'unknown-disc',
+                discNumber: null,
+                discTotal: 2,
+                trackTotal: 8,
+            })
+            expect(repository.getAlbumDetail('unknown-disc')?.trackTotal).toBeNull()
+        })
+
         it('orders tracks by disc and reports tagged totals per disc and album', () => {
             seedAlbum({ id: 'album-multi', title: 'Double' })
             seedSong({

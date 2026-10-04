@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router'
 import type { AlbumDetail } from '@release-maestro/core'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { fileUrl } from '../../shared/utils/file-url.util'
-import { formatTotalDuration } from '../../shared/utils/formatting.utils'
+import { formatTotalDuration, formatTrackCount } from '../../shared/utils/formatting.utils'
 
 /**
  * The album detail header: cover, title, and the album's own attributes.
@@ -29,16 +29,7 @@ export class AlbumDetailHeaderComponent {
      * honest about what is actually below it.
      */
     songCount = input.required<number>()
-    songCountLabel = input.required<string>()
-
-    protected songCountText = computed(() => {
-        const count = this.songCount()
-        const total = this.album().trackTotal
-        return total != null && total != count ? `${count}/${total}` : String(count)
-    })
-    protected displayedSongCountLabel = computed(() =>
-        this.songCountText().includes('/') ? 'tracks' : this.songCountLabel(),
-    )
+    protected songCountText = computed(() => formatTrackCount(this.songCount(), this.album().trackTotal))
 
     protected readonly fileUrl = fileUrl
 

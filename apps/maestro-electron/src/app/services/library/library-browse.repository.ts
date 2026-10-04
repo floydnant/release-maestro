@@ -686,8 +686,6 @@ export class LibraryBrowseRepository {
                 albumTitle: row.albumTitle,
                 trackNumber: row.trackNumber,
                 discNumber: row.discNumber,
-                discTotal: row.discTotal,
-                trackTotal: row.trackTotal,
                 genreText: row.genreText,
                 genres: genresBySong.get(row.id) ?? [],
                 recordLabelId: row.recordLabelId,
@@ -738,8 +736,6 @@ export class LibraryBrowseRepository {
                 albumTitle: songsTable.albumTitle,
                 trackNumber: songsTable.trackNumber,
                 discNumber: songsTable.discNumber,
-                discTotal: songsTable.discTotal,
-                trackTotal: songsTable.trackTotal,
                 genreText: songsTable.genreText,
                 recordLabelId: albumsTable.recordLabelId,
                 recordLabelText: songsTable.recordLabelText,
@@ -1182,23 +1178,27 @@ export class LibraryBrowseRepository {
             .groupBy(songsTable.discNumber)
             .orderBy(asc(songsTable.discNumber))
             .all()
+        const multiDisc = discRows.some(row => (row.discTotal ?? 0) > 1 || (row.discNumber ?? 0) > 1)
         let startIndex = 0
         const discGroups = discRows.map(row => {
             const group = {
                 discNumber: row.discNumber,
                 songCount: row.songCount,
-                trackTotal: row.trackTotal,
+                // An unknown bucket may contain tracks from any numbered disc.
+                trackTotal: multiDisc && row.discNumber == null ? null : row.trackTotal,
                 startIndex,
             }
             startIndex += row.songCount
             return group
         })
-        const multiDisc =
-            discRows.length > 1 || discRows.some(row => (row.discTotal ?? 0) > 1 || (row.discNumber ?? 0) > 1)
-        const trackTotal =
-            discGroups.length > 0 && discGroups.every(group => group.trackTotal != null)
-                ? discGroups.reduce((total, group) => total + (group.trackTotal ?? 0), 0)
-                : null
+        const trackTotal = !multiDisc
+            ? discRows.reduce<number | null>(
+                  (total, row) => (row.trackTotal == null ? total : Math.max(total ?? 0, row.trackTotal)),
+                  null,
+              )
+            : discGroups.length > 0 && discGroups.every(group => group.trackTotal != null)
+              ? discGroups.reduce((total, group) => total + (group.trackTotal ?? 0), 0)
+              : null
 
         const genres = this.database.db
             .selectDistinct({ id: genresTable.id, name: genresTable.name })

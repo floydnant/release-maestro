@@ -38,7 +38,7 @@ import { SongTableRowComponent } from './song-table-row.component'
  * **Virtualisation is hand-rolled, deliberately.** The CDK's `*cdkVirtualFor` needs
  * an array as long as the result set to size its scrollbar, and a 500k-entry array
  * in the renderer is exactly what ADR 0004 exists to prevent. Instead a spacer of
- * `total × ROW_HEIGHT` plus group headings gives the scrollbar its height, and the loaded window is
+ * `total × LIST_ROW_HEIGHT` plus group headings gives the scrollbar its height, and the loaded window is
  * translated into place — so the DOM holds a screenful and memory holds one window.
  *
  * The component is presentational: it renders the window it is given and emits the
@@ -275,6 +275,7 @@ export class SongTableComponent {
             this.destroyRef.onDestroy(() => observer.disconnect())
         })
 
+        // Group headers change DOM geometry; measure the viewport after those rows render.
         afterRenderEffect(() => {
             this.groupStarts()
             untracked(() => this.onScroll())
@@ -342,7 +343,7 @@ export class SongTableComponent {
      * Overscan on both sides means a slow flick does not outrun the data.
      *
      * **Deliberately not wrapped in `requestAnimationFrame`.** Scrolling here is native:
-     * a spacer of `total × ROW_HEIGHT` plus group headings gives the scrollbar its range and the loaded
+     * a spacer of `total × LIST_ROW_HEIGHT` plus group headings gives the scrollbar its range and the loaded
      * window is translated into place, so the browser composites the scroll and nothing
      * repositions per frame in JS. There is no animation loop to align to, and browsers
      * already dispatch `scroll` at most once per frame — a rAF would defer this work
@@ -559,7 +560,8 @@ export class SongTableComponent {
         const groups = this.groups()
         for (let position = groups.length - 1; position >= 0; position--) {
             const group = groups[position]
-            if (group && group.startIndex <= index) return group.label
+            if (group && group.startIndex <= index)
+                return group.startIndex == index ? `${group.label}, ${group.summary}` : group.label
         }
         return undefined
     }
@@ -617,7 +619,7 @@ export class SongTableComponent {
      * row is kept {@link SCROLL_PADDING_ROWS} rows clear of both edges.
      *
      * The row's position is measured off the DOM when it is rendered, because the
-     * canvas carries margins that `index × ROW_HEIGHT` knows nothing about — that gap
+     * canvas carries margins that `index × LIST_ROW_HEIGHT` knows nothing about — that gap
      * is what left a downward move showing a sliver of the row it had just selected.
      * A jump past the loaded window has no element to measure and falls back to the
      * arithmetic, which is close enough to land in the right region; the next render
