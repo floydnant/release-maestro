@@ -1100,6 +1100,32 @@ describe('LibraryBrowseRepository', () => {
     })
 
     describe('cover art', () => {
+        it('chooses the most common reachable member cover in grid, detail and track fallback', () => {
+            seedAlbum({ id: 'covers', title: 'Covers', coverPath: '/cache/a.jpg' })
+            seedSong({
+                id: 'missing-art',
+                title: 'Missing',
+                albumId: 'covers',
+                coverPath: '/cache/a.jpg',
+                present: false,
+            })
+            seedSong({ id: 'bonus-art', title: 'Bonus', albumId: 'covers', coverPath: '/cache/c.jpg' })
+            seedSong({ id: 'main-art-1', title: 'Main 1', albumId: 'covers', coverPath: '/cache/b.jpg' })
+            seedSong({ id: 'main-art-2', title: 'Main 2', albumId: 'covers', coverPath: '/cache/b.jpg' })
+            seedSong({ id: 'no-art', title: 'No art', albumId: 'covers' })
+            expect(repository.getAlbumDetail('covers')?.coverPath).toBe('/cache/b.jpg')
+            expect(
+                repository
+                    .queryAlbums({ query: albumQuery(), window: { offset: 0, limit: 10 } })
+                    .rows.find(row => row.id == 'covers')?.coverPath,
+            ).toBe('/cache/b.jpg')
+            expect(
+                repository
+                    .querySongs({ query: query(), window: { offset: 0, limit: 10 } })
+                    .rows.find(row => row.id == 'no-art')?.coverPath,
+            ).toBe('/cache/b.jpg')
+        })
+
         beforeEach(() => {
             db.insert(albumsTable)
                 .values({
@@ -1121,6 +1147,12 @@ describe('LibraryBrowseRepository', () => {
 
         it("falls back to the album's, because a track with no embedded art still has an album", () => {
             seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', coverPath: null })
+            seedSong({
+                id: 'art-owner',
+                title: 'Artwork owner',
+                albumId: 'album-untrue',
+                coverPath: '/covers/untrue.png',
+            })
 
             const result = repository.querySongs({ query: query(), window: { offset: 0, limit: 10 } })
 
@@ -1414,7 +1446,13 @@ describe('LibraryBrowseRepository', () => {
             })
             db.insert(albumArtistsTable).values({ albumId: 'album-untrue', artistId: 'artist-burial' }).run()
 
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', duration: 240 })
+            seedSong({
+                id: 'a',
+                title: 'Archangel',
+                albumId: 'album-untrue',
+                duration: 240,
+                coverPath: '/covers/untrue.png',
+            })
             seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue', duration: 180 })
             db.insert(songGenresTable).values({ songId: 'a', genreId: 'genre-garage' }).run()
             db.insert(songGenresTable).values({ songId: 'b', genreId: 'genre-dubstep' }).run()

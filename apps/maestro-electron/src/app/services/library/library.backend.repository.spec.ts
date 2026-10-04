@@ -488,7 +488,6 @@ describe('LibraryBackendRepository', () => {
         expect(db.select().from(albumsTable).all()).toHaveLength(2)
         expect(db.select().from(albumsTable).where(eq(albumsTable.id, originalAlbum.id)).get()).toMatchObject(
             {
-                coverPath: second.coverPath,
                 dateAdded: new Date(secondFact.createdAt),
             },
         )
@@ -504,8 +503,8 @@ describe('LibraryBackendRepository', () => {
         expect(albums).toHaveLength(1)
         expect(albums[0]?.id).not.toBe(originalAlbum.id)
         expect(songs.every(song => song.albumId == albums[0]?.id)).toBe(true)
+        expect(browse.getAlbumDetail(albums[0]?.id ?? '')?.coverPath).toBe(first.coverPath)
         expect(albums[0]).toMatchObject({
-            coverPath: first.coverPath,
             dateAdded: new Date(secondFact.createdAt),
         })
         expect(db.select().from(albumArtistsTable).all()).toHaveLength(1)
@@ -525,7 +524,7 @@ describe('LibraryBackendRepository', () => {
         }
     })
 
-    it('chooses cover art independently of read order, including missing members', () => {
+    it('chooses cover art independently of read order and retains missing artwork as a fallback', () => {
         const scannedAt = new Date('2026-06-15T10:00:00Z')
         const first = newSongFixture({ albumTitle: 'Album', coverPath: '/cache/a.jpg' })
         const second = {
@@ -538,12 +537,60 @@ describe('LibraryBackendRepository', () => {
         repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
         repository.ingestMetadata(first, fact, scannedAt, EXTRACTOR_VERSION)
         repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
-        expect(db.select().from(albumsTable).get()?.coverPath).toBe('/cache/a.jpg')
+        expect(browse.getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')?.coverPath).toBe(
+            '/cache/a.jpg',
+        )
         db.update(songsTable).set({ present: false }).where(eq(songsTable.path, first.path)).run()
+        expect(browse.getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')?.coverPath).toBe(
+            '/cache/b.jpg',
+        )
         repository.ingestMetadata({ ...second, coverPath: null }, secondFact, scannedAt, EXTRACTOR_VERSION)
-        expect(db.select().from(albumsTable).get()?.coverPath).toBe('/cache/a.jpg')
+        expect(browse.getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')?.coverPath).toBe(
+            '/cache/a.jpg',
+        )
         repository.ingestMetadata({ ...first, coverPath: null }, fact, scannedAt, EXTRACTOR_VERSION)
-        expect(db.select().from(albumsTable).get()?.coverPath).toBeNull()
+        expect(browse.getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')?.coverPath).toBeNull()
+    })
+
+    it('retains confirmed album-artist aliases independently of member read order', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        const first = newSongFixture({ albumTitle: 'Album', albumArtist: 'Artist' })
+        const secondFact = { ...fact, path: '/music/alias.flac', fileName: 'alias.flac' }
+        const second = {
+            ...first,
+            path: secondFact.path,
+            fileName: secondFact.fileName,
+            albumArtist: ' Artist ',
+        }
+        repository.ingestMetadata(first, fact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
+        const raw = db
+            .select()
+            .from(artistRawNamesTable)
+            .where(eq(artistRawNamesTable.rawText, ' Artist '))
+            .get()
+        if (!raw) throw new Error('expected raw alias')
+        db.insert(artistsTable).values({ id: 'confirmed-alias', name: 'Confirmed alias' }).run()
+        db.update(artistRawNamesTable)
+            .set({ confirmedByUser: true })
+            .where(eq(artistRawNamesTable.id, raw.id))
+            .run()
+        db.update(artistRawNameArtistsTable)
+            .set({ artistId: 'confirmed-alias' })
+            .where(eq(artistRawNameArtistsTable.artistRawNameId, raw.id))
+            .run()
+        const credits = () =>
+            browse
+                .getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')
+                ?.albumArtists.map(artist => artist.name)
+        for (const [metadata, prescan] of [
+            [first, fact],
+            [second, secondFact],
+            [first, fact],
+        ] as const) {
+            repository.ingestMetadata(metadata, prescan, scannedAt, EXTRACTOR_VERSION)
+            expect(credits()).toEqual(['Artist', 'Confirmed alias'])
+        }
     })
 
     it('removes the last album membership when an album title is cleared', () => {

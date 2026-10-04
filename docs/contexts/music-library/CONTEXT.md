@@ -169,11 +169,15 @@ only one song was retagged. A rescan moves that song alone, keeps its song ID, a
 album only after the last member leaves. Missing songs remain members. Links to deleted albums
 resolve to no album; the scanner does not guess that similarly named albums should merge.
 
-Cover art is per song. An album uses the lexically smallest non-null content-addressed cover path
-among its members, including missing songs. This makes the choice independent of read order and
-prevents a song without artwork from clearing another song's cover. Both albums' covers and dates
-added are recomputed when a song moves. These differences are resolved silently, without a new
-normalization issue: different artwork is valid, and identity differences already separate albums.
+An album retains the union of its members' resolved album-artist credits, including missing members.
+Whitespace-equivalent raw aliases can carry different confirmed resolutions; each resolved artist
+is linked once, in stable credit order. Rereading another member does not overwrite those links.
+
+Cover art is per song. An album prefers artwork from reachable members, choosing the most common
+cover and breaking ties by its content-addressed path. If no reachable member has artwork, it uses
+retained artwork from missing members by the same rule. The choice is independent of read order.
+Artwork differences are valid and produce no normalization issue. An album's date added is
+recomputed when a song joins or leaves it.
 
 Track browsing displays, sorts, and filters the song's record label. Its linked record-label entity
 is resolved from that same text, including for songs without an album. Album browsing uses the

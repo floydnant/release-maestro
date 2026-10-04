@@ -670,6 +670,9 @@ export class LibraryBrowseRepository {
         const songIds = rows.map(row => row.id)
         const creditsBySong = this.artistCredits(songIds)
         const genresBySong = this.genres(songIds)
+        const coversByAlbum = this.albumCovers(
+            rows.flatMap(row => (row.albumId == null ? [] : [row.albumId])),
+        )
 
         return {
             rows: rows.map(row => ({
@@ -678,7 +681,8 @@ export class LibraryBrowseRepository {
                 present: row.present,
                 title: row.title,
                 // A track without embedded art still belongs to an album that has some.
-                coverPath: row.coverPath ?? row.albumCoverPath,
+                coverPath:
+                    row.coverPath ?? (row.albumId == null ? null : (coversByAlbum.get(row.albumId) ?? null)),
                 artistText: row.artistText,
                 artistCredit: creditsBySong.get(row.id) ?? [],
                 albumId: row.albumId,
@@ -729,7 +733,6 @@ export class LibraryBrowseRepository {
                 present: songsTable.present,
                 title: songsTable.title,
                 coverPath: songsTable.coverPath,
-                albumCoverPath: albumsTable.coverPath,
                 artistText: songsTable.artistText,
                 albumId: songsTable.albumId,
                 albumTitle: songsTable.albumTitle,
@@ -959,12 +962,13 @@ export class LibraryBrowseRepository {
         const albumIds = rows.map(row => row.id)
         const artistsByAlbum = this.albumArtists(albumIds)
         const songCountByAlbum = this.albumSongCounts(albumIds)
+        const coversByAlbum = this.albumCovers(albumIds)
 
         return {
             rows: rows.map(row => ({
                 id: row.id,
                 title: row.title,
-                coverPath: row.coverPath,
+                coverPath: coversByAlbum.get(row.id) ?? null,
                 albumArtistText: row.artistText,
                 albumArtists: artistsByAlbum.get(row.id) ?? [],
                 year: row.year,
@@ -994,7 +998,6 @@ export class LibraryBrowseRepository {
             .select({
                 id: albumsTable.id,
                 title: albumsTable.title,
-                coverPath: albumsTable.coverPath,
                 artistText: albumsTable.artistText,
                 year: albumsTable.year,
                 recordLabelId: albumsTable.recordLabelId,
@@ -1019,6 +1022,24 @@ export class LibraryBrowseRepository {
      * An album with no songs is absent from the result rather than present as zero;
      * the caller defaults it.
      */
+    /** Choose artwork after the window, over index-backed album membership, per ADR 0005. */
+    private albumCovers(albumIds: string[]): Map<string, string> {
+        const covers = new Map<string, string>()
+        if (albumIds.length == 0) return covers
+        const rows = this.database.db
+            .select({ albumId: songsTable.albumId, coverPath: songsTable.coverPath })
+            .from(songsTable)
+            .where(and(inArray(songsTable.albumId, [...new Set(albumIds)]), isNotNull(songsTable.coverPath)))
+            .groupBy(songsTable.albumId, songsTable.present, songsTable.coverPath)
+            .orderBy(desc(songsTable.present), desc(count()), asc(songsTable.coverPath))
+            .all()
+        for (const row of rows) {
+            if (row.albumId != null && row.coverPath != null && !covers.has(row.albumId))
+                covers.set(row.albumId, row.coverPath)
+        }
+        return covers
+    }
+
     private albumSongCounts(albumIds: string[]): Map<string, number> {
         if (albumIds.length == 0) return new Map()
 
@@ -1138,7 +1159,6 @@ export class LibraryBrowseRepository {
             .select({
                 id: albumsTable.id,
                 title: albumsTable.title,
-                coverPath: albumsTable.coverPath,
                 artistText: albumsTable.artistText,
                 year: albumsTable.year,
                 date: albumsTable.date,
@@ -1207,7 +1227,7 @@ export class LibraryBrowseRepository {
         return {
             id: album.id,
             title: album.title,
-            coverPath: album.coverPath,
+            coverPath: this.albumCovers([albumId]).get(albumId) ?? null,
             albumArtistText: album.artistText,
             albumArtists: this.albumArtists([albumId]).get(albumId) ?? [],
             year: album.year,

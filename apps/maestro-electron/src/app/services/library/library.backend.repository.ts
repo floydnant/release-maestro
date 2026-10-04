@@ -432,7 +432,7 @@ export class LibraryBackendRepository {
             }
 
             const songArtists = resolveArtists(rawArtist, artistText)
-            const albumArtists = resolveArtists(rawAlbumArtist, albumArtistText)
+            resolveArtists(rawAlbumArtist, albumArtistText)
             const songGenres = resolveGenres(rawGenre, genreText)
             const recordLabelId = getOrCreateRecordLabel(recordLabelText)
             let albumId: string | null = null
@@ -452,7 +452,7 @@ export class LibraryBackendRepository {
                     year,
                     date: normalizeDisplayText(metadata.date),
                     catalogNumber: normalizeDisplayText(metadata.catalogNumber),
-                    // Cover art is recomputed from every member after the song upsert.
+                    // Cover art is selected from members by the browse read side.
                     externalRefs: mergeExternalRefs([
                         existingAlbum?.externalRefs,
                         filterExternalRefs(externalRefs, relevantExternalRefsMap.albums),
@@ -468,21 +468,6 @@ export class LibraryBackendRepository {
                 } else {
                     tx.insert(albumsTable)
                         .values({ id: albumId, ...albumValues })
-                        .run()
-                }
-
-                tx.delete(albumArtistsTable).where(eq(albumArtistsTable.albumId, albumId)).run()
-                if (albumArtists.length > 0) {
-                    const resolvedAlbumId = albumId
-                    tx.insert(albumArtistsTable)
-                        .values(
-                            albumArtists.map((artistId, position) => ({
-                                albumId: resolvedAlbumId,
-                                artistId,
-                                role: 'primary',
-                                position,
-                            })),
-                        )
                         .run()
                 }
             }
@@ -557,8 +542,7 @@ export class LibraryBackendRepository {
             }
 
             // Recompute both ends of a move in the song transaction (ADR 0005).
-            // Missing songs still belong to their album. MIN ignores absent artwork
-            // and chooses the same content-addressed cover regardless of read order.
+            // Missing songs still belong to their album. Covers are selected by the read side.
             for (const affectedAlbumId of new Set(
                 [existingSong?.albumId, albumId].filter((id): id is string => id != null),
             )) {
@@ -566,7 +550,6 @@ export class LibraryBackendRepository {
                     .select({
                         count: count(),
                         dateAdded: max(songsTable.createdAt),
-                        coverPath: min(songsTable.coverPath),
                     })
                     .from(songsTable)
                     .where(eq(songsTable.albumId, affectedAlbumId))
@@ -575,9 +558,43 @@ export class LibraryBackendRepository {
                     tx.delete(albumsTable).where(eq(albumsTable.id, affectedAlbumId)).run()
                 } else {
                     tx.update(albumsTable)
-                        .set({ dateAdded: members.dateAdded, coverPath: members.coverPath })
+                        .set({ dateAdded: members.dateAdded })
                         .where(eq(albumsTable.id, affectedAlbumId))
                         .run()
+                    // Member aliases may have distinct user-confirmed resolutions even
+                    // when their normalized album identity agrees. Retain every credit.
+                    const credits = tx
+                        .select({ artistId: artistRawNameArtistsTable.artistId })
+                        .from(songsTable)
+                        .innerJoin(
+                            artistRawNamesTable,
+                            eq(artistRawNamesTable.rawText, songsTable.rawAlbumArtist),
+                        )
+                        .innerJoin(
+                            artistRawNameArtistsTable,
+                            eq(artistRawNameArtistsTable.artistRawNameId, artistRawNamesTable.id),
+                        )
+                        .innerJoin(artistsTable, eq(artistsTable.id, artistRawNameArtistsTable.artistId))
+                        .where(eq(songsTable.albumId, affectedAlbumId))
+                        .groupBy(artistRawNameArtistsTable.artistId)
+                        .orderBy(
+                            asc(min(artistRawNameArtistsTable.position)),
+                            asc(artistsTable.name),
+                            asc(artistsTable.id),
+                        )
+                        .all()
+                    tx.delete(albumArtistsTable).where(eq(albumArtistsTable.albumId, affectedAlbumId)).run()
+                    if (credits.length > 0)
+                        tx.insert(albumArtistsTable)
+                            .values(
+                                credits.map((credit, position) => ({
+                                    albumId: affectedAlbumId,
+                                    artistId: credit.artistId,
+                                    role: 'primary',
+                                    position,
+                                })),
+                            )
+                            .run()
                 }
             }
 

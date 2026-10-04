@@ -134,8 +134,8 @@ export interface SongFilter {
     artistIds?: string[]
     genreIds?: string[]
     /**
-     * Record labels reach songs through their album — `songs` carries no record
-     * label of its own beyond the denormalized tag text.
+     * Record labels reach songs through each song's normalized record-label tag,
+     * including songs without albums.
      */
     recordLabelIds?: string[]
     albumIds?: string[]
