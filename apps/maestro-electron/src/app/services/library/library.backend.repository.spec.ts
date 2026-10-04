@@ -104,8 +104,8 @@ describe('LibraryBackendRepository', () => {
         const first = repository.processPrescanBatch([fact], firstSeenAt)
 
         expect(first).toMatchObject({ new: 1, changed: 0, unchanged: 0 })
-        expect(repository.countSongsNeedingMetadata(EXTRACTOR_VERSION)).toBe(1)
-        expect(repository.countSongsNeedingVersionRefresh(EXTRACTOR_VERSION)).toBe(0)
+        expect(repository.countSongsNeedingMetadata(firstSeenAt, EXTRACTOR_VERSION)).toBe(1)
+        expect(repository.countSongsNeedingVersionRefresh(firstSeenAt, EXTRACTOR_VERSION)).toBe(0)
 
         const secondSeenAt = new Date('2026-06-15T11:00:00Z')
         const second = repository.processPrescanBatch([fact], secondSeenAt)
@@ -123,7 +123,7 @@ describe('LibraryBackendRepository', () => {
 
         // Ingested at the current revision, so nothing is pending: the file has not
         // changed and neither have the rules that were applied to it.
-        expect(repository.countSongsNeedingMetadata(EXTRACTOR_VERSION)).toBe(0)
+        expect(repository.countSongsNeedingMetadata(seenAt, EXTRACTOR_VERSION)).toBe(0)
 
         // Exactly what an older build left behind. The file on disk is untouched, so
         // the fingerprint gate alone would skip this row forever and it would keep
@@ -132,8 +132,8 @@ describe('LibraryBackendRepository', () => {
             .set({ normalizerVersion: NORMALIZER_VERSION - 1 })
             .run()
 
-        expect(repository.countSongsNeedingMetadata(EXTRACTOR_VERSION)).toBe(1)
-        expect(repository.listSongsNeedingMetadata(null, 10, EXTRACTOR_VERSION)).toMatchObject([
+        expect(repository.countSongsNeedingMetadata(seenAt, EXTRACTOR_VERSION)).toBe(1)
+        expect(repository.listSongsNeedingMetadata(seenAt, null, 10, EXTRACTOR_VERSION)).toMatchObject([
             { path: fact.path },
         ])
     })
@@ -144,7 +144,7 @@ describe('LibraryBackendRepository', () => {
         repository.ingestMetadata(newSongFixture({ artist: 'Alpha' }), fact, seenAt, EXTRACTOR_VERSION)
         db.update(songsTable).set({ normalizerVersion: null }).run()
 
-        expect(repository.countSongsNeedingMetadata(EXTRACTOR_VERSION)).toBe(1)
+        expect(repository.countSongsNeedingMetadata(seenAt, EXTRACTOR_VERSION)).toBe(1)
     })
 
     it('re-reads an untouched file after the extractor revision changes', () => {
@@ -152,16 +152,37 @@ describe('LibraryBackendRepository', () => {
         repository.processPrescanBatch([fact], seenAt)
         repository.ingestMetadata(newSongFixture(), fact, seenAt, EXTRACTOR_VERSION)
 
-        expect(repository.countSongsNeedingMetadata(EXTRACTOR_VERSION)).toBe(0)
-        expect(repository.countSongsNeedingVersionRefresh(EXTRACTOR_VERSION)).toBe(0)
-        expect(repository.countSongsNeedingMetadata(NEXT_EXTRACTOR_VERSION)).toBe(1)
-        expect(repository.countSongsNeedingVersionRefresh(NEXT_EXTRACTOR_VERSION)).toBe(1)
-        expect(repository.listSongsNeedingMetadata(null, 10, NEXT_EXTRACTOR_VERSION)).toMatchObject([
+        expect(repository.countSongsNeedingMetadata(seenAt, EXTRACTOR_VERSION)).toBe(0)
+        expect(repository.countSongsNeedingVersionRefresh(seenAt, EXTRACTOR_VERSION)).toBe(0)
+        expect(repository.countSongsNeedingMetadata(seenAt, NEXT_EXTRACTOR_VERSION)).toBe(1)
+        expect(repository.countSongsNeedingVersionRefresh(seenAt, NEXT_EXTRACTOR_VERSION)).toBe(1)
+        expect(repository.listSongsNeedingMetadata(seenAt, null, 10, NEXT_EXTRACTOR_VERSION)).toMatchObject([
             { path: fact.path },
         ])
 
         repository.ingestMetadata(newSongFixture(), fact, seenAt, NEXT_EXTRACTOR_VERSION)
-        expect(repository.countSongsNeedingMetadata(NEXT_EXTRACTOR_VERSION)).toBe(0)
+        expect(repository.countSongsNeedingMetadata(seenAt, NEXT_EXTRACTOR_VERSION)).toBe(0)
+    })
+
+    it('does not refresh unseen rows, but retries a failed read when discovery sees it again', () => {
+        const earlier = new Date('2026-06-15T10:00:00Z')
+        const current = new Date('2026-06-15T11:00:00Z')
+        repository.processPrescanBatch([fact], earlier)
+        repository.ingestMetadata(newSongFixture(), fact, earlier, EXTRACTOR_VERSION)
+
+        // Discovery errors can leave an unseen row present. It must not enter this scan's reads.
+        expect(repository.countSongsNeedingMetadata(current, NEXT_EXTRACTOR_VERSION)).toBe(0)
+        expect(repository.countSongsNeedingVersionRefresh(current, NEXT_EXTRACTOR_VERSION)).toBe(0)
+        expect(repository.listSongsNeedingMetadata(current, null, 10, NEXT_EXTRACTOR_VERSION)).toEqual([])
+
+        repository.processPrescanBatch([fact], current)
+        expect(repository.countSongsNeedingMetadata(current, NEXT_EXTRACTOR_VERSION)).toBe(1)
+        expect(repository.countSongsNeedingVersionRefresh(current, NEXT_EXTRACTOR_VERSION)).toBe(1)
+        // No successful ingest occurred, so the next observed scan still owes the refresh.
+        repository.processPrescanBatch([fact], new Date('2026-06-15T12:00:00Z'))
+        expect(
+            repository.countSongsNeedingMetadata(new Date('2026-06-15T12:00:00Z'), NEXT_EXTRACTOR_VERSION),
+        ).toBe(1)
     })
 
     it('re-reads rows from before extractor revisions were stored', () => {
@@ -170,8 +191,8 @@ describe('LibraryBackendRepository', () => {
         repository.ingestMetadata(newSongFixture(), fact, seenAt, EXTRACTOR_VERSION)
         db.update(songsTable).set({ extractorVersion: null }).run()
 
-        expect(repository.countSongsNeedingMetadata(EXTRACTOR_VERSION)).toBe(1)
-        expect(repository.countSongsNeedingVersionRefresh(EXTRACTOR_VERSION)).toBe(1)
+        expect(repository.countSongsNeedingMetadata(seenAt, EXTRACTOR_VERSION)).toBe(1)
+        expect(repository.countSongsNeedingVersionRefresh(seenAt, EXTRACTOR_VERSION)).toBe(1)
     })
 
     it('keeps performer references separate from compilation album artists', () => {
@@ -346,7 +367,7 @@ describe('LibraryBackendRepository', () => {
                 .where(eq(genreRawNameGenresTable.genreRawNameId, rawGenreName?.id ?? ''))
                 .all(),
         ).toHaveLength(1)
-        expect(repository.countSongsNeedingMetadata(EXTRACTOR_VERSION)).toBe(0)
+        expect(repository.countSongsNeedingMetadata(seenAt, EXTRACTOR_VERSION)).toBe(0)
     })
 
     it('attributes artist references to the credit named by the tag', () => {

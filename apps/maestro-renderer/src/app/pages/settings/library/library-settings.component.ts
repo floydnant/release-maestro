@@ -73,6 +73,7 @@ export class LibrarySettingsComponent {
         if (!terminal) return null
         const failed = terminal.discoveryFailureCount + terminal.readFailureCount
         const parts = [`${terminal.discovered} files discovered`, `${terminal.imported} imported`]
+        if (terminal.refreshTotal) parts.push(`${terminal.refreshTotal} selected for metadata refresh`)
         if (terminal.missing) parts.push(`${terminal.missing} missing`)
         if (failed) parts.push(`${failed} failed`)
         if (terminal.normalizationIssues) {
@@ -89,6 +90,7 @@ export class LibrarySettingsComponent {
         // `total` is the number of files seen by the scan; `count` would only be
         // the tracks (re-)ingested, which is 0 on a no-op rescan.
         const parts = [`${lastScan.total} tracks`]
+        if (lastScan.refreshTotal) parts.push(`${lastScan.refreshTotal} selected for metadata refresh`)
         if (lastScan.new) parts.push(`${lastScan.new} new`)
         if (lastScan.changed) parts.push(`${lastScan.changed} changed`)
         if (lastScan.missing) parts.push(`${lastScan.missing} missing`)

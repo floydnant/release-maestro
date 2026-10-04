@@ -10,6 +10,7 @@ const completedStatus = (
     missingSongs = 0,
     resumedReads = 0,
     terminalOverrides: Partial<LibraryScanTerminalResult> = {},
+    refreshTotal = 0,
 ): LibraryScanStatus => {
     const terminal: LibraryScanTerminalResult = {
         outcome: 'completed',
@@ -41,6 +42,7 @@ const completedStatus = (
         phase: 'completed',
         finishedAt: terminal.finishedAt,
         readDone: terminal.readsAttempted,
+        refreshTotal,
         failedFiles,
         terminal,
     }
@@ -136,6 +138,47 @@ test.describe('startup scan summary', () => {
         await createRendererScenario(page, scenario, '/home')
 
         await expect(page.getByRole('status', { name: 'Library scan' })).toHaveText('Updated 1 track')
+    })
+
+    test('reports a refresh-only scan while reading and after completion', async ({ page }) => {
+        const completed = completedStatus(0, 0, 'startup', 0, 0, 3, {}, 3)
+        const reading: LibraryScanStatus = {
+            ...completed,
+            phase: 'reading',
+            revision: 1,
+            terminal: null,
+            finishedAt: null,
+            readDone: 0,
+        }
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status: reading, albums: [], lastScan: null },
+            })
+            .build()
+        const controller = await createRendererScenario(page, scenario, '/home')
+        await expect(page.locator('.scan-indicator')).toContainText('Refreshing metadata')
+        await controller.emit('library:scan-status', { status: completed, newAlbums: [] })
+        const summary = page.getByRole('status', { name: 'Library scan' })
+        await expect(summary).toHaveText('Metadata refreshed')
+        await expect(summary.locator('app-icon')).toHaveAttribute('color', 'content.success')
+    })
+
+    test('excludes refreshes from updates while counting resumed reads', async ({ page }) => {
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: {
+                    status: completedStatus(1, 1, 'startup', 0, 0, 4, {}, 3),
+                    albums: [],
+                    lastScan: null,
+                },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/home')
+        await expect(page.getByRole('status', { name: 'Library scan' })).toHaveText(
+            'Added 1 track · Updated 2 tracks · Metadata refreshed',
+        )
     })
 
     test('keeps the completed icon aligned with the running indicator', async ({ page }) => {

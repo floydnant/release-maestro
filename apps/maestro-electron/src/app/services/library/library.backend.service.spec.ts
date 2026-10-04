@@ -56,9 +56,14 @@ describe('LibraryBackendService', () => {
 
         expect(repository.processPrescanBatch).toHaveBeenCalledWith([fact], scanSeenAt, false)
         expect(repository.markNotSeenPresent).toHaveBeenCalledWith(scanSeenAt)
-        expect(repository.countSongsNeedingMetadata).toHaveBeenCalledWith(EXTRACTOR_VERSION)
-        expect(repository.countSongsNeedingVersionRefresh).toHaveBeenCalledWith(EXTRACTOR_VERSION)
-        expect(repository.listSongsNeedingMetadata).toHaveBeenCalledWith(null, 100, EXTRACTOR_VERSION)
+        expect(repository.countSongsNeedingMetadata).toHaveBeenCalledWith(scanSeenAt, EXTRACTOR_VERSION)
+        expect(repository.countSongsNeedingVersionRefresh).toHaveBeenCalledWith(scanSeenAt, EXTRACTOR_VERSION)
+        expect(repository.listSongsNeedingMetadata).toHaveBeenCalledWith(
+            scanSeenAt,
+            null,
+            100,
+            EXTRACTOR_VERSION,
+        )
         expect(metadataService.readFiles).toHaveBeenCalledWith([fact.path], undefined)
         expect(repository.ingestMetadata).toHaveBeenCalledWith(
             metadata,

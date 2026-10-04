@@ -71,8 +71,14 @@ export class LibraryBackendService {
                 const missing = prescanErrors == 0 ? this.repository.markNotSeenPresent(scanStartedAt) : 0
                 const { extractorVersion } = await this.metadata.ping()
                 if (abortSignal?.aborted) return
-                const metadataReadTotal = this.repository.countSongsNeedingMetadata(extractorVersion)
-                const refreshTotal = this.repository.countSongsNeedingVersionRefresh(extractorVersion)
+                const metadataReadTotal = this.repository.countSongsNeedingMetadata(
+                    scanStartedAt,
+                    extractorVersion,
+                )
+                const refreshTotal = this.repository.countSongsNeedingVersionRefresh(
+                    scanStartedAt,
+                    extractorVersion,
+                )
                 let metadataReadDone = 0
                 let ingested = 0
                 let afterPath: string | null = null
@@ -81,6 +87,7 @@ export class LibraryBackendService {
 
                 while (!abortSignal?.aborted) {
                     const facts = this.repository.listSongsNeedingMetadata(
+                        scanStartedAt,
                         afterPath,
                         DEEP_READ_BATCH_SIZE,
                         extractorVersion,

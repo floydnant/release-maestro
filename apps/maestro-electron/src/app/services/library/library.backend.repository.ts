@@ -156,11 +156,15 @@ export class LibraryBackendRepository {
     }
 
     listSongsNeedingMetadata(
+        seenAt: Date,
         afterPath: string | null,
         limit: number,
         extractorVersion: string,
     ): PrescanFileFact[] {
-        const pendingCondition = songsNeedingMetadata(extractorVersion)
+        const pendingCondition = and(
+            eq(songsTable.lastSeenAt, seenAt),
+            songsNeedingMetadata(extractorVersion),
+        )
         const where = afterPath
             ? and(eq(songsTable.present, true), pendingCondition, gt(songsTable.path, afterPath))
             : and(eq(songsTable.present, true), pendingCondition)
@@ -187,17 +191,7 @@ export class LibraryBackendRepository {
             }))
     }
 
-    countSongsNeedingMetadata(extractorVersion: string): number {
-        return (
-            this.database.db
-                .select({ count: count(songsTable.id) })
-                .from(songsTable)
-                .where(and(eq(songsTable.present, true), songsNeedingMetadata(extractorVersion)))
-                .get()?.count ?? 0
-        )
-    }
-
-    countSongsNeedingVersionRefresh(extractorVersion: string): number {
+    countSongsNeedingMetadata(seenAt: Date, extractorVersion: string): number {
         return (
             this.database.db
                 .select({ count: count(songsTable.id) })
@@ -205,6 +199,23 @@ export class LibraryBackendRepository {
                 .where(
                     and(
                         eq(songsTable.present, true),
+                        eq(songsTable.lastSeenAt, seenAt),
+                        songsNeedingMetadata(extractorVersion),
+                    ),
+                )
+                .get()?.count ?? 0
+        )
+    }
+
+    countSongsNeedingVersionRefresh(seenAt: Date, extractorVersion: string): number {
+        return (
+            this.database.db
+                .select({ count: count(songsTable.id) })
+                .from(songsTable)
+                .where(
+                    and(
+                        eq(songsTable.present, true),
+                        eq(songsTable.lastSeenAt, seenAt),
                         eq(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
                         metadataRevisionMismatch(extractorVersion),
                     ),

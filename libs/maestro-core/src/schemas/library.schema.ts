@@ -87,6 +87,8 @@ export interface LibraryScanTerminalResult {
     unavailableFolders: string[]
     /** Deep metadata reads planned / attempted (attempted = succeeded + failed). */
     readTotal: number
+    /** Revision-driven reads selected. Optional for snapshots from older app versions. */
+    refreshTotal?: number
     readsAttempted: number
     /** Tracks successfully ingested. */
     imported: number
@@ -145,7 +147,7 @@ export interface LibraryScanStatus {
     readDone: number
     readTotal: number
     /** Tracks selected because the normalizer or extractor revision changed. */
-    refreshTotal?: number
+    refreshTotal: number
     imported: number
     /** Files that failed so far (all stages). Details land in `terminal.failures`. */
     failedFiles: number
@@ -157,6 +159,8 @@ export interface LibraryScanStatus {
 
 /** Persisted record of the last successfully completed scan. */
 export interface LibraryLastScanInfo extends ScanResult {
+    /** Absent on completed scans saved by older app versions. */
+    refreshTotal?: number
     finishedAt: number
     scannedFolders: string[]
     normalizationIssues?: number

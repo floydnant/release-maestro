@@ -24,6 +24,7 @@ const status = (
     new: 0,
     changed: 0,
     unchanged: 0,
+    refreshTotal: 0,
     readDone: 0,
     readTotal: 10,
     imported: 0,
