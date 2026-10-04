@@ -136,8 +136,9 @@ The one-shot summary produced when a scan ends, carrying the outcome (`completed
 `failed`) and the final tallies. Every non-idle scan produces exactly one.
 
 **Failure stage**:
-Whether a per-file failure happened in `discovery` or `read`. Kept distinct because the two mean
-different things — an unreadable folder is not a broken tag.
+Whether a failure happened in `discovery`, an audio `read`, or the artwork `cover` cache. Discovery
+and read counts refer to files. Cover counts refer to distinct cache paths shared by songs, and do
+not count as failed audio imports.
 
 **Normalization issue**:
 A suspicious or malformed tag value found on a song during ingest (wrong-looking field, embedded
