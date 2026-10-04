@@ -1010,18 +1010,6 @@ export class LibraryBrowseRepository {
             .offset(offset)
     }
 
-    /**
-     * How many songs each album in the window has, missing ones included.
-     *
-     * A live `COUNT`, and affordable precisely because it runs *after* the window —
-     * one grouped seek per tile on screen over `songs_album_id_idx`, not one per album
-     * in the library. That is the whole difference between this and the
-     * `ORDER BY (SELECT COUNT(*) …)` ADR 0005 rejected: an ordering has to evaluate the
-     * aggregate for every candidate row before it knows which ones the window holds.
-     *
-     * An album with no songs is absent from the result rather than present as zero;
-     * the caller defaults it.
-     */
     /** Choose artwork after the window, over index-backed album membership, per ADR 0005. */
     private albumCovers(albumIds: string[]): Map<string, string> {
         const covers = new Map<string, string>()
@@ -1040,6 +1028,18 @@ export class LibraryBrowseRepository {
         return covers
     }
 
+    /**
+     * How many songs each album in the window has, missing ones included.
+     *
+     * A live `COUNT`, and affordable precisely because it runs *after* the window —
+     * one grouped seek per tile on screen over `songs_album_id_idx`, not one per album
+     * in the library. That is the whole difference between this and the
+     * `ORDER BY (SELECT COUNT(*) …)` ADR 0005 rejected: an ordering has to evaluate the
+     * aggregate for every candidate row before it knows which ones the window holds.
+     *
+     * An album with no songs is absent from the result rather than present as zero;
+     * the caller defaults it.
+     */
     private albumSongCounts(albumIds: string[]): Map<string, number> {
         if (albumIds.length == 0) return new Map()
 
