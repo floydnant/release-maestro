@@ -10,6 +10,7 @@ import {
     LibraryScanTerminalError,
     LibraryScanTerminalResult,
     LibraryScanTrigger,
+    sanitizeDiagnosticText,
     toRendererEmitter,
 } from '@release-maestro/core'
 import { BrowserWindow } from 'electron'
@@ -358,7 +359,7 @@ export class LibraryScanService {
             error: details.error,
         }
         status.terminal = terminal
-        log.info('library.scan.finished', {
+        const logFields = {
             scanId: status.scanId,
             trigger: status.trigger,
             outcome,
@@ -367,7 +368,15 @@ export class LibraryScanService {
             imported: status.imported,
             failedFiles: status.failedFiles,
             unavailableFolders: status.unavailableFolders.length,
-        })
+            ...(details.error
+                ? {
+                      errorCode: details.error.code,
+                      errorMessage: sanitizeDiagnosticText(details.error.message),
+                  }
+                : {}),
+        }
+        if (outcome === 'failed') log.errorEvent('library.scan.finished', logFields)
+        else log.info('library.scan.finished', logFields)
         this.touch(status)
     }
 

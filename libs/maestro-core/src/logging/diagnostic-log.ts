@@ -18,19 +18,31 @@ export function sanitizeDiagnosticText(value: string, maxLength = MAX_FIELD_LENG
     return value
         .replace(/https?:\/\/[^\s)]+/gi, '[url]')
         .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[email]')
-        .replace(/(?:[A-Za-z]:\\|\/)[^)\r\n'"<>]*/g, '[path]')
+        .replace(/(?:[A-Za-z]:\\|\\\\|\/)[^\r\n]*/g, '[path]')
         .slice(0, maxLength)
+}
+
+/** Use this for errors whose message can contain settings or imported content. */
+export function diagnosticErrorSummary(error: unknown): DiagnosticFields {
+    if (!(error instanceof Error)) return { errorName: 'Unknown' }
+    const fields: DiagnosticFields = {
+        errorName: /^[A-Za-z][A-Za-z0-9]{0,79}$/.test(error.name) ? error.name : 'Error',
+    }
+    if ('code' in error && typeof error.code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(error.code)) {
+        fields['errorCode'] = error.code
+    }
+    if ('exitCode' in error && typeof error.exitCode === 'number' && Number.isFinite(error.exitCode)) {
+        fields['exitCode'] = error.exitCode
+    }
+    return fields
 }
 
 export function diagnosticErrorFields(error: unknown): DiagnosticFields {
     if (!(error instanceof Error)) return { errorName: 'Unknown', errorMessage: 'Unknown error' }
 
     const fields: DiagnosticFields = {
-        errorName: sanitizeDiagnosticText(error.name),
+        ...diagnosticErrorSummary(error),
         errorMessage: sanitizeDiagnosticText(error.message),
-    }
-    if ('code' in error && typeof error.code === 'string') {
-        fields['errorCode'] = sanitizeDiagnosticText(error.code)
     }
     if (error.stack) {
         fields['errorStack'] = sanitizeDiagnosticText(error.stack, MAX_STACK_LENGTH)

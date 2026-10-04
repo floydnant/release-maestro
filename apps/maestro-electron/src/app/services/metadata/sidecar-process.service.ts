@@ -42,8 +42,19 @@ export class SidecarProcessService {
     constructor(private readonly binaryPath: string) {}
 
     private ensureStarted(): ChildProcessWithoutNullStreams {
-        if (this.process && this.process.exitCode == null && !this.process.killed) {
+        if (
+            this.process &&
+            this.process.exitCode == null &&
+            this.process.signalCode == null &&
+            !this.process.killed
+        ) {
             return this.process
+        }
+
+        // 'exit' can precede 'close'. A new request may arrive while the old
+        // streams still drain, so settle its requests before replacing the child.
+        if (this.process) {
+            this.rejectPendingRequests(new Error('metadata-engine exited before its streams closed'))
         }
 
         const child = spawn(
@@ -62,6 +73,7 @@ export class SidecarProcessService {
 
         child.on('error', error => {
             log.error('worker.process.error', error)
+            if (this.process !== child) return
             this.handleExit(new Error(`metadata-engine failed to start: ${error.message}`))
         })
         child.on('close', (code, signal) => {
@@ -148,9 +160,12 @@ export class SidecarProcessService {
         this.stderrReadline = null
         this.process = null
 
-        if (this.pending.size > 0) {
-            log.error('worker.request.interrupted', error, { pendingRequests: this.pending.size })
-        }
+        this.rejectPendingRequests(error)
+    }
+
+    private rejectPendingRequests(error: Error): void {
+        if (this.pending.size === 0) return
+        log.error('worker.request.interrupted', error, { pendingRequests: this.pending.size })
 
         // Fail any in-flight requests so callers don't hang forever.
         for (const [, pending] of this.pending) pending.reject(error)

@@ -21,6 +21,9 @@ pass settings, email content, metadata payloads, whole domain objects, full path
 logger. The shared logger removes common paths, URLs, and email addresses from strings as a second
 line of defense. Review any new string field for private content before adding it.
 
+For import errors, record the error type and code with `diagnosticErrorSummary`. Apple Mail error
+messages can contain the configured mailbox name; the full message remains available to the UI.
+
 The production Settings > Diagnostics page shows the latest 20 entries. It can open the log folder
 or save a JSONL export of both bounded files. The export adds the app version and platform. It does
 not include the database or settings. Users review the export file before sharing it. No log is

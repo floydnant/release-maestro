@@ -1,5 +1,6 @@
 import { bufferCount, concatMap, filter, materialize, merge, Observable, switchMap } from 'rxjs'
 import {
+    diagnosticErrorSummary,
     BandcampEmailFeedSourceItem,
     BandcampFeedItem,
     EmailImportProgress,
@@ -149,7 +150,12 @@ export class FeedBackendService {
                             // The import itself succeeded; without a checkpoint the next one is just slower
                             await this.feedBackendRepository
                                 .advanceEmailImportCheckpoint(vendor, mailboxName, coveredUntil)
-                                .catch(error => log.error('feed.import.checkpoint.failed', error))
+                                .catch(error =>
+                                    log.errorEvent(
+                                        'feed.import.checkpoint.failed',
+                                        diagnosticErrorSummary(error),
+                                    ),
+                                )
                         }
 
                         const newlyImported =
@@ -164,7 +170,10 @@ export class FeedBackendService {
                         }
                     }
                     if (notification.kind == 'E') {
-                        log.error('feed.import.pipeline.failed', notification.error)
+                        log.errorEvent(
+                            'feed.import.pipeline.failed',
+                            diagnosticErrorSummary(notification.error),
+                        )
 
                         return {
                             phase: 'error' as const,

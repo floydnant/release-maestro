@@ -4,7 +4,7 @@ import * as fs from 'fs/promises'
 import { join } from 'path'
 import { createInterface } from 'readline'
 import { Observable, Subject } from 'rxjs'
-import { Email, EmailImportStreamPacket, emailSchema } from '@release-maestro/core'
+import { Email, EmailImportStreamPacket, diagnosticErrorSummary, emailSchema } from '@release-maestro/core'
 import { appPaths } from '../../app-env'
 import { createMainLogger } from '../../logging/logger'
 import type { EmailImporterPlugin } from './email.backend.repository'
@@ -53,13 +53,26 @@ export const formatAppleScriptDate = (date: Date): string =>
     `${date.getFullYear()}-${padTwoDigits(date.getMonth() + 1)}-${padTwoDigits(date.getDate())}` +
     `T${padTwoDigits(date.getHours())}:${padTwoDigits(date.getMinutes())}:${padTwoDigits(date.getSeconds())}`
 
+class AppleMailExportError extends Error {
+    readonly code = 'APPLE_MAIL_EXPORT_FAILED'
+
+    constructor(
+        message: string,
+        readonly exitCode: number | null,
+    ) {
+        super(message)
+        this.name = 'AppleMailExportError'
+    }
+}
+
 const toExportError = (exitCode: number | null, unhandledOutput: string[]): Error => {
     const mailError = unhandledOutput
         .map(line => line.match(/Mail got an error: (.+)/)?.[1])
         .find(message => message !== undefined)
 
-    return new Error(
+    return new AppleMailExportError(
         `[AppleMailImporter] ${mailError ?? unhandledOutput.at(-1) ?? `osascript exited with code ${exitCode}`}`,
+        exitCode,
     )
 }
 
@@ -75,7 +88,7 @@ const isMailRunning = (): Promise<boolean> =>
     runAppleScript('application "Mail" is running').then(
         output => output !== 'false',
         error => {
-            log.error('apple-mail.running-check.failed', error)
+            log.errorEvent('apple-mail.running-check.failed', diagnosticErrorSummary(error))
             return true
         },
     )
@@ -83,7 +96,7 @@ const isMailRunning = (): Promise<boolean> =>
 const quitMail = (): Promise<void> =>
     runAppleScript('if application "Mail" is running then tell application "Mail" to quit').then(
         () => undefined,
-        error => log.error('apple-mail.quit.failed', error),
+        error => log.errorEvent('apple-mail.quit.failed', diagnosticErrorSummary(error)),
     )
 
 export class AppleMailRepository implements EmailImporterPlugin {
@@ -118,7 +131,7 @@ export class AppleMailRepository implements EmailImporterPlugin {
                     handledLines = handledLines
                         .then(() => this.handleExportLine(line, result$, unhandledOutput, abortSignal))
                         .catch((error: unknown) => {
-                            log.error('apple-mail.export-line.failed', error)
+                            log.errorEvent('apple-mail.export-line.failed', diagnosticErrorSummary(error))
                             lineFailure ??= error instanceof Error ? error : new Error(String(error))
                         })
                 })
@@ -139,16 +152,14 @@ export class AppleMailRepository implements EmailImporterPlugin {
 
                         // An aborted export completes rather than errors: the user asked it to stop
                         if (error && !abortSignal.aborted) {
-                            log.warn('apple-mail.export.failed', {
-                                errorName: error.name,
-                            })
+                            log.errorEvent('apple-mail.export.failed', diagnosticErrorSummary(error))
                             result$.error(error)
                         } else {
                             result$.complete()
                         }
 
                         fs.rm(exportPath, { recursive: true }).catch(err => {
-                            log.error('apple-mail.export-cleanup.failed', err)
+                            log.errorEvent('apple-mail.export-cleanup.failed', diagnosticErrorSummary(err))
                         })
                     })
                 }

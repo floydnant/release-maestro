@@ -1,4 +1,4 @@
-import { diagnosticEntry, parseDiagnosticEntry } from './diagnostic-log'
+import { diagnosticEntry, diagnosticErrorSummary, parseDiagnosticEntry } from './diagnostic-log'
 
 describe('diagnostic logs', () => {
     it('removes private paths, URLs, and email addresses from error fields', () => {
@@ -44,5 +44,41 @@ describe('diagnostic logs', () => {
         )
 
         expect(JSON.stringify(entry)).not.toContain('Secret Song.flac')
+    })
+
+    it('removes filenames with apostrophes', () => {
+        const entry = diagnosticEntry(
+            'error',
+            'library',
+            'library.file.failed',
+            {},
+            new Error("open /Users/alice/Music/Alice's Secret Album/track.flac"),
+        )
+
+        expect(JSON.stringify(entry)).not.toContain('Secret Album')
+    })
+
+    it('removes UNC paths', () => {
+        const entry = diagnosticEntry(
+            'error',
+            'library',
+            'library.file.failed',
+            {},
+            new Error('open \\\\nas\\Alice\\Private Album\\track.flac'),
+        )
+
+        expect(JSON.stringify(entry)).not.toContain('Private Album')
+        expect(JSON.stringify(entry)).not.toContain('track.flac')
+    })
+
+    it('keeps the error type and code without a sensitive message', () => {
+        const error = Object.assign(new Error('Can’t get mailbox "Private purchases"'), {
+            code: 'APPLE_MAIL_EXPORT_FAILED',
+        })
+
+        expect(diagnosticErrorSummary(error)).toEqual({
+            errorName: 'Error',
+            errorCode: 'APPLE_MAIL_EXPORT_FAILED',
+        })
     })
 })

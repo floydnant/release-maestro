@@ -1,4 +1,5 @@
 import {
+    diagnosticErrorSummary,
     EmailImportProgress,
     EmailImportProgressUpdate,
     EmailImportTrigger,
@@ -105,7 +106,7 @@ export class EmailImportService {
         this.running = started
         log.info('feed.import.started', { trigger })
         this.settled = this.run(started)
-            .catch(error => log.error('feed.import.reporting-failed', error))
+            .catch(error => log.errorEvent('feed.import.reporting-failed', diagnosticErrorSummary(error)))
             .finally(() => {
                 this.running = null
             })
@@ -166,7 +167,10 @@ export class EmailImportService {
             const progress$ = await this.feed.triggerEmailImport(running.abortController.signal)
             await lastValueFrom(progress$.pipe(tap(report)), { defaultValue: undefined })
         } catch (error) {
-            log.error('feed.import.run.failed', error, { trigger: running.trigger })
+            log.errorEvent('feed.import.run.failed', {
+                ...diagnosticErrorSummary(error),
+                trigger: running.trigger,
+            })
             report({
                 phase: 'error',
                 errorMessage: error instanceof Error ? error.message : 'Unknown error during email import',

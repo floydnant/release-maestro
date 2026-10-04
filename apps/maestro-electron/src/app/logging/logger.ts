@@ -88,6 +88,8 @@ export function createMainLogger(scope: string) {
             writeDiagnosticEntry(diagnosticEntry('warn', scope, event, fields), 'main'),
         error: (event: string, error: unknown, fields?: DiagnosticFields) =>
             writeDiagnosticEntry(diagnosticEntry('error', scope, event, fields, error), 'main'),
+        errorEvent: (event: string, fields?: DiagnosticFields) =>
+            writeDiagnosticEntry(diagnosticEntry('error', scope, event, fields), 'main'),
     }
 }
 

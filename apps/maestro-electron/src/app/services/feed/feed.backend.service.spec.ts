@@ -148,12 +148,24 @@ describe('FeedBackendService email import', () => {
 
     it('does not checkpoint a failed import', async () => {
         const { updates } = await runImport()
+        const errorLog = jest.spyOn(console, 'error').mockImplementation()
+        const mailError = Object.assign(new Error('Can’t get mailbox "Private purchases". (-1728)'), {
+            code: 'APPLE_MAIL_EXPORT_FAILED',
+        })
 
         emails$.next(packet('2026-10-01T21:40:12'))
-        emails$.error(new Error('Mail got an error'))
+        emails$.error(mailError)
 
-        await expect(updates).resolves.toContainEqual(expect.objectContaining({ phase: 'error' }))
+        await expect(updates).resolves.toContainEqual(
+            expect.objectContaining({ phase: 'error', errorMessage: mailError.message }),
+        )
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
+        expect(errorLog).toHaveBeenCalledWith(
+            '[main:feed] feed.import.pipeline.failed',
+            expect.objectContaining({ errorCode: 'APPLE_MAIL_EXPORT_FAILED' }),
+        )
+        expect(JSON.stringify(errorLog.mock.calls)).not.toContain('Private purchases')
+        errorLog.mockRestore()
     })
 
     it('completes with saved successes while retaining the checkpoint after skipped emails', async () => {
