@@ -208,7 +208,7 @@ export class DebugComponent {
             case 'discovering':
                 return `discovered ${status.discovered} (new ${status.new}, changed ${status.changed}, unchanged ${status.unchanged})`
             case 'reading':
-                return `read ${status.readDone}/${status.readTotal}, imported ${status.imported}, failed ${status.failedFiles}, issues ${status.normalizationIssues}`
+                return `read ${status.readDone}/${status.readTotal}, imported ${status.imported}, failed ${status.failedFiles}, artwork failures ${status.coverFailureCount}, issues ${status.normalizationIssues}`
             case 'completed':
                 return `imported ${terminal?.imported ?? 0}, discovered ${
                     terminal?.discovered ?? 0
@@ -216,7 +216,7 @@ export class DebugComponent {
                     terminal?.unchanged ?? 0
                 }, missing ${terminal?.missing ?? 0}, failed ${
                     (terminal?.discoveryFailureCount ?? 0) + (terminal?.readFailureCount ?? 0)
-                }`
+                }, artwork failures ${status.coverFailureCount}`
             case 'failed':
             case 'cancelled':
                 return terminal?.error?.message ?? '—'

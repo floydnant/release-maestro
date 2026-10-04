@@ -884,7 +884,7 @@ export class LibraryBackendRepository {
                 createdAt: fact.createdAt ? new Date(fact.createdAt) : null,
                 fileFingerprint: fileFingerprint(fact),
                 scannedFileFingerprint: fileFingerprint(fact),
-                coverNeedsRefresh: false,
+                coverNeedsRefresh: metadata.coverError !== undefined,
                 present: true,
                 lastSeenAt: existingSong?.lastSeenAt ?? scannedAt,
                 lastScannedAt: scannedAt,

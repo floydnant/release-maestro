@@ -21,6 +21,7 @@ const terminalResult = (overrides: Partial<LibraryScanTerminalResult> = {}): Lib
     imported: 1,
     discoveryFailureCount: 0,
     readFailureCount: 1,
+    coverFailureCount: 0,
     failures: [
         {
             stage: 'read',
@@ -53,11 +54,48 @@ const scanStatus = (terminal: LibraryScanTerminalResult): LibraryScanStatus => (
     readTotal: terminal.readTotal,
     imported: terminal.imported,
     failedFiles: terminal.discoveryFailureCount + terminal.readFailureCount,
+    coverFailureCount: terminal.coverFailureCount,
     normalizationIssues: terminal.normalizationIssues,
     terminal,
 })
 
 test.describe('library settings scenarios', () => {
+    test('reports artwork failures while retaining successful imports', async ({ page }) => {
+        const terminal = terminalResult({
+            imported: 2,
+            readFailureCount: 0,
+            coverFailureCount: 1,
+            failures: [{ stage: 'cover', path: '/cache/cover.png', message: 'write blocked' }],
+        })
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: {
+                    status: scanStatus(terminal),
+                    albums: [],
+                    lastScan: {
+                        count: 2,
+                        total: 10,
+                        coverFailureCount: 1,
+                        errors: 0,
+                        finishedAt: terminal.finishedAt,
+                        scannedFolders: ['/music'],
+                    },
+                },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/settings/library')
+        await expect(page.getByLabel('Latest scan result')).toContainText('2 imported')
+        await expect(page.getByLabel('Latest scan result')).toContainText('1 artwork cache failure')
+        await expect(
+            page.getByText(
+                '1 artwork cache failure. Successful audio imports remain intact; pending artwork retries on the next scan.',
+            ),
+        ).toBeVisible()
+        await expect(page.getByText('could not be imported.', { exact: false })).toBeHidden()
+        await expect(page.getByText(/Last completed scan: .*1 artwork cache failure/)).toBeVisible()
+    })
+
     test('retains the metadata refresh count in terminal and saved summaries', async ({ page }) => {
         const terminal = terminalResult({ refreshTotal: 8 })
         const scenario = scenarioBuilder()
@@ -217,6 +255,7 @@ test.describe('library settings scenarios', () => {
         const terminal = terminalResult({
             failures,
             readFailureCount: failures.length,
+            coverFailureCount: 0,
         })
         const scenario = scenarioBuilder()
             .settings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
@@ -266,6 +305,7 @@ test.describe('library settings scenarios', () => {
             imported: 0,
             failures: [],
             readFailureCount: 0,
+            coverFailureCount: 0,
             error: {
                 code: 'SCAN_ERROR',
                 message: 'The metadata engine stopped responding',
@@ -293,6 +333,7 @@ test.describe('library settings scenarios', () => {
             unavailableFolders: ['/usb/library'],
             failures: [],
             readFailureCount: 0,
+            coverFailureCount: 0,
         })
         const scenario = scenarioBuilder()
             .settings({

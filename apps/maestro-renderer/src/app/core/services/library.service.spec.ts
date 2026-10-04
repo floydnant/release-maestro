@@ -29,6 +29,7 @@ const status = (
     readTotal: 10,
     imported: 0,
     failedFiles: 0,
+    coverFailureCount: 0,
     normalizationIssues: 0,
     terminal: null,
     ...overrides,

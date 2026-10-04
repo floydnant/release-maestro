@@ -58,6 +58,8 @@ still need metadata. A changed fingerprint, missing content hash, changed metada
 unavailable cached cover queues a read, including work left unfinished by an earlier scan.
 Cover refresh state persists until a successful read and does not discard the song's audio identity.
 
+An artwork cache failure preserves successfully read tags and the content hash. The song keeps
+its cover retry pending; the scan reports the failed cache path separately from audio read failures.
 _Avoid_: full scan, tag scan
 
 **Metadata revision**:

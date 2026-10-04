@@ -76,15 +76,28 @@
 
     @if (terminal(); as terminalResult) {
         @if (terminalResult.failures.length > 0) {
-            <h2 class="mt-8 type-section-title text-content-primary">Failed files</h2>
-            <p class="mt-1 type-body-sm text-content-muted">
-                {{ terminalResult.discoveryFailureCount + terminalResult.readFailureCount }} file{{
-                    terminalResult.discoveryFailureCount + terminalResult.readFailureCount === 1 ? '' : 's'
-                }}
-                could not be imported.
-            </p>
+            <h2 class="mt-8 type-section-title text-content-primary">
+                {{ terminalResult.coverFailureCount > 0 ? 'Scan failures' : 'Failed files' }}
+            </h2>
+            @if (terminalResult.discoveryFailureCount + terminalResult.readFailureCount > 0) {
+                <p class="mt-1 type-body-sm text-content-muted">
+                    {{ terminalResult.discoveryFailureCount + terminalResult.readFailureCount }} file{{
+                        terminalResult.discoveryFailureCount + terminalResult.readFailureCount === 1
+                            ? ''
+                            : 's'
+                    }}
+                    could not be imported.
+                </p>
+            }
+            @if (terminalResult.coverFailureCount > 0) {
+                <p class="artwork-failures | mt-1 type-body-sm text-content-warning">
+                    {{ terminalResult.coverFailureCount }} artwork cache failure{{
+                        terminalResult.coverFailureCount === 1 ? '' : 's'
+                    }}. Successful audio imports remain intact; pending artwork retries on the next scan.
+                </p>
+            }
             <div class="mt-3 panel p-2" aria-label="Failed files">
-                @for (failure of terminalResult.failures; track failure.path) {
+                @for (failure of terminalResult.failures; track failure.stage + failure.path) {
                     <div class="group flex items-center gap-3 px-3 py-2">
                         <div class="min-w-0 grow select-text">
                             <p class="mt-0.5 type-body-sm text-content-danger">
