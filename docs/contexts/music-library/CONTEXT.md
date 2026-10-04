@@ -53,10 +53,24 @@ new, changed, or unchanged. Called _prescan_ at the metadata-engine boundary.
 _Avoid_: crawl, walk, indexing
 
 **Deep read**:
-The second scan phase. Reads full tags and cover art for the files that need it. Its queue comes from
-a fingerprint or extractor/normalizer revision mismatch in the database, not from the discovery tallies — which is what makes an
-interrupted scan resumable.
+The second scan phase. Reads full tags and cover art for files seen by the current discovery that
+still need metadata. A changed fingerprint or metadata revision queues a read, including work left
+unfinished by an earlier scan.
 _Avoid_: full scan, tag scan
+
+**Metadata revision**:
+The version of the extractor and normalizer rules that last read a song. A changed revision means
+unchanged audio may contain information the app could not previously extract or normalize.
+
+**Metadata refresh**:
+A deep read of unchanged audio after the metadata revision changes. It updates the song's metadata
+while preserving its identity and Added date. Failed reads remain pending for the next scan that sees
+the file. The scan reports refreshes separately from files changed on disk.
+
+**Unused catalog entity**:
+An album, artist, genre, record label, or raw name with no remaining catalog references. Completed
+scans remove these entities after metadata updates. Missing songs retain their references, and
+user-confirmed raw-name resolutions remain even without songs.
 
 **Reconciliation**:
 Marking songs absent (`present = false`) when discovery did not see them. Skipped when the scan was
