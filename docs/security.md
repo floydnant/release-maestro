@@ -32,11 +32,15 @@ Security advisories block unless an exact exception applies, including advisorie
 Unscored RustSec maintenance notices are informational; unsoundness blocks. Scanner errors,
 missing ecosystem coverage, and invalid or expired exceptions also fail.
 
-`tools/security/exceptions.json` accepts 28 existing findings until November 2, 2026.
+`tools/security/exceptions.json` accepts 9 existing findings until November 2, 2026.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, and UTC expiry date.
 They expire at the start of that date; new versions or advisories still block. Keep exceptions within
 30 days, review extensions in a PR, and remove them after fixes. Never regenerate the baseline
 automatically or suppress whole packages. Acceptance does not establish safety.
+
+Nx pins Axios and brace-expansion to vulnerable versions. Exact-version overrides in
+`pnpm-workspace.yaml` replace them with Axios 1.20.0 and brace-expansion 5.0.12. Remove the
+overrides when the installed Nx versions use fixed dependencies.
 
 `make security` runs separately from `make sure` because advisories require network access and
 can change without code changes.
