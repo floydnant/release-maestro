@@ -18,7 +18,9 @@ make security-tools        # Download scanners only
 
 Commands download pinned, SHA-256-verified tools from `tools/security/tools.json` on first use.
 Tools support macOS, Linux, and Windows on x64 and arm64. Delete `.cache/security-tools` to
-replace a corrupt cache. Review tool versions and checksums together when updating them.
+replace a corrupt cache. The `update-dependencies` skill covers scanner versions, all platform
+assets and checksums, advisory rescans, and removal of resolved exceptions. Exception extensions
+remain explicit maintainer decisions.
 
 ## Vulnerability gate
 

@@ -1,6 +1,6 @@
 ---
 name: update-dependencies
-description: Update Release Maestro dependencies, repair update-related incompatibilities and regressions, and open a PR.
+description: Update Release Maestro dependencies and pinned tools, repair regressions, and open a PR.
 disable-model-invocation: true
 ---
 
@@ -11,9 +11,11 @@ Preserve existing product behavior.
 
 ## Update and repair
 
-1. Honor the requested scope. By default, update all tracked npm and Cargo packages and the Node.js
-   runtime to compatible stable releases, including majors. Use a supported Node.js LTS release and
-   keep `.node-version`, the engine range, CI setup, and developer bootstrap documentation aligned.
+1. Honor the requested scope. By default, update all tracked npm and Cargo packages, the Node.js
+   runtime, GitHub Actions, and pinned tools in `tools/security/tools.json` to compatible stable
+   releases, including majors. Read `docs/security.md` when the security tooling is present.
+   Use a supported Node.js LTS release. Keep `.node-version`, the engine range, CI setup, and
+   developer bootstrap documentation aligned.
    Keep prereleases opt-in and existing pinning conventions.
 2. Start a dedicated branch or worktree from `origin/main`, record the base commit, and establish a
    verification baseline. Reuse a matching branch and PR when resuming. Keep unrelated changes out.
@@ -34,6 +36,21 @@ Preserve existing product behavior.
    conflicts. Stop repeating attempts when they produce no new evidence. A blocked explicitly
    requested version remains unfinished work.
 
+## Security tools and findings
+
+For OSV-Scanner and Syft, check the official releases of each repository named in
+`tools/security/tools.json`. Update each tool's version, asset names, and SHA-256 digests together.
+Account for every configured platform, including platforms other than the host. Use the upstream
+release checksums and compare them with downloaded asset bytes; verify upstream signatures or
+attestations when available. Keep the installer compatible with the selected release layout.
+
+Run `make security` against the updated lockfiles. Fix findings within the requested scope and remove
+exceptions for findings no longer present. Review dependency overrides and remove them when upstream
+versions include the fixes. Keep the exception count and tooling instructions in `docs/security.md`
+current. Report remaining blocking findings and expired exceptions with their package versions,
+advisory IDs, and available fixes. Risk acceptance and exception extensions require an explicit
+maintainer decision; do not regenerate the baseline or extend expiry dates to make the scan pass.
+
 ## Verify and publish
 
 Follow [verification-loop](../verification-loop/SKILL.md) from focused checks through `make sure`.
@@ -42,6 +59,10 @@ Verify installs from the final lockfiles and inspect generated changes for unrel
 - `make agents-check` for changes to agent skills, harness tooling, their root dependencies, or files
   under `.agents/`.
 - `make test-tools` for changes to repository tools, their dependencies, or files under `tools/`.
+- `make security` for dependency updates; a failing scan keeps the PR blocked.
+- `make security-tools` and `make sbom` for scanner pin, checksum, installer, or inventory changes.
+  Run `make sbom-release` against an existing package when artifact scanning changes. Verify the
+  non-host platform assets and use CI to exercise supported operating systems.
 - `make build-prod` for compiler, bundler, or build-tool updates.
 - `make e2e-production` for Electron, native modules, sidecar packaging, or packaged loading changes.
   Use CI for other platforms.
@@ -51,9 +72,9 @@ If the final diff changes source code, configuration, tooling, or tests, run
 and before publishing. Manifest-only and lockfile-only updates do not need this review.
 
 Unless the user limits the task to local work, commit, push, and open one PR following
-`.github/pull_request_template.md`. Include direct dependency version changes, migration fixes,
-relevant official migration links, and deferred updates with reasons. Report local verification in
-the final response; the template leaves routine check lists to CI.
+`.github/pull_request_template.md`. Include direct dependency and pinned-tool version changes,
+migration fixes, relevant official migration links, and deferred updates with reasons. Report local
+verification in the final response; the template leaves routine check lists to CI.
 
 Open ready for review after local gates pass. Watch CI on the pushed commit and fix update-related
 failures on the same PR. Keep blocked or incomplete work in draft and explain the blocker. Do not
