@@ -1,8 +1,15 @@
 import { lastValueFrom, Subject, toArray } from 'rxjs'
 import { fromPartial } from '@total-typescript/shoehorn'
 import { Email, EmailImportStreamPacket } from '@release-maestro/core'
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Shared synthetic fixtures live in fixtures/, per docs/testing.md.
+import {
+    fansBoughtMusicEmail,
+    newReleaseEmail,
+    scrapedBandcampAlbum,
+} from '../../../../../../fixtures/feed.fixture'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
+import { BandcampApiFailedToFetchTralbumException } from '../bandcamp/bandcamp-api.exceptions'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
 import { FeedBackendRepository } from './feed.backend.repository'
@@ -46,6 +53,8 @@ describe('FeedBackendService email import', () => {
     let loadEmails: jest.MockedFunction<EmailBackendRepository['loadEmails']>
     let mailboxName: string | null
     let service: FeedBackendService
+    let scrapeTralbumInfo: jest.MockedFunction<BandcampApiBackendService['scrapeTralbumInfo']>
+    let getLinkMetaDataBatch: jest.MockedFunction<WebScrapingService['getLinkMetaDataBatch']>
 
     beforeEach(() => {
         feedRepository = new FeedBackendRepository(createMigratedTestDatabase().client)
@@ -59,10 +68,21 @@ describe('FeedBackendService email import', () => {
             loadEmails,
             getMailboxName: () => mailboxName,
         })
+        scrapeTralbumInfo = jest.fn<
+            ReturnType<BandcampApiBackendService['scrapeTralbumInfo']>,
+            Parameters<BandcampApiBackendService['scrapeTralbumInfo']>
+        >(async url => ({
+            ...scrapedBandcampAlbum,
+            type: url.includes('/track/') ? 'track' : 'album',
+        }))
+        getLinkMetaDataBatch = jest.fn<
+            ReturnType<WebScrapingService['getLinkMetaDataBatch']>,
+            Parameters<WebScrapingService['getLinkMetaDataBatch']>
+        >(async () => ({}))
         service = new FeedBackendService(
             emailRepository,
-            fromPartial<BandcampApiBackendService>({}),
-            fromPartial<WebScrapingService>({}),
+            fromPartial<BandcampApiBackendService>({ scrapeTralbumInfo }),
+            fromPartial<WebScrapingService>({ getLinkMetaDataBatch }),
             feedRepository,
         )
     })
@@ -73,6 +93,120 @@ describe('FeedBackendService email import', () => {
         )
         return { updates, abortController }
     }
+
+    it('imports and hydrates each distinct album and track from a fan-purchase notification', async () => {
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
+        emails$.complete()
+
+        await expect(updates).resolves.toContainEqual({
+            phase: 'completed',
+            totalProcessed: 1,
+            totalImported: 2,
+            newlyImported: 2,
+        })
+        const stored = await feedRepository.listFeedItems(0, 10)
+        expect(new Set(stored.map(item => item.id)).size).toBe(2)
+        expect(stored.map(item => item.dedupeIdentifier).sort()).toEqual([
+            'https://other.bandcamp.com/track/second',
+            'https://test.bandcamp.com/album/first',
+        ])
+        for (const item of stored) {
+            expect(item).toMatchObject({
+                eventDate: new Date(fansBoughtMusicEmail.dateReceived),
+                source: {
+                    type: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
+                    messageId: fansBoughtMusicEmail.messageId,
+                    isRead: true,
+                },
+                isSnoozed: false,
+                lastViewedAt: null,
+            })
+        }
+        const hydrated = await service.loadFeed(0, 10)
+        expect(hydrated).toHaveLength(2)
+        for (const item of hydrated) {
+            expect(item.sourceType).toBe('EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC')
+            expect(item.data.emailId).toBe(fansBoughtMusicEmail.messageId)
+            expect(item.data.tracks).toEqual(scrapedBandcampAlbum.tracks)
+            expect(item.data.iframeUrl).toContain(`/${item.data.releaseType}=123/`)
+        }
+        expect(hydrated.map(item => item.data.releaseType).sort()).toEqual(['album', 'track'])
+        expect(hydrated.find(item => item.data.releaseType === 'album')?.data.fanNames).toEqual([
+            'Adam Pitts',
+        ])
+        expect(hydrated.find(item => item.data.releaseType === 'track')?.data.fanNames).toEqual([
+            'Maya',
+            'River & Rain',
+        ])
+        expect(getLinkMetaDataBatch).not.toHaveBeenCalled()
+    })
+
+    it('deduplicates fan purchases on reimport and against new-release notifications', async () => {
+        jest.useFakeTimers({ now: new Date('2026-10-02T10:00:00Z') })
+        try {
+            const { updates } = await runImport()
+            emails$.next({ current: 1, total: 2, email: newReleaseEmail })
+            emails$.next({ current: 2, total: 2, email: fansBoughtMusicEmail })
+            emails$.complete()
+            await updates
+            const firstItems = await feedRepository.listFeedItems(0, 10)
+            expect(firstItems).toHaveLength(2)
+            expect(firstItems.find(item => item.data.tralbumUrl.includes('/album/'))?.source.type).toBe(
+                'EMAIL.BANDCAMP_NEW_RELEASE',
+            )
+
+            jest.setSystemTime(new Date('2026-10-02T10:00:01Z'))
+            emails$ = new Subject()
+            const next = await runImport()
+            emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
+            emails$.complete()
+            await expect(next.updates).resolves.toContainEqual({
+                phase: 'completed',
+                totalProcessed: 1,
+                totalImported: 2,
+                newlyImported: 0,
+            })
+            expect(await feedRepository.listFeedItems(0, 10)).toEqual(firstItems)
+        } finally {
+            jest.useRealTimers()
+        }
+    })
+
+    it('retains a failed fan purchase without preventing the other release from hydrating', async () => {
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
+        emails$.complete()
+        await updates
+        scrapeTralbumInfo.mockRejectedValueOnce(
+            new BandcampApiFailedToFetchTralbumException('https://test.bandcamp.com/album/first', 404),
+        )
+
+        const hydrated = await service.loadFeed(0, 10)
+        expect(hydrated).toHaveLength(2)
+        expect(hydrated.filter(item => item.error)).toHaveLength(1)
+        const failed = hydrated.find(item => item.error)
+        expect(failed).toMatchObject({
+            sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
+            error: { message: 'The Bandcamp track or album could not be found' },
+        })
+        expect(failed?.data.releaseName).toBe(failed?.data.releaseUrl)
+        expect(failed?.data.fanNames.length).toBeGreaterThan(0)
+        expect(hydrated.find(item => !item.error)?.data.tracks).toEqual(scrapedBandcampAlbum.tracks)
+    })
+
+    it('imports no releases from a fan notification without release links', async () => {
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 1, email: { ...fansBoughtMusicEmail, htmlBody: '' } })
+        emails$.complete()
+        await expect(updates).resolves.toContainEqual({
+            phase: 'completed',
+            totalProcessed: 1,
+            totalImported: 0,
+            newlyImported: 0,
+        })
+        expect(await feedRepository.listFeedItems(0, 10)).toEqual([])
+    })
 
     it('reads the whole mailbox on the first import and checkpoints the newest email', async () => {
         const { updates } = await runImport()

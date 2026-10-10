@@ -13,6 +13,58 @@ const validateEmail = (data: unknown): Email | null => {
     return result.success ? result.data : null
 }
 
+/** Mail exports the raw MIME source, including transfer-encoded HTML. */
+const parseAppleMailHtml = (source: string): string => {
+    const lines = source.replace(/\r\n/g, '\n').split('\n')
+    const logicalLines: { text: string; start: number }[] = []
+    lines.forEach((line, start) => {
+        const previous = logicalLines.at(-1)
+        if (previous && /^[ \t]/.test(line)) {
+            previous.text += ` ${line.trim()}`
+        } else {
+            logicalLines.push({ text: line, start })
+        }
+    })
+    const htmlHeaderIndex =
+        logicalLines.find(line => /^Content-Type:\s*text\/html\b/i.test(line.text))?.start ?? -1
+    if (htmlHeaderIndex === -1) return source.trim()
+
+    let headersStart = htmlHeaderIndex
+    while (headersStart > 0 && lines[headersStart - 1] !== '') headersStart--
+    const headersEnd = lines.findIndex((line, index) => index > htmlHeaderIndex && line === '')
+    if (headersEnd === -1) throw new Error('Incomplete HTML MIME headers')
+    const headers = lines
+        .slice(headersStart, headersEnd)
+        .join('\n')
+        .replace(/\n[ \t]+/g, ' ')
+    const boundary = lines
+        .slice(0, htmlHeaderIndex)
+        .reverse()
+        .find(line => line.startsWith('--'))
+    const bodyEnd = boundary
+        ? lines.findIndex(
+              (line, index) => index > headersEnd && (line === boundary || line === `${boundary}--`),
+          )
+        : -1
+    const body = lines.slice(headersEnd + 1, bodyEnd === -1 ? undefined : bodyEnd).join('\n')
+    const encoding = headers.match(/^Content-Transfer-Encoding:\s*(\S+)/im)?.[1]?.toLowerCase()
+    const charset = headers.match(/charset="?([^";\s]+)/i)?.[1] ?? 'utf-8'
+
+    if (encoding === 'base64') {
+        return new TextDecoder(charset).decode(Buffer.from(body, 'base64')).trim()
+    }
+    if (encoding === 'quoted-printable') {
+        const bytes = Buffer.from(
+            body
+                .replace(/=\n/g, '')
+                .replace(/=([\da-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16))),
+            'latin1',
+        )
+        return new TextDecoder(charset).decode(bytes).trim()
+    }
+    return body.trim()
+}
+
 const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string): Email | null => {
     const data: Record<string, unknown> = {
         vendor: 'APPLE_MAIL',
@@ -21,10 +73,7 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
         '==========================================\n==========================================',
     )
     data.plainBody = plainTextBody?.trim() || ''
-    data.htmlBody = htmlFileContents
-        ?.replace(/^(.|\n)*Content-Type: text\/html; charset=.+\nContent-Transfer-Encoding: .+\n/, '')
-        .replace(/--it_was_only_a_kiss--/g, '') // What the heck is this?
-        .trim()
+    data.htmlBody = parseAppleMailHtml(htmlFileContents)
 
     for (const line of frontMatter?.trim().split('\n') || []) {
         const key = line.match(/^(\w+)+: /)?.[1]

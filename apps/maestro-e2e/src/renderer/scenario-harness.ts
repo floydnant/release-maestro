@@ -314,6 +314,7 @@ export const scenarioBuilder = (scenario: Partial<RendererScenario> = {}) => {
 export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {}): HydratedFeedItem => ({
     id: 'release-1',
     type: 'BANDCAMP.TRALBUM',
+    sourceType: 'EMAIL.BANDCAMP_NEW_RELEASE',
     error: null,
     data: {
         releaseUrl: 'https://example.bandcamp.com/album/gecko',
@@ -321,6 +322,7 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
         emailReceivedAt: new Date('2026-06-20T10:00:00.000Z'),
         isEmailRead: false,
         emailId: 'email-1',
+        fanNames: [],
         releaseName: 'Gecko',
         band: {
             name: 'Shiva Chandra',
