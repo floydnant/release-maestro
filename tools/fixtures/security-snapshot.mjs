@@ -2,7 +2,7 @@ export const snapshotInputs = () => {
     const component = (name, version, ecosystem, scope) => ({
         name,
         version,
-        purl: `pkg:${ecosystem}/${name.replace('@', '%40')}@${version}`,
+        purl: `pkg:${ecosystem}/${name.split('/').map(encodeURIComponent).join('/')}@${version}`,
         properties: [{ name: 'release-maestro:dependency-scope', value: scope }],
     })
     return {
