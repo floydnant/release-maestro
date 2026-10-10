@@ -38,39 +38,15 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
               run: node tools/release.mjs resolve
 
-    security:
-        name: Release dependency vulnerabilities
-        needs: resolve
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-              with:
-                  ref: ${{ needs.resolve.outputs.sha }}
-                  persist-credentials: false
-            - uses: ./.github/actions/setup-node
-              with:
-                  install-command: pnpm install --frozen-lockfile --ignore-scripts
-            - name: Check the tagged commit before publishing installers
-              run: make security
-            - name: Upload vulnerability report
-              if: always()
-              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-              with:
-                  name: release-vulnerabilities
-                  path: |
-                      dist/security/osv.json
-                      dist/security/findings.json
-                  if-no-files-found: ignore
-
     build:
-        needs: [resolve, security]
+        needs: resolve
         uses: ./.github/workflows/build.yml
         with:
             release-sha: ${{ needs.resolve.outputs.sha }}
             release-tag: ${{ needs.resolve.outputs.tag }}
 
     publish:
-        needs: [resolve, security, build]
+        needs: [resolve, build]
         runs-on: ubuntu-latest
         permissions:
             contents: write

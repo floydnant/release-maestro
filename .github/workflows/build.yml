@@ -46,6 +46,20 @@ jobs:
                   RELEASE_TAG: ${{ inputs.release-tag }}
               run: node tools/release.mjs verify
 
+            - name: Check tagged dependencies before building a release
+              if: inputs.release-tag != ''
+              run: make security
+
+            - name: Upload release vulnerability report
+              if: always() && inputs.release-tag != ''
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: release-vulnerabilities-${{ matrix.platform }}
+                  path: |
+                      dist/security/osv.json
+                      dist/security/findings.json
+                  if-no-files-found: ignore
+
             - name: Install Linux dependencies
               if: runner.os == 'Linux'
               run: |
