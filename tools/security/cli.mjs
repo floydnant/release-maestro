@@ -7,6 +7,7 @@ import { parseAllDocuments } from 'yaml'
 import { installTool, sha256 } from './install.mjs'
 import { evaluateScan, validateExceptions } from './policy.mjs'
 import { cargoRuntimePackages, npmRuntimePackages, scopeSbom } from './sbom.mjs'
+import { dependencySnapshot } from './snapshot.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const output = join(root, 'dist/security')
@@ -75,6 +76,7 @@ const sbom = async artifactDirectory => {
             'runtime.cdx.json',
             'artifact.cdx.json',
             'provenance.json',
+            'github-snapshot.json',
         ]) {
             rmSync(join(output, file), { force: true })
         }
@@ -151,6 +153,19 @@ const sbom = async artifactDirectory => {
                 ].map(file => [file, sha256(readFileSync(join(root, file)))]),
             ),
         }
+        writeJson(join(output, 'github-snapshot.json'), {
+            version: 0,
+            sha: provenance.revision,
+            ref: process.env.GITHUB_REF ?? 'refs/heads/main',
+            job: { correlator: 'release-maestro-lockfiles', id: process.env.GITHUB_RUN_ID ?? 'local' },
+            detector: {
+                name: 'release-maestro-lockfiles',
+                version: '1',
+                url: 'https://github.com/floydnant/release-maestro/tree/main/tools/security',
+            },
+            scanned: new Date().toISOString(),
+            manifests: dependencySnapshot(repository, lock, metadata),
+        })
         if (artifactDirectory) {
             const path = resolve(root, artifactDirectory)
             if (!statSync(path).isDirectory()) throw new Error(`Not a packaged artifact directory: ${path}`)

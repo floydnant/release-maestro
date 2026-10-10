@@ -1,4 +1,4 @@
-export const validateExceptions = (exceptions, now = new Date()) => {
+export const validateExceptions = exceptions => {
     if (!Array.isArray(exceptions)) throw new Error('Security exceptions must be an array')
     const keys = new Set()
     for (const exception of exceptions) {
@@ -14,8 +14,6 @@ export const validateExceptions = (exceptions, now = new Date()) => {
         if (!Number.isFinite(expires.getTime()) || expires.toISOString().slice(0, 10) !== exception.expires) {
             throw new Error(`Invalid security exception expiry: ${exception.id}`)
         }
-        if (expires <= now)
-            throw new Error(`Expired security exception: ${exception.id} (${exception.expires})`)
         const key = JSON.stringify([exception.ecosystem, exception.name, exception.version, exception.id])
         if (keys.has(key)) throw new Error(`Duplicate security exception: ${exception.id}`)
         keys.add(key)
@@ -23,7 +21,7 @@ export const validateExceptions = (exceptions, now = new Date()) => {
 }
 
 export const evaluateScan = (report, exceptions, now = new Date()) => {
-    validateExceptions(exceptions, now)
+    validateExceptions(exceptions)
     if (!Array.isArray(report.results)) throw new Error('Invalid OSV report: missing results')
     // A scan that silently drops an ecosystem must never pass the gate.
     for (const lockfile of ['pnpm-lock.yaml', 'Cargo.lock']) {
@@ -42,7 +40,8 @@ export const evaluateScan = (report, exceptions, now = new Date()) => {
                         item.ecosystem === pkg.ecosystem &&
                         item.name === pkg.name &&
                         item.version === pkg.version &&
-                        item.id === vulnerability.id,
+                        item.id === vulnerability.id &&
+                        new Date(`${item.expires}T00:00:00Z`) > now,
                 )
                 // RustSec maintenance notices are useful but are not security vulnerabilities.
                 const informational =

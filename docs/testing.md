@@ -96,7 +96,8 @@ CI runs `make dev-instance-self-test` as a separate job. Run it locally after co
 `tools/dev-instance`; it starts two complete development stacks in temporary worktrees from `HEAD`,
 so uncommitted changes are not included.
 `make test-tools` runs the focused repository tools suite. `make test` and `make sure` include it.
-It includes the security gate, exception expiry, checksum verification, and SBOM dependency scope tests.
+It includes the security gate, exception expiry, checksum verification, SBOM dependency scope, and
+GitHub dependency-snapshot graph tests.
 Run `make security` separately for current npm and Rust vulnerability advisories, and `make sbom`
 for dependency inventories. See [security checks](security.md) for setup, CI, and exception policy.
 

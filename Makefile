@@ -12,7 +12,7 @@ security-tools: ## Download checksum-pinned security tools for this platform
 	node tools/security/cli.mjs install
 security: ## Scan both lockfiles for known vulnerabilities (requires network)
 	node tools/security/cli.mjs scan
-security-policy-check: ## Validate vulnerability exceptions and their expiry dates
+security-policy-check: ## Validate vulnerability exception fields and date formats
 	node tools/security/cli.mjs policy
 sbom: ## Generate repository and runtime CycloneDX SBOMs in dist/security
 	node tools/security/cli.mjs sbom

@@ -58,12 +58,23 @@ test('treats maintenance notices as informational but blocks unsoundness and uns
     assert.equal(evaluateScan(report(vulnerabilities), [], now)[0].status, 'blocked')
 })
 
-test('rejects expired, invalid, incomplete, and duplicate exceptions', () => {
-    for (const expires of ['2026-10-03', '2026-02-30', '', 'tomorrow']) {
-        assert.throws(() => validateExceptions([{ ...exception, expires }], now))
+test('rejects invalid, incomplete, and duplicate exceptions', () => {
+    for (const expires of ['2026-02-30', '', 'tomorrow']) {
+        assert.throws(() => validateExceptions([{ ...exception, expires }]))
     }
-    assert.throws(() => validateExceptions([{ ...exception, reason: '' }], now), /reason/)
-    assert.throws(() => validateExceptions([exception, exception], now), /Duplicate/)
+    assert.throws(() => validateExceptions([{ ...exception, reason: '' }]), /reason/)
+    assert.throws(() => validateExceptions([exception, exception]), /Duplicate/)
+})
+
+test('expiry blocks the matching vulnerability at midnight UTC, while resolved findings stay clean', () => {
+    const expires = new Date('2026-11-02T00:00:00Z')
+    assert.doesNotThrow(() => validateExceptions([exception]))
+    assert.equal(
+        evaluateScan(report([{ id: exception.id }]), [exception], new Date(expires.getTime() - 1))[0].status,
+        'accepted',
+    )
+    assert.equal(evaluateScan(report([{ id: exception.id }]), [exception], expires)[0].status, 'blocked')
+    assert.deepEqual(evaluateScan(report([]), [exception], expires), [])
 })
 
 test('rejects corrupted tool downloads and cached bytes', () => {

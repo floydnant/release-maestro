@@ -24,19 +24,42 @@ remain explicit maintainer decisions.
 
 ## Vulnerability gate
 
-OSV-Scanner checks all dependencies in both lockfiles. The Security workflow runs on PRs,
-main, daily, and on demand. The
-[Dependency security ruleset](https://github.com/floydnant/release-maestro/rules/24417605) requires
-`Dependency vulnerabilities` before merging. Reports are `dist/security/{osv,findings}.json`;
-CI uploads them even on failure.
+The required `Dependency vulnerabilities` PR check compares the base and proposed lockfiles with
+OSV's pinned reusable PR workflow. Both scans run in the same workflow against current advisories.
+Only newly introduced vulnerabilities fail the comparison, including unscored advisories. Existing
+findings and newly disclosed advisories affecting both revisions do not block unrelated PRs. The
+check also validates exception structure. Scanner and comparison errors fail the required check.
+The [Dependency security ruleset](https://github.com/floydnant/release-maestro/rules/24417605)
+continues to require that check name. PR comparison reports are uploaded as OSV Actions artifacts
+and to GitHub code scanning. The comparison uses an empty OSV config so neither revision can
+silently suppress findings. New vulnerabilities must be fixed before merging; local exceptions
+apply to full scans rather than the PR comparison.
 
-Security advisories block unless an exact exception applies, including advisories without severity.
-Unscored RustSec maintenance notices are informational; unsoundness blocks. Scanner errors,
-missing ecosystem coverage, and invalid or expired exceptions also fail.
+`make security` scans the complete npm and Cargo lockfiles. The `Full dependency vulnerabilities`
+job runs on main, daily, and on demand. Full scans fail on security advisories unless an exact,
+unexpired exception applies. Unscored RustSec maintenance notices are informational; unsoundness
+blocks. Scanner errors, missing ecosystem coverage, and malformed exceptions also fail.
+Reports are `dist/security/{osv,findings}.json`; CI uploads them even on failure.
+
+Dependabot security updates are enabled for this repository and open fix PRs automatically when
+GitHub detects an alert with a resolvable patch. On main, daily, and manual main runs, the workflow
+submits the complete npm and Cargo dependency snapshot to GitHub. PR runs only generate artifacts
+and have no dependency-submission write permission. This supplies the transitive dependencies missing from
+GitHub's current graph. Submitted dependencies
+receive [Dependabot alerts and security updates](https://docs.github.com/en/rest/dependency-graph/dependency-submission). `.github/dependabot.yml` groups security updates
+for npm, Cargo, and GitHub Actions. Security updates are triggered by alerts rather than the
+weekly version-update schedule or the daily OSV scan. Dependabot cannot fix every OSV finding,
+exact upstream pin, or advisory without a patch. Remaining findings need maintainer follow-up;
+fix PRs run normal CI and are reviewed before merging. GitHub's documented pnpm support currently
+ends at v10; this repository uses v12. Recent Dependabot PRs have updated the lockfile successfully,
+but that does not establish complete remediation coverage. Dependency submission fills graph
+coverage; it cannot guarantee that Dependabot can resolve a compatible fix.
 
 `tools/security/exceptions.json` accepts 9 existing findings until November 2, 2026.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, and UTC expiry date.
-They expire at the start of that date; new versions or advisories still block. Keep exceptions within
+They expire at the start of that date. Full scans then block only if the matching vulnerability
+is still present; a stale entry for a resolved finding does not fail the scan. Offline policy validation
+checks date formats rather than whether the date has passed. Keep exceptions within
 30 days, review extensions in a PR, and remove them after fixes. Never regenerate the baseline
 automatically or suppress whole packages. Acceptance does not establish safety.
 
@@ -51,12 +74,13 @@ can change without code changes.
 
 Syft writes CycloneDX 1.6 JSON to `dist/security`:
 
-| File                  | Contents                                                        |
-| --------------------- | --------------------------------------------------------------- |
-| `repository.cdx.json` | All lockfile dependencies, tagged as runtime or development     |
-| `runtime.cdx.json`    | Production dependency graph, including Electron                 |
-| `artifact.cdx.json`   | Packages identifiable in the directory passed to `sbom-release` |
-| `provenance.json`     | Git revision, platform, architecture, and input checksums       |
+| File                   | Contents                                                                    |
+| ---------------------- | --------------------------------------------------------------------------- |
+| `repository.cdx.json`  | All lockfile dependencies, tagged as runtime or development                 |
+| `runtime.cdx.json`     | Production dependency graph, including Electron                             |
+| `artifact.cdx.json`    | Packages identifiable in the directory passed to `sbom-release`             |
+| `provenance.json`      | Git revision, platform, architecture, and input checksums                   |
+| `github-snapshot.json` | GitHub dependency snapshot with direct dependencies, scope, and graph edges |
 
 Source SBOMs use manifests and lockfiles only. Runtime scope also includes renderer translation
 packages currently in `devDependencies`. Optional and platform-specific dependencies may not ship.

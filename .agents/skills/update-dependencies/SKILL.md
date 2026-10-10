@@ -59,7 +59,9 @@ Verify installs from the final lockfiles and inspect generated changes for unrel
 - `make agents-check` for changes to agent skills, harness tooling, their root dependencies, or files
   under `.agents/`.
 - `make test-tools` for changes to repository tools, their dependencies, or files under `tools/`.
-- `make security` for dependency updates; a failing scan keeps the PR blocked.
+- `make security` for dependency updates, even when the PR comparison passes. Existing findings
+  do not automatically block merging; report every remaining full-scan blocker and its remediation
+  or acceptance decision. A passing comparison only means the PR introduces no new vulnerabilities.
 - `make security-tools` and `make sbom` for scanner pin, checksum, installer, or inventory changes.
   Run `make sbom-release` against an existing package when artifact scanning changes. Verify the
   non-host platform assets and use CI to exercise supported operating systems.
@@ -76,8 +78,9 @@ Unless the user limits the task to local work, commit, push, and open one PR fol
 migration fixes, relevant official migration links, and deferred updates with reasons. Report local
 verification in the final response; the template leaves routine check lists to CI.
 
-Open ready for review after local gates pass. Watch CI on the pushed commit and fix update-related
-failures on the same PR. Keep blocked or incomplete work in draft and explain the blocker. Do not
+Open ready for review once scoped updates, regression checks, and the PR comparison pass.
+Disclose existing full-scan findings; they do not automatically require a draft. Watch CI on the
+pushed commit and fix update-related failures on the same PR. Keep blocked or incomplete work in draft and explain the blocker. Do not
 merge or enable auto-merge.
 
 After the ready-for-review update PR passes CI, inspect each open Dependabot-authored PR. Close it
