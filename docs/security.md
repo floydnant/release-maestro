@@ -67,6 +67,10 @@ Nx pins Axios and brace-expansion to vulnerable versions. Exact-version override
 `pnpm-workspace.yaml` replace them with Axios 1.20.0 and brace-expansion 5.0.12. Remove the
 overrides when the installed Nx versions use fixed dependencies.
 
+Release-please checks main before creating a release. The Release workflow checks the immutable
+tag commit before building or publishing installers, including manual publications and retries.
+Both use `make security`; see [releasing](releasing.md).
+
 `make security` runs separately from `make sure` because advisories require network access and
 can change without code changes.
 
