@@ -6,6 +6,7 @@
 /out-tsc
 /app-builds
 /release
+/.cache/security-tools
 main.js
 src/**/*.js
 app/**/*.js

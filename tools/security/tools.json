@@ -1,0 +1,62 @@
+{
+    "osv-scanner": {
+        "repository": "google/osv-scanner",
+        "version": "2.6.0",
+        "platforms": {
+            "darwin-amd64": {
+                "asset": "osv-scanner_darwin_amd64",
+                "sha256": "60c5296637e977b28eeda5c7f13573e447659a632922737f94d11fa7e30ad6ca"
+            },
+            "darwin-arm64": {
+                "asset": "osv-scanner_darwin_arm64",
+                "sha256": "98c460dcd37de25819babd757d04542045b6243113e209edcd4d89fedb0256b4"
+            },
+            "linux-amd64": {
+                "asset": "osv-scanner_linux_amd64",
+                "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
+            },
+            "linux-arm64": {
+                "asset": "osv-scanner_linux_arm64",
+                "sha256": "2c71403eb443d05891c4f268c3ad771cf4f16e5443463fd7851ef8f454d3c7e4"
+            },
+            "windows-amd64": {
+                "asset": "osv-scanner_windows_amd64.exe",
+                "sha256": "e0ed7644118b717b028c249ee9d3515024e55e8510747ca08906eb96765354d6"
+            },
+            "windows-arm64": {
+                "asset": "osv-scanner_windows_arm64.exe",
+                "sha256": "ca1379da0e408279ef2c85cde0846a903495738a91c7b065a208048437c1686c"
+            }
+        }
+    },
+    "syft": {
+        "repository": "anchore/syft",
+        "version": "1.54.0",
+        "platforms": {
+            "darwin-amd64": {
+                "asset": "syft_1.54.0_darwin_amd64.tar.gz",
+                "sha256": "22b71725e388a4c0de385249c4bc1044f78a870f2894f34b43ba957e792145d7"
+            },
+            "darwin-arm64": {
+                "asset": "syft_1.54.0_darwin_arm64.tar.gz",
+                "sha256": "7e0bdad94c569fc6d5785c9a657bbae3d4c4e140ccb5eace3d0b5b6bc2b6dbcf"
+            },
+            "linux-amd64": {
+                "asset": "syft_1.54.0_linux_amd64.tar.gz",
+                "sha256": "54a87372498168b2d033e876fd41fa4e8035b872699e525a57046e1f2f09c860"
+            },
+            "linux-arm64": {
+                "asset": "syft_1.54.0_linux_arm64.tar.gz",
+                "sha256": "ee6d4566373a05b344bc6b5f1706f14419bf9338ba39ff686e247deefe9b8818"
+            },
+            "windows-amd64": {
+                "asset": "syft_1.54.0_windows_amd64.zip",
+                "sha256": "77f4b472779058e819eec9a054753a5071a996aaa40db31a290f8b256748593f"
+            },
+            "windows-arm64": {
+                "asset": "syft_1.54.0_windows_arm64.zip",
+                "sha256": "0fdfa61470a69b99ace491df1fd7ef9803439c15d4d3d19a0bcb139d8b9fba4e"
+            }
+        }
+    }
+}

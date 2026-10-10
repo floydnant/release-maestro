@@ -52,6 +52,9 @@ intentional convenience summaries.
   one E2E layer is relevant.
 - `make test-tools` runs the repository tools suite. `make test` includes it; `make agents-check`
   checks only agent skills and harness adapters.
+- `make security` scans npm and Rust lockfiles against current advisories. `make sbom` generates
+  dependency inventories; `make sbom-release` also scans an existing package. See
+  [docs/security.md](docs/security.md) for tooling, exception policy, and output limitations.
 - `make e2e-production` packages the app for the host OS and runs the production-compatible Electron
   suite. Use it for file-URL, lazy-loading, packaging, and cross-platform behavior.
 - `make affected` runs build, lint, unit tests, development Electron E2E, and renderer E2E for

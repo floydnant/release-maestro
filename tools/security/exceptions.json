@@ -1,0 +1,74 @@
+[
+    {
+        "name": "basic-ftp",
+        "version": "5.3.1",
+        "ecosystem": "npm",
+        "id": "GHSA-c475-qrg2-pj4r",
+        "expires": "2026-11-02",
+        "reason": "Existing proxy/PAC dependency under Bandcamp/Puppeteer. Untrusted FTP directory listings can trigger CPU exhaustion. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "braces",
+        "version": "3.0.3",
+        "ecosystem": "npm",
+        "id": "GHSA-vfj7-8cjw-p6xm",
+        "expires": "2026-11-02",
+        "reason": "Existing watcher and glob dependency. Deeply nested patterns can exhaust the stack. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "esbuild",
+        "version": "0.18.20",
+        "ecosystem": "npm",
+        "id": "GHSA-67mh-4wv8-2f99",
+        "expires": "2026-11-02",
+        "reason": "Existing drizzle-kit loader dependency. The advisory concerns its development HTTP server. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "extract-zip",
+        "version": "2.0.1",
+        "ecosystem": "npm",
+        "id": "GHSA-7pqw-9j4j-h8q3",
+        "expires": "2026-11-02",
+        "reason": "Existing Puppeteer dependency under bandcamp-fetch. Browser archive extraction can write through unsafe symlinks. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "extract-zip",
+        "version": "2.0.1",
+        "ecosystem": "npm",
+        "id": "GHSA-jmr9-qjv8-65gv",
+        "expires": "2026-11-02",
+        "reason": "Existing Puppeteer dependency under bandcamp-fetch. Browser archive extraction can write through unsafe symlinks. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "http-cache-semantics",
+        "version": "4.2.0",
+        "ecosystem": "npm",
+        "id": "GHSA-ch52-4w7c-c8xp",
+        "expires": "2026-11-02",
+        "reason": "Existing Electron download client dependency. Shared HTTP caching can disclose responses. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "serialize-javascript",
+        "version": "6.0.2",
+        "ecosystem": "npm",
+        "id": "GHSA-5c6j-r48x-rmvq",
+        "expires": "2026-11-02",
+        "reason": "Existing nx-electron build dependency. Crafted objects can cause code injection or CPU exhaustion during serialization. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "serialize-javascript",
+        "version": "6.0.2",
+        "ecosystem": "npm",
+        "id": "GHSA-qj8w-gfj5-8c6v",
+        "expires": "2026-11-02",
+        "reason": "Existing nx-electron build dependency. Crafted objects can cause code injection or CPU exhaustion during serialization. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    },
+    {
+        "name": "smol-toml",
+        "version": "1.6.1",
+        "ecosystem": "npm",
+        "id": "GHSA-7w5x-hrqm-74c2",
+        "expires": "2026-11-02",
+        "reason": "Existing Nx TOML parser dependency. Malformed TOML can exhaust CPU. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
+    }
+]

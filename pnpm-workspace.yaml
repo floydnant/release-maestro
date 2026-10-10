@@ -79,3 +79,9 @@ minimumReleaseAgeExclude:
     - playwright@1.64.0-alpha-1789764292000
     - playwright-core@1.64.0-alpha-1789764292000
 minimumReleaseAgeExcludePrune: true
+
+# Nx pins these vulnerable versions exactly. Replace only the affected versions with fixes.
+overrides:
+    axios@1.18.1: 1.20.0
+    brace-expansion@5.0.8: 5.0.12
+    brace-expansion@5.0.9: 5.0.12
