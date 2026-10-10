@@ -1,8 +1,12 @@
 import { expect, test, type TestInfo } from '@playwright/test'
-import { mkdir, rm } from 'node:fs/promises'
+import { copyFile, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ElectronApplication, Page } from 'playwright'
-import { buildTaggedLibrary, cleanupTaggedLibraries } from '../fixtures/tagged-library.fixture'
+import {
+    buildTaggedLibrary,
+    cleanupTaggedLibraries,
+    DEFAULT_LIBRARY,
+} from '../fixtures/tagged-library.fixture'
 import { launchReleaseMaestro } from './launch-release-maestro'
 
 /**
@@ -288,4 +292,41 @@ test('tracks whose files went away stay listed, marked, and can be scoped to', a
     await expect(
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '6 tracks' }),
     ).toBeVisible()
+})
+
+test('retagging moves songs between albums and keeps record-label clicks consistent', async ({}, testInfo) => {
+    const appDataDir = testInfo.outputPath('app-data')
+    await mkdir(appDataDir, { recursive: true })
+    const libraryDir = await buildTaggedLibrary(testInfo)
+    await scanAndOpenTracks(testInfo, appDataDir, libraryDir)
+    await electronApp?.close()
+    electronApp = undefined
+
+    const editedSongs = DEFAULT_LIBRARY.filter(song => song.album == 'Daybreak').map(song => ({
+        ...song,
+        album: 'Daybreak revised',
+        recordLabel: 'New record label',
+    }))
+    const replacementDir = await buildTaggedLibrary(testInfo, editedSongs)
+    for (const song of editedSongs) {
+        await copyFile(join(replacementDir, song.fileName), join(libraryDir, song.fileName))
+    }
+    electronApp = await launchReleaseMaestro(appDataDir, testInfo)
+    page = await electronApp.firstWindow()
+    await page.getByRole('link', { name: 'Settings' }).click()
+    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await expect(page.getByLabel('Latest scan result')).toContainText('Completed', { timeout: 20_000 })
+    await page.getByRole('link', { name: 'Tracks' }).click()
+    const dawn = page.getByRole('row').filter({ hasText: 'Dawn' })
+    await expect(dawn).toContainText('Daybreak revised')
+    await dawn.getByRole('link', { name: 'New record label', exact: true }).click()
+    await expect(page).toHaveURL(/\/record-labels\/[^/?]+$/)
+    await expect(page.getByRole('heading', { name: 'New record label', exact: true })).toBeVisible()
+    await expect.poll(async () => (await rowTitles()).sort()).toEqual(['Dawn', 'Noon'])
+    await expect(page.getByRole('link', { name: 'Tracks 2', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Albums', exact: true }).click()
+    await expect(
+        page.getByRole('status', { name: 'Result count' }).filter({ hasText: '4 albums' }),
+    ).toBeVisible()
+    await expect(page.getByRole('link', { name: /^Daybreak revised/ })).toContainText('2 tracks')
 })

@@ -11,6 +11,7 @@ import {
     isNull,
     lt,
     max,
+    min,
     ne,
     notExists,
     notInArray,
@@ -71,7 +72,7 @@ const issueFingerprint = (issue: NormalizationIssue): string =>
     })
 
 export class LibraryBackendRepository {
-    constructor(private readonly database: DatabaseClient) {}
+    constructor(private readonly database: Pick<DatabaseClient, 'db'>) {}
 
     nextScanSeenAt(): Date {
         const latest = this.database.db
@@ -431,7 +432,7 @@ export class LibraryBackendRepository {
             }
 
             const songArtists = resolveArtists(rawArtist, artistText)
-            const albumArtists = resolveArtists(rawAlbumArtist, albumArtistText)
+            resolveArtists(rawAlbumArtist, albumArtistText)
             const songGenres = resolveGenres(rawGenre, genreText)
             const recordLabelId = getOrCreateRecordLabel(recordLabelText)
             let albumId: string | null = null
@@ -451,7 +452,7 @@ export class LibraryBackendRepository {
                     year,
                     date: normalizeDisplayText(metadata.date),
                     catalogNumber: normalizeDisplayText(metadata.catalogNumber),
-                    coverPath: metadata.coverPath,
+                    // Cover art is selected from members by the browse read side.
                     externalRefs: mergeExternalRefs([
                         existingAlbum?.externalRefs,
                         filterExternalRefs(externalRefs, relevantExternalRefsMap.albums),
@@ -467,21 +468,6 @@ export class LibraryBackendRepository {
                 } else {
                     tx.insert(albumsTable)
                         .values({ id: albumId, ...albumValues })
-                        .run()
-                }
-
-                tx.delete(albumArtistsTable).where(eq(albumArtistsTable.albumId, albumId)).run()
-                if (albumArtists.length > 0) {
-                    const resolvedAlbumId = albumId
-                    tx.insert(albumArtistsTable)
-                        .values(
-                            albumArtists.map((artistId, position) => ({
-                                albumId: resolvedAlbumId,
-                                artistId,
-                                role: 'primary',
-                                position,
-                            })),
-                        )
                         .run()
                 }
             }
@@ -555,34 +541,61 @@ export class LibraryBackendRepository {
                     .run()
             }
 
-            // `albums.date_added` is denormalized so the grid can sort on it (ADR 0004,
-            // ADR 0005), which makes it this transaction's job to keep true. Both ends of
-            // a move are recomputed: re-tagging a file can re-key its album, and doing
-            // only the new one would leave the old dated by a song it no longer has.
-            //
-            // Recomputed rather than adjusted, because an adjustment has to be right
-            // about whether this song was already on the album — and it is not, when a
-            // re-read leaves the album unchanged. The `MAX` runs over
-            // `songs_album_id_idx`, which is cheap and cannot drift.
-            //
-            // An album is as new as the most recent file on it, so ripping the rest of a
-            // part-ripped record brings the whole thing back to the top rather than
-            // leaving it where its oldest track put it. `null` when no song on the album
-            // carries a creation time.
+            // Recompute both ends of a move in the song transaction (ADR 0005).
+            // Missing songs still belong to their album. Covers are selected by the read side.
             for (const affectedAlbumId of new Set(
                 [existingSong?.albumId, albumId].filter((id): id is string => id != null),
             )) {
-                tx.update(albumsTable)
-                    .set({
-                        dateAdded:
-                            tx
-                                .select({ value: max(songsTable.createdAt) })
-                                .from(songsTable)
-                                .where(eq(songsTable.albumId, affectedAlbumId))
-                                .get()?.value ?? null,
+                const members = tx
+                    .select({
+                        count: count(),
+                        dateAdded: max(songsTable.createdAt),
                     })
-                    .where(eq(albumsTable.id, affectedAlbumId))
-                    .run()
+                    .from(songsTable)
+                    .where(eq(songsTable.albumId, affectedAlbumId))
+                    .get()
+                if (!members || members.count == 0) {
+                    tx.delete(albumsTable).where(eq(albumsTable.id, affectedAlbumId)).run()
+                } else {
+                    tx.update(albumsTable)
+                        .set({ dateAdded: members.dateAdded })
+                        .where(eq(albumsTable.id, affectedAlbumId))
+                        .run()
+                    // Member aliases may have distinct user-confirmed resolutions even
+                    // when their normalized album identity agrees. Retain every credit.
+                    const credits = tx
+                        .select({ artistId: artistRawNameArtistsTable.artistId })
+                        .from(songsTable)
+                        .innerJoin(
+                            artistRawNamesTable,
+                            eq(artistRawNamesTable.rawText, songsTable.rawAlbumArtist),
+                        )
+                        .innerJoin(
+                            artistRawNameArtistsTable,
+                            eq(artistRawNameArtistsTable.artistRawNameId, artistRawNamesTable.id),
+                        )
+                        .innerJoin(artistsTable, eq(artistsTable.id, artistRawNameArtistsTable.artistId))
+                        .where(eq(songsTable.albumId, affectedAlbumId))
+                        .groupBy(artistRawNameArtistsTable.artistId)
+                        .orderBy(
+                            asc(min(artistRawNameArtistsTable.position)),
+                            asc(artistsTable.name),
+                            asc(artistsTable.id),
+                        )
+                        .all()
+                    tx.delete(albumArtistsTable).where(eq(albumArtistsTable.albumId, affectedAlbumId)).run()
+                    if (credits.length > 0)
+                        tx.insert(albumArtistsTable)
+                            .values(
+                                credits.map((credit, position) => ({
+                                    albumId: affectedAlbumId,
+                                    artistId: credit.artistId,
+                                    role: 'primary',
+                                    position,
+                                })),
+                            )
+                            .run()
+                }
             }
 
             tx.delete(songArtistsTable).where(eq(songArtistsTable.songId, songId)).run()

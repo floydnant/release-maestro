@@ -149,7 +149,7 @@ describe('LibraryBrowseRepository', () => {
         sqlite.pragma('foreign_keys = ON')
         db = drizzle(sqlite, { schema })
         migrate(db, { migrationsFolder })
-        repository = new LibraryBrowseRepository(fromPartial({ db }))
+        repository = new LibraryBrowseRepository({ db })
     })
 
     afterEach(() => sqlite.close())
@@ -365,6 +365,51 @@ describe('LibraryBrowseRepository', () => {
     })
 
     describe('record labels', () => {
+        it.each([null, 'other-album'])(
+            'uses the song label for detail statistics and artist credits with album %s',
+            albumId => {
+                db.insert(recordLabelsTable)
+                    .values([
+                        { id: 'actual', name: 'Actual Records' },
+                        { id: 'other', name: 'Other Records' },
+                    ])
+                    .run()
+                db.insert(artistsTable).values({ id: 'artist', name: 'Artist' }).run()
+                if (albumId)
+                    seedAlbum({ id: albumId, title: 'Old album', recordLabelId: 'other', year: 1990 })
+                seedSong({
+                    id: 'song',
+                    title: 'Song',
+                    albumId,
+                    recordLabelText: 'Actual Records',
+                    year: 2022,
+                    present: false,
+                })
+                db.insert(songArtistsTable).values({ songId: 'song', artistId: 'artist', position: 0 }).run()
+                expect(repository.getRecordLabelDetail('actual')).toMatchObject({
+                    songCount: 1,
+                    artistCount: 1,
+                    albumCount: 0,
+                    firstYear: 2022,
+                    lastYear: 2022,
+                })
+                expect(
+                    repository.queryRecordLabelArtists({
+                        recordLabelId: 'actual',
+                        window: { offset: 0, limit: 10 },
+                    }),
+                ).toMatchObject({
+                    total: 1,
+                    rows: [{ id: 'artist', hasSongCredits: true, hasAlbumCredits: false }],
+                })
+                expect(repository.getRecordLabelDetail('other')).toMatchObject({
+                    songCount: 0,
+                    artistCount: 0,
+                    albumCount: albumId ? 1 : 0,
+                })
+            },
+        )
+
         it('windows names and derives distinct stats from linked albums and songs', () => {
             db.insert(recordLabelsTable)
                 .values([
@@ -384,7 +429,7 @@ describe('LibraryBrowseRepository', () => {
             db.insert(albumArtistsTable)
                 .values({ albumId: 'album2', artistId: 'album-artist', position: 0 })
                 .run()
-            seedSong({ id: 'song1', title: 'First', albumId: 'album1', recordLabelText: 'Wrong text' })
+            seedSong({ id: 'song1', title: 'First', albumId: 'album1', recordLabelText: '100% Records' })
             seedSong({
                 id: 'song2',
                 title: 'Second',
@@ -495,7 +540,7 @@ describe('LibraryBrowseRepository', () => {
             seedAlbum({ id: 'album1', title: 'Own album', recordLabelId: 'label' })
             seedAlbum({ id: 'album2', title: 'Appearance', recordLabelId: 'label' })
             db.insert(albumArtistsTable).values({ albumId: 'album1', artistId: 'artist', position: 0 }).run()
-            seedSong({ id: 'song', title: 'Track', albumId: 'album2' })
+            seedSong({ id: 'song', title: 'Track', albumId: 'album2', recordLabelText: 'Kosmische' })
             db.insert(songArtistsTable).values({ songId: 'song', artistId: 'artist', position: 0 }).run()
 
             expect(
@@ -510,8 +555,20 @@ describe('LibraryBrowseRepository', () => {
             db.insert(recordLabelsTable).values({ id: 'a', name: 'Kosmische' }).run()
             seedAlbum({ id: 'undated', title: 'Undated', recordLabelId: 'a' })
             seedAlbum({ id: 'dated', title: 'Dated', recordLabelId: 'a', year: 2015 })
-            seedSong({ id: 'song1', title: 'Early', albumId: 'undated', year: 2011 })
-            seedSong({ id: 'song2', title: 'Late', albumId: 'undated', year: 2013 })
+            seedSong({
+                id: 'song1',
+                title: 'Early',
+                albumId: 'undated',
+                year: 2011,
+                recordLabelText: 'Kosmische',
+            })
+            seedSong({
+                id: 'song2',
+                title: 'Late',
+                albumId: 'undated',
+                year: 2013,
+                recordLabelText: 'Kosmische',
+            })
             seedSong({ id: 'song3', title: 'Untagged', albumId: 'dated' })
             expect(repository.getRecordLabelDetail('a')).toMatchObject({ firstYear: 2011, lastYear: 2015 })
         })
@@ -538,8 +595,20 @@ describe('LibraryBrowseRepository', () => {
                 .run()
             seedAlbum({ id: 'album1', title: 'Album one', recordLabelId: 'r1' })
             seedAlbum({ id: 'album2', title: 'Album two' })
-            seedSong({ id: 's1', title: 'First', albumId: 'album1', genreText: 'Techno; Ambient' })
-            seedSong({ id: 's2', title: 'Missing', albumId: 'album1', present: false })
+            seedSong({
+                id: 's1',
+                title: 'First',
+                albumId: 'album1',
+                genreText: 'Techno; Ambient',
+                recordLabelText: 'Record label',
+            })
+            seedSong({
+                id: 's2',
+                title: 'Missing',
+                albumId: 'album1',
+                present: false,
+                recordLabelText: 'Record label',
+            })
             seedSong({ id: 's3', title: 'Unsplit', albumId: 'album2', genreText: 'Techno; Ambient' })
             db.insert(songGenresTable)
                 .values([
@@ -576,6 +645,59 @@ describe('LibraryBrowseRepository', () => {
                 recordLabelCount: 0,
             })
             expect(repository.getGenreDetail('gone')).toBeNull()
+        })
+
+        it('lists and counts song record labels that lead to matching genre tracks despite album drift', () => {
+            db.insert(recordLabelsTable)
+                .values([
+                    { id: 'song-label', name: 'Song record label' },
+                    { id: 'albumless-label', name: 'Albumless record label' },
+                ])
+                .run()
+            seedSong({ id: 'drift', title: 'Drift', albumId: 'album1', recordLabelText: 'Song record label' })
+            seedSong({
+                id: 'albumless',
+                title: 'Albumless',
+                recordLabelText: 'Albumless record label',
+                present: false,
+            })
+            seedSong({ id: 'no-label', title: 'No record label', albumId: 'album1' })
+            db.insert(songGenresTable)
+                .values([
+                    { songId: 'drift', genreId: 'compound' },
+                    { songId: 'albumless', genreId: 'compound' },
+                    { songId: 'no-label', genreId: 'compound' },
+                ])
+                .run()
+
+            const related = repository.queryGenreRelated({
+                query: { genreId: 'compound', kind: 'recordLabels' },
+                window: { offset: 0, limit: 10 },
+            })
+            expect(related).toEqual({
+                offset: 0,
+                total: 2,
+                rows: [
+                    { id: 'albumless-label', name: 'Albumless record label' },
+                    { id: 'song-label', name: 'Song record label' },
+                ],
+            })
+            expect(repository.getGenreDetail('compound')).toMatchObject({
+                songCount: 4,
+                albumCount: 2,
+                recordLabelCount: 2,
+            })
+            for (const recordLabel of related.rows) {
+                const songs = repository.querySongs({
+                    query: query({ filter: { genreIds: ['compound'], recordLabelIds: [recordLabel.id] } }),
+                    window: { offset: 0, limit: 10 },
+                })
+                expect(songs.total).toBe(1)
+                expect(songs.rows[0]).toMatchObject({
+                    recordLabelId: recordLabel.id,
+                    recordLabelText: recordLabel.name,
+                })
+            }
         })
 
         it('windows genres in both name directions and searches literal wildcards', () => {
@@ -743,7 +865,7 @@ describe('LibraryBrowseRepository', () => {
                 })
                 .run()
 
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
             seedSong({ id: 'b', title: 'Moth' })
             seedSong({ id: 'c', title: 'Wolf Cub' })
 
@@ -774,13 +896,38 @@ describe('LibraryBrowseRepository', () => {
             expect(result.rows).toHaveLength(2)
         })
 
-        it('reaches a record label through the album', () => {
+        it('resolves the song record label from its own tag', () => {
             const result = repository.querySongs({
                 query: query({ filter: { recordLabelIds: ['label-hyperdub'] } }),
                 window: { offset: 0, limit: 10 },
             })
 
             expect(titlesOf(result)).toEqual(['Archangel'])
+        })
+
+        it('displays, sorts and filters the same record label despite album drift or no album', () => {
+            db.insert(recordLabelsTable).values({ id: 'label-warp', name: 'Warp' }).run()
+            seedSong({ id: 'd', title: 'Drift', albumId: 'album-untrue', recordLabelText: 'Warp' })
+            seedSong({ id: 'e', title: 'No album', recordLabelText: 'Warp' })
+            seedSong({ id: 'f', title: 'No record label', albumId: 'album-untrue' })
+            const result = repository.querySongs({
+                query: query({ sort: { field: SongSortField.recordLabel, direction: 'asc' } }),
+                window: { offset: 0, limit: 10 },
+            })
+            expect(
+                result.rows.filter(row => row.recordLabelText != null).map(row => row.recordLabelText),
+            ).toEqual(['Hyperdub', 'Warp', 'Warp'])
+            expect(result.rows.find(row => row.id == 'f')?.recordLabelId).toBeNull()
+            expect(result.rows.find(row => row.id == 'd')).toMatchObject({
+                recordLabelId: 'label-warp',
+                recordLabelText: 'Warp',
+            })
+            const filtered = repository.querySongs({
+                query: query({ filter: { recordLabelIds: ['label-warp', 'label-warp'] } }),
+                window: { offset: 0, limit: 10 },
+            })
+            expect(filtered.total).toBe(2)
+            expect(titlesOf(filtered).sort()).toEqual(['Drift', 'No album'])
         })
 
         it('filters by genre entity', () => {
@@ -953,6 +1100,32 @@ describe('LibraryBrowseRepository', () => {
     })
 
     describe('cover art', () => {
+        it('chooses the most common reachable member cover in grid, detail and track fallback', () => {
+            seedAlbum({ id: 'covers', title: 'Covers', coverPath: '/cache/a.jpg' })
+            seedSong({
+                id: 'missing-art',
+                title: 'Missing',
+                albumId: 'covers',
+                coverPath: '/cache/a.jpg',
+                present: false,
+            })
+            seedSong({ id: 'bonus-art', title: 'Bonus', albumId: 'covers', coverPath: '/cache/c.jpg' })
+            seedSong({ id: 'main-art-1', title: 'Main 1', albumId: 'covers', coverPath: '/cache/b.jpg' })
+            seedSong({ id: 'main-art-2', title: 'Main 2', albumId: 'covers', coverPath: '/cache/b.jpg' })
+            seedSong({ id: 'no-art', title: 'No art', albumId: 'covers' })
+            expect(repository.getAlbumDetail('covers')?.coverPath).toBe('/cache/b.jpg')
+            expect(
+                repository
+                    .queryAlbums({ query: albumQuery(), window: { offset: 0, limit: 10 } })
+                    .rows.find(row => row.id == 'covers')?.coverPath,
+            ).toBe('/cache/b.jpg')
+            expect(
+                repository
+                    .querySongs({ query: query(), window: { offset: 0, limit: 10 } })
+                    .rows.find(row => row.id == 'no-art')?.coverPath,
+            ).toBe('/cache/b.jpg')
+        })
+
         beforeEach(() => {
             db.insert(albumsTable)
                 .values({
@@ -974,6 +1147,12 @@ describe('LibraryBrowseRepository', () => {
 
         it("falls back to the album's, because a track with no embedded art still has an album", () => {
             seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', coverPath: null })
+            seedSong({
+                id: 'art-owner',
+                title: 'Artwork owner',
+                albumId: 'album-untrue',
+                coverPath: '/covers/untrue.png',
+            })
 
             const result = repository.querySongs({ query: query(), window: { offset: 0, limit: 10 } })
 
@@ -1067,7 +1246,7 @@ describe('LibraryBrowseRepository', () => {
         })
 
         it('counts each tile’s tracks over the window rather than reading a stored column', () => {
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
             seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue' })
             seedSong({ id: 'c', title: 'Xtal', albumId: 'album-selected' })
 
@@ -1134,7 +1313,7 @@ describe('LibraryBrowseRepository', () => {
         })
 
         it('reaches a genre through the album’s songs', () => {
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
             db.insert(songGenresTable).values({ songId: 'a', genreId: 'genre-garage' }).run()
 
             const result = repository.queryAlbums({
@@ -1146,7 +1325,7 @@ describe('LibraryBrowseRepository', () => {
         })
 
         it('counts an album once when several of its songs carry the selected genre', () => {
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
             seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue' })
             db.insert(songGenresTable).values({ songId: 'a', genreId: 'genre-garage' }).run()
             db.insert(songGenresTable).values({ songId: 'b', genreId: 'genre-garage' }).run()
@@ -1199,7 +1378,7 @@ describe('LibraryBrowseRepository', () => {
         })
 
         it('does not search the titles of the album’s songs', () => {
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue' })
+            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', recordLabelText: 'Hyperdub' })
 
             expect(repository.queryAlbums(albumSearch('archangel')).total).toBe(0)
         })
@@ -1267,7 +1446,13 @@ describe('LibraryBrowseRepository', () => {
             })
             db.insert(albumArtistsTable).values({ albumId: 'album-untrue', artistId: 'artist-burial' }).run()
 
-            seedSong({ id: 'a', title: 'Archangel', albumId: 'album-untrue', duration: 240 })
+            seedSong({
+                id: 'a',
+                title: 'Archangel',
+                albumId: 'album-untrue',
+                duration: 240,
+                coverPath: '/covers/untrue.png',
+            })
             seedSong({ id: 'b', title: 'Near Dark', albumId: 'album-untrue', duration: 180 })
             db.insert(songGenresTable).values({ songId: 'a', genreId: 'genre-garage' }).run()
             db.insert(songGenresTable).values({ songId: 'b', genreId: 'genre-dubstep' }).run()

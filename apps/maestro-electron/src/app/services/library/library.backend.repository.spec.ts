@@ -1,13 +1,15 @@
+import { emptySongQuery, SongMetadata } from '@release-maestro/core'
 import Database from 'better-sqlite3'
 import { fromPartial } from '@total-typescript/shoehorn'
 import { asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
 import * as schema from '../../database/drizzle.schema'
 import {
+    albumArtistsTable,
     albumsTable,
     artistRawNameArtistsTable,
     artistRawNamesTable,
@@ -54,13 +56,16 @@ describe('LibraryBackendRepository', () => {
     let sqlite: Database.Database
     let db: ReturnType<typeof drizzle<typeof schema>>
     let repository: LibraryBackendRepository
+    let browse: LibraryBrowseRepository
 
     beforeEach(() => {
         sqlite = new Database(':memory:')
         sqlite.pragma('foreign_keys = ON')
         db = drizzle(sqlite, { schema })
         migrate(db, { migrationsFolder })
-        repository = new LibraryBackendRepository(fromPartial({ db }))
+        const database = { db }
+        repository = new LibraryBackendRepository(database)
+        browse = new LibraryBrowseRepository(database)
     })
 
     afterEach(() => sqlite.close())
@@ -441,6 +446,190 @@ describe('LibraryBackendRepository', () => {
         })
         repository.ingestMetadata({ ...corrected, extraMetadata: [] }, fact, scannedAt, EXTRACTOR_VERSION)
         expect(browse.getArtistDetail(artist.id)?.externalRefs).toEqual({})
+    })
+
+    it.each<[string, Partial<SongMetadata>]>([
+        ['record label', { label: 'Other label' }],
+        ['album artist', { albumArtist: 'Other artist' }],
+        ['year', { year: 2025 }],
+        ['date', { date: '2025-01-01' }],
+        ['catalog number', { catalogNumber: 'OTHER-1' }],
+        ['title', { albumTitle: 'Other album' }],
+    ])('moves only the retagged song when its %s changes, then removes the empty album', (_, edit) => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        const first = newSongFixture({
+            albumTitle: 'Album',
+            albumArtist: 'Artist',
+            label: 'Label',
+            year: 2024,
+            date: '2024-01-01',
+            catalogNumber: 'CAT-1',
+            coverPath: '/cache/a.jpg',
+        })
+        const second = {
+            ...first,
+            path: '/music/second.flac',
+            fileName: 'second.flac',
+            coverPath: '/cache/b.jpg',
+        }
+        const secondFact = {
+            ...fact,
+            path: second.path,
+            fileName: second.fileName,
+            createdAt: fact.createdAt + 1000,
+        }
+        repository.ingestMetadata(first, fact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
+        const originalSongs = db.select().from(songsTable).orderBy(asc(songsTable.path)).all()
+        const originalAlbum = db.select().from(albumsTable).get()
+        if (!originalAlbum) throw new Error('expected original album')
+
+        repository.ingestMetadata({ ...first, ...edit }, fact, scannedAt, EXTRACTOR_VERSION)
+        expect(db.select().from(albumsTable).all()).toHaveLength(2)
+        expect(db.select().from(albumsTable).where(eq(albumsTable.id, originalAlbum.id)).get()).toMatchObject(
+            {
+                dateAdded: new Date(secondFact.createdAt),
+            },
+        )
+        expect(db.select().from(songsTable).where(eq(songsTable.path, second.path)).get()?.albumId).toBe(
+            originalAlbum.id,
+        )
+
+        repository.ingestMetadata({ ...second, ...edit }, secondFact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata({ ...first, ...edit }, fact, scannedAt, EXTRACTOR_VERSION)
+        const songs = db.select().from(songsTable).orderBy(asc(songsTable.path)).all()
+        const albums = db.select().from(albumsTable).all()
+        expect(songs.map(song => song.id)).toEqual(originalSongs.map(song => song.id))
+        expect(albums).toHaveLength(1)
+        expect(albums[0]?.id).not.toBe(originalAlbum.id)
+        expect(songs.every(song => song.albumId == albums[0]?.id)).toBe(true)
+        expect(browse.getAlbumDetail(albums[0]?.id ?? '')?.coverPath).toBe(first.coverPath)
+        expect(albums[0]).toMatchObject({
+            dateAdded: new Date(secondFact.createdAt),
+        })
+        expect(db.select().from(albumArtistsTable).all()).toHaveLength(1)
+        const rows = browse.querySongs({ query: emptySongQuery(), window: { offset: 0, limit: 10 } }).rows
+        expect(rows).toHaveLength(2)
+        for (const row of rows) {
+            expect(row.recordLabelText).toBe(edit.label ?? first.label)
+            if (!row.recordLabelId) throw new Error('expected record label ID')
+            expect(
+                browse
+                    .querySongs({
+                        query: { ...emptySongQuery(), filter: { recordLabelIds: [row.recordLabelId] } },
+                        window: { offset: 0, limit: 10 },
+                    })
+                    .rows.map(song => song.id),
+            ).toContain(row.id)
+        }
+    })
+
+    it('chooses cover art independently of read order and retains missing artwork as a fallback', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        const first = newSongFixture({ albumTitle: 'Album', coverPath: '/cache/a.jpg' })
+        const second = {
+            ...first,
+            path: '/music/second.flac',
+            fileName: 'second.flac',
+            coverPath: '/cache/b.jpg',
+        }
+        const secondFact = { ...fact, path: second.path, fileName: second.fileName }
+        repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(first, fact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
+        expect(browse.getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')?.coverPath).toBe(
+            '/cache/a.jpg',
+        )
+        db.update(songsTable).set({ present: false }).where(eq(songsTable.path, first.path)).run()
+        expect(browse.getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')?.coverPath).toBe(
+            '/cache/b.jpg',
+        )
+        repository.ingestMetadata({ ...second, coverPath: null }, secondFact, scannedAt, EXTRACTOR_VERSION)
+        expect(browse.getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')?.coverPath).toBe(
+            '/cache/a.jpg',
+        )
+        repository.ingestMetadata({ ...first, coverPath: null }, fact, scannedAt, EXTRACTOR_VERSION)
+        expect(browse.getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')?.coverPath).toBeNull()
+    })
+
+    it('retains confirmed album-artist aliases independently of member read order', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        const first = newSongFixture({ albumTitle: 'Album', albumArtist: 'Artist' })
+        const secondFact = { ...fact, path: '/music/alias.flac', fileName: 'alias.flac' }
+        const second = {
+            ...first,
+            path: secondFact.path,
+            fileName: secondFact.fileName,
+            albumArtist: ' Artist ',
+        }
+        repository.ingestMetadata(first, fact, scannedAt, EXTRACTOR_VERSION)
+        repository.ingestMetadata(second, secondFact, scannedAt, EXTRACTOR_VERSION)
+        const raw = db
+            .select()
+            .from(artistRawNamesTable)
+            .where(eq(artistRawNamesTable.rawText, ' Artist '))
+            .get()
+        if (!raw) throw new Error('expected raw alias')
+        db.insert(artistsTable).values({ id: 'confirmed-alias', name: 'Confirmed alias' }).run()
+        db.update(artistRawNamesTable)
+            .set({ confirmedByUser: true })
+            .where(eq(artistRawNamesTable.id, raw.id))
+            .run()
+        db.update(artistRawNameArtistsTable)
+            .set({ artistId: 'confirmed-alias' })
+            .where(eq(artistRawNameArtistsTable.artistRawNameId, raw.id))
+            .run()
+        const credits = () =>
+            browse
+                .getAlbumDetail(db.select().from(albumsTable).get()?.id ?? '')
+                ?.albumArtists.map(artist => artist.name)
+        for (const [metadata, prescan] of [
+            [first, fact],
+            [second, secondFact],
+            [first, fact],
+        ] as const) {
+            repository.ingestMetadata(metadata, prescan, scannedAt, EXTRACTOR_VERSION)
+            expect(credits()).toEqual(['Artist', 'Confirmed alias'])
+        }
+    })
+
+    it('removes the last album membership when an album title is cleared', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        repository.ingestMetadata(
+            newSongFixture({ albumTitle: 'Album', albumArtist: 'Artist' }),
+            fact,
+            scannedAt,
+            EXTRACTOR_VERSION,
+        )
+        repository.ingestMetadata(newSongFixture(), fact, scannedAt, EXTRACTOR_VERSION)
+        expect(db.select().from(albumsTable).all()).toEqual([])
+        expect(db.select().from(albumArtistsTable).all()).toEqual([])
+        expect(db.select().from(songsTable).get()?.albumId).toBeNull()
+    })
+
+    it('backfills covers and removes legacy empty albums without dropping missing songs', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        repository.ingestMetadata(
+            newSongFixture({ albumTitle: 'Album', albumArtist: 'Artist', coverPath: '/cache/a.jpg' }),
+            fact,
+            scannedAt,
+            EXTRACTOR_VERSION,
+        )
+        db.update(songsTable).set({ present: false }).run()
+        db.update(albumsTable).set({ coverPath: '/cache/stale.jpg' }).run()
+        db.insert(albumsTable).values({ id: 'empty', identityKey: 'empty', title: 'Empty' }).run()
+        const artist = db.select().from(artistsTable).get()
+        if (!artist) throw new Error('expected artist')
+        db.insert(albumArtistsTable).values({ albumId: 'empty', artistId: artist.id }).run()
+
+        const migration = readFileSync(join(migrationsFolder, '0012_reconcile-album-fields.sql'), 'utf8')
+        sqlite.exec(migration)
+        sqlite.exec(migration)
+        expect(db.select().from(albumsTable).all()).toEqual([
+            expect.objectContaining({ title: 'Album', coverPath: '/cache/a.jpg' }),
+        ])
+        expect(db.select().from(albumArtistsTable).all()).toHaveLength(1)
+        expect(db.select().from(songsTable).get()?.present).toBe(false)
     })
 
     it('reapplies a user-confirmed raw-name resolution in order', () => {
