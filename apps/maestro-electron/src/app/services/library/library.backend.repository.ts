@@ -4,8 +4,10 @@ import {
     and,
     asc,
     count,
+    countDistinct,
     eq,
     gt,
+    gte,
     inArray,
     isNotNull,
     isNull,
@@ -16,6 +18,7 @@ import {
     notExists,
     notInArray,
     or,
+    sql,
 } from 'drizzle-orm'
 import { DatabaseClient } from '../../database/database.client'
 import {
@@ -59,6 +62,13 @@ export interface PrescanBatchComparison {
     unchanged: number
     changed: number
     new: number
+    changedPaths: string[]
+}
+
+export interface MovedSongCandidate {
+    original: DbSong
+    found: DbSong
+    intermediate?: DbSong[]
 }
 
 const titleFromFileName = (fileName: string): string => fileName.replace(/\.[^.]+$/, '').trim() || fileName
@@ -74,6 +84,351 @@ const issueFingerprint = (issue: NormalizationIssue): string =>
 export class LibraryBackendRepository {
     constructor(private readonly database: Pick<DatabaseClient, 'db'>) {}
 
+    private pendingMoveGroups(): DbSong[][] {
+        const pending = this.database.db
+            .select()
+            .from(songsTable)
+            .where(isNotNull(songsTable.moveOriginId))
+            .all()
+        const originIds = [
+            ...new Set(pending.flatMap(song => (song.moveOriginId ? [song.moveOriginId] : []))),
+        ]
+        if (originIds.length == 0) return []
+        const origins = this.database.db
+            .select()
+            .from(songsTable)
+            .where(inArray(songsTable.id, originIds))
+            .all()
+        return origins.map(origin => [origin, ...pending.filter(song => song.moveOriginId == origin.id)])
+    }
+
+    invalidateCoexistingMoves(seenAt: Date): void {
+        for (const group of this.pendingMoveGroups()) {
+            if (group.filter(song => song.lastSeenAt.getTime() == seenAt.getTime()).length > 1) {
+                this.database.db
+                    .update(songsTable)
+                    .set({ moveOriginId: null })
+                    .where(
+                        inArray(
+                            songsTable.id,
+                            group.map(song => song.id),
+                        ),
+                    )
+                    .run()
+            }
+        }
+    }
+
+    recordPendingMove({ original, found, intermediate = [] }: MovedSongCandidate): void {
+        const ids = [found, ...intermediate].filter(song => song.id != original.id).map(song => song.id)
+        if (ids.length > 0)
+            this.database.db
+                .update(songsTable)
+                .set({ moveOriginId: original.id })
+                .where(inArray(songsTable.id, ids))
+                .run()
+    }
+
+    /** Positive availability evidence must not depend on a destination finishing its metadata read. */
+    findAvailabilityProbes(seenAt: Date): { songId: string; originalPath: string; foundPath: string }[] {
+        const seenSizes = this.database.db
+            .select({ size: songsTable.size })
+            .from(songsTable)
+            .where(and(eq(songsTable.lastSeenAt, seenAt), isNotNull(songsTable.firstSeenAt)))
+        const originals = this.database.db
+            .select({
+                id: songsTable.id,
+                path: songsTable.path,
+                size: songsTable.size,
+                lastAvailableAt: songsTable.lastAvailableAt,
+            })
+            .from(songsTable)
+            .where(and(lt(songsTable.lastSeenAt, seenAt), inArray(songsTable.size, seenSizes)))
+            .all()
+        const probes = originals.flatMap(original => {
+            const found = this.database.db
+                .select({ path: songsTable.path })
+                .from(songsTable)
+                .where(
+                    and(
+                        eq(songsTable.lastSeenAt, seenAt),
+                        eq(songsTable.size, original.size),
+                        gt(songsTable.firstSeenAt, original.lastAvailableAt),
+                    ),
+                )
+                .all()
+            // Prefer a possible case alias: its old spelling is not a separate original.
+            const destination =
+                found.find(song => song.path.toLowerCase() == original.path.toLowerCase()) ?? found[0]
+            return destination
+                ? [{ songId: original.id, originalPath: original.path, foundPath: destination.path }]
+                : []
+        })
+        // Returning to an earlier path reverses the discovery chronology. Pending rename
+        // evidence still needs a coexistence check, including when a metadata read fails.
+        for (const group of this.pendingMoveGroups()) {
+            const found = group.find(song => song.lastSeenAt.getTime() == seenAt.getTime())
+            if (!found) continue
+            for (const original of group.filter(song => song.lastSeenAt < seenAt)) {
+                if (!probes.some(probe => probe.songId == original.id)) {
+                    probes.push({ songId: original.id, originalPath: original.path, foundPath: found.path })
+                }
+            }
+        }
+        return probes
+    }
+
+    /** Match only complete, unambiguous pairs after every discovery/deep-read batch. */
+    findMovedSongCandidates(seenAt: Date): MovedSongCandidate[] {
+        const candidates = new Map<string, MovedSongCandidate>()
+        const contentGroups = this.database.db
+            .select({ hash: songsTable.contentHash, size: songsTable.size })
+            .from(songsTable)
+            .where(isNotNull(songsTable.contentHash))
+            .groupBy(songsTable.contentHash, songsTable.size)
+            .having(
+                and(
+                    gt(count(), 1),
+                    eq(count(sql`case when ${eq(songsTable.lastSeenAt, seenAt)} then 1 end`), 1),
+                ),
+            )
+            .all()
+        const consider = (pair: DbSong[], legacy: boolean) => {
+            if (
+                pair.length < 2 ||
+                pair.filter(song => song.lastSeenAt.getTime() == seenAt.getTime()).length != 1
+            )
+                return
+            const found = pair.find(song => song.lastSeenAt.getTime() == seenAt.getTime())
+            if (!found) return
+            const origins = new Set(pair.map(song => song.moveOriginId ?? song.id))
+            let originId: string | undefined
+            if (origins.size == 1) {
+                originId = found.moveOriginId ?? found.id
+            } else if (
+                origins.size == 2 &&
+                !found.moveOriginId &&
+                !pair.some(song => song.moveOriginId == found.id)
+            ) {
+                originId = [...origins].find(id => id != found.id)
+                const firstSeenAt = found.firstSeenAt
+                if (
+                    !firstSeenAt ||
+                    pair.some(song => song.id != found.id && firstSeenAt <= song.lastAvailableAt)
+                )
+                    return
+            } else return
+            const original = pair.find(song => song.id == originId)
+            if (!original) return
+            // A failed read may leave a hash for an older version of this path.
+            if (pair.some(song => song.scannedFileFingerprint != song.fileFingerprint)) return
+            if (!found.contentHash || !found.present) return
+            if (
+                legacy &&
+                (original.contentHash ||
+                    !original.rawTitle?.trim() ||
+                    original.rawTitle == original.fileName ||
+                    !(original.rawArtist?.trim() || original.rawAlbumTitle?.trim()) ||
+                    !original.duration)
+            )
+                return
+            if (!candidates.has(found.id))
+                candidates.set(found.id, {
+                    original,
+                    found,
+                    intermediate: pair.filter(song => song.id != original.id && song.id != found.id),
+                })
+        }
+        for (const group of contentGroups) {
+            if (!group.hash) continue
+            consider(
+                this.database.db
+                    .select()
+                    .from(songsTable)
+                    .where(and(eq(songsTable.contentHash, group.hash), eq(songsTable.size, group.size)))
+                    .all(),
+                false,
+            )
+        }
+        // Older original rows have no byte hash. Group their persisted tags and audio properties,
+        // excluding artwork paths and user-editable references. Only inspect sizes needing this fallback.
+        const legacySizes = this.database.db
+            .select({ size: songsTable.size })
+            .from(songsTable)
+            .where(and(isNull(songsTable.contentHash), lt(songsTable.lastSeenAt, seenAt)))
+        const legacyRows = this.database.db
+            .select()
+            .from(songsTable)
+            .where(inArray(songsTable.size, legacySizes))
+            .all()
+        const preDiscKeys = new Set(
+            legacyRows
+                .filter(
+                    song =>
+                        song.contentHash == null &&
+                        song.firstSeenAt == null &&
+                        song.discNumber == null &&
+                        song.discTotal == null &&
+                        song.trackTotal == null,
+                )
+                .map(song => legacyMoveKey(song, false)),
+        )
+        const legacyGroups = new Map<string, DbSong[]>()
+        for (const song of legacyRows) {
+            const baseKey = legacyMoveKey(song, false)
+            const key = preDiscKeys.has(baseKey) ? baseKey : legacyMoveKey(song)
+            const group = legacyGroups.get(key) ?? []
+            group.push(song)
+            legacyGroups.set(key, group)
+        }
+        for (const pair of legacyGroups.values()) consider(pair, true)
+        return [...candidates.values()]
+    }
+
+    /** Keep the original identity and user state, replace its location and latest derived data atomically. */
+    reconcileMovedSong({ original, found, intermediate = [] }: MovedSongCandidate): void {
+        this.database.db.transaction(tx => {
+            const sources = [
+                ...new Map([original, ...intermediate, found].map(song => [song.id, song])).values(),
+            ]
+            const sourceIds = sources.map(song => song.id)
+            const issues = tx
+                .select()
+                .from(normalizationIssuesTable)
+                .where(
+                    and(
+                        eq(normalizationIssuesTable.entityType, 'SONG'),
+                        inArray(normalizationIssuesTable.entityId, sourceIds),
+                    ),
+                )
+                .all()
+            for (const fingerprint of new Set(issues.map(issue => issue.fingerprint))) {
+                const group = issues.filter(issue => issue.fingerprint == fingerprint)
+                const originalIssue = group.find(issue => issue.entityId == original.id)
+                const current = group.find(issue => issue.entityId == found.id)
+                const retained = originalIssue ?? current ?? group[0]
+                if (!retained) continue
+                const dismissed = group.find(issue => issue.status == 'DISMISSED')
+                for (const issue of group.filter(issue => issue.id != retained.id)) {
+                    tx.delete(normalizationIssuesTable).where(eq(normalizationIssuesTable.id, issue.id)).run()
+                }
+                tx.update(normalizationIssuesTable)
+                    .set({
+                        entityId: original.id,
+                        lastSeenAt: current?.lastSeenAt ?? retained.lastSeenAt,
+                        detectorVersion: current?.detectorVersion ?? retained.detectorVersion,
+                        status: dismissed
+                            ? 'DISMISSED'
+                            : (current?.status ??
+                              (retained.status == 'OPEN' ? 'DISAPPEARED' : retained.status)),
+                        closedAt: dismissed
+                            ? dismissed.closedAt
+                            : current
+                              ? current.closedAt
+                              : retained.status == 'OPEN'
+                                ? found.lastScannedAt
+                                : retained.closedAt,
+                    })
+                    .where(eq(normalizationIssuesTable.id, retained.id))
+                    .run()
+            }
+            if (found.id != original.id) {
+                tx.delete(songArtistsTable).where(eq(songArtistsTable.songId, original.id)).run()
+                tx.update(songArtistsTable)
+                    .set({ songId: original.id })
+                    .where(eq(songArtistsTable.songId, found.id))
+                    .run()
+                tx.delete(songGenresTable).where(eq(songGenresTable.songId, original.id)).run()
+                tx.update(songGenresTable)
+                    .set({ songId: original.id })
+                    .where(eq(songGenresTable.songId, found.id))
+                    .run()
+            }
+            tx.delete(songsTable)
+                .where(
+                    inArray(
+                        songsTable.id,
+                        sourceIds.filter(id => id != original.id),
+                    ),
+                )
+                .run()
+            tx.update(songsTable)
+                .set({
+                    ...found,
+                    id: original.id,
+                    addedAt: original.addedAt,
+                    firstSeenAt: original.firstSeenAt,
+                    moveOriginId: null,
+                    externalRefs: mergeExternalRefs(sources.map(song => song.externalRefs)),
+                })
+                .where(eq(songsTable.id, original.id))
+                .run()
+            reconcileAlbumMembers(
+                tx,
+                sources.map(song => song.albumId),
+            )
+        })
+    }
+
+    recordSongAvailable(id: string, availableAt: Date): void {
+        const song = this.database.db.select().from(songsTable).where(eq(songsTable.id, id)).get()
+        if (song)
+            this.database.db
+                .update(songsTable)
+                .set({ moveOriginId: null })
+                .where(eq(songsTable.moveOriginId, song.moveOriginId ?? song.id))
+                .run()
+
+        this.database.db
+            .update(songsTable)
+            .set({ lastAvailableAt: availableAt })
+            .where(eq(songsTable.id, id))
+            .run()
+    }
+
+    countOpenIssuesForReadSongs(seenAt: Date): number {
+        return (
+            this.database.db
+                .select({ value: countDistinct(songsTable.id) })
+                .from(songsTable)
+                .innerJoin(
+                    normalizationIssuesTable,
+                    and(
+                        eq(normalizationIssuesTable.entityType, 'SONG'),
+                        eq(normalizationIssuesTable.entityId, songsTable.id),
+                    ),
+                )
+                .where(
+                    and(
+                        eq(songsTable.lastSeenAt, seenAt),
+                        gte(songsTable.lastScannedAt, seenAt),
+                        eq(normalizationIssuesTable.status, 'OPEN'),
+                    ),
+                )
+                .get()?.value ?? 0
+        )
+    }
+
+    /** Current fingerprint proves whether a stored hash is still evidence about this file. */
+    getReadIdentity(path: string): { size: number; contentHash: string | null } | null {
+        const song = this.database.db
+            .select({
+                size: songsTable.size,
+                contentHash: songsTable.contentHash,
+                fileFingerprint: songsTable.fileFingerprint,
+                scannedFileFingerprint: songsTable.scannedFileFingerprint,
+            })
+            .from(songsTable)
+            .where(eq(songsTable.path, path))
+            .get()
+        return song
+            ? {
+                  size: song.size,
+                  contentHash: song.fileFingerprint == song.scannedFileFingerprint ? song.contentHash : null,
+              }
+            : null
+    }
+
     nextScanSeenAt(): Date {
         const latest = this.database.db
             .select({ value: max(songsTable.lastSeenAt) })
@@ -84,7 +439,7 @@ export class LibraryBackendRepository {
 
     processPrescanBatch(facts: PrescanFileFact[], seenAt: Date, initialScan = false): PrescanBatchComparison {
         if (facts.length == 0) {
-            return { unchanged: 0, changed: 0, new: 0 }
+            return { unchanged: 0, changed: 0, new: 0, changedPaths: [] }
         }
 
         const existingSongs = this.database.db
@@ -105,6 +460,7 @@ export class LibraryBackendRepository {
             unchanged: 0,
             changed: 0,
             new: 0,
+            changedPaths: [],
         }
 
         this.database.db.transaction(tx => {
@@ -119,6 +475,7 @@ export class LibraryBackendRepository {
                     fileFingerprint: fingerprint,
                     present: true,
                     lastSeenAt: seenAt,
+                    lastAvailableAt: seenAt,
                 }
 
                 if (!existing) {
@@ -127,6 +484,7 @@ export class LibraryBackendRepository {
                             id: randomUUID(),
                             path: fact.path,
                             ...fileValues,
+                            firstSeenAt: seenAt,
                             addedAt: initialScan ? (fileValues.createdAt ?? seenAt) : seenAt,
                             title: titleFromFileName(fact.fileName),
                         })
@@ -141,6 +499,7 @@ export class LibraryBackendRepository {
                     comparison.unchanged += 1
                 } else {
                     comparison.changed += 1
+                    comparison.changedPaths.push(fact.path)
                 }
             }
         })
@@ -167,8 +526,13 @@ export class LibraryBackendRepository {
             songsNeedingMetadata(extractorVersion),
         )
         const where = afterPath
-            ? and(eq(songsTable.present, true), pendingCondition, gt(songsTable.path, afterPath))
-            : and(eq(songsTable.present, true), pendingCondition)
+            ? and(
+                  eq(songsTable.lastSeenAt, seenAt),
+                  eq(songsTable.present, true),
+                  pendingCondition,
+                  gt(songsTable.path, afterPath),
+              )
+            : and(eq(songsTable.lastSeenAt, seenAt), eq(songsTable.present, true), pendingCondition)
 
         return this.database.db
             .select({
@@ -527,6 +891,7 @@ export class LibraryBackendRepository {
                 tagType: metadata.fileInfo?.tagType ?? null,
                 codec: metadata.fileInfo?.codec ?? null,
                 metadataHash: metadataHash(metadata),
+                contentHash: metadata.contentHash,
                 normalizerVersion: NORMALIZER_VERSION,
                 extractorVersion,
                 externalRefs,
@@ -541,62 +906,7 @@ export class LibraryBackendRepository {
                     .run()
             }
 
-            // Recompute both ends of a move in the song transaction (ADR 0005).
-            // Missing songs still belong to their album. Covers are selected by the read side.
-            for (const affectedAlbumId of new Set(
-                [existingSong?.albumId, albumId].filter((id): id is string => id != null),
-            )) {
-                const members = tx
-                    .select({
-                        count: count(),
-                        dateAdded: max(songsTable.createdAt),
-                    })
-                    .from(songsTable)
-                    .where(eq(songsTable.albumId, affectedAlbumId))
-                    .get()
-                if (!members || members.count == 0) {
-                    tx.delete(albumsTable).where(eq(albumsTable.id, affectedAlbumId)).run()
-                } else {
-                    tx.update(albumsTable)
-                        .set({ dateAdded: members.dateAdded })
-                        .where(eq(albumsTable.id, affectedAlbumId))
-                        .run()
-                    // Member aliases may have distinct user-confirmed resolutions even
-                    // when their normalized album identity agrees. Retain every credit.
-                    const credits = tx
-                        .select({ artistId: artistRawNameArtistsTable.artistId })
-                        .from(songsTable)
-                        .innerJoin(
-                            artistRawNamesTable,
-                            eq(artistRawNamesTable.rawText, songsTable.rawAlbumArtist),
-                        )
-                        .innerJoin(
-                            artistRawNameArtistsTable,
-                            eq(artistRawNameArtistsTable.artistRawNameId, artistRawNamesTable.id),
-                        )
-                        .innerJoin(artistsTable, eq(artistsTable.id, artistRawNameArtistsTable.artistId))
-                        .where(eq(songsTable.albumId, affectedAlbumId))
-                        .groupBy(artistRawNameArtistsTable.artistId)
-                        .orderBy(
-                            asc(min(artistRawNameArtistsTable.position)),
-                            asc(artistsTable.name),
-                            asc(artistsTable.id),
-                        )
-                        .all()
-                    tx.delete(albumArtistsTable).where(eq(albumArtistsTable.albumId, affectedAlbumId)).run()
-                    if (credits.length > 0)
-                        tx.insert(albumArtistsTable)
-                            .values(
-                                credits.map((credit, position) => ({
-                                    albumId: affectedAlbumId,
-                                    artistId: credit.artistId,
-                                    role: 'primary',
-                                    position,
-                                })),
-                            )
-                            .run()
-                }
-            }
+            reconcileAlbumMembers(tx, [existingSong?.albumId, albumId])
 
             tx.delete(songArtistsTable).where(eq(songArtistsTable.songId, songId)).run()
             if (songArtists.length > 0) {
@@ -822,6 +1132,7 @@ export class LibraryBackendRepository {
  */
 const songsNeedingMetadata = (extractorVersion: string) =>
     or(
+        isNull(songsTable.contentHash),
         isNull(songsTable.scannedFileFingerprint),
         ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
         metadataRevisionMismatch(extractorVersion),
@@ -835,3 +1146,91 @@ const metadataRevisionMismatch = (extractorVersion: string) =>
         isNull(songsTable.extractorVersion),
         ne(songsTable.extractorVersion, extractorVersion),
     )
+
+/** Legacy identity uses persisted tag values; file and artwork locations are deliberately absent. */
+const legacyMoveKey = (song: DbSong, includeDiscFields = true): string =>
+    stableHash({
+        size: song.size,
+        title: normalizeDisplayText(song.rawTitle),
+        artist: normalizeDisplayText(song.rawArtist),
+        album: normalizeDisplayText(song.rawAlbumTitle),
+        albumArtist: normalizeDisplayText(song.rawAlbumArtist),
+        genre: normalizeDisplayText(song.rawGenre),
+        label: normalizeDisplayText(song.rawRecordLabel),
+        catalogNumber: song.catalogNumber,
+        year: song.year,
+        track: song.trackNumber,
+        ...(includeDiscFields
+            ? { discNumber: song.discNumber, discTotal: song.discTotal, trackTotal: song.trackTotal }
+            : {}),
+        comment: song.comment,
+        musicalKey: song.musicalKey,
+        bpm: song.bpm,
+        energy: song.energy,
+        lyrics: song.lyrics,
+        date: song.date,
+        duration: song.duration,
+        overallBitrate: song.overallBitrate,
+        audioBitrate: song.audioBitrate,
+        sampleRate: song.sampleRate,
+        bitDepth: song.bitDepth,
+        channels: song.channels,
+        tagType: song.tagType,
+        codec: song.codec,
+    })
+
+/** Missing songs retain membership. Recompute date and all confirmed member credits. */
+const reconcileAlbumMembers = (
+    tx: Pick<DatabaseClient['db'], 'select' | 'update' | 'delete' | 'insert'>,
+    albumIds: (string | null | undefined)[],
+): void => {
+    for (const affectedAlbumId of new Set(albumIds.filter((id): id is string => id != null))) {
+        const members = tx
+            .select({
+                count: count(),
+                dateAdded: max(songsTable.createdAt),
+            })
+            .from(songsTable)
+            .where(eq(songsTable.albumId, affectedAlbumId))
+            .get()
+        if (!members || members.count == 0) {
+            tx.delete(albumsTable).where(eq(albumsTable.id, affectedAlbumId)).run()
+        } else {
+            tx.update(albumsTable)
+                .set({ dateAdded: members.dateAdded })
+                .where(eq(albumsTable.id, affectedAlbumId))
+                .run()
+            // Member aliases may have distinct user-confirmed resolutions even
+            // when their normalized album identity agrees. Retain every credit.
+            const credits = tx
+                .select({ artistId: artistRawNameArtistsTable.artistId })
+                .from(songsTable)
+                .innerJoin(artistRawNamesTable, eq(artistRawNamesTable.rawText, songsTable.rawAlbumArtist))
+                .innerJoin(
+                    artistRawNameArtistsTable,
+                    eq(artistRawNameArtistsTable.artistRawNameId, artistRawNamesTable.id),
+                )
+                .innerJoin(artistsTable, eq(artistsTable.id, artistRawNameArtistsTable.artistId))
+                .where(eq(songsTable.albumId, affectedAlbumId))
+                .groupBy(artistRawNameArtistsTable.artistId)
+                .orderBy(
+                    asc(min(artistRawNameArtistsTable.position)),
+                    asc(artistsTable.name),
+                    asc(artistsTable.id),
+                )
+                .all()
+            tx.delete(albumArtistsTable).where(eq(albumArtistsTable.albumId, affectedAlbumId)).run()
+            if (credits.length > 0)
+                tx.insert(albumArtistsTable)
+                    .values(
+                        credits.map((credit, position) => ({
+                            albumId: affectedAlbumId,
+                            artistId: credit.artistId,
+                            role: 'primary',
+                            position,
+                        })),
+                    )
+                    .run()
+        }
+    }
+}

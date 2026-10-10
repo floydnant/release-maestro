@@ -31,6 +31,8 @@ export interface FileInfo {
  * sub-objects would be a follow-up improvement, not part of this migration.
  */
 export interface SongMetadata {
+    /** SHA-256 of the complete file bytes, independent of its path and timestamps. */
+    contentHash: string
     title: string
     artist: string | null
     albumTitle: string | null
