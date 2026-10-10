@@ -66,24 +66,6 @@ jobs:
                   sudo apt-get update
                   sudo apt-get install -y libgtk-3-dev webkit2gtk-4.0 libappindicator3-dev librsvg2-dev patchelf
 
-            - name: Install production test dependencies
-              if: inputs.release-tag != ''
-              run: pnpm exec playwright install --with-deps chromium
-
-            - name: Test the production app
-              if: inputs.release-tag != ''
-              uses: GabrielBB/xvfb-action@b706e4e27b14669b486812790492dc50ca16b465 # v1.7
-              with:
-                  run: make e2e-production
-
-            - name: Upload failed production test report
-              if: failure() && inputs.release-tag != ''
-              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-              with:
-                  name: release-playwright-report-${{ matrix.platform }}
-                  path: playwright-report
-                  retention-days: 7
-
             - name: Build installers
               run: make package
 

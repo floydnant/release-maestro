@@ -13,9 +13,12 @@ Merge the release-please PR to publish a version. The bot maintains root
    and publishing release notes, the workflow runs `make security` on current main and checks that
    main has not advanced during the scan.
 4. The Release workflow resolves the immutable tag commit and runs another full security scan.
-   After that passes, it tests and builds that commit on Linux, macOS, and Windows.
+   After that passes, it builds installers from that commit on Linux, macOS, and Windows.
    Builds also save per-platform SBOMs as Actions artifacts.
 5. After all builds pass, the workflow attaches installers and updater metadata.
+
+The Quality workflow runs production Electron and renderer E2E tests on PRs and main.
+Release builds do not rerun those suites after the tag is created.
 
 Unaccepted security advisories block release creation on main. The tagged-commit scan blocks
 installer publication, including manually created releases and retries. Exact, unexpired exceptions
