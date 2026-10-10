@@ -54,8 +54,12 @@ _Avoid_: crawl, walk, indexing
 
 **Deep read**:
 The second scan phase. Reads full tags and cover art for files seen by the current discovery that
-still need metadata. A changed fingerprint, missing content hash, or changed metadata revision
-queues a read, including work left unfinished by an earlier scan.
+still need metadata. A changed fingerprint, missing content hash, changed metadata revision, or
+unavailable cached cover queues a read, including work left unfinished by an earlier scan.
+Cover refresh state persists until a successful read and does not discard the song's audio identity.
+
+An artwork cache failure preserves successfully read tags and the content hash. The song keeps
+its cover retry pending; the scan reports the failed cache path separately from audio read failures.
 _Avoid_: full scan, tag scan
 
 **Metadata revision**:
@@ -132,8 +136,9 @@ The one-shot summary produced when a scan ends, carrying the outcome (`completed
 `failed`) and the final tallies. Every non-idle scan produces exactly one.
 
 **Failure stage**:
-Whether a per-file failure happened in `discovery` or `read`. Kept distinct because the two mean
-different things — an unreadable folder is not a broken tag.
+Whether a failure happened in `discovery`, an audio `read`, or the artwork `cover` cache. Discovery
+and read counts refer to files. Cover counts refer to distinct cache paths shared by songs, and do
+not count as failed audio imports.
 
 **Normalization issue**:
 A suspicious or malformed tag value found on a song during ingest (wrong-looking field, embedded

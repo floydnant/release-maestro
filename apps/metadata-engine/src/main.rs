@@ -21,8 +21,8 @@ mod native_tags;
 mod protocol;
 
 use metadata::{
-    is_supported_audio_file_extension, read_song_metadata_v2, update_song_metadata,
-    ReadSongMetadataError, SongMetadataUpdateable,
+    is_supported_audio_file_extension, read_song_metadata_v2,
+    update_song_metadata, ReadSongMetadataError, SongMetadataUpdateable,
 };
 use protocol::{classify_engine_error, ErrorCode, Event, Request, Response, PROTOCOL_VERSION};
 use serde::{Deserialize, Serialize};
@@ -668,7 +668,8 @@ fn read_song_metadata_error_code(error: &ReadSongMetadataError) -> ErrorCode {
         ReadSongMetadataError::NotAnAudioFile { .. } => ErrorCode::NotAnAudioFile,
         ReadSongMetadataError::MetadataParseFailed { .. } => ErrorCode::ParseFailed,
         ReadSongMetadataError::FileMetadataReadFailed { .. }
-        | ReadSongMetadataError::FileNameMissing { .. } => ErrorCode::Internal,
+        | ReadSongMetadataError::FileNameMissing { .. }
+ => ErrorCode::Internal,
     }
 }
 

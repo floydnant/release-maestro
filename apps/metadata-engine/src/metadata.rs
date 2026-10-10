@@ -95,6 +95,12 @@ pub struct FileInfo {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub struct CoverError {
+    pub path: String,
+    pub message: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SongMetadata {
     pub content_hash: String,
@@ -103,6 +109,8 @@ pub struct SongMetadata {
     pub album_title: Option<String>,
     pub album_artist: Option<String>,
     pub cover_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover_error: Option<CoverError>,
     pub year: Option<i32>,
     pub track: Option<u16>,
     pub disc_number: Option<u16>,
@@ -914,49 +922,51 @@ pub fn read_song_metadata_v2(
         apply_tag(tag, false);
     }
 
+    let mut cover_error = None;
     let cover_path = tagged_file
         .primary_tag()
-        .and_then(|tag| {
-            tag.pictures().first().and_then(|cover| {
-                let file_ext: Option<&str> = cover.mime_type().and_then(|mime| {
-                    ImageFormat::from_lofty_mimetype(mime.clone()).map(|format| format.extension())
-                });
-                if file_ext.is_none() {
-                    eprintln!(
-                        "Unsupported or missing MIME type for cover art: {:?}",
-                        cover.mime_type()
-                    );
-                    return None;
-                }
-
-                // Content-addressed filename: derived from the image bytes
-                // rather than the song's file name. This avoids collisions
-                // between same-named files in different folders and lets
-                // identical artwork dedupe to a single cache entry.
-                let digest = hex_digest(cover.data());
-                let cover_path = format!(
-                    "{}{}{}.{}",
-                    cover_art_cache_dir,
-                    separator(),
-                    digest,
-                    file_ext.unwrap()
+        .and_then(|tag| tag.pictures().first())
+        .map(|cover| {
+            let file_ext: Option<&str> = cover.mime_type().and_then(|mime| {
+                ImageFormat::from_lofty_mimetype(mime.clone()).map(|format| format.extension())
+            });
+            if file_ext.is_none() {
+                eprintln!(
+                    "Unsupported or missing MIME type for cover art: {:?}",
+                    cover.mime_type()
                 );
+                return None;
+            }
 
-                // Identical bytes always hash to the same path, so an
-                // existing file is guaranteed to hold the same artwork.
-                if Path::new(&cover_path).exists() {
-                    return Some(cover_path);
-                }
+            // Content-addressed filename: derived from the image bytes
+            // rather than the song's file name. This avoids collisions
+            // between same-named files in different folders and lets
+            // identical artwork dedupe to a single cache entry.
+            let digest = hex_digest(cover.data());
+            let cover_path = format!(
+                "{}{}{}.{}",
+                cover_art_cache_dir,
+                separator(),
+                digest,
+                file_ext.unwrap()
+            );
 
-                match fs::write(cover_path.clone(), cover.data()) {
-                    Ok(_) => Some(cover_path),
-                    Err(err) => {
-                        eprintln!("Failed to write cover art: {:?}", err);
-                        None
-                    }
-                }
-            })
+            // A failed write can leave a truncated file. Reuse only complete covers.
+            if fs::metadata(&cover_path).is_ok_and(|metadata| {
+                metadata.is_file() && metadata.len() == cover.data().len() as u64
+            }) {
+                return Some(cover_path);
+            }
+
+            if let Err(error) = fs::write(&cover_path, cover.data()) {
+                cover_error = Some(CoverError {
+                    path: cover_path.clone(),
+                    message: error.to_string(),
+                });
+            }
+            Some(cover_path)
         })
+        .flatten()
         .or_else(|| {
             Path::new(&path)
                 .parent()
@@ -1002,6 +1012,7 @@ pub fn read_song_metadata_v2(
         duration: Some(file_info.duration),
         file_info: Some(file_info),
         cover_path,
+        cover_error,
         comment,
         musical_key: key,
         bpm,
@@ -1166,6 +1177,7 @@ mod tests {
             album_title: None,
             album_artist: None,
             cover_path: None,
+            cover_error: None,
             year: None,
             track: None,
             disc_number: Some(2),

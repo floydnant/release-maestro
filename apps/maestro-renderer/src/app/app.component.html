@@ -168,6 +168,13 @@
                                 }
                                 Reading
                                 <span class="font-mono">{{ scan.readDone }}/{{ scan.readTotal }}</span> tracks
+                                @if (scan.coverFailureCount > 0) {
+                                    <span class="artwork-failures | text-content-warning"
+                                        >· {{ scan.coverFailureCount }} artwork cache failure{{
+                                            scan.coverFailureCount === 1 ? '' : 's'
+                                        }}</span
+                                    >
+                                }
                                 @if (scan.failedFiles > 0) {
                                     <span class="text-content-danger"
                                         >· <span class="font-mono">{{ scan.failedFiles }}</span> Failed</span
@@ -316,6 +323,13 @@
                                         {{ scan.missingSongs }}
                                         {{ scan.missingSongs === 1 ? 'track' : 'tracks' }} missing
                                     }
+                                }
+                                @if (scan.coverFailureCount > 0) {
+                                    <span class="artwork-failures | text-content-warning"
+                                        >· {{ scan.coverFailureCount }} artwork cache failure{{
+                                            scan.coverFailureCount === 1 ? '' : 's'
+                                        }}</span
+                                    >
                                 }
                             </span>
                         }

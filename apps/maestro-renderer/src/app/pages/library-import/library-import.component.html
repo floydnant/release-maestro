@@ -85,6 +85,17 @@
                 class="content-band | mx-auto w-fit rounded-xl border border-border-subtle bg-black/70 px-10 py-16 shadow-lg backdrop-blur-md"
             >
                 <div class="mx-auto w-full max-w-2xl px-8 text-center">
+                    @if (status.coverFailureCount > 0) {
+                        <p
+                            class="artwork-failures | mt-4 type-body-sm text-content-warning"
+                            aria-label="Artwork cache failures"
+                        >
+                            {{ status.coverFailureCount }} artwork cache failure{{
+                                status.coverFailureCount === 1 ? '' : 's'
+                            }}. Successful audio imports remain intact; pending artwork retries on the next
+                            scan.
+                        </p>
+                    }
                     @if (step() === 'done') {
                         <p class="text-content-success">
                             <app-icon name="success" color="content.success" size="2.5rem"></app-icon>
@@ -180,11 +191,11 @@
                                 Take me to my library
                             </button>
                         </div>
-                        @if (status.failedFiles > 0) {
+                        @if (status.failedFiles > 0 || status.coverFailureCount > 0) {
                             <p class="mt-4 type-body-sm">
-                                <a class="text-content-action" routerLink="/settings/library"
-                                    >View failed files</a
-                                >
+                                <a class="text-content-action" routerLink="/settings/library">{{
+                                    status.coverFailureCount > 0 ? 'View scan failures' : 'View failed files'
+                                }}</a>
                             </p>
                         }
                     } @else if (terminalBanner(); as terminal) {
@@ -213,11 +224,11 @@
                                 Continue anyway
                             </button>
                         </div>
-                        @if (status.failedFiles > 0) {
+                        @if (status.failedFiles > 0 || status.coverFailureCount > 0) {
                             <p class="mt-3 type-body-sm">
-                                <a class="text-content-action" routerLink="/settings/library"
-                                    >View failed files</a
-                                >
+                                <a class="text-content-action" routerLink="/settings/library">{{
+                                    status.coverFailureCount > 0 ? 'View scan failures' : 'View failed files'
+                                }}</a>
                             </p>
                         }
                     } @else {

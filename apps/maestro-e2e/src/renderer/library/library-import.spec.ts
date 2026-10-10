@@ -21,6 +21,7 @@ const completedStatus = (overrides: Partial<LibraryScanTerminalResult> = {}): Li
         imported: 0,
         discoveryFailureCount: 0,
         readFailureCount: 0,
+        coverFailureCount: 0,
         failures: [],
         failuresTruncated: false,
         normalizationIssues: 0,
@@ -46,6 +47,7 @@ const completedStatus = (overrides: Partial<LibraryScanTerminalResult> = {}): Li
         readTotal: terminal.readTotal,
         imported: terminal.imported,
         failedFiles: terminal.discoveryFailureCount + terminal.readFailureCount,
+        coverFailureCount: terminal.coverFailureCount,
         normalizationIssues: terminal.normalizationIssues,
         terminal,
     }
@@ -113,4 +115,27 @@ test('the import dropzone and counters retain their token typography', async ({ 
         .evaluate(element => getComputedStyle(element).fontFamily)
     await expect(page.getByLabel('Imported tracks')).toHaveCSS('font-family', family)
     await expect(page.getByLabel('Failed files count')).toHaveCSS('font-family', family)
+})
+
+test('artwork failures do not turn successful audio imports into failed files', async ({ page }) => {
+    const status = completedStatus({
+        discovered: 1,
+        new: 1,
+        readTotal: 1,
+        readsAttempted: 1,
+        imported: 1,
+        coverFailureCount: 1,
+        failures: [{ stage: 'cover', path: '/cache/cover.png', message: 'write blocked' }],
+    })
+    const scenario = scenarioBuilder()
+        .settings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
+        .handler('library:start-scan', { kind: 'resolve', value: status })
+        .build()
+    await createRendererScenario(page, scenario, '/import')
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
+    await expect(page.getByLabel('Artwork cache failures')).toContainText(
+        'Successful audio imports remain intact',
+    )
+    await expect(page.getByRole('link', { name: 'View scan failures' })).toBeVisible()
 })

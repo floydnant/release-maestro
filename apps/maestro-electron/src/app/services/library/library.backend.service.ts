@@ -39,6 +39,17 @@ export class LibraryBackendService {
                 const moves: MovedSongCandidate[] = []
                 const failedReads = new Map<string, ReturnType<LibraryBackendRepository['getReadIdentity']>>()
 
+                const failedCoverPaths = new Set<string>()
+                const reportCoverError = (path: string, error: unknown) => {
+                    if (failedCoverPaths.has(path)) return
+                    failedCoverPaths.add(path)
+                    subscriber.next({
+                        phase: 'coverError',
+                        path,
+                        error: error instanceof Error ? error.message : String(error),
+                    })
+                }
+
                 try {
                     await new Promise<void>((resolve, reject) => {
                         this.metadata.prescan(paths, abortSignal).subscribe({
@@ -76,6 +87,8 @@ export class LibraryBackendService {
                         })
                     })
 
+                    if (abortSignal?.aborted) return
+                    await this.queueMissingCovers(scanStartedAt, abortSignal, reportCoverError)
                     if (abortSignal?.aborted) return
                     const { extractorVersion } = await this.metadata.ping()
                     if (abortSignal?.aborted) return
@@ -126,6 +139,12 @@ export class LibraryBackendService {
                                     )
                                     ingested += 1
                                     subscriber.next(update)
+                                    if (update.metadata.coverError) {
+                                        reportCoverError(
+                                            update.metadata.coverError.path,
+                                            update.metadata.coverError.message,
+                                        )
+                                    }
                                     if (openIssues > 0) {
                                         // Count distinct tracks with issues, not the issues themselves.
                                         normalizationIssues += 1
@@ -242,6 +261,39 @@ export class LibraryBackendService {
                 error => subscriber.error(error),
             )
         })
+    }
+
+    private async queueMissingCovers(
+        seenAt: Date,
+        abortSignal: AbortSignal | undefined,
+        onError: (path: string, error: unknown) => void,
+    ): Promise<void> {
+        let afterPath: string | null = null
+        const needsRefresh = new Map<string, boolean>()
+        while (!abortSignal?.aborted) {
+            const songs = this.repository.listSeenSongCovers(seenAt, afterPath, DEEP_READ_BATCH_SIZE)
+            const lastSong = songs.at(-1)
+            if (lastSong === undefined) return
+            afterPath = lastSong.path
+            const coverPaths = [...new Set(songs.map(song => song.coverPath))].filter(
+                path => !needsRefresh.has(path),
+            )
+            await Promise.all(
+                coverPaths.map(async coverPath => {
+                    try {
+                        needsRefresh.set(coverPath, !(await stat(coverPath)).isFile())
+                    } catch (error) {
+                        needsRefresh.set(coverPath, true)
+                        if (!isAbsent(error)) onError(coverPath, error)
+                    }
+                }),
+            )
+            if (abortSignal?.aborted) return
+            this.repository.queueSongsWithMissingCovers(
+                seenAt,
+                songs.filter(song => needsRefresh.get(song.coverPath)).map(song => song.path),
+            )
+        }
     }
 
     private readAndIngestBatch(
