@@ -51,6 +51,20 @@ jobs:
                   install-command: pnpm install --frozen-lockfile --ignore-scripts
             - name: Validate exception structure
               run: make security-policy-check
+            # Release-please's combined PR branch for target-branch main.
+            # Keep the full scan inside the required gate so release blockers prevent merging.
+            - name: Check release readiness
+              if: github.head_ref == 'release-please--branches--main'
+              run: make security
+            - name: Upload release readiness reports
+              if: always() && github.head_ref == 'release-please--branches--main'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: release-pr-vulnerabilities
+                  path: |
+                      dist/security/osv.json
+                      dist/security/findings.json
+                  if-no-files-found: ignore
 
     dependencies:
         name: Full dependency vulnerabilities

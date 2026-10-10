@@ -6,7 +6,9 @@ Merge the release-please PR to publish a version. The bot maintains root
 ## Release flow
 
 1. Merge application or dependency PRs into `main` using Conventional Commits.
-2. Review and merge the bot's release PR. Keep its title and body.
+2. Review the bot's release PR. Its required `Dependency vulnerabilities` check runs `make security`
+   on the proposed merge commit and blocks merging while unaccepted vulnerabilities remain.
+   Merge after the check passes. Keep the PR's title and body.
 3. Release-please maintains its PR independently of the security backlog. Before creating a tag
    and publishing release notes, the workflow runs `make security` on current main and checks that
    main has not advanced during the scan.
@@ -17,7 +19,9 @@ Merge the release-please PR to publish a version. The bot maintains root
 
 Unaccepted security advisories block release creation on main. The tagged-commit scan blocks
 installer publication, including manually created releases and retries. Exact, unexpired exceptions
-apply to these full scans; the PR comparison alone does not establish release readiness.
+apply to these full scans, including the release PR check. Ordinary PRs use only the comparison.
+The release PR check identifies current blockers before merging; post-merge scans still catch
+advisories published afterwards.
 See [security policy](security.md) for the remediation and exception workflow.
 
 The release appears before its installers. Downloads become available when the
