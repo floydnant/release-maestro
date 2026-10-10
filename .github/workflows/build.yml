@@ -52,7 +52,7 @@ jobs:
 
             - name: Upload release vulnerability report
               if: always() && inputs.release-tag != ''
-              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
               with:
                   name: release-vulnerabilities-${{ matrix.platform }}
                   path: |
@@ -76,7 +76,7 @@ jobs:
               run: make sbom-release
 
             - name: Upload release SBOMs
-              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
               with:
                   name: release-sbom-${{ matrix.platform }}
                   path: dist/security/
@@ -88,7 +88,7 @@ jobs:
               run: node tools/release.mjs stage
 
             - name: Upload installers
-              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
               with:
                   name: installers-${{ matrix.platform }}
                   path: ${{ runner.temp }}/release-assets
