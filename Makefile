@@ -1,4 +1,4 @@
-.PHONY: dev dev-allocate dev-release dev-reallocate dev-status dev-list dev-stop dev-recover dev-log dev-instance-self-test serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-tools test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: dev dev-allocate dev-release dev-reallocate dev-status dev-list dev-stop dev-recover dev-log dev-instance-self-test serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-tools test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
@@ -82,7 +82,7 @@ open-dmg: ## Open the generated DMG file (macOS)
 	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
 	open "$$dmgPath"
 install-dmg: package ## Install the packaged app (macOS) using the DMG
-	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
+	dmgPath="$$(find dist/executables -name '*-universal.dmg' -print -quit | tr -d '\n')" && \
 	hdiutil attach "$$dmgPath" && \
 	volumeName="$$(find /Volumes -d -name "Release Maestro *-universal" -print -quit | tr -d '\n')" && \
 	appPath="$$volumeName/Release Maestro.app" && \
@@ -174,9 +174,6 @@ rebuild-electron: ## Rebuild native dependencies (e.g. after Electron version ch
 	$(PNPM) exec electron-rebuild -f -w better-sqlite3
 rebuild-node: ## Rebuild native dependencies for Node.js (e.g. after Node version change)
 	$(PNPM) rebuild better-sqlite3
-
-version: ## Generate changelog and update version
-	$(PNPM) exec conventional-changelog -i CHANGELOG.md -s -r 0 && $(PNPM) exec prettier --write CHANGELOG.md && git add CHANGELOG.md
 
 # Help
 help: ## Show this help

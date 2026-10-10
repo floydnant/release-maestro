@@ -35,6 +35,13 @@ and to GitHub code scanning. The comparison uses an empty OSV config so neither 
 silently suppress findings. New vulnerabilities must be fixed before merging; local exceptions
 apply to full scans rather than the PR comparison.
 
+Release-please PRs, identified by the `release-please--` branch prefix, also run `make security` inside
+the required `Dependency vulnerabilities` check. It scans the proposed merge commit with the
+same full-scan policy used before publication, including exact, unexpired exceptions.
+Unaccepted findings fail that check before the release PR can merge. Reports are uploaded as
+`release-pr-vulnerabilities`, including on failure. Ordinary PRs retain the comparison-only policy.
+Keep the prefix in `.github/workflows/security.yml` aligned if release-please's branch naming changes.
+
 `make security` scans the complete npm and Cargo lockfiles. The `Full dependency vulnerabilities`
 job runs on main, daily, and on demand. Full scans fail on security advisories unless an exact,
 unexpired exception applies. Unscored RustSec maintenance notices are informational; unsoundness
@@ -66,6 +73,10 @@ automatically or suppress whole packages. Acceptance does not establish safety.
 Nx pins Axios and brace-expansion to vulnerable versions. Exact-version overrides in
 `pnpm-workspace.yaml` replace them with Axios 1.20.0 and brace-expansion 5.0.12. Remove the
 overrides when the installed Nx versions use fixed dependencies.
+
+Release-please checks main before creating a release. The Release workflow checks the immutable
+tag commit before building or publishing installers, including manual publications and retries.
+Both use `make security`; see [releasing](releasing.md).
 
 `make security` runs separately from `make sure` because advisories require network access and
 can change without code changes.
