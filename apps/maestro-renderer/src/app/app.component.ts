@@ -32,6 +32,7 @@ type ScanIndicatorView =
           discovered: number
           readDone: number
           readTotal: number
+          refreshingMetadata: boolean
           failedFiles: number
       }
     | {
@@ -39,6 +40,7 @@ type ScanIndicatorView =
           scanId: number
           newSongs: number
           changedSongs: number
+          refreshedMetadata: boolean
           successfulReads: number
           /**
            * Files the library holds that read fine, now or in an earlier scan. A file that fails is
@@ -266,8 +268,9 @@ export class AppComponent {
                     // A resumed deep read can update an unchanged file's metadata.
                     changedSongs: Math.max(
                         status.terminal.changed,
-                        status.terminal.imported - status.terminal.new,
+                        status.terminal.imported - status.terminal.new - status.refreshTotal,
                     ),
+                    refreshedMetadata: status.refreshTotal > 0,
                     missingSongs: status.terminal.missing,
                     successfulReads: status.terminal.imported,
                     readableFiles: status.terminal.discovered - status.terminal.readFailureCount,
@@ -284,6 +287,7 @@ export class AppComponent {
             discovered: status.discovered,
             readDone: status.readDone,
             readTotal: status.readTotal,
+            refreshingMetadata: status.refreshTotal > 0,
             failedFiles: status.failedFiles,
         }
         return {

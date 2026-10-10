@@ -42,6 +42,9 @@
                     @if (scanStatus.phase === 'discovering') {
                         Discovering files… {{ scanStatus.discovered }} found
                     } @else {
+                        @if (scanStatus.refreshTotal > 0) {
+                            Refreshing metadata after app update.
+                        }
                         Reading tracks… {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
                     }
                 </p>

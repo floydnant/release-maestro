@@ -1,6 +1,21 @@
 import { PrescanFileFact, SongMetadata } from '@release-maestro/core'
 import { randomUUID } from 'crypto'
-import { and, asc, count, eq, gt, inArray, isNull, lt, max, ne, or } from 'drizzle-orm'
+import {
+    and,
+    asc,
+    count,
+    eq,
+    gt,
+    inArray,
+    isNotNull,
+    isNull,
+    lt,
+    max,
+    ne,
+    notExists,
+    notInArray,
+    or,
+} from 'drizzle-orm'
 import { DatabaseClient } from '../../database/database.client'
 import {
     albumArtistsTable,
@@ -36,7 +51,7 @@ import {
 
 /**
  * Change-detection tallies for one prescan batch. The deep-read queue is NOT
- * derived from this — `listSongsNeedingMetadata` (fingerprint mismatch in the DB)
+ * derived from this — `listSongsNeedingMetadata` (fingerprint or revision mismatch in the DB)
  * is the sole source, which also makes interrupted scans resumable.
  */
 export interface PrescanBatchComparison {
@@ -140,8 +155,16 @@ export class LibraryBackendRepository {
             .run().changes
     }
 
-    listSongsNeedingMetadata(afterPath: string | null, limit: number): PrescanFileFact[] {
-        const pendingCondition = songsNeedingMetadata()
+    listSongsNeedingMetadata(
+        seenAt: Date,
+        afterPath: string | null,
+        limit: number,
+        extractorVersion: string,
+    ): PrescanFileFact[] {
+        const pendingCondition = and(
+            eq(songsTable.lastSeenAt, seenAt),
+            songsNeedingMetadata(extractorVersion),
+        )
         const where = afterPath
             ? and(eq(songsTable.present, true), pendingCondition, gt(songsTable.path, afterPath))
             : and(eq(songsTable.present, true), pendingCondition)
@@ -168,18 +191,46 @@ export class LibraryBackendRepository {
             }))
     }
 
-    countSongsNeedingMetadata(): number {
+    countSongsNeedingMetadata(seenAt: Date, extractorVersion: string): number {
         return (
             this.database.db
                 .select({ count: count(songsTable.id) })
                 .from(songsTable)
-                .where(and(eq(songsTable.present, true), songsNeedingMetadata()))
+                .where(
+                    and(
+                        eq(songsTable.present, true),
+                        eq(songsTable.lastSeenAt, seenAt),
+                        songsNeedingMetadata(extractorVersion),
+                    ),
+                )
+                .get()?.count ?? 0
+        )
+    }
+
+    countSongsNeedingVersionRefresh(seenAt: Date, extractorVersion: string): number {
+        return (
+            this.database.db
+                .select({ count: count(songsTable.id) })
+                .from(songsTable)
+                .where(
+                    and(
+                        eq(songsTable.present, true),
+                        eq(songsTable.lastSeenAt, seenAt),
+                        eq(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
+                        metadataRevisionMismatch(extractorVersion),
+                    ),
+                )
                 .get()?.count ?? 0
         )
     }
 
     /** @returns the number of normalization issues left OPEN on the song after ingest. */
-    ingestMetadata(metadata: SongMetadata, fact: PrescanFileFact, scannedAt: Date): number {
+    ingestMetadata(
+        metadata: SongMetadata,
+        fact: PrescanFileFact,
+        scannedAt: Date,
+        extractorVersion: string,
+    ): number {
         const db = this.database.db
         const rawArtist = metadata.artist
         const rawAlbumArtist = metadata.albumArtist
@@ -488,6 +539,7 @@ export class LibraryBackendRepository {
                 codec: metadata.fileInfo?.codec ?? null,
                 metadataHash: metadataHash(metadata),
                 normalizerVersion: NORMALIZER_VERSION,
+                extractorVersion,
                 externalRefs,
                 albumId,
             } satisfies Omit<typeof songsTable.$inferInsert, 'id'>
@@ -626,6 +678,118 @@ export class LibraryBackendRepository {
             return openIssues
         })
     }
+
+    removeUnusedCatalogEntities(): void {
+        this.database.db.transaction(tx => {
+            // A re-read can move the last song off an album. Drop empty albums first
+            // so their artist and record label links do not keep obsolete entities alive.
+            tx.delete(albumsTable)
+                .where(
+                    notExists(
+                        tx
+                            .select({ id: songsTable.id })
+                            .from(songsTable)
+                            .where(eq(songsTable.albumId, albumsTable.id)),
+                    ),
+                )
+                .run()
+            // Keep user-confirmed resolutions even if the tag no longer appears.
+            tx.delete(artistRawNamesTable)
+                .where(
+                    and(
+                        eq(artistRawNamesTable.confirmedByUser, false),
+                        notInArray(
+                            artistRawNamesTable.rawText,
+                            tx
+                                .select({ rawText: songsTable.rawArtist })
+                                .from(songsTable)
+                                .where(isNotNull(songsTable.rawArtist))
+                                .union(
+                                    tx
+                                        .select({ rawText: songsTable.rawAlbumArtist })
+                                        .from(songsTable)
+                                        .where(isNotNull(songsTable.rawAlbumArtist)),
+                                ),
+                        ),
+                    ),
+                )
+                .run()
+            tx.delete(genreRawNamesTable)
+                .where(
+                    and(
+                        eq(genreRawNamesTable.confirmedByUser, false),
+                        notInArray(
+                            genreRawNamesTable.rawText,
+                            tx
+                                .select({ rawText: songsTable.rawGenre })
+                                .from(songsTable)
+                                .where(isNotNull(songsTable.rawGenre)),
+                        ),
+                    ),
+                )
+                .run()
+            tx.delete(artistsTable)
+                .where(
+                    and(
+                        notExists(
+                            tx
+                                .select({ artistId: songArtistsTable.artistId })
+                                .from(songArtistsTable)
+                                .where(eq(songArtistsTable.artistId, artistsTable.id)),
+                        ),
+                        notExists(
+                            tx
+                                .select({ artistId: albumArtistsTable.artistId })
+                                .from(albumArtistsTable)
+                                .where(eq(albumArtistsTable.artistId, artistsTable.id)),
+                        ),
+                        notExists(
+                            tx
+                                .select({ artistId: artistRawNameArtistsTable.artistId })
+                                .from(artistRawNameArtistsTable)
+                                .where(eq(artistRawNameArtistsTable.artistId, artistsTable.id)),
+                        ),
+                    ),
+                )
+                .run()
+            tx.delete(genresTable)
+                .where(
+                    and(
+                        notExists(
+                            tx
+                                .select({ genreId: songGenresTable.genreId })
+                                .from(songGenresTable)
+                                .where(eq(songGenresTable.genreId, genresTable.id)),
+                        ),
+                        notExists(
+                            tx
+                                .select({ genreId: genreRawNameGenresTable.genreId })
+                                .from(genreRawNameGenresTable)
+                                .where(eq(genreRawNameGenresTable.genreId, genresTable.id)),
+                        ),
+                    ),
+                )
+                .run()
+            tx.delete(recordLabelsTable)
+                .where(
+                    and(
+                        notExists(
+                            tx
+                                .select({ id: albumsTable.id })
+                                .from(albumsTable)
+                                .where(eq(albumsTable.recordLabelId, recordLabelsTable.id)),
+                        ),
+                        notExists(
+                            tx
+                                .select({ id: songsTable.id })
+                                .from(songsTable)
+                                .where(eq(songsTable.recordLabelText, recordLabelsTable.name)),
+                        ),
+                    ),
+                )
+                .run()
+        })
+    }
 }
 
 /**
@@ -636,14 +800,22 @@ export class LibraryBackendRepository {
  * reach the other.
  *
  * A file qualifies when it has never been read, when the file itself changed, or when
- * it was last read by an older revision of the normalizer. That last clause is what
- * lets a change in how a column is derived reach rows already in the database: nothing
+ * it was last read by an older revision of the normalizer or Rust extractor. Those clauses
+ * let a changed rule reach rows already in the database: nothing
  * happens on disk, so the fingerprint alone would skip them forever.
  */
-const songsNeedingMetadata = () =>
+const songsNeedingMetadata = (extractorVersion: string) =>
     or(
         isNull(songsTable.scannedFileFingerprint),
         ne(songsTable.scannedFileFingerprint, songsTable.fileFingerprint),
+        metadataRevisionMismatch(extractorVersion),
+    )
+
+/** Both the read queue and its refresh subtotal use the same revision rule. */
+const metadataRevisionMismatch = (extractorVersion: string) =>
+    or(
         isNull(songsTable.normalizerVersion),
         ne(songsTable.normalizerVersion, NORMALIZER_VERSION),
+        isNull(songsTable.extractorVersion),
+        ne(songsTable.extractorVersion, extractorVersion),
     )

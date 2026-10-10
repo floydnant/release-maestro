@@ -36,6 +36,7 @@ use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
+const EXTRACTOR_VERSION: &str = env!("EXTRACTOR_VERSION");
 const DEFAULT_PRESCAN_BATCH_SIZE: usize = 200;
 
 fn main() {
@@ -256,7 +257,7 @@ fn run_loop() {
 fn handle_ping(emitter: &Emitter, request: &Request) {
     emitter.response(Response::ok(
         request.id.clone(),
-        json!({ "protocolVersion": PROTOCOL_VERSION, "engineVersion": ENGINE_VERSION }),
+        json!({ "protocolVersion": PROTOCOL_VERSION, "engineVersion": ENGINE_VERSION, "extractorVersion": EXTRACTOR_VERSION }),
     ));
 }
 

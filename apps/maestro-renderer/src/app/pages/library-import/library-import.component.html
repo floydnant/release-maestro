@@ -111,6 +111,9 @@
                                 ></app-progress-ring>
                                 Discovering files… {{ status.discovered }} found so far
                             } @else if (status.phase === 'reading') {
+                                @if (status.refreshTotal > 0) {
+                                    Refreshing metadata after app update.
+                                }
                                 Reading tracks…
                                 <span class="font-mono">{{ status.readDone }} / {{ status.readTotal }}</span>
                             }

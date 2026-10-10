@@ -41,6 +41,7 @@ const completedStatus = (overrides: Partial<LibraryScanTerminalResult> = {}): Li
         new: terminal.new,
         changed: terminal.changed,
         unchanged: terminal.unchanged,
+        refreshTotal: 0,
         readDone: terminal.readsAttempted,
         readTotal: terminal.readTotal,
         imported: terminal.imported,
