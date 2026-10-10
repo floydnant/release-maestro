@@ -67,8 +67,10 @@ settings approval. Declining either hook does not break allocation or cleanup. T
 
 Use `pnpm exec nx build metadata-engine` to build only the host sidecar.
 
-`make dev` also opens local debug endpoints for agent inspection. See
-[`inspect-running-app`](.agents/skills/inspect-running-app/SKILL.md) for attachment and profiling.
+Inspect the app in the Electron window that `make dev` opens. The Angular dev server supplies
+assets to Electron; opening its URL in an external browser does not provide the Electron APIs or IPC.
+Use [`inspect-running-app`](.agents/skills/inspect-running-app/SKILL.md) to attach to the existing
+Electron window through its local debug endpoint for UI inspection and screenshots.
 
 ## Commands
 

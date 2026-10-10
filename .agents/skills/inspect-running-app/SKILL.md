@@ -1,9 +1,14 @@
 ---
 name: inspect-running-app
-description: Attach Chrome DevTools to the running dev app to inspect the DOM, console, and network, click through a flow, or capture a screenshot. Use when reproducing a bug by hand against `make dev`. For CPU, trace, and memory work use `profiling`; for committed Playwright specs use `e2e-testing`.
+description: Inspect the running Electron window through its CDP endpoint for UI checks, bug reproduction, console, network, or screenshots. Use for all live app inspection, including renderer UI work. For CPU, trace, and memory work use `profiling`; for committed Playwright specs use `e2e-testing`.
 ---
 
 # Inspect the running app
+
+Release Maestro runs in Electron. Attach to its existing window; never open the renderer
+dev-server URL in an external browser or browser preview. The renderer depends on Electron APIs
+and IPC. A browser page cannot reproduce the working app. Browser-based renderer E2E supplies
+mocked IPC for automated scenarios; see [docs/testing.md](../../../docs/testing.md).
 
 `make dev` opens two worktree-specific debug ports. They speak different protocols and answer
 different questions. Run `make dev-status` first and use the ports it prints.
@@ -22,7 +27,7 @@ the app and losing the state it needs to inspect. Packaged builds do not use thi
 
 ## Start the app and confirm both ports
 
-Start the app in one terminal:
+Check `make dev-status` and reuse this worktree's running app. If it is stopped, start it in one terminal:
 
 ```bash
 make dev
@@ -38,15 +43,21 @@ curl -s "http://127.0.0.1:${cdp_port}/json/list"
 curl -s "http://127.0.0.1:${inspector_port}/json/list"
 ```
 
-Open `http://localhost:<renderer port>` using the port from `make dev-status`. If another program takes a persisted port,
+Use the CDP port to attach to the Electron window. The renderer port serves assets to Electron;
+it is not an inspection endpoint. If another program takes a persisted port,
 startup fails and tells you to run `make dev-reallocate`. It does not move an active MCP endpoint.
 
-## Drive the renderer through the MCP server
+## Drive the Electron window through the MCP server
 
 `.mcp.json` and `.codex/config.toml` launch the repository MCP wrapper. It resolves this worktree's
 CDP port when the server starts, so separate worktrees need no config rewrites. Prefer its tools over
 hand-written protocol calls. `take_snapshot` returns an accessibility tree with stable `uid` refs, a
 steadier handle on the UI than a DOM query.
+
+Call `list_pages`, select the existing app page with `select_page`, then call `take_snapshot`.
+Continue once the snapshot shows the Electron app UI. If attachment fails or no app page exists,
+check `make dev-status`, the `make dev` logs, and the wrapper's CDP endpoint. Restore that connection
+before inspecting the UI; launching an external browser is not a fallback.
 
 These constraints cost time when you meet them cold:
 
@@ -72,7 +83,7 @@ If dependencies are missing, startup fails without downloading a fallback packag
 
 Keep `--usageStatistics=false`. The server reports usage data to Google by default.
 Both clients enable this server for the project, including its extra heap tools. Those tool
-definitions cost context even when the app is not running; browser attachment is lazy.
+definitions cost context even when the app is not running; Electron attachment is lazy.
 
 For interaction-heavy work, opt into the repository's pinned Playwright MCP server. Codex disables
 it in `.codex/config.toml` so its tools do not consume context by default; start a session with
@@ -147,8 +158,9 @@ the app cannot reach on its own. Save direct IPC for reading state, such as
 
 ## Finish the session
 
-Stop the `make dev` process normally. If its supervisor exited first, inspect and stop only this
-worktree's validated holders:
+Leave a pre-existing app session running. If you started `make dev` for this inspection, stop
+that process normally when finished. If its supervisor exited first, inspect and stop only this
+worktree's validated holders for the session you started:
 
 ```bash
 make dev-status
