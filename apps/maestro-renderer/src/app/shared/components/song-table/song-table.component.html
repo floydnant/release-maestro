@@ -174,26 +174,44 @@
                 @let selected = isRowSelected(row, index);
 
                 <div
-                    class="song-table__row | flex items-center"
+                    class="song-table__row | flex flex-col"
                     role="row"
                     [id]="rowElementId(index)"
                     [ngClass]="{
-                        'row-selected | bg-background-elevated': selected,
-                        'row-hover | hover:bg-background-surface': !selected,
                         'row-missing | opacity-70': !row.present,
+                        'justify-center': !groupAt().has(index),
+                        'justify-end': groupAt().has(index),
                     }"
-                    [style.height.px]="rowHeight"
+                    [style.height.px]="rowHeightAt(index)"
                     [attr.aria-rowindex]="index + 2"
                     [attr.aria-selected]="selected"
-                    [attr.aria-label]="rowLabel(row)"
-                    (mousedown)="onRowPointerDown($event, index, row)"
+                    [attr.aria-label]="rowLabel(row, groupLabelAt(index))"
                 >
-                    <app-song-table-row
-                        [row]="row"
-                        [selected]="selected"
-                        [columns]="columns()"
-                        (filterMissing)="filterMissing.emit()"
-                    ></app-song-table-row>
+                    @if (groupAt().get(index); as group) {
+                        <div
+                            class="song-table__group | flex h-6 w-full items-center gap-2 border-b border-border-subtle bg-background-surface px-6 type-body-sm text-content-secondary"
+                            role="presentation"
+                        >
+                            <span>{{ group.label }}</span>
+                            <span class="font-mono text-content-muted">{{ group.summary }}</span>
+                        </div>
+                    }
+                    <div
+                        class="song-table__cells | flex h-10 w-full items-center"
+                        role="presentation"
+                        [ngClass]="{
+                            'row-selected | bg-background-elevated': selected,
+                            'row-hover | hover:bg-background-surface': !selected,
+                        }"
+                        (mousedown)="onRowPointerDown($event, index, row)"
+                    >
+                        <app-song-table-row
+                            [row]="row"
+                            [selected]="selected"
+                            [columns]="columns()"
+                            (filterMissing)="filterMissing.emit()"
+                        ></app-song-table-row>
+                    </div>
                 </div>
             }
         </div>

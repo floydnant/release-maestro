@@ -58,6 +58,10 @@ type SongSeed = {
     addedAt?: Date | null
     present?: boolean
     coverPath?: string | null
+    trackNumber?: number | null
+    discNumber?: number | null
+    discTotal?: number | null
+    trackTotal?: number | null
 }
 
 type AlbumSeed = {
@@ -103,6 +107,10 @@ describe('LibraryBrowseRepository', () => {
                 musicalKey: seed.musicalKey ?? null,
                 duration: seed.duration ?? null,
                 coverPath: seed.coverPath ?? null,
+                trackNumber: seed.trackNumber ?? null,
+                discNumber: seed.discNumber ?? null,
+                discTotal: seed.discTotal ?? null,
+                trackTotal: seed.trackTotal ?? null,
             })
             .run()
     }
@@ -1308,6 +1316,94 @@ describe('LibraryBrowseRepository', () => {
 
         it('returns null for an id that resolves to nothing, rather than throwing', () => {
             expect(repository.getAlbumDetail('album-gone')).toBeNull()
+        })
+
+        it('counts mixed untagged and disc-one songs as one disc', () => {
+            seedAlbum({ id: 'one-disc', title: 'One disc' })
+            for (let index = 0; index < 8; index++) {
+                seedSong({
+                    id: `single-${index}`,
+                    title: `Track ${index}`,
+                    albumId: 'one-disc',
+                    discNumber: index % 2 ? 1 : null,
+                    discTotal: 1,
+                    trackTotal: 8,
+                })
+            }
+            expect(repository.getAlbumDetail('one-disc')).toMatchObject({
+                songCount: 8,
+                trackTotal: 8,
+                discGroups: [],
+            })
+        })
+
+        it('does not count an unknown bucket as another tagged disc total', () => {
+            seedAlbum({ id: 'unknown-disc', title: 'Unknown disc' })
+            seedSong({
+                id: 'known',
+                title: 'Known',
+                albumId: 'unknown-disc',
+                discNumber: 2,
+                discTotal: 2,
+                trackTotal: 8,
+            })
+            seedSong({
+                id: 'unknown',
+                title: 'Unknown',
+                albumId: 'unknown-disc',
+                discNumber: null,
+                discTotal: 2,
+                trackTotal: 8,
+            })
+            expect(repository.getAlbumDetail('unknown-disc')?.trackTotal).toBeNull()
+        })
+
+        it('orders tracks by disc and reports tagged totals per disc and album', () => {
+            seedAlbum({ id: 'album-multi', title: 'Double' })
+            seedSong({
+                id: 'disc-2-first',
+                title: 'Disc 2 First',
+                albumId: 'album-multi',
+                discNumber: 2,
+                discTotal: 2,
+                trackNumber: 1,
+                trackTotal: 3,
+            })
+            seedSong({
+                id: 'disc-1-second',
+                title: 'Disc 1 Second',
+                albumId: 'album-multi',
+                discNumber: 1,
+                discTotal: 2,
+                trackNumber: 2,
+                trackTotal: 2,
+            })
+            seedSong({
+                id: 'disc-1-first',
+                title: 'Disc 1 First',
+                albumId: 'album-multi',
+                discNumber: 1,
+                discTotal: 2,
+                trackNumber: 1,
+                trackTotal: 2,
+            })
+
+            const query = emptySongQuery()
+            query.filter = { albumIds: ['album-multi'] }
+            query.sort = { field: SongSortField.trackNumber, direction: 'asc' }
+            expect(titlesOf(repository.querySongs({ query, window: { offset: 0, limit: 10 } }))).toEqual([
+                'Disc 1 First',
+                'Disc 1 Second',
+                'Disc 2 First',
+            ])
+            expect(repository.getAlbumDetail('album-multi')).toMatchObject({
+                songCount: 3,
+                trackTotal: 5,
+                discGroups: [
+                    { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 0 },
+                    { discNumber: 2, songCount: 1, trackTotal: 3, startIndex: 2 },
+                ],
+            })
         })
     })
 })

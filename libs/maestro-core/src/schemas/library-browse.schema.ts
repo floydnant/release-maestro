@@ -96,8 +96,7 @@ export const SongSortField = {
      * only orders a list that is already one album — the album detail page (MAE-119).
      * Sorting a whole library by it would interleave every record's track 1.
      *
-     * A multi-disc album orders `1,1,2,2,3,3…` and cannot do better: there is no disc
-     * number anywhere in the system until MAE-123 lands one.
+     * Album lists order by disc number before track number.
      */
     trackNumber: 'trackNumber',
 } as const
@@ -218,6 +217,7 @@ export interface SongRow {
      * this renders the `null` as unknown rather than filling it in.
      */
     trackNumber: number | null
+    discNumber: number | null
     genreText: string | null
     genres: CatalogEntityRef[]
     recordLabelId: string | null
@@ -429,6 +429,14 @@ export interface AlbumDetail {
     recordLabelId: string | null
     recordLabelText: string | null
     songCount: number
+    /** Sum of the tagged track totals per disc, when every disc has a tagged total. */
+    trackTotal: number | null
+    discGroups: {
+        discNumber: number | null
+        songCount: number
+        trackTotal: number | null
+        startIndex: number
+    }[]
     /** Summed song durations in seconds; `null` when no song on the album has one. */
     totalDuration: number | null
     /** Distinct genres across the album's songs, for the header's genre line. */

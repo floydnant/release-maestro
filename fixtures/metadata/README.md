@@ -22,6 +22,7 @@ The binary-level tests in `apps/metadata-engine/tests/metadata.rs` cover:
 - ID3v2.3 UTF-16, ID3v2.4 UTF-8, ID3v1 fallback, and primary-tag precedence.
 - Every legacy energy, BPM, key, comment, catalog number, and lyrics alias recognized by the engine.
 - Fractional and invalid BPM, track totals and overflow, dates, Unicode, and multiline text.
+- Independent disc/track slash pairs, separate-total precedence, and zero values across all eight formats.
 - Arbitrary custom fields, repeated values, MP4 namespaces, and opaque energy strings.
 - External references in MP3, FLAC and M4A, including ISRC, barcode, AcoustID, ASIN and service IDs.
 - Embedded artwork, folder artwork, edits, null clears, omitted fields, renames, and rejected writes.
