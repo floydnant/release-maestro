@@ -74,9 +74,9 @@ If the final diff changes source code, configuration, tooling, or tests, run
 and before publishing. Manifest-only and lockfile-only updates do not need this review.
 
 Unless the user limits the task to local work, commit, push, and open one PR following
-`.github/pull_request_template.md`. Include direct dependency and pinned-tool version changes,
-migration fixes, relevant official migration links, and deferred updates with reasons. Report local
-verification in the final response; the template leaves routine check lists to CI.
+`.github/pull_request_template.md`, with the `deps:` title prefix. Include direct dependency and
+pinned-tool version changes, migration fixes, relevant official migration links, and deferred
+updates with reasons. Report local verification in the final response; the template leaves routine check lists to CI.
 
 Open ready for review once scoped updates, regression checks, and the PR comparison pass.
 Disclose existing full-scan findings; they do not automatically require a draft. Watch CI on the
