@@ -35,13 +35,12 @@ and to GitHub code scanning. The comparison uses an empty OSV config so neither 
 silently suppress findings. New vulnerabilities must be fixed before merging; local exceptions
 apply to full scans rather than the PR comparison.
 
-Release-please's generated `release-please--branches--main` PR also runs `make security` inside
+Release-please PRs, identified by the `release-please--` branch prefix, also run `make security` inside
 the required `Dependency vulnerabilities` check. It scans the proposed merge commit with the
 same full-scan policy used before publication, including exact, unexpired exceptions.
 Unaccepted findings fail that check before the release PR can merge. Reports are uploaded as
 `release-pr-vulnerabilities`, including on failure. Ordinary PRs retain the comparison-only policy.
-Keep the branch condition in `.github/workflows/security.yml` aligned if the release-please
-target branch or branch naming changes.
+Keep the prefix in `.github/workflows/security.yml` aligned if release-please's branch naming changes.
 
 `make security` scans the complete npm and Cargo lockfiles. The `Full dependency vulnerabilities`
 job runs on main, daily, and on demand. Full scans fail on security advisories unless an exact,
