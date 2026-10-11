@@ -2,7 +2,6 @@ import { NgClass } from '@angular/common'
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core'
 import { Router, RouterModule } from '@angular/router'
 import { LibraryFolderValidation, LibraryScanTerminalResult } from '@release-maestro/core'
-import { HlmAlert, HlmAlertDescription } from '@spartan-ng/helm/alert'
 import { HlmButton } from '@spartan-ng/helm/button'
 import { HlmCard } from '@spartan-ng/helm/card'
 import { ElectronService } from '../../core/services'
@@ -34,8 +33,6 @@ type ImportStep = 'pick' | 'scanning' | 'done'
         ImportMosaicComponent,
         FolderListComponent,
         NgClass,
-        HlmAlert,
-        HlmAlertDescription,
         HlmButton,
         HlmCard,
     ],
@@ -43,16 +40,19 @@ type ImportStep = 'pick' | 'scanning' | 'done'
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: { class: 'block size-full' },
     styles: `
-        /* Fades the full-window mosaic gently toward the top and bottom edges (pure
-           black so the covers pop against it). */
+        /* Two layers over the cover wall, pure black to match its backdrop. A short band along the
+           top edge gives the macOS window controls, which sit over the wall, contrast against any
+           artwork. A vignette darkens the wall most behind the centered card and least at the window
+           edges, so the covers keep their color where nothing sits over them. */
         .mosaic-veil {
-            background: linear-gradient(
-                to bottom,
-                rgb(0 0 0 / 0.9) 0%,
-                transparent 25%,
-                transparent 75%,
-                rgb(0 0 0 / 0.9) 100%
-            );
+            background:
+                linear-gradient(to bottom, rgb(0 0 0 / 0.85), rgb(0 0 0 / 0.5) 48px, transparent 120px),
+                radial-gradient(
+                    ellipse 60% 70% at center,
+                    rgb(0 0 0 / 0.85),
+                    rgb(0 0 0 / 0.55) 55%,
+                    rgb(0 0 0 / 0.15)
+                );
         }
     `,
 })
@@ -62,6 +62,13 @@ export class LibraryImportComponent {
     readonly library = inject(LibraryService)
 
     readonly step = signal<ImportStep>('pick')
+
+    /**
+     * The cover wall only exists once the scan has sent artwork. Until then (and for libraries
+     * without any) the page stays on the canvas like every other screen, rather than going dark
+     * behind an empty wall.
+     */
+    readonly showsCoverWall = computed(() => this.step() !== 'pick' && this.library.mosaicAlbums().length > 0)
     readonly pendingFolders = signal<string[]>([])
     readonly startInFlight = signal(false)
     readonly folderValidations = signal<LibraryFolderValidation[]>([])

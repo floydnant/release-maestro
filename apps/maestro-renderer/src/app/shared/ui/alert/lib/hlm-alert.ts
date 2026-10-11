@@ -7,7 +7,6 @@ const alertVariants = cva('grid gap-2 rounded-lg border p-3 type-body-sm group/a
         variant: {
             default: 'border-border-default bg-background-surface text-content-primary',
             destructive: 'border-status-danger-border bg-status-danger-background text-status-danger-content',
-            plain: 'rounded-none border-0 bg-transparent p-0',
         },
     },
     defaultVariants: {

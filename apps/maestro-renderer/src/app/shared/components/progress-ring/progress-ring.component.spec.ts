@@ -14,7 +14,7 @@ describe('ProgressRingComponent', () => {
         fixture.detectChanges()
     })
 
-    it('keeps circular geometry and exposes determinate progress through Brain', () => {
+    it('keeps circular geometry and exposes determinate progress', () => {
         fixture.componentRef.setInput('diameter', 25)
         fixture.componentRef.setInput('strokeWidth', 2.5)
         fixture.componentRef.setInput('progress', 75)
@@ -23,8 +23,8 @@ describe('ProgressRingComponent', () => {
         const element: HTMLElement = fixture.nativeElement
         const meter = element.querySelector<SVGElement>('[role="progressbar"]')
         expect(meter?.getAttribute('aria-valuenow')).toBe('75')
-        expect(meter?.style.width).toBe('25px')
-        expect(meter?.style.height).toBe('25px')
+        expect(meter?.getAttribute('width')).toBe('25')
+        expect(meter?.getAttribute('height')).toBe('25')
         expect(meter?.querySelector('.progress-ring')?.getAttribute('r')).toBe('7.5')
         expect(Number(meter?.querySelector('.progress-ring')?.getAttribute('stroke-dashoffset'))).toBeCloseTo(
             3.75 * Math.PI,

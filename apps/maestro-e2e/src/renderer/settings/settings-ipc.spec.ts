@@ -60,10 +60,11 @@ test.describe('settings IPC scenarios', () => {
         await createRendererScenario(page, scenarioBuilder().build(), '/settings/debug')
 
         const healthPayload = page.getByLabel('Metadata worker health payload')
-        const disclosure = page.getByRole('button', { name: 'Health payload' })
+        // A native <details> disclosure: its <summary> is the keyboard-operable toggle.
+        const disclosure = page.locator('summary', { hasText: 'Health payload' })
         await expect(healthPayload).toBeHidden()
         await disclosure.press('Enter')
-        await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+        await expect(disclosure.locator('xpath=..')).toHaveAttribute('open', '')
         await expect(healthPayload).toBeVisible()
         await expect(healthPayload).toContainText('"ok": true')
         await disclosure.press('Space')

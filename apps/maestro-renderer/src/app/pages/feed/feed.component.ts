@@ -14,7 +14,6 @@ import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
-import { HlmAlertImports } from '@spartan-ng/helm/alert'
 import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
@@ -62,7 +61,6 @@ type FeedState =
         HlmButtonImports,
         HlmTooltipImports,
         HlmProgressImports,
-        HlmAlertImports,
     ],
 })
 export class FeedComponent {

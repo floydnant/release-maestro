@@ -26,24 +26,38 @@ Preserve existing control geometry when adopting these components. Regular butto
 `px-3 py-1.5` padding and content height. Inputs and textareas keep native sizing. Explicit icon sizes
 are for controls whose established layout uses those sizes. A click target that has no button
 appearance uses `variant="plain" size="none"`, with its existing layout and typography. Seeking
-targets and sortable headings must not acquire hover backgrounds.
+targets and sortable headings must not acquire hover backgrounds. Only filled variants show a
+disabled fill; quiet and text variants dim their content.
+
+Use a shared component where it supplies the element's appearance or behavior. When a caller would
+have to cancel most of a component's classes to keep the existing look, the element is not that
+component: keep its own markup, as the track grid, catalog rows, album tiles, stat tiles and inline
+error messages do. Native `<details>` stays the disclosure control for raw diagnostic payloads.
 
 Sidebar links use the `navigation` button variant. Angular's `RouterLinkActive` sets
-`aria-current="page"`, and the shared variant supplies the active appearance. The `link` variant
-allows inline links to shrink inside bounded library cells.
+`aria-current="page"`, and the shared variant supplies the active appearance.
 
-History controls use the `history` variant and the shared `pointer-hover` state. Only pointer hover
-fills their background; keyboard focus keeps the focus ring without that fill.
+Text links come in two variants, neither takes a button size, and both rest in the text colors
+rather than an accent. `link` is for internal navigation to library entities and settings: it
+inherits the surrounding color and turns foreground with an underline on hover. Where an internal
+link sits in running text, add `underline decoration-content-muted hover:decoration-current` so it
+reads as a link at rest. `external-link` is for links that leave the app: foreground text with a
+muted standing underline, taking the action accent only on hover, matching links in imported release
+copy.
 
-The track grid composes the role-qualified table directives with its existing windowing and row
-layout. Scan progress keeps its outcome segments and circular geometry inside `HlmProgress`;
-indeterminate work uses `HlmSpinner`. Feed playback composes the same progress primitives inside
-the seek button.
+Scan progress keeps its outcome segments and circular geometry in the app's own markup;
+indeterminate work uses `HlmSpinner`. Feed playback composes the progress primitives inside the seek
+button.
 
 `HlmSpinner` retains the application's two-arc SVG, requested diameter, stroke and colors, and
 ambient rotation. Its per-ring rotation offsets require the scoped animation stylesheet.
 
-Tooltips wait 600ms, wrap long paths, and fit within 24rem and the viewport. Brain 1.5.0 has a pinned
+Tooltips wait 600ms, wrap long paths, and fit within 24rem and the viewport. `hlmTooltip` labels or
+explains a control; when the control's accessible name already contains the tooltip text, it is not
+also announced as a description. `hlmOverflowTooltip` reveals truncated text and shows only while
+its host, or something inside it, is clipping — measured on hover and focus — so fully visible text
+never repeats in a tooltip. Do not put a tooltip on text whose full value is visible elsewhere, or
+on roving-focus grid items where every arrow key would open one. Brain 1.5.0 has a pinned
 patch in `patches/@spartan-ng__brain@1.5.0.patch`: capture document scroll and dismiss the tooltip,
 including pending displays and retained content hover. Its original window listener misses nested
 scroll panels. Review and remove this patch when an upstream upgrade fixes that behavior; rerun the

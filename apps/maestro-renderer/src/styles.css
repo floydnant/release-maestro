@@ -90,12 +90,17 @@ body {
 }
 
 @layer components {
+    /* Links in imported copy leave the app, so they match the external-link variant: foreground
+       text and a quiet underline, taking the accent on hover. */
     a:not([hlmBtn]) {
-        @apply cursor-default text-content-action underline;
+        @apply text-content-primary underline decoration-content-muted hover:text-content-action hover:decoration-current;
         text-underline-offset: 0.18em;
     }
 
+    /* A desktop app keeps the arrow cursor on everything clickable, whatever styles the element. */
+    a,
     button,
+    summary,
     [role='button'] {
         @apply cursor-default;
     }

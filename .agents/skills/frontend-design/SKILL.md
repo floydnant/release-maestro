@@ -16,6 +16,11 @@ semantic tokens and established compositions when building or refining renderer 
   Invisible click targets use `variant="plain" size="none"` and retain their existing layout;
   seeking targets and sortable headings do not get hover backgrounds. The component library supplies
   behavior without imposing a new visual treatment.
+- If keeping the existing look means cancelling most of a component's classes, the element is not
+  that component. Keep its own markup instead of applying the directive and overriding it.
+- Text links use `variant="link"` for internal navigation and `variant="external-link"` for links
+  that leave the app. Truncated text gets `hlmOverflowTooltip`, which only appears while the text is
+  cut off; `hlmTooltip` is for labelling or explaining a control.
 - Brain supplies the packaged interaction behavior. Helm source is local and editable. Keep data
   fetching, domain state and recovery actions in product components; compose their controls from
   shared UI.

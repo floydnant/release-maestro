@@ -53,11 +53,7 @@
             {{ summaryText }}
         </p>
         @if (terminal()?.error; as terminalError) {
-            <div hlmAlert variant="plain" class="scan-error | mt-1">
-                <p hlmAlertDescription class="type-body-sm text-content-danger">
-                    {{ terminalError.message }}
-                </p>
-            </div>
+            <p class="mt-1 type-body-sm text-content-danger">{{ terminalError.message }}</p>
         }
         @if (unavailableFoldersText(); as unavailableText) {
             <p class="mt-1 type-body-sm text-content-warning" aria-label="Unavailable folders">
@@ -82,14 +78,14 @@
                 }}
                 could not be imported.
             </p>
-            <div hlmCard class="failed-files | mt-3 gap-0 p-2" aria-label="Failed files">
+            <div hlmCard class="failed-files | mt-3 p-2" aria-label="Failed files">
                 @for (failure of terminalResult.failures; track failure.path) {
                     <div class="group flex items-center gap-3 px-3 py-2">
                         <div class="min-w-0 grow select-text">
                             <p class="mt-0.5 type-body-sm text-content-danger">
                                 {{ failure.message }}
                             </p>
-                            <p class="flex min-w-0 type-body-sm" [hlmTooltip]="failure.path">
+                            <p class="flex min-w-0 type-body-sm" [hlmOverflowTooltip]="failure.path">
                                 <span class="truncate text-content-muted">{{
                                     folderParent(failure.path)
                                 }}</span

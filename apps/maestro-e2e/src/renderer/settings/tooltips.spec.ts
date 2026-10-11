@@ -1,5 +1,10 @@
 import { expect, Locator, Page, test } from '@playwright/test'
-import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
+import {
+    createRendererScenario,
+    createSongRow,
+    rendererScenarios,
+    scenarioBuilder,
+} from '../scenario-harness'
 
 const freezeTooltipClock = async (page: Page) => {
     await page.clock.install({ time: new Date('2026-10-03T00:00:00Z') })
@@ -143,5 +148,35 @@ test.describe('shared tooltips', () => {
         await page.getByRole('heading', { name: 'Components' }).hover()
         await trigger.hover()
         await expect(tooltip).toHaveText('The library stays available while folders are scanned.')
+    })
+})
+
+test.describe('tooltips in library views', () => {
+    test('reveal a track title only while it is cut off', async ({ page }) => {
+        const longTitle = 'An extended mix whose title runs on long past the width of its column in the grid'
+        await createRendererScenario(
+            page,
+            scenarioBuilder()
+                .songs([createSongRow({ title: 'Short' }), createSongRow({ id: 'long', title: longTitle })])
+                .build(),
+            '/tracks',
+        )
+        await page.setViewportSize({ width: 900, height: 700 })
+        await freezeTooltipClock(page)
+        await page.getByRole('gridcell').getByText('Short', { exact: true }).hover()
+        await page.clock.runFor(700)
+        await expect(page.getByRole('tooltip')).toBeHidden()
+
+        await page.getByRole('gridcell').getByText(longTitle, { exact: true }).hover()
+        await page.clock.runFor(700)
+        await expect(page.getByRole('tooltip')).toHaveText(longTitle)
+    })
+
+    test('do not repeat an icon control’s name as its description', async ({ page }) => {
+        await createRendererScenario(page, rendererScenarios.albums.withAlbums(), '/albums')
+        const direction = page.getByRole('button', { name: /^Sorted descending/ })
+        await direction.focus()
+        await expect(page.getByRole('tooltip')).toHaveText('Sorted descending — sort ascending')
+        await expect(direction).not.toHaveAttribute('aria-describedby')
     })
 })
