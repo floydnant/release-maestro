@@ -166,6 +166,41 @@ test.describe('shared UI components', () => {
         )
     })
 
+    test('toggles a switch from the keyboard and its label, and disables a switch on request', async ({
+        page,
+    }) => {
+        const filterSwitch = page.getByRole('switch', { name: 'Hide releases with no playable tracks' })
+        await expect(filterSwitch).toBeChecked()
+        await filterSwitch.press('Space')
+        await expect(filterSwitch).not.toBeChecked()
+        await expect(filterSwitch).toBeFocused()
+        await filterSwitch.press('Enter')
+        await expect(filterSwitch).toBeChecked()
+        await page.getByText('Hide releases with no playable tracks', { exact: true }).click()
+        await expect(filterSwitch).not.toBeChecked()
+
+        // The thumb rests against the track's inset on the side that matches its state.
+        const thumbPosition = () =>
+            filterSwitch.evaluate(track => {
+                const thumb = track.querySelector('[data-slot="switch-thumb"]')
+                if (!thumb) return null
+                const inset = parseFloat(getComputedStyle(track).paddingLeft)
+                const trackBox = track.getBoundingClientRect()
+                const thumbBox = thumb.getBoundingClientRect()
+                return {
+                    atStart: Math.abs(thumbBox.left - trackBox.left - inset) < 0.5,
+                    atEnd: Math.abs(trackBox.right - thumbBox.right - inset) < 0.5,
+                }
+            })
+        await expect.poll(thumbPosition).toEqual({ atStart: true, atEnd: false })
+        await filterSwitch.press('Space')
+        await expect.poll(thumbPosition).toEqual({ atStart: false, atEnd: true })
+
+        const disabledSwitch = page.getByRole('switch', { name: 'Unavailable setting' })
+        await expect(disabledSwitch).toBeDisabled()
+        await expect(disabledSwitch).toBeChecked()
+    })
+
     test('retains the two-arc loading spinner and the design system motion', async ({ page }) => {
         const spinner = page.getByRole('status', { name: 'Reading metadata' })
         await expect(spinner).toBeVisible()

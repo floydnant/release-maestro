@@ -76,6 +76,10 @@ Inputs and textareas accept `aria-describedby`; Brain combines those caller IDs
 with descriptions registered by the enclosing Field. The dialog service accepts component classes and `TemplateRef`; a template's `let-dialog`
 receives the supplied context and `close(result)` action.
 
+`hlm-switch` renders Brain's `button[role=switch]`. Name it with a `<label for>` that matches its
+`inputId`, and pass its description through `aria-describedby`: the switch does not read Field
+descriptions. Its `focus()` method moves focus to that button.
+
 Product components own music data, scan state, recovery actions and navigation. Their fetched
 viewport windows and query/range selection remain governed by
 [ADR 0004](../../../../../../docs/adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md).
