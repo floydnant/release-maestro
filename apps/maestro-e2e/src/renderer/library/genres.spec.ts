@@ -8,6 +8,7 @@ import {
     respond,
     scenarioBuilder,
 } from '../scenario-harness'
+import { chooseAlbumSort } from '../../support/album-sort-control'
 
 const scenario = () =>
     scenarioBuilder()
@@ -292,7 +293,7 @@ test('genre albums use the shared grid and recover after a failed load', async (
     await expect
         .poll(async () => (await controller.lastCall('library:query-albums'))?.payload)
         .toMatchObject({ query: { filter: { genreIds: ['ambient'] } } })
-    await page.getByLabel('Sort by').selectOption('title')
+    await chooseAlbumSort(page, 'Title')
     await expect
         .poll(async () => (await controller.lastCall('library:query-albums'))?.payload)
         .toMatchObject({ query: { sort: { field: 'title' }, filter: { genreIds: ['ambient'] } } })
@@ -318,7 +319,7 @@ test('section changes retain keyboard focus and reset the previous section sort'
     await expect
         .poll(async () => (await controller.lastCall('library:query-albums'))?.payload)
         .toMatchObject({ query: { sort: { field: 'dateAdded', direction: 'desc' } } })
-    await page.getByLabel('Sort by').selectOption('year')
+    await chooseAlbumSort(page, 'Year')
     const tracks = tabs.getByRole('link', { name: /^Tracks / })
     await tracks.focus()
     await page.keyboard.press('Enter')

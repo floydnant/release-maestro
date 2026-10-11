@@ -9,10 +9,9 @@ import {
     viewChild,
 } from '@angular/core'
 import { LibraryFolderValidation, LibraryScanTerminalResult } from '@release-maestro/core'
-import { HlmAlert, HlmAlertDescription } from '@spartan-ng/helm/alert'
 import { HlmButton } from '@spartan-ng/helm/button'
 import { HlmCard } from '@spartan-ng/helm/card'
-import { HlmTooltip } from '@spartan-ng/helm/tooltip'
+import { HlmOverflowTooltip, HlmTooltip } from '@spartan-ng/helm/tooltip'
 import { ElectronService } from '../../../core/services'
 import { LibraryService } from '../../../core/services/library.service'
 import { FolderListComponent } from '../../../shared/components/folder-list/folder-list.component'
@@ -38,10 +37,9 @@ const OUTCOME_LABELS: Record<LibraryScanTerminalResult['outcome'], string> = {
         IconComponent,
         ProgressRingComponent,
         FolderListComponent,
-        HlmAlert,
-        HlmAlertDescription,
         HlmButton,
         HlmCard,
+        HlmOverflowTooltip,
         HlmTooltip,
     ],
     templateUrl: './library-settings.component.html',

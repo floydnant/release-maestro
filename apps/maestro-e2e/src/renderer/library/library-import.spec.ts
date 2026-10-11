@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { fixtureCoverPath } from '../../fixtures/cover-art.fixture'
 import { LibraryScanStatus, LibraryScanTerminalResult } from '@release-maestro/core'
 import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
 
@@ -84,7 +85,7 @@ test('a reachable folder with no supported files still shows the empty-folder re
     await expect(page.getByRole('heading', { name: 'No audio files found' })).toBeVisible()
 })
 
-test('the import dropzone and counters retain their token typography', async ({ page }) => {
+test('the import dropzone and counters keep their original emphasis', async ({ page }) => {
     const status: LibraryScanStatus = {
         ...completedStatus({ discovered: 12, imported: 3, readTotal: 12, readsAttempted: 3 }),
         phase: 'reading',
@@ -101,15 +102,71 @@ test('the import dropzone and counters retain their token typography', async ({ 
             .build(),
         '/import',
     )
-    await expect(page.getByText('Drop folders here')).toHaveCSS('font-weight', '400')
+    await expect(page.getByText('Drop folders here')).toHaveCSS('font-weight', '600')
     await page.getByRole('button', { name: 'Add folders', exact: true }).click()
     await expect(page.getByText('/music', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByRole('heading', { name: 'Importing your library' })).toBeVisible()
     await expect(page.getByLabel('Imported tracks')).toHaveText('3')
-    const family = await page
-        .getByRole('heading', { name: 'Importing your library' })
-        .evaluate(element => getComputedStyle(element).fontFamily)
-    await expect(page.getByLabel('Imported tracks')).toHaveCSS('font-family', family)
-    await expect(page.getByLabel('Failed files count')).toHaveCSS('font-family', family)
+    // Counters are monospaced so their width holds steady while they count up.
+    await expect(page.getByLabel('Imported tracks')).toHaveCSS('font-family', /monospace/)
+    await expect(page.getByLabel('Failed files count')).toHaveCSS('font-family', /monospace/)
+})
+
+test('an inline spinner is exactly its ring and centres on the text beside it', async ({ page }) => {
+    const status: LibraryScanStatus = {
+        ...completedStatus({ discovered: 412 }),
+        phase: 'discovering',
+        finishedAt: null,
+        terminal: null,
+    }
+    await createRendererScenario(
+        page,
+        scenarioBuilder()
+            .settings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
+            .handler('library:start-scan', { kind: 'resolve', value: status })
+            .build(),
+        '/import',
+    )
+    await page.getByRole('button', { name: 'Continue' }).click()
+    const line = page.getByText(/Discovering files/)
+    await expect(line).toBeVisible()
+    const geometry = await line.evaluate(element => {
+        const ring = element.querySelector('app-progress-ring')?.getBoundingClientRect()
+        const row = element.getBoundingClientRect()
+        return (
+            ring && { height: ring.height, offset: ring.top + ring.height / 2 - (row.top + row.height / 2) }
+        )
+    })
+    expect(geometry?.height).toBeCloseTo(18, 0)
+    expect(Math.abs(geometry?.offset ?? Infinity)).toBeLessThan(1)
+})
+
+test('the import page only goes dark once there is cover art to show behind it', async ({ page }) => {
+    const status: LibraryScanStatus = {
+        ...completedStatus({ discovered: 12, imported: 3, readTotal: 12, readsAttempted: 3 }),
+        phase: 'reading',
+        finishedAt: null,
+        terminal: null,
+    }
+    const controller = await createRendererScenario(
+        page,
+        scenarioBuilder()
+            .settings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
+            .handler('library:start-scan', { kind: 'resolve', value: status })
+            .build(),
+        '/import',
+    )
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByRole('heading', { name: 'Importing your library' })).toBeVisible()
+
+    const backdrop = page.locator('app-library-import > div').first()
+    const canvas = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+    await expect(backdrop).toHaveCSS('background-color', canvas)
+
+    await controller.emit('library:scan-status', {
+        status: { ...status, revision: 2 },
+        newAlbums: [{ albumTitle: 'Karasu', artist: 'Kodama', coverPath: fixtureCoverPath('karasu') }],
+    })
+    await expect(backdrop).toHaveCSS('background-color', 'rgb(0, 0, 0)')
 })

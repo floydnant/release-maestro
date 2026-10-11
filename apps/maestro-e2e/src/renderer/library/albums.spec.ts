@@ -10,6 +10,7 @@ import {
     scenarioBuilder,
     type RendererScenarioController,
 } from '../scenario-harness'
+import { chooseAlbumSort, expectAlbumSort } from '../../support/album-sort-control'
 
 /**
  * The albums grid and the album detail page against mocked IPC.
@@ -371,7 +372,7 @@ test.describe('sorting', () => {
     test('asks the read side for the chosen column, and puts it in the URL', async ({ page }) => {
         const controller = await openAlbums(page)
 
-        await page.getByLabel('Sort by').selectOption('year')
+        await chooseAlbumSort(page, 'Year')
 
         await expect.poll(async () => (await lastQuery(controller))?.query.sort.field).toBe('year')
         expect(new URL(page.url()).searchParams.get('sort')).toBe('year')
@@ -382,7 +383,7 @@ test.describe('sorting', () => {
     }) => {
         const controller = await openAlbums(page)
 
-        await page.getByLabel('Sort by').selectOption('year')
+        await chooseAlbumSort(page, 'Year')
 
         await expect.poll(async () => (await lastQuery(controller))?.query.sort.direction).toBe('desc')
     })
@@ -390,9 +391,9 @@ test.describe('sorting', () => {
     test('starts a title sort A–Z', async ({ page }) => {
         const controller = await openAlbums(page, scenarioBuilder().albums(createAlbumRows()).build())
 
-        await page.getByLabel('Sort by').selectOption('year')
+        await chooseAlbumSort(page, 'Year')
         await expect.poll(async () => (await lastQuery(controller))?.query.sort.field).toBe('year')
-        await page.getByLabel('Sort by').selectOption('title')
+        await chooseAlbumSort(page, 'Title')
 
         await expect.poll(async () => (await lastQuery(controller))?.query.sort.direction).toBe('asc')
     })
@@ -403,7 +404,7 @@ test.describe('sorting', () => {
         await expect
             .poll(async () => (await lastQuery(controller))?.query.sort)
             .toEqual({ field: 'dateAdded', direction: 'desc' })
-        await expect(page.getByLabel('Sort by')).toHaveValue('dateAdded')
+        await expectAlbumSort(page, 'Added')
         // A default is not state to carry — a bare `/albums` and the URL the page sits
         // on afterwards have to be the same link.
         expect(new URL(page.url()).searchParams.get('sort')).toBeNull()
@@ -432,7 +433,7 @@ test.describe('sorting', () => {
                 field: 'recordLabel',
                 direction: 'desc',
             })
-        await expect(page.getByLabel('Sort by')).toHaveValue('recordLabel')
+        await expectAlbumSort(page, 'Record label')
     })
 })
 
@@ -500,7 +501,7 @@ test.describe('filtering by entity', () => {
             .poll(async () => (await controller.calls('library:describe-album-filter')).length)
             .toBe(1)
 
-        await page.getByLabel('Sort by').selectOption('year')
+        await chooseAlbumSort(page, 'Year')
         await expect.poll(async () => (await lastQuery(controller))?.query.sort.field).toBe('year')
 
         expect(await controller.calls('library:describe-album-filter')).toHaveLength(1)

@@ -1,4 +1,3 @@
-import { HlmAlert, HlmAlertDescription } from '@spartan-ng/helm/alert'
 import { HlmButton } from '@spartan-ng/helm/button'
 import {
     ChangeDetectionStrategy,
@@ -48,7 +47,7 @@ const KINDS: Record<
     selector: 'app-entity-albums',
     templateUrl: './entity-albums.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [HlmAlert, HlmAlertDescription, HlmButton, AlbumGridComponent, AlbumSortBarComponent],
+    imports: [HlmButton, AlbumGridComponent, AlbumSortBarComponent],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class EntityAlbumsComponent {

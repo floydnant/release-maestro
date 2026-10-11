@@ -25,7 +25,8 @@ test.describe('release feed playback scenarios', () => {
 
         await page.getByRole('button', { name: 'Play Karasu' }).click()
         await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Seek within Karasu' })).toHaveCSS('font-weight', '400')
+        // The playing track is set in bold, as it was before the shared-control migration.
+        await expect(page.getByRole('button', { name: 'Seek within Karasu' })).toHaveCSS('font-weight', '700')
 
         const progress = page.getByRole('progressbar', { name: 'Karasu playback progress' })
         await expect

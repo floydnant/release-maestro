@@ -1,5 +1,4 @@
-import { HlmButton } from '@spartan-ng/helm/button'
-import { HlmTooltip } from '@spartan-ng/helm/tooltip'
+import { HlmOverflowTooltip } from '@spartan-ng/helm/tooltip'
 import {
     afterNextRender,
     afterRenderEffect,
@@ -56,7 +55,7 @@ export interface CatalogListRow extends CatalogEntityRef {
     selector: 'app-catalog-list',
     templateUrl: './catalog-list.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [HlmTooltip, HlmButton, DecimalPipe, RouterLink],
+    imports: [HlmOverflowTooltip, DecimalPipe, RouterLink],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class CatalogListComponent {

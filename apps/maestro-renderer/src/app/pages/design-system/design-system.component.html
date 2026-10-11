@@ -10,7 +10,7 @@
     <div class="mx-auto mt-8 grid max-w-[65rem] gap-8">
         <app-spartan-specimen />
 
-        <section hlmCard class="token-panel | gap-0 p-6">
+        <section hlmCard class="token-panel | p-6">
             <h2 class="type-section-title">Foundation colors</h2>
             <div class="foundation-color-grid mt-4">
                 @for (column of foundationColorColumns; track column.family) {
@@ -32,7 +32,7 @@
             </div>
         </section>
 
-        <section hlmCard class="token-panel | gap-0 p-6">
+        <section hlmCard class="token-panel | p-6">
             <h2 class="type-section-title">Semantic colors</h2>
             <p class="mt-2 type-body-sm text-content-muted">
                 These are the color names application code should use.
@@ -58,7 +58,7 @@
             </div>
         </section>
 
-        <section hlmCard class="token-panel | gap-0 p-6">
+        <section hlmCard class="token-panel | p-6">
             <h2 class="type-section-title">Contrast pairs</h2>
             <p class="mt-2 type-body-sm text-content-muted">
                 These foreground/background pairs are validated against WCAG AA by the token generator.
@@ -78,7 +78,7 @@
             </div>
         </section>
 
-        <section hlmCard class="token-panel | gap-0 p-6">
+        <section hlmCard class="token-panel | p-6">
             <h2 class="type-section-title">Typography</h2>
             <div class="mt-4 grid gap-4">
                 @for (token of typographyVariants; track token) {
@@ -102,7 +102,7 @@
             </div>
         </section>
 
-        <section hlmCard class="token-panel | gap-0 p-6">
+        <section hlmCard class="token-panel | p-6">
             <h2 class="type-section-title">Spacing and size</h2>
             <div class="token-list mt-4">
                 @for (token of spacingTokens; track token) {
@@ -126,7 +126,7 @@
             </div>
         </section>
 
-        <section hlmCard class="token-panel | gap-0 p-6">
+        <section hlmCard class="token-panel | p-6">
             <h2 class="type-section-title">Radii, shadows, and opacity</h2>
             <div class="sample-grid mt-4">
                 @for (token of radiusTokens; track token) {

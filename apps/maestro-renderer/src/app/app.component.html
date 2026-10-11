@@ -12,11 +12,10 @@
                 >
                     <button
                         hlmBtn
-                        variant="history"
+                        variant="ghost"
                         size="icon-xs"
-                        class="history-back-button | rounded-md disabled:cursor-default data-disabled:bg-transparent"
+                        class="history-back-button | rounded-md disabled:cursor-default"
                         type="button"
-                        hlmTooltip="Back"
                         aria-label="Back"
                         [disabled]="!history.canGoBack()"
                         (click)="history.back()"
@@ -25,11 +24,10 @@
                     </button>
                     <button
                         hlmBtn
-                        variant="history"
+                        variant="ghost"
                         size="icon-xs"
-                        class="history-forward-button | rounded-md disabled:cursor-default data-disabled:bg-transparent"
+                        class="history-forward-button | rounded-md disabled:cursor-default"
                         type="button"
-                        hlmTooltip="Forward"
                         aria-label="Forward"
                         [disabled]="!history.canGoForward()"
                         (click)="history.forward()"
@@ -46,7 +44,7 @@
                             <a
                                 hlmBtn
                                 variant="navigation"
-                                class="w-full justify-start"
+                                class="w-full"
                                 routerLink="/home"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
@@ -58,7 +56,7 @@
                             <a
                                 hlmBtn
                                 variant="navigation"
-                                class="w-full justify-start"
+                                class="w-full"
                                 routerLink="/feed"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
@@ -69,7 +67,7 @@
                             <a
                                 hlmBtn
                                 variant="navigation"
-                                class="w-full justify-start"
+                                class="w-full"
                                 routerLink="/tracks"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
@@ -80,7 +78,7 @@
                             <a
                                 hlmBtn
                                 variant="navigation"
-                                class="w-full justify-start"
+                                class="w-full"
                                 routerLink="/albums"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
@@ -91,7 +89,7 @@
                             <a
                                 hlmBtn
                                 variant="navigation"
-                                class="w-full justify-start"
+                                class="w-full"
                                 routerLink="/artists"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
@@ -102,7 +100,7 @@
                             <a
                                 hlmBtn
                                 variant="navigation"
-                                class="w-full justify-start"
+                                class="w-full"
                                 routerLink="/record-labels"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
@@ -113,7 +111,7 @@
                             <a
                                 hlmBtn
                                 variant="navigation"
-                                class="w-full justify-start"
+                                class="w-full"
                                 routerLink="/genres"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
@@ -124,7 +122,7 @@
                             <a
                                 hlmBtn
                                 variant="navigation"
-                                class="w-full justify-start"
+                                class="w-full"
                                 routerLink="/settings"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
@@ -135,7 +133,7 @@
                 </nav>
 
                 @if (showLibrarySetupCta()) {
-                    <hr hlmSeparator class="my-4" />
+                    <hr />
                     <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
                     <a hlmBtn class="mt-2 w-full" routerLink="/import">Set up library</a>
                 }
@@ -180,7 +178,7 @@
                                     [diameter]="25"
                                     [strokeWidth]="2.5"
                                     color="content.success"
-                                    bgColor="background.surface"
+                                    bgColor="background.canvas"
                                     [progress]="libraryScanPercent()"
                                 ></app-progress-ring>
                             } @else {
@@ -189,7 +187,7 @@
                                     [diameter]="25"
                                     [strokeWidth]="2.5"
                                     color="content.secondary"
-                                    bgColor="background.surface"
+                                    bgColor="background.canvas"
                                 ></app-progress-ring>
                             }
 
@@ -349,9 +347,9 @@
                 <div class="title-bar__controls | flex [-webkit-app-region:no-drag]">
                     <button
                         hlmBtn
-                        variant="ghost"
-                        size="icon"
-                        class="title-bar__button | h-full w-[2.875rem] rounded-none text-content-muted hover:bg-transparent hover:text-content-muted active:bg-transparent [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
+                        variant="plain"
+                        size="none"
+                        class="title-bar__button | h-full w-[2.875rem] text-content-muted [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
                         type="button"
                         aria-label="Minimize"
                         hlmTooltip="Minimize"
@@ -361,9 +359,9 @@
                     </button>
                     <button
                         hlmBtn
-                        variant="ghost"
-                        size="icon"
-                        class="title-bar__button | h-full w-[2.875rem] rounded-none text-content-muted hover:bg-transparent hover:text-content-muted active:bg-transparent [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
+                        variant="plain"
+                        size="none"
+                        class="title-bar__button | h-full w-[2.875rem] text-content-muted [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
                         type="button"
                         aria-label="Maximize"
                         hlmTooltip="Maximize"
@@ -373,9 +371,9 @@
                     </button>
                     <button
                         hlmBtn
-                        variant="ghost"
-                        size="icon"
-                        class="title-bar__button--close | h-full w-[2.875rem] rounded-none text-content-muted hover:bg-transparent hover:text-content-muted active:bg-transparent [&:hover]:bg-status-danger-background [&:hover]:text-status-danger-content"
+                        variant="plain"
+                        size="none"
+                        class="title-bar__button--close | h-full w-[2.875rem] text-content-muted [&:hover]:bg-status-danger-background [&:hover]:text-status-danger-content"
                         type="button"
                         aria-label="Close"
                         hlmTooltip="Close"

@@ -26,21 +26,35 @@ const remPadding = (
     )
 
 test.describe('existing control appearance', () => {
-    test('fills history buttons only while the pointer hovers them', async ({ page }) => {
+    test('keeps the arrow cursor on styled links and disclosures', async ({ page }) => {
+        await createRendererScenario(page, scenarioBuilder().build(), '/settings/debug')
+        const navigationLink = page.getByRole('link', { name: 'Settings', exact: true })
+        await navigationLink.hover()
+        await expect(navigationLink).toHaveCSS('cursor', 'default')
+        const disclosure = page.locator('summary', { hasText: 'Health payload' })
+        await expect(disclosure).toHaveCSS('cursor', 'default')
+    })
+
+    test('history buttons share the quiet control states and stay unfilled while disabled', async ({
+        page,
+    }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/home')
+        const forward = page.getByRole('button', { name: 'Forward', exact: true })
+        await expect(forward).toBeDisabled()
+        await expect(forward).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+
         await page.getByRole('link', { name: 'Settings', exact: true }).click()
         const back = page.getByRole('button', { name: 'Back', exact: true })
         await expect(back).toBeEnabled()
         await page.mouse.move(0, 0)
-        await page.getByRole('link', { name: 'Home', exact: true }).press('Shift+Tab')
-        await expect(back).toBeFocused()
-        await expect.poll(() => back.evaluate(element => element.matches(':focus-visible'))).toBe(true)
         await expect(back).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
         await hoverAndSettle(back)
-        await expect(back).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+        const hovered = await back.evaluate(element => getComputedStyle(element).backgroundColor)
+        expect(hovered).not.toBe('rgba(0, 0, 0, 0)')
         await page.mouse.move(0, 0)
+        await page.getByRole('link', { name: 'Home', exact: true }).press('Shift+Tab')
         await expect(back).toBeFocused()
-        await expect(back).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+        await expect(back).toHaveCSS('background-color', hovered)
     })
 
     test('sizes regular buttons from their text and original padding', async ({ page }) => {
@@ -67,7 +81,7 @@ test.describe('existing control appearance', () => {
             .toBeLessThan(1)
     })
 
-    test('keeps feed seek targets and snooze controls visually plain on hover', async ({ page }) => {
+    test('keeps feed seek targets plain and gives snooze the quiet icon-button states', async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().feed([createHydratedRelease()]).build(), '/feed')
         const seeker = page.getByRole('button', { name: 'Seek within Karasu' })
         await hoverAndSettle(seeker)
@@ -75,10 +89,19 @@ test.describe('existing control appearance', () => {
         await expect(seeker).toHaveCSS('padding-left', '0px')
         await expect.poll(() => remPadding(seeker, 'paddingTop')).toBeCloseTo(0.25, 3)
         const snooze = page.getByRole('button', { name: 'Snooze release', exact: true })
-        await hoverAndSettle(snooze)
+        await page.mouse.move(0, 0)
         await expect(snooze).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-        await expect.poll(() => remPadding(snooze, 'paddingLeft')).toBeCloseTo(0.5, 3)
-        await expect.poll(() => remPadding(snooze, 'paddingTop')).toBeCloseTo(0.5, 3)
+        await hoverAndSettle(snooze)
+        await expect(snooze).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+        await expect
+            .poll(() =>
+                snooze.evaluate(
+                    element =>
+                        element.getBoundingClientRect().width /
+                        parseFloat(getComputedStyle(document.documentElement).fontSize),
+                ),
+            )
+            .toBeCloseTo(2.25, 2)
     })
 
     test('keeps sortable track headings plain and at their original height', async ({ page }) => {
