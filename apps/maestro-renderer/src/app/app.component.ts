@@ -6,7 +6,6 @@ import {
     effect,
     ElementRef,
     inject,
-    linkedSignal,
     signal,
     viewChild,
 } from '@angular/core'
@@ -14,7 +13,6 @@ import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
 import { TranslateService } from '@ngx-translate/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
-import { HlmCollapsibleImports } from '@spartan-ng/helm/collapsible'
 import { HlmSidebarImports } from '@spartan-ng/helm/sidebar'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { filter, map } from 'rxjs'
@@ -26,6 +24,7 @@ import { FeedService } from './core/services/feed.service'
 import { HistoryService } from './core/services/history.service'
 import { LibraryService } from './core/services/library.service'
 import { SettingsService } from './core/settings/settings.service'
+import { settingsLink } from './pages/settings/settings-link'
 import { IconComponent } from './shared/components/icon/icon.component'
 import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
 import { MinDwellPacer } from './shared/utils/min-dwell-pacer'
@@ -83,7 +82,6 @@ const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contentedit
         IconComponent,
         EmailImportIndicatorComponent,
         HlmButtonImports,
-        HlmCollapsibleImports,
         HlmSidebarImports,
         HlmTooltipImports,
     ],
@@ -195,10 +193,7 @@ export class AppComponent {
     /** The onboarding/import flow takes over the whole window: no sidebar, title bar floats on top. */
     isImportRoute = computed(() => this.currentUrl().startsWith('/import'))
 
-    isSettingsRoute = computed(() => this.currentUrl().startsWith('/settings'))
-    /** Settings children open on any settings route; a manual toggle lasts until the next navigation. */
-    readonly settingsExpanded = linkedSignal(() => this.isSettingsRoute())
-    readonly showDevelopmentSettings = !webEnv.production
+    readonly settingsLink = settingsLink
 
     /**
      * Paced title bar view of the scan. Startup scans hold each phase for a

@@ -111,102 +111,8 @@
                         </ul>
                     </div>
                     <ul hlmSidebarMenu>
-                        <li hlmSidebarMenuItem hlmCollapsible [(expanded)]="settingsExpanded">
-                            <!-- Collapsed, the parent stands in for the current settings page it hides. -->
-                            <a
-                                hlmSidebarMenuButton
-                                routerLink="/settings/library"
-                                [isActive]="isSettingsRoute() && !settingsExpanded()"
-                                >Settings</a
-                            >
-                            <button
-                                hlmSidebarMenuAction
-                                hlmCollapsibleTrigger
-                                class="settings-toggle |"
-                                [attr.aria-label]="
-                                    settingsExpanded() ? 'Collapse settings' : 'Expand settings'
-                                "
-                            >
-                                <app-icon
-                                    name="chevronDown"
-                                    size="16"
-                                    [class.-rotate-90]="!settingsExpanded()"
-                                ></app-icon>
-                            </button>
-                            <ul hlmSidebarMenuSub hlmCollapsibleContent aria-label="Settings">
-                                <li class="settings-group |">
-                                    <div hlmSidebarGroupLabel id="settings-group-music-library" class="px-2">
-                                        Music library
-                                    </div>
-                                    <ul
-                                        class="flex flex-col gap-1"
-                                        aria-labelledby="settings-group-music-library"
-                                    >
-                                        <li hlmSidebarMenuSubItem>
-                                            <a
-                                                hlmSidebarMenuSubButton
-                                                routerLink="/settings/library"
-                                                routerLinkActive=""
-                                                ariaCurrentWhenActive="page"
-                                                >Library</a
-                                            >
-                                        </li>
-                                    </ul>
-                                </li>
-                                <li class="settings-group |">
-                                    <div hlmSidebarGroupLabel id="settings-group-import-sources" class="px-2">
-                                        Import sources
-                                    </div>
-                                    <ul
-                                        class="flex flex-col gap-1"
-                                        aria-labelledby="settings-group-import-sources"
-                                    >
-                                        <li hlmSidebarMenuSubItem>
-                                            <a
-                                                hlmSidebarMenuSubButton
-                                                routerLink="/settings/apple-mail"
-                                                routerLinkActive=""
-                                                ariaCurrentWhenActive="page"
-                                                >Apple Mail</a
-                                            >
-                                        </li>
-                                    </ul>
-                                </li>
-                                @if (showDevelopmentSettings) {
-                                    <li class="settings-group |">
-                                        <div
-                                            hlmSidebarGroupLabel
-                                            id="settings-group-development"
-                                            class="px-2"
-                                        >
-                                            Development
-                                        </div>
-                                        <ul
-                                            class="flex flex-col gap-1"
-                                            aria-labelledby="settings-group-development"
-                                        >
-                                            <li hlmSidebarMenuSubItem>
-                                                <a
-                                                    hlmSidebarMenuSubButton
-                                                    routerLink="/settings/debug"
-                                                    routerLinkActive=""
-                                                    ariaCurrentWhenActive="page"
-                                                    >Debug</a
-                                                >
-                                            </li>
-                                            <li hlmSidebarMenuSubItem>
-                                                <a
-                                                    hlmSidebarMenuSubButton
-                                                    routerLink="/settings/design-system"
-                                                    routerLinkActive=""
-                                                    ariaCurrentWhenActive="page"
-                                                    >Design system</a
-                                                >
-                                            </li>
-                                        </ul>
-                                    </li>
-                                }
-                            </ul>
+                        <li hlmSidebarMenuItem>
+                            <a hlmSidebarMenuButton [routerLink]="settingsLink('library')">Settings</a>
                         </li>
                     </ul>
                 </nav>
@@ -468,4 +374,7 @@
             <router-outlet></router-outlet>
         </main>
     </div>
+
+    <!-- Settings open as a dialog over whatever page is showing. -->
+    <router-outlet name="modal"></router-outlet>
 </div>

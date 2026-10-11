@@ -99,9 +99,9 @@ test('failed files surface in Library Settings, linked from onboarding', async (
     await expect(page.getByLabel('Failed files count')).toHaveText('1')
     await page.getByRole('link', { name: 'View failed files' }).click()
 
-    await expect(page).toHaveURL(/\/settings\/library$/)
+    await expect(page).toHaveURL(/\(modal:settings\/library\)$/)
     await expect(page.getByRole('heading', { name: 'Failed files' })).toBeVisible()
-    const failedList = page.getByLabel('Failed files')
+    const failedList = page.getByRole('dialog', { name: 'Settings' }).getByLabel('Failed files')
     await expect(failedList).toContainText('zz-broken.mp3')
     await expect(page.getByText('could not be imported.')).toBeVisible()
     await expect(page.getByLabel('Latest scan result')).toContainText('1 failed')
@@ -146,8 +146,9 @@ test('library routes are available after onboarding is skipped', async ({}, test
     await expect(page.getByRole('heading', { name: 'Tracks' })).toBeVisible()
 
     await page.getByRole('link', { name: 'Library settings' }).click()
-    await expect(page).toHaveURL(/\/settings\/library$/)
+    await expect(page).toHaveURL(/\(modal:settings\/library\)$/)
     await expect(page.getByRole('heading', { name: 'Library folders' })).toBeVisible()
+    await page.keyboard.press('Escape')
 
     await page.getByRole('link', { name: 'Set up library' }).click()
     await expect(page).toHaveURL(/\/import$/)
