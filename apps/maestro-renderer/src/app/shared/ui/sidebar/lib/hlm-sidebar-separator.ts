@@ -12,6 +12,7 @@ import { classes } from '@spartan-ng/helm/utils'
 })
 export class HlmSidebarSeparator {
     constructor() {
-        classes(() => 'mx-2 w-auto bg-border-subtle')
+        // The base separator is full width when horizontal; auto width lets the margins set the inset.
+        classes(() => 'mx-2 bg-border-subtle data-horizontal:w-auto')
     }
 }
