@@ -13,7 +13,6 @@ import { toSignal } from '@angular/core/rxjs-interop'
 import { NavigationEnd, Router, RouterModule } from '@angular/router'
 import { TranslateService } from '@ngx-translate/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
-import { HlmSeparatorImports } from '@spartan-ng/helm/separator'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { filter, map } from 'rxjs'
 import { webEnv } from '../environments/environment'
@@ -81,7 +80,6 @@ const TEXT_ENTRY_SELECTOR = 'input, textarea, [contenteditable]:not([contentedit
         IconComponent,
         EmailImportIndicatorComponent,
         HlmButtonImports,
-        HlmSeparatorImports,
         HlmTooltipImports,
     ],
 })

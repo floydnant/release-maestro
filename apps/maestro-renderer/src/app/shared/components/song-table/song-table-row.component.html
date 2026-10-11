@@ -13,7 +13,6 @@
          reader sees the dash, and the cell's text stays the one glyph. -->
     <span
         class="song-table__track-number | shrink-0 truncate py-0.5 pr-2 pl-4 text-right text-content-secondary tabular-nums"
-        hlmTableCell
         role="gridcell"
         [attr.aria-label]="row().trackNumber == null ? 'No track number' : null"
         [style.width.px]="widths.trackNumber"
@@ -31,8 +30,7 @@
          held off the left edge so it is not cramped against it. Its own square shape comes
          from the row height. -->
     <span
-        class="song-table__cover | shrink-0 self-stretch py-0.5 pr-0 pl-6"
-        hlmTableCell
+        class="song-table__cover | shrink-0 self-stretch py-0.5 pl-6"
         role="gridcell"
         [style.width.px]="widths.cover"
     >
@@ -58,8 +56,7 @@
          dedicated column reserves width in every library, and most libraries have nothing
          missing at all. -->
     <span
-        class="song-table__title | flex shrink-0 grow items-center gap-1.5 px-2 py-0"
-        hlmTableCell
+        class="song-table__title | flex shrink-0 grow items-center gap-1.5 px-2"
         role="gridcell"
         [style.width.px]="widths.title"
     >
@@ -67,10 +64,10 @@
             <button
                 hlmBtn
                 variant="ghost"
-                size="icon-sm"
+                size="none"
                 type="button"
                 tabindex="-1"
-                class="grid size-5 shrink-0 place-items-center rounded-sm p-0 hover:bg-action-quiet-hover"
+                class="size-5 shrink-0 rounded-sm"
                 aria-label="Missing — show only missing tracks"
                 hlmTooltip="Missing — this file is no longer where the library saw it. Show only missing tracks."
                 (click)="onMissingBadge($event)"
@@ -78,17 +75,16 @@
                 <app-icon name="missingSong" size="14" color="content.warning"></app-icon>
             </button>
         }
-        <span class="truncate" [hlmTooltip]="row().title">{{ row().title }}</span>
+        <span class="truncate" [hlmOverflowTooltip]="row().title">{{ row().title }}</span>
     </span>
 }
 
 @if (shown().has('artist')) {
     <span
-        class="song-table__artist | shrink-0 truncate px-2 py-0"
-        hlmTableCell
+        class="song-table__artist | shrink-0 truncate px-2 text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.artist"
-        [hlmTooltip]="row().artistText || ''"
+        [hlmOverflowTooltip]="row().artistText || ''"
     >
         @if (row().artistCredit.length) {
             @for (segment of row().artistCredit; track segment.artistId; let last = $last) {
@@ -96,7 +92,7 @@
                     hlmBtn
                     variant="link"
                     tabindex="-1"
-                    class="inline-block h-auto max-w-full truncate rounded-sm p-0 align-middle type-body-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                    class="inline-block max-w-full truncate align-middle"
                     [routerLink]="['/artists', segment.artistId]"
                     (click)="onDetailLink($event)"
                 >
@@ -114,18 +110,17 @@
 
 @if (shown().has('album')) {
     <span
-        class="song-table__album | shrink-0 truncate px-2 py-0"
-        hlmTableCell
+        class="song-table__album | shrink-0 truncate px-2 text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.album"
-        [hlmTooltip]="row().albumTitle || ''"
+        [hlmOverflowTooltip]="row().albumTitle || ''"
     >
         @if (row().albumId && row().albumTitle) {
             <a
                 hlmBtn
                 variant="link"
                 tabindex="-1"
-                class="inline-block h-auto max-w-full truncate rounded-sm p-0 align-middle type-body-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                class="inline-block max-w-full truncate align-middle"
                 [routerLink]="['/albums', row().albumId]"
                 (click)="onDetailLink($event)"
             >
@@ -139,25 +134,24 @@
 
 @if (shown().has('genre')) {
     <span
-        class="song-table__genre | flex shrink-0 items-center truncate px-2 py-0"
-        hlmTableCell
+        class="song-table__genre | flex shrink-0 items-center truncate px-2 text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.genre"
-        [hlmTooltip]="row().genreText || ''"
+        [hlmOverflowTooltip]="row().genreText || ''"
     >
         @for (genre of row().genres; track genre.id; let last = $last) {
             <a
                 hlmBtn
                 variant="link"
                 tabindex="-1"
-                class="inline-block h-auto max-w-full truncate rounded-sm p-0 align-middle type-body-sm text-content-secondary no-underline underline-offset-2 hover:text-content-action hover:underline"
+                class="inline-block max-w-full truncate align-middle"
                 [routerLink]="['/genres', genre.id]"
                 (click)="onDetailLink($event)"
             >
                 {{ genre.name }}
             </a>
             @if (!last) {
-                <span class="text-content-secondary">, </span>
+                <span>, </span>
             }
         } @empty {
             <span class="text-content-muted">—</span>
@@ -167,8 +161,7 @@
 
 @if (shown().has('bpm')) {
     <span
-        class="song-table__bpm | shrink-0 truncate px-2 py-0 text-right"
-        hlmTableCell
+        class="song-table__bpm | shrink-0 truncate px-2 text-right"
         role="gridcell"
         [style.width.px]="widths.bpm"
     >
@@ -178,8 +171,7 @@
 
 @if (shown().has('musicalKey')) {
     <span
-        class="song-table__key | shrink-0 truncate px-2 py-0"
-        hlmTableCell
+        class="song-table__key | shrink-0 truncate px-2"
         role="gridcell"
         [style.width.px]="widths.musicalKey"
     >
@@ -189,8 +181,7 @@
 
 @if (shown().has('duration')) {
     <span
-        class="song-table__duration | shrink-0 truncate px-2 py-0 text-right text-content-secondary"
-        hlmTableCell
+        class="song-table__duration | shrink-0 truncate px-2 text-right text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.duration"
     >
@@ -200,8 +191,7 @@
 
 @if (shown().has('year')) {
     <span
-        class="song-table__year | shrink-0 truncate px-2 py-0 text-right text-content-secondary"
-        hlmTableCell
+        class="song-table__year | shrink-0 truncate px-2 text-right text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.year"
     >
@@ -211,18 +201,17 @@
 
 @if (shown().has('recordLabel')) {
     <span
-        class="song-table__record-label | shrink-0 truncate px-2 py-0"
-        hlmTableCell
+        class="song-table__record-label | shrink-0 truncate px-2 text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.recordLabel"
-        [hlmTooltip]="row().recordLabelText || ''"
+        [hlmOverflowTooltip]="row().recordLabelText || ''"
     >
         @if (row().recordLabelId && row().recordLabelText) {
             <a
                 hlmBtn
                 variant="link"
                 tabindex="-1"
-                class="inline-block h-auto max-w-full truncate rounded-sm p-0 align-middle type-body-sm text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                class="inline-block max-w-full truncate align-middle"
                 [routerLink]="['/record-labels', row().recordLabelId]"
                 (click)="onDetailLink($event)"
             >
@@ -236,8 +225,7 @@
 
 @if (shown().has('dateAdded')) {
     <span
-        class="song-table__date-added | shrink-0 truncate px-2 py-0 text-content-secondary"
-        hlmTableCell
+        class="song-table__date-added | shrink-0 truncate px-2 text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.dateAdded"
     >

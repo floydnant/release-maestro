@@ -3,8 +3,8 @@
         @for (link of links(); track link.url) {
             <a
                 hlmBtn
-                variant="link"
-                class="external-links__link | inline-flex h-auto items-center gap-1 rounded-sm p-0 type-body-sm text-content-action underline underline-offset-2 hover:text-content-primary"
+                variant="external-link"
+                class="external-links__link | inline-flex items-center gap-1 type-body-sm"
                 [href]="link.url"
                 target="_blank"
                 rel="noopener noreferrer"

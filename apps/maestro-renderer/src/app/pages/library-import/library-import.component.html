@@ -1,8 +1,8 @@
 <div
     class="relative size-full overflow-hidden"
     [ngClass]="{
-        'bg-background-canvas': step() === 'pick',
-        'bg-black': step() !== 'pick',
+        'bg-background-canvas': !showsCoverWall(),
+        'bg-black': showsCoverWall(),
     }"
 >
     @if (step() === 'pick') {
@@ -25,8 +25,9 @@
                     <button
                         hlmBtn
                         variant="ghost"
+                        size="none"
                         type="button"
-                        class="add-folder-btn | w-full grow gap-2 rounded-t-none border-t border-border-subtle px-4 py-3 type-body-md"
+                        class="add-folder-btn | w-full grow gap-2 rounded-b-[10px] border-t border-border-subtle px-4 py-3"
                         aria-label="Add folders"
                         (click)="addFolders()"
                     >
@@ -75,17 +76,23 @@
             [albumCount]="library.mosaicAlbumCount()"
             [active]="library.isScanning()"
         ></app-import-mosaic>
-        <div class="mosaic-veil pointer-events-none absolute inset-0"></div>
+        @if (showsCoverWall()) {
+            <div class="mosaic-veil pointer-events-none absolute inset-0"></div>
+        }
 
-        <div class="absolute inset-0 flex flex-col justify-center">
-            <!-- Full-width band behind the centered UI: solid black through the content,
-                fading out above and below so the cover wall shines around it. Its height
-                follows the content, so it always fits the UI instead of an arbitrary shape. -->
+        <div class="absolute inset-0 flex flex-col justify-center px-6">
+            <!-- One fixed-width card for every step, so the surface never resizes as the scan
+                 moves on. Over the cover wall it frosts: translucent and blurred, set in a
+                 vignette so the covers recede behind the text but keep their color at the edges. -->
             <div
                 hlmCard
-                class="content-band | mx-auto w-fit gap-0 bg-black/70 px-10 py-16 shadow-lg backdrop-blur-md"
+                class="content-band | mx-auto w-full max-w-[34rem] px-10 py-12 text-center"
+                [ngClass]="{
+                    'bg-[color-mix(in_srgb,var(--color-background-surface)_55%,transparent)] shadow-lg backdrop-blur-lg':
+                        showsCoverWall(),
+                }"
             >
-                <div class="mx-auto w-full max-w-2xl px-8 text-center">
+                <div>
                     @if (step() === 'done') {
                         <p class="text-content-success">
                             <app-icon name="success" color="content.success" size="2.5rem"></app-icon>
@@ -125,22 +132,25 @@
                         ></app-progress-bar>
                     }
 
-                    <div class="mx-auto mt-6 grid max-w-xl grid-cols-4 gap-3">
-                        <div class="text-center">
-                            <p class="type-section-title text-content-primary">
+                    <div class="import-stats | mt-6 grid grid-cols-4 divide-x divide-border-subtle">
+                        <div class="py-1">
+                            <p class="type-section-title font-mono text-content-primary">
                                 {{ status.discovered }}
                             </p>
                             <p class="mt-1 type-label-sm text-content-muted">Discovered</p>
                         </div>
-                        <div class="text-center">
-                            <p class="type-section-title text-content-primary" aria-label="Imported tracks">
+                        <div class="py-1">
+                            <p
+                                class="type-section-title font-mono text-content-primary"
+                                aria-label="Imported tracks"
+                            >
                                 {{ status.imported }}
                             </p>
                             <p class="mt-1 type-label-sm text-content-muted">Imported</p>
                         </div>
-                        <div class="text-center">
+                        <div class="py-1">
                             <p
-                                class="type-section-title"
+                                class="type-section-title font-mono"
                                 aria-label="Failed files count"
                                 [class.text-content-danger]="status.failedFiles > 0"
                                 [class.text-content-primary]="status.failedFiles === 0"
@@ -149,9 +159,9 @@
                             </p>
                             <p class="mt-1 type-label-sm text-content-muted">Failed</p>
                         </div>
-                        <div class="text-center">
+                        <div class="py-1">
                             <p
-                                class="type-section-title"
+                                class="type-section-title font-mono"
                                 [class.text-content-warning]="status.normalizationIssues > 0"
                                 [class.text-content-primary]="status.normalizationIssues === 0"
                             >
@@ -181,8 +191,7 @@
                                 <a
                                     hlmBtn
                                     variant="link"
-                                    size="none"
-                                    class="underline"
+                                    class="underline decoration-content-muted hover:decoration-current"
                                     routerLink="/settings/library"
                                     >View failed files</a
                                 >
@@ -194,16 +203,14 @@
                                 The next startup scan picks up where this one left off.
                             </p>
                         } @else {
-                            <div hlmAlert variant="plain" class="import-error | mt-6">
-                                <p hlmAlertDescription class="type-body-md text-content-danger">
-                                    <app-icon
-                                        name="error"
-                                        color="content.danger"
-                                        class="translate-y-px align-middle"
-                                    ></app-icon>
-                                    {{ terminal.error?.message || 'The import failed unexpectedly.' }}
-                                </p>
-                            </div>
+                            <p
+                                class="mt-6 flex items-center justify-center gap-2 type-body-md text-content-danger"
+                            >
+                                <app-icon name="error" color="content.danger" class="shrink-0"></app-icon>
+                                <span>{{
+                                    terminal.error?.message || 'The import failed unexpectedly.'
+                                }}</span>
+                            </p>
                         }
                         <div class="mt-4 flex items-center justify-center gap-3">
                             <button hlmBtn type="button" (click)="retryScan()">Retry import</button>
@@ -219,8 +226,7 @@
                                 <a
                                     hlmBtn
                                     variant="link"
-                                    size="none"
-                                    class="underline"
+                                    class="underline decoration-content-muted hover:decoration-current"
                                     routerLink="/settings/library"
                                     >View failed files</a
                                 >

@@ -38,7 +38,7 @@
                 hlmBtn
                 variant="plain"
                 type="button"
-                class="absolute inset-y-0 right-0 grid place-items-center text-content-muted hover:text-content-primary"
+                class="absolute inset-y-0 right-0 text-content-muted hover:text-content-primary"
                 aria-label="Clear search"
                 (click)="onClearSearch()"
             >
@@ -54,18 +54,15 @@
 @if (filters().chips.length || filters().hasFilter) {
     <div class="browse-shell__chips | flex shrink-0 flex-wrap items-center gap-2 px-4 py-2">
         @for (chip of filters().chips; track chip.kind + chip.id) {
-            <span
-                hlmBadge
-                variant="secondary"
-                class="relative gap-1 overflow-visible border-border-subtle bg-background-surface pr-[1.75rem]"
-            >
+            <span hlmBadge variant="secondary" class="relative overflow-visible pr-[1.75rem]">
                 <span class="text-content-muted">{{ chip.kindLabel }}</span>
                 {{ chip.name }}
                 <button
                     hlmBtn
                     variant="ghost"
+                    size="none"
                     type="button"
-                    class="absolute inset-y-0 right-0 flex h-auto items-center rounded-full p-0 px-1.5 text-content-muted hover:bg-action-quiet-hover hover:text-content-primary"
+                    class="absolute inset-y-0 right-0 rounded-full px-1.5 text-content-muted"
                     [attr.aria-label]="'Remove ' + chip.kindLabel + ' filter ' + chip.name"
                     (click)="chipRemove.emit(chip)"
                 >

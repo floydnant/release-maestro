@@ -2,7 +2,7 @@
     <a
         hlmBtn
         variant="ghost"
-        class="tab-bar__tab | relative gap-1.5 text-content-secondary after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full hover:bg-action-quiet-hover hover:text-content-primary aria-[current=page]:text-content-primary aria-[current=page]:after:bg-action-primary"
+        class="tab-bar__tab | relative gap-1.5 after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full aria-[current=page]:text-content-primary aria-[current=page]:after:bg-action-primary"
         [routerLink]="tab.link ?? '.'"
         [queryParams]="tab.queryParams ?? {}"
         [replaceUrl]="replaceUrl()"
