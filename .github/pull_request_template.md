@@ -7,6 +7,8 @@ Everything else is your call: add, rename, or drop sections to fit the change.
 Replace MAE-000 and the URL with the Linear issue this pull request closes, or "Closes N/A" if
 there is none associated.
 
+An agent writing this puts its model and harness on the first line, above Closes. See AGENTS.md.
+
 Do not list the checks you ran. CI reports those.
 -->
 
