@@ -31,16 +31,18 @@ export const buttonVariants = cva(
                 'external-link':
                     'inline shrink rounded-sm text-content-primary underline decoration-content-muted underline-offset-2 hover:text-content-action hover:decoration-current',
             },
+            // Every single-line control (buttons, inputs, selects) shares one fixed height, so
+            // controls placed side by side line up whatever their border or type. `xs` and `lg`
+            // are for chrome and standalone actions that are deliberately smaller or larger.
             size: {
-                default: 'rounded-lg px-3 py-1.5 type-label-md',
+                default: 'h-(--foundation-size-control-sm) rounded-lg px-3 type-label-md',
                 none: '',
                 xs: 'h-6 gap-1 rounded-md px-2 type-label-sm',
                 sm: 'h-(--foundation-size-control-sm) gap-1.5 rounded-lg px-2.5 type-label-sm',
-                lg: 'h-(--foundation-size-control-lg) rounded-lg px-4 type-label-md',
-                icon: 'size-(--foundation-size-control-md) rounded-lg p-0',
+                lg: 'h-(--foundation-size-control-md) rounded-lg px-4 type-label-md',
+                icon: 'size-(--foundation-size-control-sm) rounded-lg p-0',
                 'icon-xs': 'size-6 rounded-lg p-0',
-                'icon-sm': 'size-(--foundation-size-control-sm) rounded-lg p-0',
-                'icon-lg': 'size-(--foundation-size-control-lg) rounded-lg p-0',
+                'icon-lg': 'size-(--foundation-size-control-md) rounded-lg p-0',
             },
         },
         compoundVariants: [

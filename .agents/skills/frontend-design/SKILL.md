@@ -12,7 +12,8 @@ semantic tokens and established compositions when building or refining renderer 
   cards, progress indicators and overlays. Use their variants before adding product-level styling.
   Repeated changes to appearance belong in the shared component defaults.
 - A migration preserves the existing visuals. Compare the previous padding, content height,
-  typography and interaction states before choosing a variant. Regular buttons remain content-sized.
+  typography and interaction states before choosing a variant. Single-line controls share one fixed
+  height from the shared defaults; do not size them with vertical padding.
   Invisible click targets use `variant="plain" size="none"` and retain their existing layout;
   seeking targets and sortable headings do not get hover backgrounds. The component library supplies
   behavior without imposing a new visual treatment.

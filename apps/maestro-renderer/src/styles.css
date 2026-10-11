@@ -104,6 +104,7 @@ body {
     [role='button'] {
         @apply cursor-default;
     }
+
     input,
     textarea,
     button,
