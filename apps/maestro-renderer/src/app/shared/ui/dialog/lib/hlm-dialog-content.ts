@@ -42,7 +42,7 @@ type HlmDialogContentContext = {
         }
 
         @if (showCloseButton()) {
-            <button hlmBtn variant="ghost" size="icon-sm" class="absolute inset-e-3 top-3" hlmDialogClose>
+            <button hlmBtn variant="ghost" size="icon" class="absolute inset-e-3 top-3" hlmDialogClose>
                 <span class="sr-only">{{ closeLabel() }}</span>
                 <app-icon name="close" />
             </button>

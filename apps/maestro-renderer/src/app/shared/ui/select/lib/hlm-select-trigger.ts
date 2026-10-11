@@ -19,7 +19,6 @@ import type { ClassValue } from 'clsx'
             [id]="buttonId()"
             [class]="_computedClass()"
             [aria-invalid]="ariaInvalidInput()"
-            [attr.data-size]="size()"
             data-slot="select-trigger"
         >
             <ng-content />
@@ -34,14 +33,12 @@ export class HlmSelectTrigger {
     public readonly userClass = input<ClassValue>('', { alias: 'class' })
     protected readonly _computedClass = computed(() =>
         hlm(
-            'h-(--foundation-size-control-md) gap-2 rounded-lg border border-border-default bg-background-canvas px-3 py-1 type-body-md text-content-primary transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-border-focus data-[size=sm]:h-(--foundation-size-control-sm) data-[matches-spartan-invalid=true]:border-status-danger-border flex w-fit items-center justify-between whitespace-nowrap outline-none disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
+            'h-(--foundation-size-control-sm) gap-2 rounded-lg border border-border-default bg-background-canvas px-3 py-0 type-body-md text-content-primary transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-border-focus data-[matches-spartan-invalid=true]:border-status-danger-border flex w-fit items-center justify-between whitespace-nowrap outline-none disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
             this.userClass(),
         ),
     )
 
     public readonly buttonId = input<string>(`hlm-select-trigger-${HlmSelectTrigger._id++}`)
-
-    public readonly size = input<'default' | 'sm'>('default')
 
     /** Whether to force the trigger into an invalid state. */
     public readonly forceInvalid = input<boolean, BooleanInput>(false, { transform: booleanAttribute })

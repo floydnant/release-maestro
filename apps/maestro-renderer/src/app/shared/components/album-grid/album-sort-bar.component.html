@@ -1,7 +1,7 @@
 <label class="type-label-sm text-content-muted" for="album-sort-field">Sort by</label>
 
 <hlm-select [value]="sort().field" [itemToString]="optionLabel" (valueChange)="onFieldChange($event)">
-    <hlm-select-trigger buttonId="album-sort-field" size="sm">
+    <hlm-select-trigger buttonId="album-sort-field">
         <!-- Every label shares the value's grid cell, so the trigger is as wide as the longest
              option and the direction toggle beside it stays put when the field changes. -->
         <span class="grid justify-items-start">
@@ -21,7 +21,7 @@
 <button
     hlmBtn
     variant="ghost"
-    size="icon-sm"
+    size="icon"
     type="button"
     [attr.aria-label]="directionLabel()"
     [hlmTooltip]="directionLabel()"
