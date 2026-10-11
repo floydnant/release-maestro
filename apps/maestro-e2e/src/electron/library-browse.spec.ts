@@ -262,6 +262,7 @@ test('tracks whose files went away stay listed, marked, and can be scoped to', a
     await page.getByRole('link', { name: 'Settings' }).click()
     await page.getByRole('link', { name: 'Library', exact: true }).click()
     await expect(page.getByLabel('Latest scan result')).toContainText('Completed', { timeout: 20_000 })
+    await page.keyboard.press('Escape')
 
     await page.getByRole('link', { name: 'Tracks' }).click()
     await expect(page.getByRole('grid', { name: 'Tracks' })).toBeVisible()
