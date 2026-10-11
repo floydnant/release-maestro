@@ -9,7 +9,7 @@ test.describe('settings dialog', () => {
 
         const dialog = page.getByRole('dialog', { name: 'Settings' })
         await expect(dialog).toBeVisible()
-        await expect(page).toHaveURL(/\/tracks\(modal:settings\/library\)$/)
+        await expect(page).toHaveURL(/\/tracks\(modal:settings\/library-folders\)$/)
 
         await dialog.getByRole('link', { name: 'Apple Mail' }).click()
         await expect(page).toHaveURL(/\/tracks\(modal:settings\/apple-mail\)$/)
@@ -28,7 +28,7 @@ test.describe('settings dialog', () => {
         await expect(page).toHaveURL(/\/tracks\(modal:settings\/apple-mail\)$/)
 
         await page.goBack()
-        await expect(page).toHaveURL(/\/tracks\(modal:settings\/library\)$/)
+        await expect(page).toHaveURL(/\/tracks\(modal:settings\/library-folders\)$/)
         await expect(dialog.getByRole('heading', { name: 'Library folders' })).toBeVisible()
 
         await page.goBack()

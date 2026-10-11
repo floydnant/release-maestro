@@ -77,7 +77,7 @@ test('cancelling an import mid-scan self-heals via the startup rescan', async ({
     page = await app.firstWindow()
     await expect(page).toHaveURL(/\/home$/)
     await page.getByRole('link', { name: 'Settings' }).click()
-    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await page.getByRole('link', { name: 'Library folders', exact: true }).click()
     await expect(page.getByText(/Last completed scan: .*1500 tracks/)).toBeVisible({
         timeout: 120_000,
     })
