@@ -16,7 +16,9 @@ export class HlmCard {
     constructor() {
         classes(() =>
             hlm(
-                'gap-6 rounded-xl border border-border-subtle bg-background-surface text-content-primary shadow-md group/card flex flex-col',
+                // A plain panel by default. Only a card composed from header/content/footer parts
+                // lays them out as a column with Helm's spacing.
+                'rounded-xl border border-border-subtle bg-background-surface text-content-primary shadow-md group/card has-[>[data-slot=card-header]]:flex has-[>[data-slot=card-header]]:flex-col has-[>[data-slot=card-header]]:gap-6',
             ),
         )
     }

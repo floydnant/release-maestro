@@ -8,14 +8,32 @@ semantic tokens and established compositions when building or refining renderer 
 
 ## Use shared Spartan components
 
-- Standard controls come from `apps/maestro-renderer/src/app/shared/ui/`: buttons, fields, badges,
-  cards, progress indicators and overlays. Use their variants before adding product-level styling.
-  Repeated changes to appearance belong in the shared component defaults.
+- Source every standard control (anything a component library would ship: buttons, fields, menus,
+  overlays, pickers, toggles, tabs, sliders) in this order:
+    1. **Shared UI.** `apps/maestro-renderer/src/app/shared/ui/` holds the adapted Helm families; its
+       directory listing is the inventory. Use their variants before adding product-level styling.
+       Repeated changes to appearance belong in the shared component defaults.
+    2. **Spartan.** When shared UI lacks the control, match the use case against the Helm families at
+       the pinned tag in [upstream.json](../../../apps/maestro-renderer/src/app/shared/ui/upstream.json)
+       (`gh api 'repos/spartan-ng/spartan/contents/libs/helm?ref=<tag>' --jq '.[].name'`). Upstream
+       ships far more than this repo has copied, such as combobox, popover, command, sheet, switch,
+       toggle-group, slider, tabs and scroll-area. Add a matching family to shared UI by following
+       [shared UI maintenance](../../../apps/maestro-renderer/src/app/shared/ui/README.md), which also
+       governs updating an existing family, then use it from there.
+    3. **Product markup.** Build the control yourself only when no Helm family covers the behavior,
+       or when the element keeps a look a family would have to fight (see below). Name the families
+       you ruled out in the handoff or PR description.
 - A migration preserves the existing visuals. Compare the previous padding, content height,
-  typography and interaction states before choosing a variant. Regular buttons remain content-sized.
+  typography and interaction states before choosing a variant. Single-line controls share one fixed
+  height from the shared defaults; do not size them with vertical padding.
   Invisible click targets use `variant="plain" size="none"` and retain their existing layout;
   seeking targets and sortable headings do not get hover backgrounds. The component library supplies
   behavior without imposing a new visual treatment.
+- If keeping the existing look means cancelling most of a component's classes, the element is not
+  that component. Keep its own markup instead of applying the directive and overriding it.
+- Text links use `variant="link"` for internal navigation and `variant="external-link"` for links
+  that leave the app. Truncated text gets `hlmOverflowTooltip`, which only appears while the text is
+  cut off; `hlmTooltip` is for labelling or explaining a control.
 - Brain supplies the packaged interaction behavior. Helm source is local and editable. Keep data
   fetching, domain state and recovery actions in product components; compose their controls from
   shared UI.
@@ -25,9 +43,6 @@ semantic tokens and established compositions when building or refining renderer 
 - Navigation stays in actual links with RouterLink and the history behavior in
   [ADR 0006](../../../docs/adr/0006-only-route-changes-are-history-steps.md). A content-panel tabs
   widget is for local panels; route tabs keep their navigation semantics.
-- Before adding or updating a shared component, read
-  [shared UI maintenance](../../../apps/maestro-renderer/src/app/shared/ui/README.md). It covers tagged
-  source, token adaptation, licensing and the checks for copied code.
 
 ## Use the design system and Tailwind
 
@@ -174,6 +189,5 @@ from how you use them.
   cursors, parallax, or ornamental scroll effects.
 - Assuming a light theme. The token set is dark-only; use semantic tokens rather than literal colors
   so the app stays theme-correct.
-- Rebuilding a standard control that shared Spartan components already provide.
 - Adding another component library or a global theme that duplicates the existing semantic tokens.
 - Building a screen that only handles the happy path.

@@ -8,6 +8,7 @@ import {
     respond,
     scenarioBuilder,
 } from '../scenario-harness'
+import { chooseAlbumSort } from '../../support/album-sort-control'
 
 const scenario = () =>
     scenarioBuilder()
@@ -143,7 +144,8 @@ test('keeps resolved genre links within one row and preserves the tag in a toolt
     const cell = page
         .getByRole('gridcell')
         .filter({ has: page.getByRole('link', { name: 'Deep Progressive House' }) })
-    await expect(cell).toHaveAttribute('title', 'Techno; Ambient; Deep Progressive House')
+    await cell.hover()
+    await expect(page.getByRole('tooltip')).toHaveText('Techno; Ambient; Deep Progressive House')
     const bounds = await cell.boundingBox()
     expect(bounds).not.toBeNull()
     for (const link of await cell.getByRole('link').all()) {
@@ -291,7 +293,7 @@ test('genre albums use the shared grid and recover after a failed load', async (
     await expect
         .poll(async () => (await controller.lastCall('library:query-albums'))?.payload)
         .toMatchObject({ query: { filter: { genreIds: ['ambient'] } } })
-    await page.getByLabel('Sort by').selectOption('title')
+    await chooseAlbumSort(page, 'Title')
     await expect
         .poll(async () => (await controller.lastCall('library:query-albums'))?.payload)
         .toMatchObject({ query: { sort: { field: 'title' }, filter: { genreIds: ['ambient'] } } })
@@ -317,7 +319,7 @@ test('section changes retain keyboard focus and reset the previous section sort'
     await expect
         .poll(async () => (await controller.lastCall('library:query-albums'))?.payload)
         .toMatchObject({ query: { sort: { field: 'dateAdded', direction: 'desc' } } })
-    await page.getByLabel('Sort by').selectOption('year')
+    await chooseAlbumSort(page, 'Year')
     const tracks = tabs.getByRole('link', { name: /^Tracks / })
     await tracks.focus()
     await page.keyboard.press('Enter')

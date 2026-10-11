@@ -1,5 +1,10 @@
 import { expect, Locator, Page, test } from '@playwright/test'
-import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
+import {
+    createRendererScenario,
+    createSongRow,
+    rendererScenarios,
+    scenarioBuilder,
+} from '../scenario-harness'
 
 const freezeTooltipClock = async (page: Page) => {
     await page.clock.install({ time: new Date('2026-10-03T00:00:00Z') })
@@ -30,7 +35,7 @@ const scrollTriggerPanel = async (trigger: Locator) => {
 test.describe('shared tooltips', () => {
     test.beforeEach(async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/settings/design-system')
-        await expect(page.getByRole('heading', { name: 'Shared UI components' })).toBeVisible()
+        await expect(page.getByRole('heading', { name: 'Components' })).toBeVisible()
     })
 
     test('waits 600 milliseconds before showing a hovered tooltip', async ({ page }) => {
@@ -50,7 +55,7 @@ test.describe('shared tooltips', () => {
         await trigger.hover()
         await expect(page.getByRole('tooltip')).toBeVisible()
         await trigger.click()
-        await page.getByRole('heading', { name: 'Shared UI components' }).hover()
+        await page.getByRole('heading', { name: 'Components' }).hover()
         await expect(page.getByRole('tooltip')).toBeHidden()
         await expect(trigger).toBeFocused()
     })
@@ -121,7 +126,7 @@ test.describe('shared tooltips', () => {
         const trigger = page.getByRole('button', { name: 'About library scans' })
         await trigger.hover()
         await page.clock.runFor(300)
-        await page.getByRole('heading', { name: 'Shared UI components' }).hover()
+        await page.getByRole('heading', { name: 'Components' }).hover()
         await page.clock.runFor(600)
         await expect(page.getByRole('tooltip')).toBeHidden()
 
@@ -140,8 +145,38 @@ test.describe('shared tooltips', () => {
         await tooltip.hover()
         await page.keyboard.press('Escape')
         await expect(tooltip).toBeHidden()
-        await page.getByRole('heading', { name: 'Shared UI components' }).hover()
+        await page.getByRole('heading', { name: 'Components' }).hover()
         await trigger.hover()
         await expect(tooltip).toHaveText('The library stays available while folders are scanned.')
+    })
+})
+
+test.describe('tooltips in library views', () => {
+    test('reveal a track title only while it is cut off', async ({ page }) => {
+        const longTitle = 'An extended mix whose title runs on long past the width of its column in the grid'
+        await createRendererScenario(
+            page,
+            scenarioBuilder()
+                .songs([createSongRow({ title: 'Short' }), createSongRow({ id: 'long', title: longTitle })])
+                .build(),
+            '/tracks',
+        )
+        await page.setViewportSize({ width: 900, height: 700 })
+        await freezeTooltipClock(page)
+        await page.getByRole('gridcell').getByText('Short', { exact: true }).hover()
+        await page.clock.runFor(700)
+        await expect(page.getByRole('tooltip')).toBeHidden()
+
+        await page.getByRole('gridcell').getByText(longTitle, { exact: true }).hover()
+        await page.clock.runFor(700)
+        await expect(page.getByRole('tooltip')).toHaveText(longTitle)
+    })
+
+    test('do not repeat an icon control’s name as its description', async ({ page }) => {
+        await createRendererScenario(page, rendererScenarios.albums.withAlbums(), '/albums')
+        const direction = page.getByRole('button', { name: /^Sorted descending/ })
+        await direction.focus()
+        await expect(page.getByRole('tooltip')).toHaveText('Sorted descending — sort ascending')
+        await expect(direction).not.toHaveAttribute('aria-describedby')
     })
 })

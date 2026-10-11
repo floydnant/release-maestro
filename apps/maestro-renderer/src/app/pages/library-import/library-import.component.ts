@@ -2,14 +2,13 @@ import { NgClass } from '@angular/common'
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core'
 import { Router, RouterModule } from '@angular/router'
 import { LibraryFolderValidation, LibraryScanTerminalResult } from '@release-maestro/core'
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmCard } from '@spartan-ng/helm/card'
+import { HlmProgressImports, ProgressSegmentColor } from '@spartan-ng/helm/progress'
 import { ElectronService } from '../../core/services'
 import { LibraryService } from '../../core/services/library.service'
 import { FolderListComponent } from '../../shared/components/folder-list/folder-list.component'
 import { IconComponent } from '../../shared/components/icon/icon.component'
-import {
-    ProgressBarComponent,
-    ProgressBarSegment,
-} from '../../shared/components/progress-bar/progress-bar.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
 import { ImportMosaicComponent } from './import-mosaic.component'
 
@@ -25,27 +24,32 @@ type ImportStep = 'pick' | 'scanning' | 'done'
     selector: 'app-library-import',
     imports: [
         RouterModule,
-        ProgressBarComponent,
+        HlmProgressImports,
         ProgressRingComponent,
         IconComponent,
         ImportMosaicComponent,
         FolderListComponent,
         NgClass,
+        HlmButton,
+        HlmCard,
     ],
     templateUrl: './library-import.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: { class: 'block size-full' },
     styles: `
-        /* Fades the full-window mosaic gently toward the top and bottom edges (pure
-           black so the covers pop against it). */
+        /* Two layers over the cover wall, pure black to match its backdrop. A short band along the
+           top edge gives the macOS window controls, which sit over the wall, contrast against any
+           artwork. A vignette darkens the wall most behind the centered card and least at the window
+           edges, so the covers keep their color where nothing sits over them. */
         .mosaic-veil {
-            background: linear-gradient(
-                to bottom,
-                rgb(0 0 0 / 0.9) 0%,
-                transparent 25%,
-                transparent 75%,
-                rgb(0 0 0 / 0.9) 100%
-            );
+            background:
+                linear-gradient(to bottom, rgb(0 0 0 / 0.85), rgb(0 0 0 / 0.5) 48px, transparent 120px),
+                radial-gradient(
+                    ellipse 60% 70% at center,
+                    rgb(0 0 0 / 0.85),
+                    rgb(0 0 0 / 0.55) 55%,
+                    rgb(0 0 0 / 0.15)
+                );
         }
     `,
 })
@@ -55,6 +59,13 @@ export class LibraryImportComponent {
     readonly library = inject(LibraryService)
 
     readonly step = signal<ImportStep>('pick')
+
+    /**
+     * The cover wall only exists once the scan has sent artwork. Until then (and for libraries
+     * without any) the page stays on the canvas like every other screen, rather than going dark
+     * behind an empty wall.
+     */
+    readonly showsCoverWall = computed(() => this.step() !== 'pick' && this.library.mosaicAlbums().length > 0)
     readonly pendingFolders = signal<string[]>([])
     readonly startInFlight = signal(false)
     readonly folderValidations = signal<LibraryFolderValidation[]>([])
@@ -69,8 +80,8 @@ export class LibraryImportComponent {
         return terminal.outcome === 'cancelled' || terminal.outcome === 'failed' ? terminal : null
     })
 
-    readonly progressSegments = computed<ProgressBarSegment[]>(() => [
-        { percent: this.library.readProgressPercent(), color: 'content.success' },
+    readonly progressSegments = computed<{ value: number; color: ProgressSegmentColor }[]>(() => [
+        { value: this.library.readProgressPercent(), color: 'content.success' },
     ])
 
     readonly noFilesFound = computed(() => {

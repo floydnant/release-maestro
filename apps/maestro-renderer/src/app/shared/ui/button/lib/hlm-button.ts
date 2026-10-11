@@ -17,40 +17,38 @@ export const buttonVariants = cva(
                 secondary:
                     'bg-action-secondary text-action-secondary-content hover:bg-action-secondary-hover active:bg-action-secondary-pressed',
                 ghost: 'text-content-secondary hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed',
-                history:
-                    'text-content-secondary pointer-hover:bg-action-quiet-hover pointer-hover:text-content-primary',
                 plain: '',
                 muted: 'bg-background-surface text-content-muted hover:bg-background-elevated hover:text-content-secondary',
                 navigation:
                     'justify-start text-content-secondary hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed aria-[current=page]:bg-action-secondary aria-[current=page]:text-action-primary-content aria-[current=page]:shadow-sm aria-[current=page]:hover:bg-action-secondary-hover',
                 destructive:
                     'border border-status-danger-border bg-status-danger-background text-status-danger-content hover:bg-status-danger-hover',
-                link: 'shrink text-content-action underline-offset-4 hover:underline',
+                // Text links sit inline with their surrounding copy and take no button geometry.
+                // Internal links read as the text they belong to until hovered. External links keep a
+                // quiet standing underline, like links in imported release copy, and take the accent
+                // only on hover: the one link color that signals leaving the app.
+                link: 'inline shrink rounded-sm text-inherit underline-offset-2 hover:text-content-primary hover:underline',
+                'external-link':
+                    'inline shrink rounded-sm text-content-primary underline decoration-content-muted underline-offset-2 hover:text-content-action hover:decoration-current',
             },
+            // Every single-line control (buttons, inputs, selects) shares one fixed height, so
+            // controls placed side by side line up whatever their border or type. `xs` and `lg`
+            // are for chrome and standalone actions that are deliberately smaller or larger.
             size: {
-                default: 'rounded-lg px-3 py-1.5 type-label-md',
+                default: 'h-(--foundation-size-control-sm) rounded-lg px-3 type-label-md',
                 none: '',
                 xs: 'h-6 gap-1 rounded-md px-2 type-label-sm',
                 sm: 'h-(--foundation-size-control-sm) gap-1.5 rounded-lg px-2.5 type-label-sm',
-                lg: 'h-(--foundation-size-control-lg) rounded-lg px-4 type-label-md',
-                icon: 'size-(--foundation-size-control-md) rounded-lg p-0',
+                lg: 'h-(--foundation-size-control-md) rounded-lg px-4 type-label-md',
+                icon: 'size-(--foundation-size-control-sm) rounded-lg p-0',
                 'icon-xs': 'size-6 rounded-lg p-0',
-                'icon-sm': 'size-(--foundation-size-control-sm) rounded-lg p-0',
-                'icon-lg': 'size-(--foundation-size-control-lg) rounded-lg p-0',
+                'icon-lg': 'size-(--foundation-size-control-md) rounded-lg p-0',
             },
         },
         compoundVariants: [
             {
-                variant: [
-                    'default',
-                    'outline',
-                    'secondary',
-                    'ghost',
-                    'muted',
-                    'navigation',
-                    'destructive',
-                    'link',
-                ],
+                // Only filled controls show a disabled fill; quiet and text controls only dim.
+                variant: ['default', 'outline', 'secondary', 'muted', 'destructive'],
                 class: 'data-disabled:bg-action-primary-disabled',
             },
         ],
@@ -62,6 +60,10 @@ export const buttonVariants = cva(
 )
 
 export type ButtonVariants = VariantProps<typeof buttonVariants>
+
+/** Text links inherit their surrounding typography, so they never take a button size. */
+const isTextLinkVariant = (variant: ButtonVariants['variant']) =>
+    variant === 'link' || variant === 'external-link'
 
 @Directive({
     selector: 'button[hlmBtn], a[hlmBtn]',
@@ -89,9 +91,11 @@ export class HlmButton {
     public readonly size = input<ButtonVariants['size']>(this._config.size)
 
     constructor() {
-        classes(() =>
-            hlm([buttonVariants({ variant: this.variant(), size: this.size() }), this._additionalClasses()]),
-        )
+        classes(() => {
+            const variant = this.variant()
+            const size = isTextLinkVariant(variant) ? 'none' : this.size()
+            return hlm([buttonVariants({ variant, size }), this._additionalClasses()])
+        })
     }
 
     setClass(classes: string): void {

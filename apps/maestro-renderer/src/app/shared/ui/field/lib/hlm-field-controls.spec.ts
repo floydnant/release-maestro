@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core'
 import { TestBed } from '@angular/core/testing'
-import { HlmField, HlmFieldDescription, HlmFieldLabel } from '@spartan-ng/helm/field'
-import { HlmNativeSelect } from '@spartan-ng/helm/native-select'
+import { HlmFieldLabel } from '@spartan-ng/helm/field'
 import { HlmInput } from '@spartan-ng/helm/input'
 import { HlmTextarea } from '@spartan-ng/helm/textarea'
 
@@ -18,22 +17,6 @@ import { HlmTextarea } from '@spartan-ng/helm/textarea'
 })
 class FieldControlsTest {}
 
-@Component({
-    selector: 'hlm-native-select-field-test',
-    imports: [HlmNativeSelect, HlmField, HlmFieldDescription, HlmFieldLabel],
-    changeDetection: ChangeDetectionStrategy.OnPush,
-    template: `
-        <p id="manual-hint">Pick a format.</p>
-        <div hlmField>
-            <hlm-native-select aria-describedby="manual-hint">
-                <option value="digital">Digital</option>
-            </hlm-native-select>
-            <p hlmFieldDescription id="field-hint">The album format.</p>
-        </div>
-    `,
-})
-class NativeSelectFieldTest {}
-
 describe('Helm field controls', () => {
     it('keeps the caller label target and id outside a Field', () => {
         const fixture = TestBed.createComponent(FieldControlsTest)
@@ -42,15 +25,6 @@ describe('Helm field controls', () => {
         const label: HTMLElement = fixture.nativeElement.querySelector('label')
         expect(label.getAttribute('for')).toBe('title-control')
         expect(label.id).toBe('title-label')
-    })
-
-    it('combines caller and Field descriptions on the native select', () => {
-        const fixture = TestBed.createComponent(NativeSelectFieldTest)
-        fixture.detectChanges()
-        TestBed.tick()
-
-        const select: HTMLSelectElement = fixture.nativeElement.querySelector('select')
-        expect(select.getAttribute('aria-describedby')).toBe('manual-hint field-hint')
     })
 
     it('preserves caller descriptions on native inputs and textareas', () => {

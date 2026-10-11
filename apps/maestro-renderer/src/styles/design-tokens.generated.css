@@ -186,6 +186,11 @@
     --type-body-sm-weight: var(--foundation-typography-weight-regular);
     --type-body-sm-line-height: var(--foundation-typography-line-height-normal);
     --type-body-sm-letter-spacing: var(--foundation-typography-letter-spacing-normal);
+    --type-body-xs-family: var(--foundation-typography-family-sans);
+    --type-body-xs-size: var(--foundation-typography-size-xs);
+    --type-body-xs-weight: var(--foundation-typography-weight-regular);
+    --type-body-xs-line-height: var(--foundation-typography-line-height-normal);
+    --type-body-xs-letter-spacing: var(--foundation-typography-letter-spacing-normal);
     --type-label-md-family: var(--foundation-typography-family-sans);
     --type-label-md-size: var(--foundation-typography-size-sm);
     --type-label-md-weight: var(--foundation-typography-weight-semibold);
@@ -317,6 +322,9 @@
     --text-body-sm: var(--type-body-sm-size);
     --text-body-sm--line-height: var(--type-body-sm-line-height);
     --text-body-sm--letter-spacing: var(--type-body-sm-letter-spacing);
+    --text-body-xs: var(--type-body-xs-size);
+    --text-body-xs--line-height: var(--type-body-xs-line-height);
+    --text-body-xs--letter-spacing: var(--type-body-xs-letter-spacing);
     --text-label-md: var(--type-label-md-size);
     --text-label-md--line-height: var(--type-label-md-line-height);
     --text-label-md--letter-spacing: var(--type-label-md-letter-spacing);
@@ -328,7 +336,7 @@
     --text-code-sm--letter-spacing: var(--type-code-sm-letter-spacing);
 }
 
-@source inline("type-hero-title type-section-title type-body-md type-body-sm type-label-md type-label-sm type-code-sm");
+@source inline("type-hero-title type-section-title type-body-md type-body-sm type-body-xs type-label-md type-label-sm type-code-sm");
 
 @utility type-hero-title {
     font-family: var(--type-hero-title-family);
@@ -360,6 +368,14 @@
     font-weight: var(--type-body-sm-weight);
     line-height: var(--type-body-sm-line-height);
     letter-spacing: var(--type-body-sm-letter-spacing);
+}
+
+@utility type-body-xs {
+    font-family: var(--type-body-xs-family);
+    font-size: var(--type-body-xs-size);
+    font-weight: var(--type-body-xs-weight);
+    line-height: var(--type-body-xs-line-height);
+    letter-spacing: var(--type-body-xs-letter-spacing);
 }
 
 @utility type-label-md {

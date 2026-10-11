@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { fixtureCoverPath } from '../../fixtures/cover-art.fixture'
 import type { LibraryScanStatus, QuerySongsRequest } from '@release-maestro/core'
 import {
     createRendererScenario,
@@ -49,6 +50,18 @@ const rowSelection = (page: Page, titles: string[]): Promise<(string | null)[]> 
     Promise.all(titles.map(title => rowByTitle(page, title).getAttribute('aria-selected')))
 
 test.describe('rendering a window', () => {
+    test('keeps virtual rows at 40px with all row controls outside the tab order', async ({ page }) => {
+        await openTracks(page)
+        for (const title of ['Dawn', 'Dusk', 'Void']) {
+            const row = rowByTitle(page, title)
+            await expect(row).toBeVisible()
+            await expect.poll(() => row.evaluate(element => element.getBoundingClientRect().height)).toBe(40)
+            for (const control of await row.getByRole('link').or(row.getByRole('button')).all()) {
+                await expect(control).toHaveAttribute('tabindex', '-1')
+            }
+        }
+    })
+
     test('shows the tracks in the window and the total of the whole library', async ({ page }) => {
         await openTracks(page, scenarioBuilder().songs(createSongRows(), { total: 1_204 }).build())
 
@@ -90,11 +103,15 @@ test.describe('rendering a window', () => {
     })
 
     test('shows cover art at the start of a row that has any', async ({ page }) => {
-        const withCover = createSongRow({ coverPath: '/scenario/covers/daybreak.png' })
+        const withCover = createSongRow({ coverPath: fixtureCoverPath('daybreak') })
         await openTracks(page, scenarioBuilder().songs([withCover]).build())
 
         const cover = rowByTitle(page, 'Dawn').locator('img')
-        await expect(cover).toHaveAttribute('src', 'file:///scenario/covers/daybreak.png')
+        // The row turns its cover path into a file URL; the harness then paints stand-in art.
+        await expect(cover).toHaveAttribute('data-fixture-src', 'file:///fixtures/covers/daybreak.svg')
+        await expect
+            .poll(() => cover.evaluate((img: HTMLImageElement) => img.naturalWidth))
+            .toBeGreaterThan(0)
         // Decorative: the title beside it already names the row.
         await expect(cover).toHaveAttribute('alt', '')
     })

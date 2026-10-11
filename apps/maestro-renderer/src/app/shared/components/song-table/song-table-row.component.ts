@@ -1,3 +1,5 @@
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmOverflowTooltip, HlmTooltip } from '@spartan-ng/helm/tooltip'
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import type { SongRow } from '@release-maestro/core'
@@ -33,7 +35,7 @@ import {
     selector: 'app-song-table-row',
     templateUrl: './song-table-row.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent, RouterLink],
+    imports: [HlmButton, HlmOverflowTooltip, HlmTooltip, IconComponent, RouterLink],
     host: { class: 'contents' },
 })
 export class SongTableRowComponent {

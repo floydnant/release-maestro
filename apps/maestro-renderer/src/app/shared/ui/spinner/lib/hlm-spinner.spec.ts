@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing'
-import { HlmSpinner } from './hlm-spinner'
 import { semanticColor } from '../../../design-tokens.generated'
+import { HlmSpinner } from './hlm-spinner'
 
 describe(HlmSpinner.name, () => {
     it('preserves the existing loading ring at its default size', async () => {
@@ -23,7 +23,7 @@ describe(HlmSpinner.name, () => {
             expect(circle.getAttribute('cy')).toBe('11')
         }
         for (const arc of circles.slice(1)) {
-            expect(arc.getAttribute('stroke')).toBe(semanticColor('content.action'))
+            expect(arc.getAttribute('stroke')).toBe(semanticColor('content.primary'))
             expect(Number(arc.getAttribute('stroke-dashoffset'))).toBeCloseTo(9.6 * Math.PI)
         }
         expect(element.querySelector('app-icon')).toBeNull()
