@@ -1,6 +1,6 @@
-import { HlmButton } from '@spartan-ng/helm/button'
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import type { SongSort, SongSortField } from '@release-maestro/core'
+import { HlmButton } from '@spartan-ng/helm/button'
 import { IconComponent } from '../icon/icon.component'
 
 /**
@@ -41,7 +41,7 @@ import { IconComponent } from '../icon/icon.component'
                 <app-icon
                     [name]="sort().direction === 'asc' ? 'sortAscending' : 'sortDescending'"
                     size="12"
-                    color="content.action"
+                    color="content.primary"
                 ></app-icon>
             }
         </button>
