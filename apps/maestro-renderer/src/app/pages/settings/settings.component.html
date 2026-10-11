@@ -1,4 +1,4 @@
-<hlm-dialog state="open" (closed)="close()">
+<hlm-dialog state="open" autoFocus="first-heading" (closed)="close()">
     <hlm-dialog-content
         *hlmDialogPortal
         class="settings-dialog | flex h-[min(48rem,calc(100vh-6rem))] w-[min(72rem,calc(100vw-6rem))] max-w-none overflow-hidden p-0"
@@ -7,7 +7,9 @@
             class="settings-dialog__nav | flex w-52 shrink-0 flex-col overflow-y-auto border-r border-border-subtle bg-background-surface p-2"
             aria-label="Settings sections"
         >
-            <h1 hlmDialogTitle class="px-3 pt-2 pb-1 type-label-md text-content-primary">Settings</h1>
+            <h1 hlmDialogTitle class="px-3 pt-2 pb-1 type-label-md text-content-primary focus:outline-none">
+                Settings
+            </h1>
             <div hlmSidebarGroup class="px-0">
                 <div hlmSidebarGroupLabel id="settings-group-music-library">Music library</div>
                 <ul hlmSidebarMenu aria-labelledby="settings-group-music-library">
