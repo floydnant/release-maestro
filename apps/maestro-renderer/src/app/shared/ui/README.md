@@ -82,6 +82,10 @@ Route tabs remain links with the history behavior in
 
 ## Add or update a component
 
+When a screen needs a standard control this directory lacks, check whether a Helm family at the
+pinned tag covers the use case before building product markup. Upstream ships many families not yet
+copied here, and adding one is the default.
+
 The Brain runtime and copied Helm source start at Spartan 1.5.0. Check the root `package.json` and
 [upstream.json](upstream.json) for the versions currently in use.
 

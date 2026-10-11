@@ -60,7 +60,9 @@ when a block has a clear state or behavior boundary.
 
 **Where it goes.** A component used by one page lives beside that page —
 `pages/library-import/import-mosaic.component.ts` is the pattern. It moves to `shared/components/`
-when a second consumer actually appears, not in anticipation of one.
+when a second consumer actually appears, not in anticipation of one. Standard controls such as
+selects, menus, dialogs and toggles are not product components: they come from `shared/ui`, or are
+added there from Spartan, as frontend-design describes.
 
 **How it is written.**
 
