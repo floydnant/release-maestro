@@ -36,7 +36,7 @@ describe(DesignSystemComponent.name, () => {
         expect(element.textContent).toContain('background.canvas')
         expect(element.textContent).toContain('Contrast pairs')
         expect(element.textContent).toContain('content.primary')
-        const componentHeadings = Array.from(element.querySelectorAll('h2')).filter(heading =>
+        const componentHeadings = Array.from(element.querySelectorAll('h3')).filter(heading =>
             heading.textContent?.includes('Components'),
         )
         expect(componentHeadings).toHaveLength(1)
