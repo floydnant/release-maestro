@@ -43,6 +43,8 @@ test.describe('settings dialog', () => {
     test('an old settings URL opens the dialog over Home', async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/settings/apple-mail')
         await expect(page).toHaveURL(/\/home\(modal:settings\/apple-mail\)$/)
-        await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible()
+        const dialog = page.getByRole('dialog', { name: 'Settings' })
+        await expect(dialog).toBeVisible()
+        await expect(dialog.getByRole('heading', { name: 'Settings' })).toBeFocused()
     })
 })
