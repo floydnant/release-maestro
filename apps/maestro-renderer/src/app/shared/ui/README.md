@@ -47,9 +47,11 @@ reads as a link at rest. `external-link` is for links that leave the app: foregr
 muted standing underline, taking the action accent only on hover, matching links in imported release
 copy.
 
-Scan progress keeps its outcome segments and circular geometry in the app's own markup;
-indeterminate work uses `HlmSpinner`. Feed playback composes the progress primitives inside the seek
-button.
+`HlmProgress` keeps Brain's value, maximum, value text, indeterminate state and direction support.
+`HlmProgressSegment` adds semantic outcome colors and widths measured against the parent's maximum.
+The progress bar glows by default; `glow="hover"` limits it to hover and `glow="off"` disables it.
+Feed playback composes the progress primitives inside the seek button. Circular scan progress keeps
+its geometry in app markup; indeterminate work uses `HlmSpinner`.
 
 `HlmSpinner` retains the application's two-arc SVG, requested diameter, stroke and colors, and
 ambient rotation. Its per-ring rotation offsets require the scoped animation stylesheet.

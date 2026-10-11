@@ -7,14 +7,11 @@ import { HlmBadge } from '@spartan-ng/helm/badge'
 import { HlmButton } from '@spartan-ng/helm/button'
 import { HlmCard } from '@spartan-ng/helm/card'
 import { HlmInput } from '@spartan-ng/helm/input'
+import { HlmProgressImports, ProgressSegmentColor } from '@spartan-ng/helm/progress'
 import { HlmTextarea } from '@spartan-ng/helm/textarea'
 import { HlmOverflowTooltip } from '@spartan-ng/helm/tooltip'
 import { LibraryService } from '../../../core/services/library.service'
 import { MetadataService } from '../../../core/services/metadata.service'
-import {
-    ProgressBarComponent,
-    ProgressBarSegment,
-} from '../../../shared/components/progress-bar/progress-bar.component'
 
 const getErrorMessage = (error: unknown): string => {
     if (typeof error === 'string') return error
@@ -39,7 +36,7 @@ const MAX_SCAN_LOG_ENTRIES = 200
     imports: [
         FormsModule,
         JsonPipe,
-        ProgressBarComponent,
+        HlmProgressImports,
         HlmAlert,
         HlmAlertDescription,
         HlmBadge,
@@ -78,9 +75,9 @@ export class DebugComponent {
     scanInFlight = this.library.isScanning
     scanStatus = this.library.scanStatus
     progress = computed(() => Math.round(this.library.readProgressPercent()))
-    scanProgressSegments = computed<ProgressBarSegment[]>(() => [
+    scanProgressSegments = computed<{ value: number; color: ProgressSegmentColor }[]>(() => [
         {
-            percent: this.progress(),
+            value: this.progress(),
             color: 'content.success',
         },
     ])
