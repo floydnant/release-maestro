@@ -16,6 +16,7 @@ import { RouterLink } from '@angular/router'
 import { type CatalogEntityRef } from '@release-maestro/core'
 import type { BrowseStatus } from '../../browse/browse-query'
 import { IconComponent } from '../icon/icon.component'
+import { settingsLink } from '../../../pages/settings/settings-link'
 
 /**
  * The chrome every browse surface shares: title and count, search, the applied
@@ -71,6 +72,7 @@ export interface BrowseFilterState {
     },
 })
 export class BrowseShellComponent {
+    readonly settingsLink = settingsLink
     state = input.required<BrowseShellState>()
     filters = input.required<BrowseFilterState>()
 

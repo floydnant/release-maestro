@@ -119,11 +119,11 @@ export default [
         rules: {
             '@angular-eslint/component-selector': ['error', helmSelectorOptions],
             '@angular-eslint/directive-selector': ['error', helmSelectorOptions],
-            // Preserve upstream class overrides, value inputs and explicit ARIA validity/description
-            // overrides. Other aliases keep their usual selector contract.
+            // Preserve upstream class overrides, value and checked-state inputs, and explicit ARIA
+            // validity/description overrides. Other aliases keep their usual selector contract.
             '@angular-eslint/no-input-rename': [
                 'error',
-                { allowedNames: ['class', 'value', 'aria-invalid', 'aria-describedby'] },
+                { allowedNames: ['class', 'value', 'checked', 'aria-invalid', 'aria-describedby'] },
             ],
             'tailwindcss/no-custom-classname': ['error', { whitelist: typographyClassNames }],
         },

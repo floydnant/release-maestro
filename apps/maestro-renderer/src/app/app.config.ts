@@ -1,3 +1,4 @@
+import { DEFAULT_DIALOG_CONFIG } from '@angular/cdk/dialog'
 import { provideHttpClient, withInterceptorsFromDi, withXhr } from '@angular/common/http'
 import {
     ApplicationConfig,
@@ -18,6 +19,9 @@ export const appConfig: ApplicationConfig = {
         provideZoneChangeDetection({ eventCoalescing: true }),
         provideHttpClient(withXhr(), withInterceptorsFromDi()),
         provideRouter(appRoutes),
+        // A dialog that is a route closes when its route does. CDK's default closes every dialog on
+        // popstate, which would turn Back inside the settings dialog into a second navigation.
+        { provide: DEFAULT_DIALOG_CONFIG, useValue: { closeOnNavigation: false } },
         importProvidersFrom(CoreModule, SharedModule),
         provideTranslateService({
             loader: provideTranslateHttpLoader({
