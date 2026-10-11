@@ -4,6 +4,8 @@ import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
 test.describe('settings dialog', () => {
     test('opens over the current page and returns focus when dismissed', async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/tracks')
+        // Opened mid-navigation, the dialog would sit over an empty page instead of Tracks.
+        await expect(page).toHaveURL(/\/tracks$/)
         const settingsLink = page.getByRole('link', { name: 'Settings', exact: true })
         await settingsLink.click()
 
@@ -22,6 +24,8 @@ test.describe('settings dialog', () => {
 
     test('Back steps through sections, then closes the dialog', async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/tracks')
+        // Opened mid-navigation, the dialog would sit over an empty page instead of Tracks.
+        await expect(page).toHaveURL(/\/tracks$/)
         await page.getByRole('link', { name: 'Settings', exact: true }).click()
         const dialog = page.getByRole('dialog', { name: 'Settings' })
         await dialog.getByRole('link', { name: 'Apple Mail' }).click()
