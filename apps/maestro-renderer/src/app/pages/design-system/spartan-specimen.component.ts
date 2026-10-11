@@ -10,6 +10,7 @@ import { HlmLabel } from '@spartan-ng/helm/label'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
 import { HlmSelectImports } from '@spartan-ng/helm/select'
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner'
+import { HlmSwitchImports } from '@spartan-ng/helm/switch'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 
 @Component({
@@ -25,6 +26,7 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
         HlmProgressImports,
         HlmSelectImports,
         HlmSpinnerImports,
+        HlmSwitchImports,
         HlmTooltipImports,
     ],
     templateUrl: './spartan-specimen.component.html',
@@ -34,4 +36,5 @@ export class SpartanSpecimenComponent {
     readonly libraryView = signal<ReturnType<BrnSelect<string>['value']>>('Tracks')
     readonly savedFolderLabel = signal<string | null>(null)
     readonly selectedAction = signal<string | null>(null)
+    readonly hideUnplayableReleases = signal(true)
 }
