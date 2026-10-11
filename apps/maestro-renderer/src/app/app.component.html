@@ -59,59 +59,58 @@
                                 >Feed</a
                             >
                         </li>
-                        <li hlmSidebarMenuItem>
-                            <span
-                                class="sidebar__library-label | flex h-(--foundation-size-control-sm) items-center px-3 type-label-md text-content-secondary"
-                                >Library</span
-                            >
-                            <ul hlmSidebarMenuSub aria-label="Library">
-                                <li hlmSidebarMenuSubItem>
-                                    <a
-                                        hlmSidebarMenuSubButton
-                                        routerLink="/tracks"
-                                        routerLinkActive=""
-                                        ariaCurrentWhenActive="page"
-                                        >Tracks</a
-                                    >
-                                </li>
-                                <li hlmSidebarMenuSubItem>
-                                    <a
-                                        hlmSidebarMenuSubButton
-                                        routerLink="/albums"
-                                        routerLinkActive=""
-                                        ariaCurrentWhenActive="page"
-                                        >Albums</a
-                                    >
-                                </li>
-                                <li hlmSidebarMenuSubItem>
-                                    <a
-                                        hlmSidebarMenuSubButton
-                                        routerLink="/artists"
-                                        routerLinkActive=""
-                                        ariaCurrentWhenActive="page"
-                                        >Artists</a
-                                    >
-                                </li>
-                                <li hlmSidebarMenuSubItem>
-                                    <a
-                                        hlmSidebarMenuSubButton
-                                        routerLink="/record-labels"
-                                        routerLinkActive=""
-                                        ariaCurrentWhenActive="page"
-                                        >Record labels</a
-                                    >
-                                </li>
-                                <li hlmSidebarMenuSubItem>
-                                    <a
-                                        hlmSidebarMenuSubButton
-                                        routerLink="/genres"
-                                        routerLinkActive=""
-                                        ariaCurrentWhenActive="page"
-                                        >Genres</a
-                                    >
-                                </li>
-                            </ul>
-                        </li>
+                    </ul>
+                    <div hlmSidebarGroup class="px-0">
+                        <div hlmSidebarGroupLabel id="sidebar-group-library">Library</div>
+                        <ul hlmSidebarMenu aria-labelledby="sidebar-group-library">
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/tracks"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Tracks</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/albums"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Albums</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/artists"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Artists</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/record-labels"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Record labels</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/genres"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Genres</a
+                                >
+                            </li>
+                        </ul>
+                    </div>
+                    <ul hlmSidebarMenu>
                         <li hlmSidebarMenuItem hlmCollapsible [(expanded)]="settingsExpanded">
                             <!-- Collapsed, the parent stands in for the current settings page it hides. -->
                             <a
