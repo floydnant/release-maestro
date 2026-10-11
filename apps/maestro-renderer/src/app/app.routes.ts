@@ -100,6 +100,7 @@ export const appRoutes: Route[] = [
         path: 'settings',
         component: SettingsComponent,
         children: [
+            { path: '', redirectTo: 'library', pathMatch: 'full' },
             {
                 path: 'library',
                 loadComponent: () =>
