@@ -30,7 +30,7 @@ test.describe('existing control appearance', () => {
         await createRendererScenario(page, scenarioBuilder().build(), '/settings/debug')
         const navigationLink = page
             .getByRole('dialog', { name: 'Settings' })
-            .getByRole('link', { name: 'Library', exact: true })
+            .getByRole('link', { name: 'Library folders', exact: true })
         await navigationLink.hover()
         await expect(navigationLink).toHaveCSS('cursor', 'default')
         const disclosure = page.locator('summary', { hasText: 'Health payload' })
