@@ -1,3 +1,18 @@
+diff --git a/fesm2022/spartan-ng-brain-dialog.mjs b/fesm2022/spartan-ng-brain-dialog.mjs
+index c8d49a2653ac9c827c80937d11f893a90249d112..0b3cec0594387993eba8649f03c9546353da516e 100644
+--- a/fesm2022/spartan-ng-brain-dialog.mjs
++++ b/fesm2022/spartan-ng-brain-dialog.mjs
+@@ -267,6 +267,10 @@ class BrnDialogService {
+             .keydownEvents()
+             .pipe(filter((event) => event.key === 'Escape'), takeUntil(closed$))
+             .subscribe((event) => {
++            // An overlay inside the dialog (menu, select) already handled this Escape and has
++            // detached by now, which makes the dialog look topmost. Leave the dialog open.
++            if (event.defaultPrevented)
++                return;
+             if (this._overlayCloseDispatcher._attachedOverlays.at(-1) !== overlayRef)
+                 return;
+             if (dialogRef.dismiss('escape'))
 diff --git a/fesm2022/spartan-ng-brain-tooltip.mjs b/fesm2022/spartan-ng-brain-tooltip.mjs
 index a07146268c6cf7957d23fafb45c894bead457f21..1649bd27a1cde049edb83a4266ed1560638039af 100644
 --- a/fesm2022/spartan-ng-brain-tooltip.mjs

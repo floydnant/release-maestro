@@ -12,12 +12,12 @@ test.describe('settings IPC scenarios', () => {
             .build()
         const controller = await createRendererScenario(page, scenario, '/settings/apple-mail')
 
-        const mailboxInput = page.getByLabel('Mailbox Name')
+        const mailboxInput = page.getByRole('textbox', { name: 'Mailbox Name' })
         await expect(mailboxInput).toHaveValue('Bandcamp Inbox')
         await expect(mailboxInput).toHaveAccessibleDescription(
             'The name of the mailbox to import from Apple Mail.',
         )
-        await page.getByText('Mailbox Name', { exact: true }).click()
+        await page.locator('label[for="setting-mailboxName-input"]').click()
         await expect(mailboxInput).toBeFocused()
 
         await mailboxInput.fill('New Releases')
@@ -43,7 +43,7 @@ test.describe('settings IPC scenarios', () => {
             .build()
         await createRendererScenario(page, scenario, '/settings/apple-mail')
 
-        const mailboxInput = page.getByLabel('Mailbox Name')
+        const mailboxInput = page.getByRole('textbox', { name: 'Mailbox Name' })
         const saveButton = page.getByRole('button', { name: 'Save' })
 
         await expect(mailboxInput).toHaveValue('Bandcamp Inbox')

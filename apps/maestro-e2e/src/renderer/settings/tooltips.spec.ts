@@ -133,7 +133,10 @@ test.describe('shared tooltips', () => {
         await trigger.focus()
         await page.clock.runFor(600)
         await expect(page.getByRole('tooltip')).toBeVisible()
-        await page.getByRole('link', { name: 'Home', exact: true }).click()
+        await page
+            .getByRole('dialog', { name: 'Settings' })
+            .getByRole('link', { name: 'Library folders', exact: true })
+            .click()
         await expect(page.getByRole('tooltip')).toBeHidden()
     })
 

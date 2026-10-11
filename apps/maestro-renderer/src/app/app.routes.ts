@@ -4,7 +4,6 @@ import { libraryOnboardingGuard } from './core/guards/library-onboarding.guard'
 import { FeedComponent } from './pages/feed/feed.component'
 import { HomeComponent } from './pages/home/home.component'
 import { PageNotFoundComponent } from './pages/page-not-found/page-not-found.component'
-import { SettingsComponent } from './pages/settings/settings.component'
 
 const developmentSettingsRoutes: Route[] = webEnv.production
     ? []
@@ -96,18 +95,22 @@ export const appRoutes: Route[] = [
         loadComponent: () =>
             import('./pages/library-import/library-import.component').then(m => m.LibraryImportComponent),
     },
+    // Old settings URLs open the settings dialog over Home.
+    { path: 'settings', redirectTo: '/home(modal:settings/library-folders)', pathMatch: 'full' },
+    { path: 'settings/:section', redirectTo: '/home(modal:settings/:section)' },
     {
         path: 'settings',
-        component: SettingsComponent,
+        outlet: 'modal',
+        loadComponent: () => import('./pages/settings/settings.component').then(m => m.SettingsComponent),
         children: [
+            { path: '', redirectTo: 'library-folders', pathMatch: 'full' },
             {
-                path: 'library',
+                path: 'library-folders',
                 loadComponent: () =>
                     import('./pages/settings/library/library-settings.component').then(
                         m => m.LibrarySettingsComponent,
                     ),
             },
-            ...developmentSettingsRoutes,
             {
                 path: 'apple-mail',
                 loadComponent: () =>
@@ -115,6 +118,7 @@ export const appRoutes: Route[] = [
                         m => m.AppleMailImporterComponent,
                     ),
             },
+            ...developmentSettingsRoutes,
         ],
     },
     {

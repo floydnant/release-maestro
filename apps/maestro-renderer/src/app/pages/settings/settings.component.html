@@ -1,63 +1,71 @@
-<div class="grid size-full min-h-0 grid-cols-[13rem_1fr] bg-background-canvas">
-    <div class="border-r border-border-subtle bg-background-surface p-4">
-        <p class="mb-3 type-label-sm text-content-muted">Music library</p>
-        <ul class="mb-4">
-            <li>
-                <a
-                    hlmBtn
-                    variant="navigation"
-                    routerLink="library"
-                    routerLinkActive=""
-                    ariaCurrentWhenActive="page"
-                    class="settings-link | w-full"
-                    >Library</a
-                >
-            </li>
-        </ul>
-        <p class="mb-3 type-label-sm text-content-muted">Import sources</p>
-        <ul class="">
-            <li>
-                <a
-                    hlmBtn
-                    variant="navigation"
-                    routerLink="apple-mail"
-                    routerLinkActive=""
-                    ariaCurrentWhenActive="page"
-                    class="settings-link | w-full"
-                    >Apple Mail</a
-                >
-            </li>
-            <li>
-                <a
-                    hlmBtn
-                    variant="navigation"
-                    routerLink="debug"
-                    routerLinkActive=""
-                    ariaCurrentWhenActive="page"
-                    class="settings-link | mt-px w-full"
-                >
-                    Debug
-                </a>
-            </li>
-        </ul>
-        @if (showDesignSystem) {
-            <p class="mt-4 mb-3 type-label-sm text-content-muted">Development</p>
-            <ul>
-                <li>
-                    <a
-                        hlmBtn
-                        variant="navigation"
-                        routerLink="design-system"
-                        routerLinkActive=""
-                        ariaCurrentWhenActive="page"
-                        class="settings-link | w-full"
-                        >Design system</a
-                    >
-                </li>
-            </ul>
-        }
-    </div>
-    <div class="min-h-0 min-w-0 overflow-y-auto p-6">
-        <router-outlet></router-outlet>
-    </div>
-</div>
+<hlm-dialog state="open" autoFocus="first-heading" (closed)="close()">
+    <hlm-dialog-content
+        *hlmDialogPortal
+        class="settings-dialog | flex h-[min(48rem,calc(100vh-6rem))] w-[min(72rem,calc(100vw-6rem))] max-w-none overflow-hidden p-0"
+    >
+        <nav
+            class="settings-dialog__nav | flex w-52 shrink-0 flex-col overflow-y-auto border-r border-border-subtle bg-background-surface p-2"
+            aria-label="Settings sections"
+        >
+            <h1 hlmDialogTitle class="px-3 pt-2 pb-1 type-label-md text-content-primary focus:outline-none">
+                Settings
+            </h1>
+            <div hlmSidebarGroup class="px-0">
+                <div hlmSidebarGroupLabel id="settings-group-music-library">Music library</div>
+                <ul hlmSidebarMenu aria-labelledby="settings-group-music-library">
+                    <li hlmSidebarMenuItem>
+                        <a
+                            hlmSidebarMenuButton
+                            routerLink="library-folders"
+                            routerLinkActive=""
+                            ariaCurrentWhenActive="page"
+                            >Library folders</a
+                        >
+                    </li>
+                </ul>
+            </div>
+            <div hlmSidebarGroup class="px-0">
+                <div hlmSidebarGroupLabel id="settings-group-email-imports">Email imports</div>
+                <ul hlmSidebarMenu aria-labelledby="settings-group-email-imports">
+                    <li hlmSidebarMenuItem>
+                        <a
+                            hlmSidebarMenuButton
+                            routerLink="apple-mail"
+                            routerLinkActive=""
+                            ariaCurrentWhenActive="page"
+                            >Apple Mail</a
+                        >
+                    </li>
+                </ul>
+            </div>
+            @if (showDevelopmentSettings) {
+                <div hlmSidebarGroup class="px-0">
+                    <div hlmSidebarGroupLabel id="settings-group-development">Development</div>
+                    <ul hlmSidebarMenu aria-labelledby="settings-group-development">
+                        <li hlmSidebarMenuItem>
+                            <a
+                                hlmSidebarMenuButton
+                                routerLink="debug"
+                                routerLinkActive=""
+                                ariaCurrentWhenActive="page"
+                                >Debug</a
+                            >
+                        </li>
+                        <li hlmSidebarMenuItem>
+                            <a
+                                hlmSidebarMenuButton
+                                routerLink="design-system"
+                                routerLinkActive=""
+                                ariaCurrentWhenActive="page"
+                                >Design system</a
+                            >
+                        </li>
+                    </ul>
+                </div>
+            }
+        </nav>
+        <div class="settings-dialog__page | min-w-0 flex-1 overflow-y-auto bg-background-canvas px-8 py-6">
+            <router-outlet></router-outlet>
+        </div>
+    </hlm-dialog-content>
+</hlm-dialog>
