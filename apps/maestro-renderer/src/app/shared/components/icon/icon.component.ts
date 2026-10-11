@@ -4,6 +4,7 @@ import {
     octCheckCircleFill,
     octCheck,
     octChevronDown,
+    octGear,
     octChevronLeft,
     octChevronRight,
     octChevronUp,
@@ -36,6 +37,7 @@ import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.gene
 const icons = {
     check: octCheck,
     chevronDown: octChevronDown,
+    settings: octGear,
     chevronUp: octChevronUp,
     success: octCheckCircleFill,
     windowMinimize: octDash,
