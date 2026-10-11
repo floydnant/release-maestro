@@ -1,4 +1,4 @@
-export type SettingsSection = 'library' | 'apple-mail' | 'debug' | 'design-system'
+export type SettingsSection = 'library-folders' | 'apple-mail' | 'debug' | 'design-system'
 
 /**
  * Router commands that open the settings dialog on a section, over the current page. Absolute, so

@@ -96,16 +96,16 @@ export const appRoutes: Route[] = [
             import('./pages/library-import/library-import.component').then(m => m.LibraryImportComponent),
     },
     // Old settings URLs open the settings dialog over Home.
-    { path: 'settings', redirectTo: '/home(modal:settings/library)', pathMatch: 'full' },
+    { path: 'settings', redirectTo: '/home(modal:settings/library-folders)', pathMatch: 'full' },
     { path: 'settings/:section', redirectTo: '/home(modal:settings/:section)' },
     {
         path: 'settings',
         outlet: 'modal',
         loadComponent: () => import('./pages/settings/settings.component').then(m => m.SettingsComponent),
         children: [
-            { path: '', redirectTo: 'library', pathMatch: 'full' },
+            { path: '', redirectTo: 'library-folders', pathMatch: 'full' },
             {
-                path: 'library',
+                path: 'library-folders',
                 loadComponent: () =>
                     import('./pages/settings/library/library-settings.component').then(
                         m => m.LibrarySettingsComponent,

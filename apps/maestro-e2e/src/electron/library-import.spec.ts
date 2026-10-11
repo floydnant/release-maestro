@@ -59,7 +59,7 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
 
     // Settings → Library reflects the persisted folder and the session's terminal result.
     await page.getByRole('link', { name: 'Settings' }).click()
-    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await page.getByRole('link', { name: 'Library folders', exact: true }).click()
     await expect(page.getByText(libraryDir)).toBeVisible()
     await expect(page.getByLabel('Latest scan result')).toContainText('Completed')
     await expect(page.getByLabel('Latest scan result')).toContainText('6 imported')
@@ -71,7 +71,7 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     page = await electronApp.firstWindow()
     await expect(page).toHaveURL(/\/home$/)
     await page.getByRole('link', { name: 'Settings' }).click()
-    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await page.getByRole('link', { name: 'Library folders', exact: true }).click()
     // The startup rescan produces a fresh terminal result (nothing new to import),
     // while the persisted aggregate still reports the library size.
     await expect(page.getByLabel('Latest scan result')).toContainText('Completed', { timeout: 20_000 })
@@ -99,7 +99,7 @@ test('failed files surface in Library Settings, linked from onboarding', async (
     await expect(page.getByLabel('Failed files count')).toHaveText('1')
     await page.getByRole('link', { name: 'View failed files' }).click()
 
-    await expect(page).toHaveURL(/\(modal:settings\/library\)$/)
+    await expect(page).toHaveURL(/\(modal:settings\/library-folders\)$/)
     await expect(page.getByRole('heading', { name: 'Failed files' })).toBeVisible()
     const failedList = page.getByRole('dialog', { name: 'Settings' }).getByLabel('Failed files')
     await expect(failedList).toContainText('zz-broken.mp3')
@@ -146,7 +146,7 @@ test('library routes are available after onboarding is skipped', async ({}, test
     await expect(page.getByRole('heading', { name: 'Tracks' })).toBeVisible()
 
     await page.getByRole('link', { name: 'Library settings' }).click()
-    await expect(page).toHaveURL(/\(modal:settings\/library\)$/)
+    await expect(page).toHaveURL(/\(modal:settings\/library-folders\)$/)
     await expect(page.getByRole('heading', { name: 'Library folders' })).toBeVisible()
     await page.keyboard.press('Escape')
 
