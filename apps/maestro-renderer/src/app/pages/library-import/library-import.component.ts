@@ -4,14 +4,11 @@ import { Router, RouterModule } from '@angular/router'
 import { LibraryFolderValidation, LibraryScanTerminalResult } from '@release-maestro/core'
 import { HlmButton } from '@spartan-ng/helm/button'
 import { HlmCard } from '@spartan-ng/helm/card'
+import { HlmProgressImports, ProgressSegmentColor } from '@spartan-ng/helm/progress'
 import { ElectronService } from '../../core/services'
 import { LibraryService } from '../../core/services/library.service'
 import { FolderListComponent } from '../../shared/components/folder-list/folder-list.component'
 import { IconComponent } from '../../shared/components/icon/icon.component'
-import {
-    ProgressBarComponent,
-    ProgressBarSegment,
-} from '../../shared/components/progress-bar/progress-bar.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
 import { ImportMosaicComponent } from './import-mosaic.component'
 
@@ -27,7 +24,7 @@ type ImportStep = 'pick' | 'scanning' | 'done'
     selector: 'app-library-import',
     imports: [
         RouterModule,
-        ProgressBarComponent,
+        HlmProgressImports,
         ProgressRingComponent,
         IconComponent,
         ImportMosaicComponent,
@@ -83,8 +80,8 @@ export class LibraryImportComponent {
         return terminal.outcome === 'cancelled' || terminal.outcome === 'failed' ? terminal : null
     })
 
-    readonly progressSegments = computed<ProgressBarSegment[]>(() => [
-        { percent: this.library.readProgressPercent(), color: 'content.success' },
+    readonly progressSegments = computed<{ value: number; color: ProgressSegmentColor }[]>(() => [
+        { value: this.library.readProgressPercent(), color: 'content.success' },
     ])
 
     readonly noFilesFound = computed(() => {
