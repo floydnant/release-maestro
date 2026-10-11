@@ -241,7 +241,7 @@ test.describe('manual import', () => {
         const importNow = page.getByRole('button', { name: 'Import now' })
         await expect(importNow).toBeEnabled()
 
-        await page.getByLabel('Mailbox Name').fill('Releases')
+        await page.getByRole('textbox', { name: 'Mailbox Name' }).fill('Releases')
 
         await expect(importNow).toBeDisabled()
         await expect(page.getByText('Save the mailbox name to import from it.')).toBeVisible()

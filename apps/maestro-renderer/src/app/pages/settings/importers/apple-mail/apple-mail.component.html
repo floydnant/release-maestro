@@ -1,99 +1,116 @@
-<div class="settings-item | mx-auto max-w-2xl">
-    <h1 class="type-section-title text-content-primary">Apple Mail import</h1>
-    <label class="mt-6 block type-label-md text-content-primary" for="setting-mailboxName-input"
-        >Mailbox Name</label
+<div class="settings-page | mx-auto max-w-2xl">
+    <header class="settings-page__header | border-b border-border-subtle pb-6">
+        <h2 class="type-hero-title text-content-primary">Apple Mail</h2>
+        <p class="mt-2 type-body-md text-content-secondary">
+            Import Bandcamp release notifications from a mailbox in Apple Mail.
+        </p>
+    </header>
+
+    <section
+        class="settings-section | border-b border-border-subtle py-6"
+        aria-labelledby="apple-mail-mailbox"
     >
-    <p class="description | mt-1 type-body-sm text-content-muted" id="setting-mailboxName-description">
-        The name of the mailbox to import from Apple Mail.
-    </p>
-
-    <input
-        hlmInput
-        class="mt-3 max-w-xs"
-        id="setting-mailboxName-input"
-        aria-describedby="setting-mailboxName-description"
-        [(ngModel)]="mailboxName"
-        placeholder="Not set"
-    />
-</div>
-
-@if (hasChanges()) {
-    <div class="mx-auto max-w-2xl">
-        <hr class="mt-6" />
-
-        <button hlmBtn type="button" (click)="saveSettings()">Save</button>
-    </div>
-}
-
-<div class="email-import | mx-auto mt-8 max-w-2xl">
-    <h2 class="type-section-title text-content-primary">Import</h2>
-    <p class="mt-1 type-body-sm text-content-muted" id="email-import-description">
-        New emails are imported when the app starts and when you return to it, at most once an hour. Import
-        now to check the mailbox right away.
-    </p>
-
-    <div class="mt-4 flex flex-wrap items-center gap-3">
-        <button
-            hlmBtn
-            variant="secondary"
-            type="button"
-            aria-describedby="email-import-description"
-            [disabled]="!canImport()"
-            (click)="importNow()"
+        <h3 id="apple-mail-mailbox" class="type-section-title text-content-primary">Mailbox</h3>
+        <label
+            id="setting-mailboxName-label"
+            class="mt-3 block type-label-md text-content-primary"
+            for="setting-mailboxName-input"
+            >Name</label
         >
-            Import now
-        </button>
-        @if (importBlockedReason(); as reason) {
-            <p class="type-body-sm text-content-muted">{{ reason }}</p>
-        }
-    </div>
+        <p class="mt-1 type-body-sm text-content-muted" id="setting-mailboxName-description">
+            The name of the mailbox to import from Apple Mail.
+        </p>
+        <div class="mt-3 flex items-center gap-3">
+            <!-- Named "Mailbox Name": the visible label leans on the section heading -->
+            <input
+                hlmInput
+                class="max-w-xs"
+                id="setting-mailboxName-input"
+                aria-labelledby="apple-mail-mailbox setting-mailboxName-label"
+                aria-describedby="setting-mailboxName-description"
+                [(ngModel)]="mailboxName"
+                placeholder="Not set"
+            />
+            @if (hasChanges()) {
+                <button hlmBtn type="button" (click)="saveSettings()">Save</button>
+            }
+        </div>
+    </section>
 
-    @if (importUpdate(); as update) {
-        @if (update.phase === 'started' || update.phase === 'processing') {
-            <div class="email-import-progress | mt-3 flex flex-wrap items-center gap-3">
-                <p class="flex items-center gap-2 type-body-sm text-content-secondary">
-                    <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
-                    @if (update.phase === 'processing') {
-                        Importing emails {{ update.current }}/{{ update.total }}
-                    } @else {
-                        Checking mail…
-                    }
-                </p>
-                <button hlmBtn variant="ghost" type="button" (click)="cancelImport($event)">
-                    Cancel import
-                </button>
-            </div>
-        }
-    }
+    <section class="email-import | py-6" aria-labelledby="apple-mail-import">
+        <h3 id="apple-mail-import" class="type-section-title text-content-primary">Import</h3>
+        <p class="mt-1 type-body-sm text-content-muted" id="email-import-description">
+            New emails are imported when the app starts and when you return to it, at most once an hour.
+            Import now to check the mailbox right away.
+        </p>
 
-    <!-- Only the result is announced: progress would be read out again for every email -->
-    <p
-        #importStatus
-        class="email-import-result | mt-3 type-body-sm focus-visible:outline-2 focus-visible:outline-border-focus"
-        tabindex="-1"
-        role="status"
-        aria-label="Last email import"
-    >
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button
+                hlmBtn
+                variant="secondary"
+                type="button"
+                aria-describedby="email-import-description"
+                [disabled]="!canImport()"
+                (click)="importNow()"
+            >
+                Import now
+            </button>
+            @if (importBlockedReason(); as reason) {
+                <p class="type-body-sm text-content-muted">{{ reason }}</p>
+            }
+        </div>
+
         @if (importUpdate(); as update) {
-            @if (update.phase === 'completed') {
-                <span class="text-content-secondary">
-                    Last import: {{ update.totalProcessed }}
-                    {{ update.totalProcessed === 1 ? 'email' : 'emails' }} processed,
-                    {{ update.newlyImported }} new
-                    {{
-                        (update.newlyImported === 1 ? 'release' : 'releases') +
-                            (update.skippedEmails ? '.' : '')
-                    }}
-                    @if (update.skippedEmails; as skippedEmails) {
-                        {{ skippedEmails }} {{ skippedEmails === 1 ? 'email' : 'emails' }} couldn't be read.
-                        We'll try again next time.
-                    }
-                </span>
-            } @else if (update.phase === 'cancelled') {
-                <span class="text-content-secondary">Last import was cancelled.</span>
-            } @else if (update.phase === 'error') {
-                <span class="text-content-danger">Last import failed: {{ update.errorMessage }}</span>
+            @if (update.phase === 'started' || update.phase === 'processing') {
+                <div class="email-import-progress | mt-3 flex flex-wrap items-center gap-3">
+                    <p class="flex items-center gap-2 type-body-sm text-content-secondary">
+                        <app-progress-ring
+                            mode="spinning"
+                            [diameter]="16"
+                            [strokeWidth]="2"
+                        ></app-progress-ring>
+                        @if (update.phase === 'processing') {
+                            Importing emails {{ update.current }}/{{ update.total }}
+                        } @else {
+                            Checking mail…
+                        }
+                    </p>
+                    <button hlmBtn variant="ghost" type="button" (click)="cancelImport($event)">
+                        Cancel import
+                    </button>
+                </div>
             }
         }
-    </p>
+
+        <!-- Only the result is announced: progress would be read out again for every email -->
+        <p
+            #importStatus
+            class="email-import-result | mt-3 type-body-sm focus-visible:outline-2 focus-visible:outline-border-focus"
+            tabindex="-1"
+            role="status"
+            aria-label="Last email import"
+        >
+            @if (importUpdate(); as update) {
+                @if (update.phase === 'completed') {
+                    <span class="text-content-secondary">
+                        Last import: {{ update.totalProcessed }}
+                        {{ update.totalProcessed === 1 ? 'email' : 'emails' }} processed,
+                        {{ update.newlyImported }} new
+                        {{
+                            (update.newlyImported === 1 ? 'release' : 'releases') +
+                                (update.skippedEmails ? '.' : '')
+                        }}
+                        @if (update.skippedEmails; as skippedEmails) {
+                            {{ skippedEmails }} {{ skippedEmails === 1 ? 'email' : 'emails' }} couldn't be
+                            read. We'll try again next time.
+                        }
+                    </span>
+                } @else if (update.phase === 'cancelled') {
+                    <span class="text-content-secondary">Last import was cancelled.</span>
+                } @else if (update.phase === 'error') {
+                    <span class="text-content-danger">Last import failed: {{ update.errorMessage }}</span>
+                }
+            }
+        </p>
+    </section>
 </div>
