@@ -41,7 +41,13 @@
                     <p class="type-section-title text-content-primary">No new releases</p>
                     <p class="mt-2 type-body-sm text-content-muted">
                         It looks like you haven't set up your feed yet. Go to
-                        <a class="" routerLink="/settings">settings</a>
+                        <a
+                            hlmBtn
+                            variant="link"
+                            class="text-content-primary underline decoration-content-muted hover:decoration-current"
+                            routerLink="/settings"
+                            >settings</a
+                        >
                         to get started.
                     </p>
                 </div>
@@ -75,7 +81,7 @@
                                         [attr.data-track-index]="$index"
                                         [ngClass]="{
                                             'text-content-muted': !track.streamUrl,
-                                            'text-content-success': isCurrentTrack(track.streamUrl),
+                                            'font-bold text-content-success': isCurrentTrack(track.streamUrl),
                                         }"
                                     >
                                         @if (track.streamUrl) {
@@ -84,7 +90,7 @@
                                                 variant="plain"
                                                 size="icon-xs"
                                                 type="button"
-                                                class="track-control | grid shrink-0 place-items-center rounded-sm type-body-sm text-content-secondary"
+                                                class="track-control | grid shrink-0 place-items-center rounded-sm text-content-secondary"
                                                 [ngClass]="{
                                                     'hover:bg-action-quiet-hover hover:text-content-primary':
                                                         isCurrentTrack(track.streamUrl),
@@ -128,9 +134,9 @@
                                                 variant="plain"
                                                 size="none"
                                                 type="button"
-                                                class="track-seeker | relative flex min-w-0 shrink grow items-center justify-between gap-2 rounded-sm px-0 py-1 text-left type-body-sm text-content-primary"
+                                                class="track-seeker | relative flex min-w-0 shrink grow items-center justify-between gap-2 rounded-sm py-1 text-left text-content-primary"
                                                 [attr.aria-label]="'Seek within ' + track.title"
-                                                [hlmTooltip]="track.title"
+                                                [hlmOverflowTooltip]="track.title"
                                                 (mousedown)="$event.preventDefault()"
                                                 (click)="seekTrack($event, track.streamUrl)"
                                             >
@@ -165,9 +171,11 @@
                                                     {{ $index + 1 }}.
                                                 }
                                             </span>
-                                            <span class="min-w-0 grow truncate" [hlmTooltip]="track.title">{{
-                                                track.title
-                                            }}</span>
+                                            <span
+                                                class="min-w-0 grow truncate"
+                                                [hlmOverflowTooltip]="track.title"
+                                                >{{ track.title }}</span
+                                            >
                                             <span class="shrink-0">
                                                 {{ track.duration ? formatDuration(track.duration) : '' }}
                                             </span>
@@ -186,19 +194,16 @@
                         >
                             <div class="wrap-nicely overflow-x-hidden overflow-y-scroll">
                                 @if (feedItem.error; as error) {
-                                    <div
-                                        hlmAlert
-                                        variant="destructive"
-                                        class="error | mb-1.5 flex items-center gap-2 border-0 bg-transparent p-0"
-                                    >
-                                        <p class="translate-y-[3px] text-content-danger">
+                                    <div class="error | mb-1.5 flex items-center gap-2">
+                                        <p class="text-content-danger">
                                             <app-icon
                                                 name="error"
                                                 color="content.danger"
                                                 size="1.3rem"
+                                                class="translate-y-[3px]"
                                             ></app-icon>
                                         </p>
-                                        <p hlmAlertDescription class="type-label-md">
+                                        <p class="type-label-md text-content-danger">
                                             {{ error.message || 'Error loading feed item' }}
                                         </p>
                                     </div>
@@ -209,7 +214,7 @@
                                         [href]="feedItem.data.releaseUrl"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="text-content-primary transition-colors duration-fast select-text hover:text-content-action not-hover:no-underline"
+                                        class="text-content-primary select-text not-hover:no-underline"
                                     >
                                         {{ feedItem.data.releaseName }}
                                     </a>
@@ -251,7 +256,7 @@
                                                 <div class="type-body-sm">
                                                     {{ link.title }}
 
-                                                    <p class="mt-1 text-xs text-content-secondary">
+                                                    <p class="mt-0.5 type-body-xs text-content-secondary">
                                                         {{ link.url }}
                                                     </p>
                                                 </div>
@@ -289,20 +294,17 @@
                                     <div class="flex rounded-tl-xl text-xl">
                                         <button
                                             hlmBtn
-                                            variant="plain"
-                                            size="none"
-                                            class="feed-snooze | -mr-2 p-2 text-content-muted hover:text-content-primary"
+                                            variant="ghost"
+                                            size="icon"
+                                            class="feed-snooze | aria-pressed:text-content-primary"
                                             type="button"
                                             (click)="toggleCurrentFeedItemSnoozedState()"
-                                            [attr.aria-label]="
-                                                snoozedFeedItems.has(feedItem.id)
-                                                    ? 'Remove release snooze'
-                                                    : 'Snooze release'
-                                            "
+                                            aria-label="Snooze release"
+                                            [attr.aria-pressed]="snoozedFeedItems.has(feedItem.id)"
                                             [hlmTooltip]="
                                                 snoozedFeedItems.has(feedItem.id)
-                                                    ? 'Click to un-snooze (don\'t show again)'
-                                                    : 'Click to snooze (show again tomorrow)'
+                                                    ? 'Snoozed until tomorrow. Unsnooze so it does not come back.'
+                                                    : 'Snooze: show this release again tomorrow'
                                             "
                                         >
                                             <app-icon
@@ -311,7 +313,7 @@
                                                         ? 'snoozeFilled'
                                                         : 'snooze'
                                                 "
-                                                size="1.5rem"
+                                                size="20"
                                             ></app-icon>
                                         </button>
                                     </div>
@@ -344,28 +346,50 @@
                                         [href]="feedItem.data.unsubscribeUrl"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="relative mt-2.5 block w-full text-center [&_.following]:hover:hidden [&_.unfollow]:not-hover:hidden"
-                                        [attr.aria-label]="'Unfollow ' + feedItem.data.band.name"
-                                        [hlmTooltip]="feedItem.data.unsubscribeText"
+                                        class="follow-toggle | mt-2.5 grid w-full text-center"
+                                        [attr.aria-label]="
+                                            'Following ' + feedItem.data.band.name.trim() + ' – unfollow'
+                                        "
                                     >
-                                        <span class="opacity-0">Text</span>
-                                        <span class="following | absolute inset-0 py-1.5">Following</span>
-                                        <span class="unfollow | absolute inset-0 py-1.5">Unfollow</span>
+                                        <!-- Both labels share one grid cell, so the button keeps its size while hover swaps them. -->
+                                        <span
+                                            class="col-start-1 row-start-1 group-hover/button:invisible"
+                                            aria-hidden="true"
+                                            >Following</span
+                                        >
+                                        <span
+                                            class="invisible col-start-1 row-start-1 group-hover/button:visible"
+                                            aria-hidden="true"
+                                            >Unfollow</span
+                                        >
                                     </a>
                                 }
-                                <p class="mt-2.5 type-body-sm text-content-secondary select-text">
+                                <p
+                                    class="mt-2.5 type-body-sm leading-snug text-content-secondary select-text"
+                                >
                                     {{ feedItem.data.band.bio }}
                                 </p>
 
                                 <ul class="label-links | mt-2.5 type-body-sm">
                                     @for (link of feedItem.data.band.links; track $index) {
                                         <li class="truncate leading-5">
+                                            <ng-template #labelLinkTemplate>
+                                                <div class="type-body-sm">
+                                                    {{ link.text }}
+
+                                                    <p class="mt-0.5 type-body-xs text-content-secondary">
+                                                        {{ link.url }}
+                                                    </p>
+                                                </div>
+                                            </ng-template>
                                             <a
+                                                hlmBtn
+                                                variant="external-link"
                                                 [href]="link.url"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                class="max-w-full truncate text-content-primary not-hover:no-underline"
-                                                [hlmTooltip]="link.text + '\n' + link.url"
+                                                class="max-w-full truncate"
+                                                [hlmTooltip]="labelLinkTemplate"
                                             >
                                                 {{ link.text }}
                                             </a>

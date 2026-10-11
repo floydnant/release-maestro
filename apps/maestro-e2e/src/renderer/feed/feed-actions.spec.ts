@@ -29,10 +29,11 @@ test.describe('release feed item actions', () => {
 
         await snoozeButton.focus()
 
-        await expect(page.getByRole('tooltip')).toHaveText('Click to snooze (show again tomorrow)')
+        await expect(page.getByRole('tooltip')).toHaveText('Snooze: show this release again tomorrow')
+        await expect(snoozeButton).toHaveAttribute('aria-pressed', 'false')
 
         await snoozeButton.press('Enter')
 
-        await expect(page.getByRole('button', { name: 'Remove release snooze', exact: true })).toBeVisible()
+        await expect(snoozeButton).toHaveAttribute('aria-pressed', 'true')
     })
 })

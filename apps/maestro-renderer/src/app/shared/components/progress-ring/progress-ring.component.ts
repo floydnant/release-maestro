@@ -1,15 +1,16 @@
 import { ChangeDetectionStrategy, Component, input, Input, ViewEncapsulation } from '@angular/core'
-import { HlmProgress } from '@spartan-ng/helm/progress'
 import { HlmSpinner } from '@spartan-ng/helm/spinner'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 @Component({
     selector: 'app-progress-ring',
-    imports: [HlmProgress, HlmSpinner],
+    imports: [HlmSpinner],
     templateUrl: './progress-ring.component.html',
     styleUrls: ['./progress-ring.component.css'],
+    // Flex keeps the ring out of a text line box, so the host is exactly the ring's size and
+    // centres with the label beside it.
     host: {
-        class: 'inline-block',
+        class: 'inline-flex shrink-0',
     },
     changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,

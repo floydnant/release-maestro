@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, input, output, signal } fro
 import { LibraryFolderValidation } from '@release-maestro/core'
 import { HlmButton } from '@spartan-ng/helm/button'
 import { HlmCard } from '@spartan-ng/helm/card'
-import { HlmTooltip } from '@spartan-ng/helm/tooltip'
+import { HlmOverflowTooltip, HlmTooltip } from '@spartan-ng/helm/tooltip'
 import { ElectronService } from '../../../core/services'
 import { splitPathBaseName } from '../../utils/formatting.utils'
 import { IconComponent } from '../icon/icon.component'
@@ -20,7 +20,7 @@ import { IconComponent } from '../icon/icon.component'
  */
 @Component({
     selector: 'app-folder-list',
-    imports: [IconComponent, NgClass, HlmButton, HlmCard, HlmTooltip],
+    imports: [IconComponent, NgClass, HlmButton, HlmCard, HlmOverflowTooltip, HlmTooltip],
     templateUrl: './folder-list.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
