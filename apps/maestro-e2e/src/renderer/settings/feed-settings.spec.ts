@@ -8,8 +8,11 @@ test('defaults to hiding unplayable releases and persists changes without replac
     page,
 }) => {
     const controller = await createRendererScenario(page, scenarioBuilder().build(), '/settings/feed')
-    const filterSwitch = page.getByRole('switch', { name: filterLabel })
-    const save = page.getByRole('button', { name: 'Save', exact: true })
+    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const filterSwitch = dialog.getByRole('switch', { name: filterLabel })
+    const save = dialog.getByRole('button', { name: 'Save', exact: true })
+    await expect(dialog.getByRole('heading', { name: 'Feed', exact: true })).toBeVisible()
+    await expect(dialog.getByRole('heading', { name: 'Release visibility' })).toBeVisible()
     await expect(filterSwitch).toBeChecked()
     await expect(filterSwitch).toHaveAccessibleDescription(/at least one track available to preview/)
     await expect(save).toBeHidden()
@@ -26,9 +29,9 @@ test('defaults to hiding unplayable releases and persists changes without replac
         .toMatchObject({
             payload: { feed: { hideUnplayableReleases: false } },
         })
-    await page.getByRole('link', { name: 'Apple Mail', exact: true }).click()
-    await expect(page.getByLabel('Mailbox Name')).toBeVisible()
-    await page.getByRole('main').getByRole('link', { name: 'Feed', exact: true }).click()
+    await dialog.getByRole('link', { name: 'Apple Mail', exact: true }).click()
+    await expect(dialog.getByRole('textbox', { name: 'Mailbox Name' })).toBeVisible()
+    await dialog.getByRole('link', { name: 'Feed', exact: true }).click()
     await expect(filterSwitch).not.toBeChecked()
     await page.getByText(filterLabel, { exact: true }).click()
     await expect(filterSwitch).toBeChecked()
@@ -46,11 +49,12 @@ test('locks the switch while saving', async ({ page }) => {
         scenarioBuilder().handler('patch-settings', { kind: 'pending' }).build(),
         '/settings/feed',
     )
-    const filterSwitch = page.getByRole('switch', { name: filterLabel })
+    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const filterSwitch = dialog.getByRole('switch', { name: filterLabel })
     await filterSwitch.click()
-    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
 
-    const saving = page.getByRole('button', { name: 'Saving…', exact: true })
+    const saving = dialog.getByRole('button', { name: 'Saving…', exact: true })
     await expect(saving).toBeDisabled()
     await expect(filterSwitch).toBeDisabled()
     await controller.resolvePending('patch-settings', {
@@ -69,18 +73,19 @@ test('keeps unsaved changes after a failed save and supports retry', async ({ pa
         scenarioBuilder().handler('patch-settings', { kind: 'reject', message: 'Write failed' }).build(),
         '/settings/feed',
     )
-    const filterSwitch = page.getByRole('switch', { name: filterLabel })
-    const save = page.getByRole('button', { name: 'Save', exact: true })
+    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const filterSwitch = dialog.getByRole('switch', { name: filterLabel })
+    const save = dialog.getByRole('button', { name: 'Save', exact: true })
     await filterSwitch.click()
     await expect(filterSwitch).not.toBeChecked()
     await save.focus()
     await save.press('Enter')
-    await expect(page.getByRole('alert')).toHaveText('Could not save feed settings. Try again.')
+    await expect(dialog.getByRole('alert')).toHaveText('Could not save feed settings. Try again.')
     await expect(filterSwitch).not.toBeChecked()
     await expect(save).toBeFocused()
     await controller.setHandler('patch-settings', { kind: 'patch-settings' })
     await save.press('Enter')
-    await expect(page.getByRole('alert')).toBeHidden()
+    await expect(dialog.getByRole('alert')).toBeHidden()
     await expect(save).toBeHidden()
     await expect(filterSwitch).toBeFocused()
 })
