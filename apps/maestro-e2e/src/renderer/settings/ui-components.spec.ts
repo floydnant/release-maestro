@@ -158,11 +158,6 @@ test.describe('shared UI components', () => {
         await expect(search).toHaveValue('Bandcamp')
         await expect(page.getByRole('tooltip')).toBeHidden()
 
-        const order = page.getByLabel('Library order')
-        await expect(order).toHaveAttribute('id', 'shared-library-order')
-        await expect(order).toHaveValue('dateAdded')
-        await order.selectOption('year')
-        await expect(order).toHaveValue('year')
         await expect(page.getByLabel('Unavailable filter')).toBeDisabled()
         await expect(page.getByRole('button', { name: 'Unavailable action' })).toBeDisabled()
         await expect(page.getByRole('progressbar', { name: 'Scanning library folders' })).toHaveAttribute(

@@ -43,7 +43,7 @@ describe(DesignSystemComponent.name, () => {
         expect(componentHeadings[0]?.textContent).toBe('Components')
         expect(element.querySelector('section[aria-labelledby="components-heading"]')).toBeTruthy()
         expect(element.textContent).toContain('Preview folder import')
-        expect(element.querySelector<HTMLSelectElement>('#shared-library-order')?.value).toBe('dateAdded')
+        expect(element.querySelector('#shared-library-view')?.getAttribute('role')).toBe('combobox')
         expect(element.querySelector('button[hlmBtn]')).toBeTruthy()
         expect(element.querySelector('input[hlmInput]')).toBeTruthy()
         expect(element.textContent).toContain('Hydrated')

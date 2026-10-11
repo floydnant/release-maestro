@@ -53,8 +53,6 @@ export default [
                 'error',
                 {
                     ...classValidationOptions,
-                    // These inputs style native-select's inner elements rather than its host.
-                    additionalClassAttributes: ['selectClass', 'selectIconClass'],
                     /**
                      * Resolve a class list through the component's *types* when its syntax is not
                      * enumerable — an `as const`, a union alias imported from elsewhere, a
@@ -121,8 +119,8 @@ export default [
         rules: {
             '@angular-eslint/component-selector': ['error', helmSelectorOptions],
             '@angular-eslint/directive-selector': ['error', helmSelectorOptions],
-            // Preserve upstream class overrides, the native-select value API and its explicit
-            // ARIA validity/description overrides. Other aliases keep their usual selector contract.
+            // Preserve upstream class overrides, value inputs and explicit ARIA validity/description
+            // overrides. Other aliases keep their usual selector contract.
             '@angular-eslint/no-input-rename': [
                 'error',
                 { allowedNames: ['class', 'value', 'aria-invalid', 'aria-describedby'] },

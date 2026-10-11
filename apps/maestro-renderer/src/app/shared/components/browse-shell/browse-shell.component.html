@@ -19,13 +19,13 @@
             name="search"
             size="14"
             color="content.muted"
-            class="pointer-events-none absolute left-3"
+            class="pointer-events-none absolute left-2.5"
         ></app-icon>
         <input
             #searchInput
             hlmInput
             type="search"
-            class="w-64 pr-8 pl-[2.25rem]"
+            class="w-64 pr-6 pl-[2rem]"
             placeholder="Search {{ state().entityLabel }}…"
             [attr.aria-label]="'Search ' + state().entityLabel"
             [value]="searchDraft()"
@@ -38,7 +38,7 @@
                 hlmBtn
                 variant="plain"
                 type="button"
-                class="absolute inset-y-0 right-0 text-content-muted hover:text-content-primary"
+                class="absolute inset-y-0 right-0 px-2 text-content-muted hover:text-content-primary"
                 aria-label="Clear search"
                 (click)="onClearSearch()"
             >

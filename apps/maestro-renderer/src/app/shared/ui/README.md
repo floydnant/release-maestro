@@ -22,9 +22,11 @@ Shared defaults use the existing generated semantic tokens, system typography an
 interaction states. Adjust those defaults here when several callers need the same change. Product
 templates use Tailwind for layout and domain-specific composition.
 
-Preserve existing control geometry when adopting these components. Regular buttons use the original
-`px-3 py-1.5` padding and content height. Inputs and textareas keep native sizing. Explicit icon sizes
-are for controls whose established layout uses those sizes. A click target that has no button
+Every single-line control (buttons, icon buttons, inputs and select triggers) has one fixed height,
+`--foundation-size-control-sm`, so controls side by side line up regardless of border or type. Size
+them by height, never by vertical padding plus line height: that is how bordered and borderless
+controls drift apart by a pixel or two. `xs`/`icon-xs` serve title-bar and table chrome, `lg`/`icon-lg`
+standalone actions that are meant to stand out. Textareas keep native sizing. A click target that has no button
 appearance uses `variant="plain" size="none"`, with its existing layout and typography. Seeking
 targets and sortable headings must not acquire hover backgrounds. Only filled variants show a
 disabled fill; quiet and text variants dim their content.
@@ -68,9 +70,8 @@ the native static attribute and exposes `[tabindex]` for dynamic values. Disable
 `-1`; enabling restores the caller value. Use the directive input for a dynamic tabindex because
 Brain's host binding can overwrite `[attr.tabindex]`.
 
-Inputs, textareas and native selects accept `aria-describedby`; Brain combines those caller IDs
-with descriptions registered by the enclosing Field. Native selects forward the IDs to their inner
-`select`. The dialog service accepts component classes and `TemplateRef`; a template's `let-dialog`
+Inputs and textareas accept `aria-describedby`; Brain combines those caller IDs
+with descriptions registered by the enclosing Field. The dialog service accepts component classes and `TemplateRef`; a template's `let-dialog`
 receives the supplied context and `close(result)` action.
 
 Product components own music data, scan state, recovery actions and navigation. Their fetched

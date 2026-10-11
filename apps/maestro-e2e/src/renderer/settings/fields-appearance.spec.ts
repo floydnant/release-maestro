@@ -32,20 +32,15 @@ test.describe('existing field appearance', () => {
             })
 
         await expect(label).toHaveCSS('font-weight', '600')
+        // Inputs share the one control height with buttons and selects.
         await expect
             .poll(() =>
                 input.evaluate(element => {
-                    const style = getComputedStyle(element)
-                    const contentHeight =
-                        parseFloat(style.lineHeight) +
-                        parseFloat(style.paddingTop) +
-                        parseFloat(style.paddingBottom) +
-                        parseFloat(style.borderTopWidth) +
-                        parseFloat(style.borderBottomWidth)
-                    return Math.abs(element.getBoundingClientRect().height - contentHeight)
+                    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
+                    return element.getBoundingClientRect().height / rootFontSize
                 }),
             )
-            .toBeLessThan(1)
+            .toBeCloseTo(1.75, 2)
     })
 
     test('keeps native textareas bounded while editing long content', async ({ page }) => {
