@@ -140,6 +140,14 @@
                     <label hlmLabel for="shared-disabled-input">Unavailable filter</label>
                     <input hlmInput id="shared-disabled-input" disabled value="Library scan in progress" />
                 </div>
+                <div class="flex items-center gap-3">
+                    <hlm-switch inputId="shared-feed-filter" [(checked)]="hideUnplayableReleases" />
+                    <label hlmLabel for="shared-feed-filter">Hide releases with no playable tracks</label>
+                </div>
+                <div class="flex items-center gap-3">
+                    <hlm-switch inputId="shared-disabled-switch" checked disabled />
+                    <label hlmLabel for="shared-disabled-switch">Unavailable setting</label>
+                </div>
             </div>
         </section>
 
