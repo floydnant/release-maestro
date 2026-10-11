@@ -16,7 +16,7 @@ semantic tokens and established compositions when building or refining renderer 
     2. **Spartan.** When shared UI lacks the control, match the use case against the Helm families at
        the pinned tag in [upstream.json](../../../apps/maestro-renderer/src/app/shared/ui/upstream.json)
        (`gh api 'repos/spartan-ng/spartan/contents/libs/helm?ref=<tag>' --jq '.[].name'`). Upstream
-       ships far more than this repo has copied, such as combobox, popover, command, sheet, switch,
+       ships far more than this repo has copied, such as combobox, popover, command, sheet,
        toggle-group, slider, tabs and scroll-area. Add a matching family to shared UI by following
        [shared UI maintenance](../../../apps/maestro-renderer/src/app/shared/ui/README.md), which also
        governs updating an existing family, then use it from there.

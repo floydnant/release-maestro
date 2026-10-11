@@ -51,6 +51,6 @@
         "Navigation button variant follows aria-current for native route links",
         "Inline link buttons can shrink with their containing row",
         "Sidebar copies only the static menu, group and sub-menu parts; the collapsible container, mobile sheet, cookie state, rail, trigger, inset, input, skeleton and badge are omitted, and menu buttons follow aria-current like the navigation button",
-        "Switch track insets its thumb with Tailwind sizes and exposes focus() for focus restoration"
+        "Switch insets its thumb with rem padding and exposes focus() for focus restoration"
     ]
 }
