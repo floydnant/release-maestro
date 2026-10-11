@@ -40,7 +40,7 @@ import { IconComponent } from '../icon/icon.component'
             @if (isActive()) {
                 <app-icon
                     [name]="sort().direction === 'asc' ? 'sortAscending' : 'sortDescending'"
-                    size="12"
+                    size="14"
                     color="content.primary"
                 ></app-icon>
             }

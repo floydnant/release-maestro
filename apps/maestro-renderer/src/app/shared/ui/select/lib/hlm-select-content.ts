@@ -30,7 +30,7 @@ export class HlmSelectContent {
     constructor() {
         classes(() =>
             hlm(
-                'max-h-64 rounded-lg border border-border-default bg-background-elevated p-1 text-content-primary shadow-lg type-body-sm relative flex min-w-(--brn-select-width) overflow-x-hidden overflow-y-auto',
+                'max-h-64 rounded-lg border border-border-default bg-background-surface p-1 text-content-primary shadow-lg type-body-sm relative flex flex-col min-w-(--brn-select-width) overflow-x-hidden overflow-y-auto',
             ),
         )
     }

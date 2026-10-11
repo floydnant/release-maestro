@@ -57,28 +57,30 @@ test.describe('existing control appearance', () => {
         await expect(back).toHaveCSS('background-color', hovered)
     })
 
-    test('sizes regular buttons from their text and original padding', async ({ page }) => {
+    test('gives every single-line control one height, whatever its border or type', async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/settings/design-system')
-        const button = page.getByRole('button', { name: 'Preview folder import' })
-        await expect(button).toBeVisible()
-        await expect.poll(() => remPadding(button, 'paddingLeft')).toBeCloseTo(0.75, 3)
-        await expect.poll(() => remPadding(button, 'paddingRight')).toBeCloseTo(0.75, 3)
-        await expect.poll(() => remPadding(button, 'paddingTop')).toBeCloseTo(0.375, 3)
-        await expect.poll(() => remPadding(button, 'paddingBottom')).toBeCloseTo(0.375, 3)
-        await expect
-            .poll(() =>
-                button.evaluate(element => {
-                    const style = getComputedStyle(element)
-                    const contentHeight =
-                        parseFloat(style.lineHeight) +
-                        parseFloat(style.paddingTop) +
-                        parseFloat(style.paddingBottom) +
-                        parseFloat(style.borderTopWidth) +
-                        parseFloat(style.borderBottomWidth)
-                    return Math.abs(element.getBoundingClientRect().height - contentHeight)
-                }),
-            )
-            .toBeLessThan(1)
+        const primary = page.getByRole('button', { name: 'Preview folder import' })
+        const controls = [
+            primary,
+            page.getByRole('button', { name: 'Outline action' }),
+            page.getByRole('button', { name: 'Danger action' }),
+            page.getByRole('textbox', { name: 'Search releases' }),
+            page.getByRole('combobox', { name: 'Library view' }),
+        ]
+        await expect(primary).toBeVisible()
+        const controlHeight = await page.evaluate(() => {
+            const probe = document.createElement('div')
+            probe.style.height = 'var(--foundation-size-control-sm)'
+            document.body.append(probe)
+            const height = probe.getBoundingClientRect().height
+            probe.remove()
+            return height
+        })
+        for (const control of controls) {
+            await expect
+                .poll(() => control.evaluate(element => element.getBoundingClientRect().height))
+                .toBeCloseTo(controlHeight, 1)
+        }
     })
 
     test('keeps feed seek targets plain and gives snooze the quiet icon-button states', async ({ page }) => {
