@@ -110,19 +110,16 @@
                             </li>
                         </ul>
                     </div>
-                    <ul hlmSidebarMenu>
-                        <li hlmSidebarMenuItem>
-                            <a hlmSidebarMenuButton [routerLink]="settingsLink('library-folders')"
-                                >Settings</a
-                            >
-                        </li>
-                    </ul>
                 </nav>
 
                 @if (showLibrarySetupCta()) {
-                    <hr />
-                    <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
-                    <a hlmBtn class="mt-2 w-full" routerLink="/import">Set up library</a>
+                    <div hlmSidebarSeparator class="-mx-2"></div>
+                    <div class="sidebar__setup-cta | px-3 pt-2">
+                        <p class="type-body-sm text-content-secondary">
+                            Your music library isn't set up yet.
+                        </p>
+                        <a hlmBtn class="mt-2 w-full" routerLink="/import">Set up library</a>
+                    </div>
                 }
 
                 <div class="flex h-full items-center justify-center">
@@ -138,6 +135,18 @@
                         </button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Settings are about the app, not the library, so they sit apart at the bottom. -->
+            <div hlmSidebarFooter class="sidebar__footer | border-t border-border-subtle">
+                <ul hlmSidebarMenu>
+                    <li hlmSidebarMenuItem>
+                        <a hlmSidebarMenuButton [routerLink]="settingsLink('library-folders')">
+                            <app-icon name="settings" size="16" aria-hidden="true"></app-icon>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
             </div>
         </aside>
     }
