@@ -27,7 +27,7 @@
         "Release Maestro semantic tokens, typography and motion",
         "Semantic app-icon glyphs instead of Lucide",
         "Token-aware Tailwind merging",
-        "Progress indicator respects max",
+        "Progress indicator respects max and uses the success color; segments support semantic colors and per-segment glow",
         "Button preserves native static tabindex and accepts dynamic tabindex input",
         "TemplateRef dialog service rendering with implicit context",
         "Dialog content is a block-level grid panel sized to max-w-lg, replacing the upstream style-preset class",

@@ -28,7 +28,9 @@ export class HlmProgressIndicator {
 
     constructor() {
         classes(() =>
-            hlm('rounded-full bg-action-primary duration-fast ease-standard size-full flex-1 transition-all'),
+            hlm(
+                'rounded-full bg-content-success duration-fast ease-standard size-full flex-1 transition-all',
+            ),
         )
     }
 }

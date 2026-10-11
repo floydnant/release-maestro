@@ -163,9 +163,10 @@
                 <div class="grid gap-2">
                     <p id="shared-scan-progress" class="type-label-md">Scanning library folders</p>
                     <hlm-progress [value]="65" aria-labelledby="shared-scan-progress">
-                        <hlm-progress-indicator />
+                        <hlm-progress-segment [value]="55" />
+                        <hlm-progress-segment [value]="10" color="content.danger" />
                     </hlm-progress>
-                    <p class="type-body-sm text-content-secondary">65% complete</p>
+                    <p class="type-body-sm text-content-secondary">55% imported, 10% failed</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <hlm-spinner aria-label="Reading metadata" />

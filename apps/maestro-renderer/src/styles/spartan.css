@@ -28,3 +28,18 @@
     opacity: 1;
     transition: none;
 }
+
+/* A progress segment supplies its semantic color; the parent controls its glow state. */
+[data-slot='progress-segment'] {
+    transition:
+        box-shadow var(--duration-slow),
+        width var(--duration-ambient) var(--ease-standard);
+}
+
+[data-slot='progress']:is([data-glow='always'], [data-glow='hover']:hover) [data-slot='progress-segment'] {
+    box-shadow: 0 0 12px color-mix(in srgb, var(--color) 55%, transparent);
+    transition:
+        box-shadow var(--duration-fast),
+        width var(--duration-ambient) var(--ease-emphasized),
+        border-radius var(--duration-ambient);
+}
