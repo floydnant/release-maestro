@@ -11,6 +11,7 @@ import { FolderListComponent } from '../../shared/components/folder-list/folder-
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
 import { ImportMosaicComponent } from './import-mosaic.component'
+import { settingsLink } from '../settings/settings-link'
 
 type ImportStep = 'pick' | 'scanning' | 'done'
 
@@ -54,6 +55,7 @@ type ImportStep = 'pick' | 'scanning' | 'done'
     `,
 })
 export class LibraryImportComponent {
+    readonly settingsLink = settingsLink
     private readonly electronService = inject(ElectronService)
     private readonly router = inject(Router)
     readonly library = inject(LibraryService)

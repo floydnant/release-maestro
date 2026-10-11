@@ -106,7 +106,7 @@ test.describe('library settings scenarios', () => {
             kind: 'resolve',
             value: { library: { folders: [], onboardingSkipped: true }, emailPluginConfig: {} },
         })
-        await page.getByRole('link', { name: 'Home' }).click()
+        await page.keyboard.press('Escape')
         await expect(page).toHaveURL(/\/home$/)
     })
 

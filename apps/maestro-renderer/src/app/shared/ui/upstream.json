@@ -46,6 +46,7 @@
         "Tooltips use a 600ms delay and wrap within 24rem and the viewport",
         "Tooltips skip redundant descriptions; overflow tooltip shows only for clipped text",
         "Pinned Brain tooltip patch captures nested scroll and dismisses pending or hovered overlays",
+        "Pinned Brain dialog patch leaves the dialog open on an Escape a menu or select inside it already handled",
         "Navigation button variant follows aria-current for native route links",
         "Inline link buttons can shrink with their containing row",
         "Sidebar copies only the static menu, group and sub-menu parts; the collapsible container, mobile sheet, cookie state, rail, trigger, inset, input, skeleton and badge are omitted, and menu buttons follow aria-current like the navigation button"
