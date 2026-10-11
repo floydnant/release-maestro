@@ -107,7 +107,7 @@
                     Scan a library folder and your {{ state().entityLabel }} will show up here as they are
                     read.
                 </p>
-                <a hlmBtn variant="default" routerLink="/settings/library">Library settings</a>
+                <a hlmBtn variant="default" [routerLink]="settingsLink('library')">Library settings</a>
             }
         </div>
     } @else {
