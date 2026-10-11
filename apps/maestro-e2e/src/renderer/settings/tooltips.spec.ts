@@ -135,7 +135,7 @@ test.describe('shared tooltips', () => {
         await expect(page.getByRole('tooltip')).toBeVisible()
         await page
             .getByRole('dialog', { name: 'Settings' })
-            .getByRole('link', { name: 'Library', exact: true })
+            .getByRole('link', { name: 'Library folders', exact: true })
             .click()
         await expect(page.getByRole('tooltip')).toBeHidden()
     })
