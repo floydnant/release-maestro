@@ -23,7 +23,7 @@ export class ProgressRingComponent {
     @Input() mode: 'progress' | 'spinning' = 'progress'
     ariaLabel = input('Progress', { alias: 'aria-label' })
 
-    color = input<string | undefined, SemanticColorIdentifier | undefined>(semanticColor('content.action'), {
+    color = input<string | undefined, SemanticColorIdentifier | undefined>(semanticColor('content.primary'), {
         transform: value => value && semanticColor(value),
     })
     bgColor = input<string | undefined, SemanticColorIdentifier | 'transparent' | undefined>(
