@@ -189,7 +189,15 @@
                     placeholder="/music/library&#10;/other/folder"
                 ></textarea>
 
-                <app-progress-bar [segments]="scanProgressSegments()" [shouldGlow]="scanInFlight()" />
+                <hlm-progress
+                    aria-label="Library scan progress"
+                    [value]="progress()"
+                    [glow]="scanInFlight() ? 'always' : 'hover'"
+                >
+                    @for (segment of scanProgressSegments(); track $index) {
+                        <hlm-progress-segment [value]="segment.value" [color]="segment.color" />
+                    }
+                </hlm-progress>
 
                 <div class="grid gap-3 md:grid-cols-5">
                     <div
