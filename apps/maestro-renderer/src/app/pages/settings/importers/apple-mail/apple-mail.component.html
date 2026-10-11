@@ -1,4 +1,4 @@
-<div class="settings-item |">
+<div class="settings-item | mx-auto max-w-2xl">
     <p class="type-label-sm text-content-muted uppercase">Apple Mail</p>
     <h1 class="mt-1 type-section-title text-content-primary">Mailbox import</h1>
     <label class="mt-6 block type-label-md text-content-primary" for="setting-mailboxName-input"
@@ -19,12 +19,14 @@
 </div>
 
 @if (hasChanges()) {
-    <hr class="mt-6" />
+    <div class="mx-auto max-w-2xl">
+        <hr class="mt-6" />
 
-    <button hlmBtn type="button" (click)="saveSettings()">Save</button>
+        <button hlmBtn type="button" (click)="saveSettings()">Save</button>
+    </div>
 }
 
-<div class="email-import | mt-8 max-w-2xl">
+<div class="email-import | mx-auto mt-8 max-w-2xl">
     <h2 class="type-section-title text-content-primary">Import</h2>
     <p class="mt-1 type-body-sm text-content-muted" id="email-import-description">
         New emails are imported when the app starts and when you return to it, at most once an hour. Import
