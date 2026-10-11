@@ -10,18 +10,20 @@ import {
     signal,
     viewChild,
 } from '@angular/core'
-import { FormsModule } from '@angular/forms'
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmSwitch } from '@spartan-ng/helm/switch'
 import { SettingsService } from '../../../core/settings/settings.service'
 
 @Component({
     selector: 'app-feed-settings',
-    imports: [FormsModule],
+    imports: [HlmButton, HlmSwitch],
     templateUrl: './feed-settings.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FeedSettingsComponent {
     private readonly injector = inject(Injector)
-    private readonly filterCheckbox = viewChild.required<ElementRef<HTMLInputElement>>('filterCheckbox')
+    private readonly filterSwitch = viewChild.required(HlmSwitch)
+    private readonly saveButton = viewChild<ElementRef<HTMLButtonElement>>('saveButton')
     readonly settingsService = inject(SettingsService)
     readonly hideUnplayableReleases = linkedSignal(() =>
         this.settingsService.settings.hasValue()
@@ -39,6 +41,8 @@ export class FeedSettingsComponent {
 
     async saveSettings(event: MouseEvent): Promise<void> {
         if (!this.hasChanges() || this.saving()) return
+        // Disabling Save while it is pending drops its focus, so return focus once it settles:
+        // to the switch after a save removes Save, or to Save to retry a failed one.
         const restoreFocus = event.currentTarget === document.activeElement
         this.saving.set(true)
         this.saveError.set(null)
@@ -51,9 +55,14 @@ export class FeedSettingsComponent {
         } finally {
             this.saving.set(false)
             if (restoreFocus) {
-                afterNextRender(() => this.filterCheckbox().nativeElement.focus(), {
-                    injector: this.injector,
-                })
+                afterNextRender(
+                    () => {
+                        const saveButton = this.saveButton()
+                        if (saveButton) saveButton.nativeElement.focus()
+                        else this.filterSwitch().focus()
+                    },
+                    { injector: this.injector },
+                )
             }
         }
     }
