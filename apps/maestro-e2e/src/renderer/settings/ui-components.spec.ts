@@ -126,6 +126,12 @@ test.describe('shared UI components', () => {
         await expect(submenu).toBeVisible()
         const scan = submenu.getByRole('menuitem', { name: 'Scan configured folders' })
         await expect(scan).toBeFocused()
+        // The submenu opens beside its parent menu, never on top of it
+        const [actionsRight, submenuLeft] = await Promise.all([
+            actions.evaluate(menu => menu.getBoundingClientRect().right),
+            submenu.evaluate(menu => menu.getBoundingClientRect().left),
+        ])
+        expect(submenuLeft).toBeGreaterThanOrEqual(actionsRight - 1)
         await scan.press('Escape')
         await expect(submenu).toBeHidden()
         await expect(scanOptions).toBeFocused()
