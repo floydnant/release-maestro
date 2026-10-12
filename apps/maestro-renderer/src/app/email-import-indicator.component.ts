@@ -71,7 +71,7 @@ export class EmailImportIndicatorComponent {
         const count = view.newlyImported
         const skippedEmails = view.skippedEmails ?? 0
         if (skippedEmails > 0) {
-            const added = count > 0 ? `Added ${count} ${count === 1 ? 'release' : 'releases'}. ` : ''
+            const added = count > 0 ? `${count} new ${count === 1 ? 'release' : 'releases'}. ` : ''
             return {
                 icon: 'success',
                 color: 'content.secondary',
@@ -83,7 +83,7 @@ export class EmailImportIndicatorComponent {
         return {
             icon: 'success',
             color: count > 0 ? 'content.success' : 'content.secondary',
-            text: count > 0 ? `Added ${count} ${count === 1 ? 'release' : 'releases'}` : 'No new releases',
+            text: count > 0 ? `${count} new ${count === 1 ? 'release' : 'releases'}` : 'No new releases',
             title: '',
         } as const
     })
