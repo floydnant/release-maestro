@@ -74,7 +74,7 @@ export class HlmDialogContent {
     constructor() {
         classes(() =>
             hlm([
-                'max-w-lg rounded-xl border border-border-default bg-background-elevated p-6 text-content-primary shadow-lg duration-fast ease-standard relative mx-auto w-full outline-none sm:mx-0',
+                'grid w-lg max-w-[calc(100vw-2rem)] gap-4 rounded-xl border border-border-default bg-background-elevated p-6 text-content-primary shadow-lg duration-fast ease-standard relative mx-auto outline-none sm:mx-0',
                 this._dynamicComponentClass,
             ]),
         )
