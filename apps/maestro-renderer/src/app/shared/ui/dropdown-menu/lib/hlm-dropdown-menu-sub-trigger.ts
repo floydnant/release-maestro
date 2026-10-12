@@ -1,8 +1,43 @@
 import { CdkMenuTrigger } from '@angular/cdk/menu'
-import { computed, Directive, effect, forwardRef, inject, input } from '@angular/core'
+import type { ConnectedPosition } from '@angular/cdk/overlay'
+import {
+    afterNextRender,
+    computed,
+    Directive,
+    effect,
+    ElementRef,
+    forwardRef,
+    inject,
+    input,
+    signal,
+} from '@angular/core'
 import { createMenuPosition, MENU_SIDE, type MenuAlign, type MenuSide } from '@spartan-ng/brain/core'
 import { classes, hlm } from '@spartan-ng/helm/utils'
-import { injectHlmDropdownMenuConfig } from './hlm-dropdown-menu-token'
+
+type MenuInset = { start: number; end: number; top: number; bottom: number }
+
+const oppositeAlign = { start: 'end', end: 'start', center: 'center' } as const satisfies Record<
+    MenuAlign,
+    MenuAlign
+>
+
+/**
+ * Opens beside the parent menu, flipping to the other side and the other vertical edge when the
+ * viewport is too small. Offsets clear the parent menu's padding and border so the submenu never
+ * covers it, and line up the submenu's first item with the trigger.
+ */
+function submenuPositions(align: MenuAlign, side: MenuSide, inset: MenuInset): ConnectedPosition[] {
+    if (side === 'top' || side === 'bottom') return createMenuPosition(align, side)
+    const positions = [
+        ...createMenuPosition(align, side),
+        ...(align === 'center' ? [] : createMenuPosition(oppositeAlign[align], side)),
+    ]
+    return positions.map(position => ({
+        ...position,
+        offsetX: position.overlayX === 'start' ? inset.end : -inset.start,
+        offsetY: position.overlayY === 'top' ? -inset.top : position.overlayY === 'bottom' ? inset.bottom : 0,
+    }))
+}
 
 @Directive({
     selector: '[hlmDropdownMenuSubTrigger]',
@@ -21,12 +56,16 @@ import { injectHlmDropdownMenuConfig } from './hlm-dropdown-menu-token'
 })
 export class HlmDropdownMenuSubTrigger {
     private readonly _cdkTrigger = inject(CdkMenuTrigger, { host: true })
-    private readonly _config = injectHlmDropdownMenuConfig()
+    private readonly _host = inject<ElementRef<HTMLElement>>(ElementRef)
 
-    public readonly align = input<MenuAlign>(this._config.align)
-    public readonly side = input<MenuSide>(this._config.side)
+    public readonly align = input<MenuAlign>('start')
+    // A submenu opens beside its parent; the menu config's side is for the top-level menu.
+    public readonly side = input<MenuSide>('right')
 
-    private readonly _menuPosition = computed(() => createMenuPosition(this.align(), this.side()))
+    private readonly _parentInset = signal<MenuInset>({ start: 0, end: 0, top: 0, bottom: 0 })
+    private readonly _menuPosition = computed(() =>
+        submenuPositions(this.align(), this.side(), this._parentInset()),
+    )
 
     constructor() {
         // CDK sets transform-origin on the submenu content from the resolved position; the content reads it
@@ -35,10 +74,29 @@ export class HlmDropdownMenuSubTrigger {
         ;(this._cdkTrigger as { transformOriginSelector?: string }).transformOriginSelector =
             '[data-slot="dropdown-menu-sub"]'
 
+        // CDK creates the overlay on first open, which can only follow this render.
+        afterNextRender({ read: () => this._parentInset.set(this.measureParentInset()) })
+
         effect(() => {
             this._cdkTrigger.menuPosition = this._menuPosition()
         })
 
         classes(() => hlm('aria-expanded:bg-action-quiet-hover aria-expanded:text-content-primary'))
+    }
+
+    private measureParentInset(): MenuInset {
+        const item = this._host.nativeElement
+        const menu = item.closest('[data-slot="dropdown-menu"], [data-slot="dropdown-menu-sub"]')
+        if (!menu) return { start: 0, end: 0, top: 0, bottom: 0 }
+        const itemBox = item.getBoundingClientRect()
+        const menuBox = menu.getBoundingClientRect()
+        // The submenu shares the parent's padding and border, so they also offset its first item.
+        const style = getComputedStyle(menu)
+        return {
+            start: itemBox.left - menuBox.left,
+            end: menuBox.right - itemBox.right,
+            top: parseFloat(style.paddingTop) + parseFloat(style.borderTopWidth),
+            bottom: parseFloat(style.paddingBottom) + parseFloat(style.borderBottomWidth),
+        }
     }
 }
