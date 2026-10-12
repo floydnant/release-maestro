@@ -9,7 +9,7 @@ export class HlmDialogFooter {
     constructor() {
         classes(() =>
             hlm(
-                'mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
+                'mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
             ),
         )
     }
