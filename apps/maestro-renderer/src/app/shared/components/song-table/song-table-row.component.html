@@ -42,8 +42,10 @@
             />
         } @else {
             <span
-                class="flex aspect-square h-full items-center justify-center rounded-sm bg-background-elevated outline-1 outline-background-surface"
-                [class.outline]="selected()"
+                class="flex aspect-square h-full items-center justify-center rounded-sm bg-background-surface"
+                [ngClass]="{
+                    'outline-1 outline-background-canvas': !selected(),
+                }"
             >
                 <app-icon name="musicNote" size="14" color="content.muted"></app-icon>
             </span>
