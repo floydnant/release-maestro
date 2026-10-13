@@ -48,7 +48,7 @@ export class HlmDropdownMenuCheckbox {
     constructor() {
         classes(() =>
             hlm(
-                'gap-2 rounded-md py-1.5 ps-8 pe-2 type-body-sm focus:bg-action-quiet-hover group/dropdown-menu-checkbox relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
+                'gap-2 rounded-md h-(--foundation-size-control-sm) ps-8 pe-2 type-body-sm focus:bg-action-quiet-hover group/dropdown-menu-checkbox relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
             ),
         )
     }
