@@ -22,9 +22,9 @@ Shared defaults use the existing generated semantic tokens, system typography an
 interaction states. Adjust those defaults here when several callers need the same change. Product
 templates use Tailwind for layout and domain-specific composition.
 
-Every single-line control (buttons, icon buttons, inputs and select triggers) has one fixed height,
-`--foundation-size-control-sm`, so controls side by side line up regardless of border or type. Size
-them by height, never by vertical padding plus line height: that is how bordered and borderless
+Every single-line control (buttons, icon buttons, inputs, select triggers, and menu and select
+items) has one fixed height, `--foundation-size-control-sm`, so controls side by side line up
+regardless of border or type. Size them by height, never by vertical padding plus line height: that is how bordered and borderless
 controls drift apart by a pixel or two. `xs`/`icon-xs` serve title-bar and table chrome, `lg`/`icon-lg`
 standalone actions that are meant to stand out. Textareas keep native sizing. A click target that has no button
 appearance uses `variant="plain" size="none"`, with its existing layout and typography. Seeking
