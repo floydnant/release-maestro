@@ -32,6 +32,15 @@ describe('appSettingsSchema (write validation)', () => {
         }
         expect(() => appSettingsSchema.parse({ feed: { hideUnplayableReleases: 'false' } })).toThrow()
     })
+
+    it('accepts whole snooze hours from one hour to one week and rejects others', () => {
+        for (const snoozeHours of [1, 16, 168]) {
+            expect(appSettingsSchema.parse({ feed: { snoozeHours } }).feed).toEqual({ snoozeHours })
+        }
+        for (const snoozeHours of [0, 169, 1.5, '16']) {
+            expect(() => appSettingsSchema.parse({ feed: { snoozeHours } })).toThrow()
+        }
+    })
 })
 
 describe('storedAppSettingsSchema (tolerant read)', () => {
@@ -44,6 +53,12 @@ describe('storedAppSettingsSchema (tolerant read)', () => {
             hideUnplayableReleases: false,
         })
     })
+    it('drops an invalid snooze duration but keeps the filter preference', () => {
+        expect(
+            storedAppSettingsSchema.parse({ feed: { hideUnplayableReleases: false, snoozeHours: 0 } }).feed,
+        ).toEqual({ hideUnplayableReleases: false, snoozeHours: undefined })
+    })
+
     it('drops individually invalid fields instead of failing the read', () => {
         const parsed = storedAppSettingsSchema.parse({
             library: { folders: 'corrupted', onboardingSkipped: true },
