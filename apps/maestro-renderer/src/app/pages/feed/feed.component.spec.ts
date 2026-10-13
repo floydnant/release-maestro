@@ -4,6 +4,7 @@ import { provideTranslateService } from '@ngx-translate/core'
 import { fromPartial } from '@total-typescript/shoehorn'
 import { EMPTY } from 'rxjs'
 import { FeedService } from '../../core/services/feed.service'
+import { SettingsService } from '../../core/settings/settings.service'
 import { provideWebAudioPlayerMock } from '../../../test/mocks'
 import { FeedComponent } from './feed.component'
 
@@ -22,6 +23,10 @@ describe(FeedComponent.name, () => {
                 provideTranslateService(),
                 provideRouter([]),
                 audioPlayerProvider,
+                {
+                    provide: SettingsService,
+                    useValue: fromPartial<SettingsService>({ settings: { hasValue: () => false } }),
+                },
                 {
                     provide: FeedService,
                     useValue: {
