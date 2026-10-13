@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common'
 import {
     ChangeDetectionStrategy,
     Component,
+    computed,
     ElementRef,
     HostListener,
     inject,
@@ -10,13 +11,14 @@ import {
 } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
-import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
+import { assertUnreachable, DEFAULT_FEED_SNOOZE_HOURS, HydratedFeedItem } from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
 import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
+import { SettingsService } from '../../core/settings/settings.service'
 import { FeedService } from '../../core/services/feed.service'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
@@ -69,6 +71,19 @@ export class FeedComponent {
     feedService = inject(FeedService)
     audioPlayer = inject(WebAudioPlayer)
     readonly settingsLink = settingsLink
+    private readonly settingsService = inject(SettingsService)
+    /** How long a snoozed release stays away, from Settings → Feed. */
+    private readonly snoozeDuration = computed(() => {
+        const settings = this.settingsService.settings
+        const hours =
+            (settings.hasValue() ? settings.value()?.feed?.snoozeHours : undefined) ??
+            DEFAULT_FEED_SNOOZE_HOURS
+        return hours === 1 ? '1 hour' : `${hours} hours`
+    })
+    readonly snoozeHint = computed(() => `Snooze: show this release again in ${this.snoozeDuration()}`)
+    readonly unsnoozeHint = computed(
+        () => `Snoozed for ${this.snoozeDuration()}. Unsnooze so it does not come back.`,
+    )
     readonly playbackProgressLabel = (value: number, max: number) =>
         `${formatDuration(value)} of ${formatDuration(max)}`
 

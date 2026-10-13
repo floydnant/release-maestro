@@ -155,6 +155,8 @@ it is snoozed.
 
 **Snoozed**:
 A viewed item marked to come back rather than stay gone. A snoozed item re-enters the feed once its
-last view is old enough; an unsnoozed viewed item does not return. Snooze is therefore "later", not
+last view is older than the _snooze duration_; an unsnoozed viewed item does not return. Settings →
+Feed sets the duration in whole hours, from 1 to 168; it defaults to 16, so a release snoozed today
+comes back at the same time tomorrow rather than just after it. Snooze is therefore "later", not
 "hide" — the feed query is "never viewed, or snoozed and viewed long enough ago".
 _Avoid_: dismiss, archive, hide — those read as permanent

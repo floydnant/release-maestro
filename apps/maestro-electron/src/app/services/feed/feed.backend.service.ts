@@ -284,13 +284,19 @@ export class FeedBackendService {
     }
 
     async loadFeed(index: number, count: number, excludedIds: string[] = []): Promise<HydratedFeedItem[]> {
-        const hideUnplayableReleases = this.settingsService.getSettings().feed?.hideUnplayableReleases ?? true
+        const feedSettings = this.settingsService.getSettings().feed
+        const hideUnplayableReleases = feedSettings?.hideUnplayableReleases ?? true
         const items: HydratedFeedItem[] = []
         const scannedIds = [...excludedIds]
         // Hidden releases remain unviewed. Continue past them to fill the visible page.
         while (items.length < count) {
             const remaining = count - items.length
-            const candidates = await this.feedBackendRepository.listFeedItems(index, remaining, scannedIds)
+            const candidates = await this.feedBackendRepository.listFeedItems(
+                index,
+                remaining,
+                scannedIds,
+                feedSettings?.snoozeHours,
+            )
             if (candidates.length === 0) break
             items.push(...(await this.hydrateFeed(candidates, hideUnplayableReleases)))
             scannedIds.push(...candidates.map(item => item.id))

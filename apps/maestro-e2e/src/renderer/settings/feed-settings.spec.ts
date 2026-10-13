@@ -3,6 +3,7 @@ import type { AppSettings } from '@release-maestro/core'
 import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
 
 const filterLabel = 'Hide releases with no playable tracks'
+const snoozeLabel = 'Snooze duration hours'
 
 test('defaults to hiding unplayable releases and persists changes without replacing other settings', async ({
     page,
@@ -20,6 +21,8 @@ test('defaults to hiding unplayable releases and persists changes without replac
     await filterSwitch.press('Space')
     await expect(filterSwitch).not.toBeChecked()
     await filterSwitch.press('Tab')
+    await expect(dialog.getByRole('spinbutton', { name: snoozeLabel })).toBeFocused()
+    await page.keyboard.press('Tab')
     await expect(save).toBeFocused()
     await save.press('Enter')
     await expect(save).toBeHidden()
@@ -41,6 +44,35 @@ test('defaults to hiding unplayable releases and persists changes without replac
         .toMatchObject({
             payload: { feed: { hideUnplayableReleases: true } },
         })
+})
+
+test('saves a whole number of snooze hours and blocks entries outside the range', async ({ page }) => {
+    const controller = await createRendererScenario(page, scenarioBuilder().build(), '/settings/feed')
+    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const snoozeHours = dialog.getByRole('spinbutton', { name: snoozeLabel })
+    const save = dialog.getByRole('button', { name: 'Save', exact: true })
+    const rangeError = dialog.getByRole('alert').filter({ hasText: 'Enter a whole number of hours' })
+    await expect(dialog.getByRole('heading', { name: 'Snooze' })).toBeVisible()
+    await expect(snoozeHours).toHaveValue('16')
+    await expect(snoozeHours).toHaveAccessibleDescription(/returns to your feed this many hours/)
+    await expect(save).toBeHidden()
+
+    for (const invalid of ['0', '169', '1.5', '']) {
+        await snoozeHours.fill(invalid)
+        await expect(rangeError).toHaveText('Enter a whole number of hours from 1 to 168.')
+        await expect(snoozeHours).toHaveAttribute('aria-invalid', 'true')
+        await expect(save).toBeDisabled()
+    }
+
+    await snoozeHours.fill('24')
+    await expect(rangeError).toBeHidden()
+    await expect(snoozeHours).toHaveAttribute('aria-invalid', 'false')
+    await save.click()
+    await expect(save).toBeHidden()
+    await expect(snoozeHours).toBeFocused()
+    await expect
+        .poll(() => controller.lastCall('patch-settings'))
+        .toMatchObject({ payload: { feed: { hideUnplayableReleases: true, snoozeHours: 24 } } })
 })
 
 test('locks the switch while saving', async ({ page }) => {

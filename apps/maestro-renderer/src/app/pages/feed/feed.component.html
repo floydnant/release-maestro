@@ -304,8 +304,8 @@
                                             [attr.aria-pressed]="snoozedFeedItems.has(feedItem.id)"
                                             [hlmTooltip]="
                                                 snoozedFeedItems.has(feedItem.id)
-                                                    ? 'Snoozed until tomorrow. Unsnooze so it does not come back.'
-                                                    : 'Snooze: show this release again tomorrow'
+                                                    ? unsnoozeHint()
+                                                    : snoozeHint()
                                             "
                                         >
                                             <app-icon
