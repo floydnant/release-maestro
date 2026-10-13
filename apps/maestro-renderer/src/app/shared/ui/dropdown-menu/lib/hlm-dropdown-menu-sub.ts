@@ -30,7 +30,7 @@ export class HlmDropdownMenuSub {
 
         classes(() =>
             hlm(
-                'min-w-32 rounded-lg border border-border-default bg-background-elevated p-1 text-content-primary shadow-lg type-body-sm w-auto',
+                'min-w-32 rounded-lg border border-border-subtle bg-background-surface p-1 text-content-primary shadow-lg type-body-sm w-auto',
             ),
         )
     }
