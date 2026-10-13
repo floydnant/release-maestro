@@ -9,10 +9,10 @@ import { classes, hlm } from '@spartan-ng/helm/utils'
 })
 export class HlmSwitchThumb {
     constructor() {
-        // Checked travel is the track's inner width minus the thumb: 1.75rem - 1rem, or 1.25rem - 0.75rem.
+        // Checked travel is the track's inner width minus the thumb: 30px - 15px, or 23px - 11px.
         classes(() =>
             hlm(
-                'pointer-events-none block rounded-full bg-content-primary transition-transform duration-fast ease-standard group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 data-unchecked:translate-x-0 group-data-[size=default]/switch:data-checked:ltr:translate-x-3 group-data-[size=default]/switch:data-checked:rtl:-translate-x-3 group-data-[size=sm]/switch:data-checked:ltr:translate-x-2 group-data-[size=sm]/switch:data-checked:rtl:-translate-x-2',
+                'pointer-events-none block rounded-full bg-content-primary transition-transform duration-fast ease-standard group-data-[size=default]/switch:size-[15px] group-data-[size=sm]/switch:size-[11px] data-unchecked:translate-x-0 group-data-[size=default]/switch:data-checked:ltr:translate-x-[15px] group-data-[size=default]/switch:data-checked:rtl:translate-x-[-15px] group-data-[size=sm]/switch:data-checked:ltr:translate-x-[12px] group-data-[size=sm]/switch:data-checked:rtl:translate-x-[-12px]',
             ),
         )
     }
