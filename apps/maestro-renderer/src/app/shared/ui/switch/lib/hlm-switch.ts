@@ -59,11 +59,12 @@ export class HlmSwitch implements ControlValueAccessor {
     private readonly _brnSwitch = viewChild.required(BrnSwitch)
 
     public readonly userClass = input<ClassValue>('', { alias: 'class' })
-    // Padding insets the thumb in rem, like the track and thumb sizes, so travel stays exact at the
-    // app's root font size.
+    // Track, inset and thumb are whole pixels. The 15.2px root size makes rem values fractional, and
+    // the browser then rounds the thumb's edges differently at each end, so the resting gap and the
+    // thumb's width visibly change with the direction.
     protected readonly _computedClass = computed(() =>
         hlm(
-            'group/switch inline-flex shrink-0 items-center rounded-full p-0.5 outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-border-focus data-checked:bg-action-primary data-unchecked:bg-border-default data-[matches-spartan-invalid=true]:ring-2 data-[matches-spartan-invalid=true]:ring-status-danger-border data-disabled:cursor-not-allowed data-disabled:opacity-50 data-[size=default]:h-5 data-[size=default]:w-8 data-[size=sm]:h-4 data-[size=sm]:w-6',
+            'group/switch inline-flex shrink-0 items-center rounded-full p-[2px] outline-none transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-border-focus data-checked:bg-action-primary data-unchecked:bg-background-elevated data-[matches-spartan-invalid=true]:ring-2 data-[matches-spartan-invalid=true]:ring-status-danger-border data-disabled:cursor-not-allowed data-disabled:opacity-50 data-[size=default]:h-[19px] data-[size=default]:w-[34px] data-[size=sm]:h-[15px] data-[size=sm]:w-[27px]',
             this.userClass(),
         ),
     )
