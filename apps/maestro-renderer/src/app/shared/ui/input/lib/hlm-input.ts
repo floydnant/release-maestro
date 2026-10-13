@@ -15,7 +15,7 @@ export class HlmInput {
     constructor() {
         classes(() =>
             hlm(
-                'h-(--foundation-size-control-sm) rounded-lg border border-border-default bg-background-canvas px-3 py-0 type-body-md text-content-primary transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-border-focus data-[matches-spartan-invalid=true]:border-status-danger-border file:text-content-primary placeholder:text-content-muted w-full min-w-0 outline-none file:inline-flex file:border-0 file:bg-transparent disabled:cursor-not-allowed',
+                'h-(--foundation-size-control-sm) rounded-lg border border-border-default bg-background-canvas px-3 py-0 scheme-dark type-body-md text-content-primary transition-colors duration-fast ease-standard focus-visible:ring-2 focus-visible:ring-border-focus data-[matches-spartan-invalid=true]:border-status-danger-border file:text-content-primary placeholder:text-content-muted w-full min-w-0 outline-none file:inline-flex file:border-0 file:bg-transparent disabled:cursor-not-allowed',
             ),
         )
     }
