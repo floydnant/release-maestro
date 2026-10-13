@@ -4,7 +4,7 @@
         <p class="mt-2 type-body-md text-content-secondary">Choose which releases appear in your feed.</p>
     </header>
 
-    <section class="settings-section | py-6" aria-labelledby="feed-visibility">
+    <section class="settings-section | border-b border-border-subtle py-6" aria-labelledby="feed-visibility">
         <h3 id="feed-visibility" class="type-section-title text-content-primary">Release visibility</h3>
 
         @if (settingsService.settings.isLoading()) {
@@ -44,25 +44,75 @@
                     </p>
                 </div>
             </div>
-            @if (hasChanges()) {
-                <div class="mt-4 flex flex-wrap items-center gap-3">
-                    <button
-                        #saveButton
-                        hlmBtn
-                        class="feed-settings-save |"
-                        type="button"
-                        [disabled]="saving()"
-                        (click)="saveSettings($event)"
-                    >
-                        {{ saving() ? 'Saving…' : 'Save' }}
-                    </button>
-                    @if (saveError(); as error) {
-                        <p class="feed-settings-save-error | type-body-sm text-content-danger" role="alert">
-                            {{ error }}
-                        </p>
-                    }
-                </div>
-            }
         }
     </section>
+
+    @if (!settingsService.settings.isLoading() && settingsService.settings.hasValue()) {
+        <section class="settings-section | py-6" aria-labelledby="feed-snooze">
+            <h3 id="feed-snooze" class="type-section-title text-content-primary">Snooze</h3>
+            <label
+                id="feed-snooze-hours-label"
+                class="mt-3 block type-label-md text-content-primary"
+                for="feed-snooze-hours"
+                >Snooze duration</label
+            >
+            <p class="mt-1 type-body-sm text-content-muted" id="feed-snooze-hours-description">
+                A snoozed release returns to your feed this many hours after you last saw it. Changes apply
+                the next time you open the feed.
+            </p>
+            <div class="mt-3 flex items-center gap-2">
+                <input
+                    #snoozeHoursField
+                    hlmInput
+                    class="feed-snooze-hours | w-24"
+                    id="feed-snooze-hours"
+                    type="number"
+                    inputmode="numeric"
+                    step="1"
+                    aria-labelledby="feed-snooze-hours-label feed-snooze-hours-unit"
+                    [min]="minSnoozeHours"
+                    [max]="maxSnoozeHours"
+                    [aria-describedby]="
+                        snoozeHours() === null
+                            ? 'feed-snooze-hours-description feed-snooze-hours-error'
+                            : 'feed-snooze-hours-description'
+                    "
+                    [attr.aria-invalid]="snoozeHours() === null"
+                    [forceInvalid]="snoozeHours() === null"
+                    [disabled]="saving()"
+                    [value]="snoozeHoursText()"
+                    (input)="snoozeHoursText.set(snoozeHoursField.value)"
+                />
+                <span id="feed-snooze-hours-unit" class="type-body-md text-content-secondary">hours</span>
+            </div>
+            @if (snoozeHours() === null) {
+                <p
+                    class="feed-snooze-hours-error | mt-2 type-body-sm text-content-danger"
+                    id="feed-snooze-hours-error"
+                    role="alert"
+                >
+                    Enter a whole number of hours from {{ minSnoozeHours }} to {{ maxSnoozeHours }}.
+                </p>
+            }
+        </section>
+        @if (hasChanges()) {
+            <div class="flex flex-wrap items-center gap-3">
+                <button
+                    #saveButton
+                    hlmBtn
+                    class="feed-settings-save |"
+                    type="button"
+                    [disabled]="saving() || snoozeHours() === null"
+                    (click)="saveSettings($event)"
+                >
+                    {{ saving() ? 'Saving…' : 'Save' }}
+                </button>
+                @if (saveError(); as error) {
+                    <p class="feed-settings-save-error | type-body-sm text-content-danger" role="alert">
+                        {{ error }}
+                    </p>
+                }
+            </div>
+        }
+    }
 </div>

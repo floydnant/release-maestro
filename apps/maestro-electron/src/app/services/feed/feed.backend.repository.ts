@@ -1,19 +1,11 @@
 import { and, count, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm'
-import { EmailVendor, FeedItemMaster } from '@release-maestro/core'
+import { DEFAULT_FEED_SNOOZE_HOURS, EmailVendor, FeedItemMaster } from '@release-maestro/core'
 import { DatabaseClient } from '../../database/database.client'
 import {
     feedEmailImportCheckpointsTable,
     feedItemHistoryEntriesTable,
     feedItemsTable,
 } from '../../database/drizzle.schema'
-
-/**
- * The time after which a feed item should be shown again if it was marked as snoozed.
- *
- * Deliberately shorter than a day: the UI promises "show again tomorrow", and a full 24h would push
- * the item past the same time next day, so a user with a routine would keep missing it.
- */
-const FEED_ITEM_SNOOZE_TIME_MS = 1000 * 60 * 60 * 16
 
 /**
  * Don't create view history entries for feed items that were viewed in the last 3 minutes.
@@ -30,7 +22,13 @@ export class FeedBackendRepository {
         await this.db.db.insert(feedItemsTable).values(feedItemsToIngest).onConflictDoNothing()
     }
 
-    async listFeedItems(index: number, count: number, excludedIds: string[] = []): Promise<FeedItemMaster[]> {
+    async listFeedItems(
+        index: number,
+        count: number,
+        excludedIds: string[] = [],
+        snoozeHours = DEFAULT_FEED_SNOOZE_HOURS,
+    ): Promise<FeedItemMaster[]> {
+        const snoozedBefore = new Date(Date.now() - snoozeHours * 60 * 60 * 1000)
         const items = await this.db.db
             .select()
             .from(feedItemsTable)
@@ -43,7 +41,7 @@ export class FeedBackendRepository {
                         isNull(feedItemsTable.lastViewedAt),
                         and(
                             eq(feedItemsTable.isSnoozed, true),
-                            lt(feedItemsTable.lastViewedAt, new Date(Date.now() - FEED_ITEM_SNOOZE_TIME_MS)),
+                            lt(feedItemsTable.lastViewedAt, snoozedBefore),
                         ),
                     ),
                 ),
