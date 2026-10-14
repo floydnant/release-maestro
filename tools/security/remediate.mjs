@@ -11,6 +11,7 @@ import {
     lockVersions,
     npmFindings,
     remediationBody,
+    scopedOverrides,
     verifiedRemediation,
 } from './remediation.mjs'
 
@@ -140,17 +141,14 @@ const main = async () => {
                                 '-r',
                             ]),
                         override: () => {
-                            const workspace = parseDocument(
-                                readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'),
+                            writeFileSync(
+                                join(root, 'pnpm-workspace.yaml'),
+                                scopedOverrides(
+                                    readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'),
+                                    group,
+                                    target,
+                                ),
                             )
-                            if (!workspace.has('overrides')) workspace.set('overrides', {})
-                            for (const version of group.versions) {
-                                const key = `${group.name}@${version}`
-                                if (workspace.hasIn(['overrides', key]))
-                                    throw new Error(`Existing override needs maintainer review: ${key}`)
-                                workspace.setIn(['overrides', key], target)
-                            }
-                            writeFileSync(join(root, 'pnpm-workspace.yaml'), workspace.toString())
                             run('pnpm', ['install', '--lockfile-only', '--ignore-scripts'])
                         },
                         scan,

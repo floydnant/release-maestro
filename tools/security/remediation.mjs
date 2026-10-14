@@ -1,3 +1,5 @@
+import { parseDocument } from 'yaml'
+
 // Planning and verification are independent of registry, scanner, and GitHub transports.
 const stable = version => /^\d+\.\d+\.\d+$/.test(version)
 export const compareVersions = (left, right) => {
@@ -142,3 +144,16 @@ export const applyFirstEligibleFix = async (candidates, actions) => {
 }
 
 export const currentPrContainsMain = comparison => ['ahead', 'identical'].includes(comparison.status)
+
+export const scopedOverrides = (source, group, target) => {
+    const workspace = parseDocument(source)
+    if (workspace.errors.length) throw workspace.errors[0]
+    if (!workspace.has('overrides')) workspace.set('overrides', {})
+    for (const version of group.versions) {
+        const key = `${group.name}@${version}`
+        if (workspace.hasIn(['overrides', key]))
+            throw new Error(`Existing override needs maintainer review: ${key}`)
+        workspace.setIn(['overrides', key], target)
+    }
+    return workspace.toString({ indent: 4, lineWidth: 0, singleQuote: true })
+}
