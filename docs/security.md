@@ -81,6 +81,47 @@ Both use `make security`; see [releasing](releasing.md).
 `make security` runs separately from `make sure` because advisories require network access and
 can change without code changes.
 
+## Automated remediation
+
+The Security remediation workflow runs daily on main and supports manual main runs. It retries npm
+findings that Dependabot cannot fix, including accepted findings. Cargo findings remain in the report
+for maintainer follow-up. Dependabot continues to handle normal version and security updates.
+
+```bash
+make security-remediation-plan # Scan and preview eligible fixes without changing dependency inputs
+make security-remediate        # Apply and verify fixes; dependency inputs must be committed
+```
+
+Run the apply command in a disposable checkout. It changes `pnpm-lock.yaml` and can add scoped
+exact-version overrides to `pnpm-workspace.yaml`. It does not commit or publish local changes.
+Both commands write `dist/security/remediation.json` and `remediation-pr.md`.
+
+The planner selects stable, non-deprecated registry releases with known publish times that satisfy
+`minimumReleaseAge`. It queries OSV to reject candidates with known vulnerabilities. The apply command
+first tries a targeted update across transitive dependencies. If upstream constraints retain a finding,
+it retries from the original inputs with an override for each affected version. pnpm enforces the
+existing freshness, provenance, and source policy. Install scripts never run. A full scan must remove
+all targeted advisories without introducing other findings. Failed attempts restore their dependency
+inputs and try later eligible versions. Reports name the versions actually resolved. Findings without an eligible fix remain visible; the automation never extends exceptions.
+
+CI reads open Dependabot PR lockfiles without executing their code. Only heads that contain the
+scanned main revision can cover findings. It defers packages already covered
+by a PR only when none of their proposed versions have known OSV vulnerabilities. Missing fixes and
+failures appear in the run summary and uploaded artifacts. Daily runs retry after releases age.
+
+After verification, the workflow creates a Release Maestro CI App token using `RELEASE_APP_CLIENT_ID`
+and `RELEASE_APP_PRIVATE_KEY`, the same credentials as release-please. The token grants contents and
+pull request writes. It pushes and opens a ready-for-review PR on `security/automated-remediation`, so
+normal CI runs. Merging remains a maintainer decision, especially for overrides across major versions.
+
+Each run rebuilds fixes from the scanned main revision. Identical retries do not push new commits.
+Changed inputs or a changed base update the same PR with an explicit branch lease. A changed main
+revision during preparation stops publication. Unexpected commits anywhere on the automation branch or a PR owned by another actor stop
+publication. Commit authors, committers, subjects, and changed paths identify expected automation
+commits. This check is not a cryptographic proof of authorship. Do not hand-edit the reserved branch. Resume by resolving the human changes and deleting the reserved automation branch.
+When main has no npm findings, the workflow closes its obsolete PR. Unresolved findings preserve
+an existing PR so transient preparation failures cannot discard a previous verified fix.
+
 ## SBOMs
 
 Syft writes CycloneDX 1.6 JSON to `dist/security`:
