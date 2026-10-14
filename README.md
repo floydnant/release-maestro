@@ -46,7 +46,9 @@ make dev
 
 Node.js, pnpm, and Rust are required. `.node-version` selects the development and CI Node.js
 version, while `package.json` declares the supported range and project pnpm release. Use `pnpm`
-normally; pnpm downloads and runs the project's declared release when necessary. `make install`
+normally; pnpm downloads and runs the project's declared release when necessary.
+If an older pnpm fails to switch versions with `ENOEXEC` on macOS, install the declared release
+with `npm install --global --allow-scripts=pnpm pnpm@12.11.2`, then retry. `make install`
 installs the root package from the lockfile, fetches the locked Rust crates, and installs Playwright
 Chromium with its system dependencies. Linux system dependencies may require sudo. Chromium
 requires an OS supported by the installed Playwright version.
