@@ -62,7 +62,7 @@ ends at v10; this repository uses v12. Recent Dependabot PRs have updated the lo
 but that does not establish complete remediation coverage. Dependency submission fills graph
 coverage; it cannot guarantee that Dependabot can resolve a compatible fix.
 
-`tools/security/exceptions.json` accepts 9 existing findings until November 2, 2026.
+`tools/security/exceptions.json` accepts 7 existing findings until November 2, 2026.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, and UTC expiry date.
 They expire at the start of that date. Full scans then block only if the matching vulnerability
 is still present; a stale entry for a resolved finding does not fail the scan. Offline policy validation
@@ -70,9 +70,9 @@ checks date formats rather than whether the date has passed. Keep exceptions wit
 30 days, review extensions in a PR, and remove them after fixes. Never regenerate the baseline
 automatically or suppress whole packages. Acceptance does not establish safety.
 
-Nx pins Axios and brace-expansion to vulnerable versions. Exact-version overrides in
-`pnpm-workspace.yaml` replace them with Axios 1.20.0 and brace-expansion 5.0.12. Remove the
-overrides when the installed Nx versions use fixed dependencies.
+Nx pins Axios, brace-expansion, and smol-toml to vulnerable versions. Exact-version overrides in
+`pnpm-workspace.yaml` replace them with Axios 1.20.0, brace-expansion 5.0.12, and smol-toml 1.9.1.
+Remove the overrides when the installed Nx versions use fixed dependencies.
 
 Release-please checks main before creating a release. The Release workflow checks the immutable
 tag commit before building or publishing installers, including manual publications and retries.
