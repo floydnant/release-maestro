@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import prettier from 'prettier'
+import { parse } from 'yaml'
 import { test } from '@jest/globals'
 import { remediationInputs } from '../fixtures/security-remediation.mjs'
 import {
@@ -218,9 +219,18 @@ test('generated scoped overrides satisfy repository formatting and preserve exis
             filepath: 'pnpm-workspace.yaml',
         })
         assert.equal(output, formatted)
-        assert(output.includes(`${selected.name}@1.0.0`))
-        assert.match(output, /minimumReleaseAge: 4320/)
-        assert.match(output, /axios@1.18.1: 1.20.0/)
+        const { overrides, ...policy } = parse(output)
+        const { overrides: existing, ...original } = parse(input)
+        assert.deepEqual(policy, original)
+        assert.deepEqual(overrides, { ...existing, [`${selected.name}@1.0.0`]: '1.1.0' })
         assert.throws(() => scopedOverrides(output, selected, '1.1.1'), /Existing override/)
     }
+})
+
+test('a workspace without overrides receives a new overrides map', () => {
+    const { group } = remediationInputs()
+    assert.deepEqual(parse(scopedOverrides('minimumReleaseAge: 4320\n', group, '1.1.0')), {
+        minimumReleaseAge: 4320,
+        overrides: { 'parser@1.0.0': '1.1.0' },
+    })
 })

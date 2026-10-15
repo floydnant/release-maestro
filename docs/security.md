@@ -56,8 +56,8 @@ GitHub's current graph. Submitted dependencies
 receive [Dependabot alerts and security updates](https://docs.github.com/en/rest/dependency-graph/dependency-submission). `.github/dependabot.yml` groups security updates
 for npm, Cargo, and GitHub Actions. Security updates are triggered by alerts rather than the
 weekly version-update schedule or the daily OSV scan. Dependabot cannot fix every OSV finding,
-exact upstream pin, or advisory without a patch. Remaining findings need maintainer follow-up;
-fix PRs run normal CI and are reviewed before merging. GitHub's documented pnpm support currently
+exact upstream pin, or advisory without a patch. [Automated remediation](#automated-remediation)
+retries the remaining npm findings; other findings need maintainer follow-up. Fix PRs run normal CI and are reviewed before merging. GitHub's documented pnpm support currently
 ends at v10; this repository uses v12. Recent Dependabot PRs have updated the lockfile successfully,
 but that does not establish complete remediation coverage. Dependency submission fills graph
 coverage; it cannot guarantee that Dependabot can resolve a compatible fix.
@@ -72,7 +72,8 @@ automatically or suppress whole packages. Acceptance does not establish safety.
 
 Nx pins Axios and brace-expansion to vulnerable versions. Exact-version overrides in
 `pnpm-workspace.yaml` replace them with Axios 1.20.0 and brace-expansion 5.0.12. Remove the
-overrides when the installed Nx versions use fixed dependencies.
+overrides when the installed Nx versions use fixed dependencies. Automated remediation PRs can add further
+scoped overrides; each PR body names the packages it overrides.
 
 Release-please checks main before creating a release. The Release workflow checks the immutable
 tag commit before building or publishing installers, including manual publications and retries.
@@ -98,8 +99,9 @@ Both commands write `dist/security/remediation.json` and `remediation-pr.md`.
 
 The planner selects stable, non-deprecated registry releases with known publish times that satisfy
 `minimumReleaseAge`. It queries OSV to reject candidates with known vulnerabilities. The apply command
-first tries a targeted update across transitive dependencies. If upstream constraints retain a finding,
-it retries from the original inputs with an override for each affected version. pnpm enforces the
+first tries a targeted update across transitive dependencies. If the update resolves a version the
+planner did not select, or upstream constraints retain a finding, it retries from the original inputs
+with an override for each affected version. pnpm enforces the
 existing freshness, provenance, and source policy. Install scripts never run. A full scan must remove
 all targeted advisories without introducing other findings. Failed attempts restore their dependency
 inputs and try later eligible versions, and a failed run restores the inputs it started from. Reports
@@ -120,11 +122,12 @@ especially for overrides across major versions.
 Each run rebuilds fixes from the scanned main revision. Identical retries do not push new commits.
 Changed inputs or a changed base update the same PR with an explicit branch lease. A changed main
 revision during preparation stops publication. So do unexpected commits anywhere on the automation
-branch and a PR owned by another actor. Commit authors, committers, subjects, and changed paths
+branch and a same-repository PR owned by another actor; fork PRs never count as the automation PR. Commit authors, committers, subjects, and changed paths
 identify expected automation commits; this check is not a cryptographic proof of authorship. Do not
 hand-edit the reserved branch. To resume, resolve the human changes and delete the branch.
-When main has no npm findings, the workflow closes its obsolete PR. Unresolved findings preserve
-an existing PR so transient preparation failures cannot discard a previous verified fix.
+When main has no npm findings, the workflow closes its obsolete PR. A run without fixes keeps an
+existing PR, and a run where a package lookup fails keeps the existing branch unchanged. A
+transient failure therefore cannot discard a previous verified fix.
 
 ## SBOMs
 

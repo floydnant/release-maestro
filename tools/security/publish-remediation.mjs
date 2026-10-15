@@ -25,10 +25,11 @@ export const publishRemediation = (repo, report, runCommand = run) => {
             '--base',
             'main',
             '--json',
-            'number,author,headRefOid,url',
+            'number,author,headRefOid,isCrossRepository,url',
         ]),
     )
-    const pr = prs[0]
+    // A fork can reuse the branch name; only a same-repository PR is the automation PR.
+    const pr = prs.find(candidate => !candidate.isCrossRepository)
     if (pr && pr.author.login !== 'app/release-maestro-ci')
         throw new Error('The remediation PR is not owned by Release Maestro CI')
     if (!report.packages.some(p => p.status === 'fixed')) {
@@ -55,6 +56,13 @@ export const publishRemediation = (repo, report, runCommand = run) => {
                         'The remediation branch contains an unexpected commit; resolve human edits before retrying',
                     )
             }
+        }
+        const failed = report.packages.filter(p => p.status === 'failed')
+        if (remote && failed.length) {
+            console.log(
+                `Preparation failed for ${failed.map(p => p.name).join(', ')}; keeping the existing remediation branch`,
+            )
+            return
         }
         // Rebuild from scanned main, but do not push an identical dependency change every day.
         if (!remote || git(['diff', remote, '--', ...inputs]) || git(['rev-list', `${remote}..${main}`])) {
@@ -85,10 +93,15 @@ export const publishRemediation = (repo, report, runCommand = run) => {
     }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    if (!process.env.GH_REPO || !process.env.GH_TOKEN)
-        throw new Error('GH_REPO and the Release Maestro CI App token are required')
-    publishRemediation(
-        process.env.GH_REPO,
-        JSON.parse(readFileSync('dist/security/remediation.json', 'utf8')),
-    )
+    try {
+        if (!process.env.GH_REPO || !process.env.GH_TOKEN)
+            throw new Error('GH_REPO and the Release Maestro CI App token are required')
+        publishRemediation(
+            process.env.GH_REPO,
+            JSON.parse(readFileSync('dist/security/remediation.json', 'utf8')),
+        )
+    } catch (error) {
+        console.error(error.message)
+        process.exitCode = 1
+    }
 }

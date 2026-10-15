@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, test } from '@jest/globals'
+import { parse } from 'yaml'
 import { remediationInputs } from '../fixtures/security-remediation.mjs'
 import { remediate } from './remediate.mjs'
 
@@ -10,6 +11,7 @@ const lockfile = packages =>
     `lockfileVersion: '9.0'\n\npackages:\n${packages.map(p => `  ${p}: {}\n`).join('')}`
 const vulnerable = {
     'parser@1.0.0': 'GHSA-parser',
+    'transitive@1.0.0': 'GHSA-transitive',
     'playwright-core@1.64.0-alpha-1789764292000': 'GHSA-playwright',
 }
 const checkouts = []
@@ -18,16 +20,27 @@ afterEach(() => {
 })
 
 // A temporary checkout whose scanner reports a finding for each vulnerable lockfile entry.
-const checkout = ({ failScan } = {}) => {
+// Groups run in name order. `update` maps lockfile entries that `pnpm update` replaces; `pnpm install` applies overrides.
+const checkout = ({
+    failScan,
+    failRegistry = false,
+    packages = ['parser@1.0.0', 'playwright-core@1.64.0-alpha-1789764292000'],
+    update = { 'parser@1.0.0': 'parser@1.1.0' },
+} = {}) => {
     const root = mkdtempSync(join(tmpdir(), 'maestro-remediate-'))
     checkouts.push(root)
     mkdirSync(join(root, 'dist/security'), { recursive: true })
     const files = {
         'package.json': '{}\n',
         'pnpm-workspace.yaml': 'minimumReleaseAge: 4320\n',
-        'pnpm-lock.yaml': lockfile(Object.keys(vulnerable)),
+        'pnpm-lock.yaml': lockfile(packages),
     }
     for (const [path, contents] of Object.entries(files)) writeFileSync(join(root, path), contents)
+    const rewriteLock = replacements => {
+        let lock = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8')
+        for (const [from, to] of Object.entries(replacements)) lock = lock.replace(`${from}:`, `${to}:`)
+        writeFileSync(join(root, 'pnpm-lock.yaml'), lock)
+    }
     let scans = 0
     const run = (command, args) => {
         if (command === process.execPath) {
@@ -35,7 +48,7 @@ const checkout = ({ failScan } = {}) => {
             if (scans === failScan) throw new Error('OSV scan failed: exit 2')
             const lock = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8')
             const findings = Object.entries(vulnerable)
-                .filter(([entry]) => lock.includes(entry))
+                .filter(([entry]) => lock.includes(`${entry}:`))
                 .map(([entry, id]) => {
                     const at = entry.lastIndexOf('@')
                     const [name, version] = [entry.slice(0, at), entry.slice(at + 1)]
@@ -43,31 +56,43 @@ const checkout = ({ failScan } = {}) => {
                 })
             writeFileSync(join(root, 'dist/security/findings.json'), JSON.stringify(findings))
         }
-        if (command === 'pnpm' && args[0] === 'update')
-            writeFileSync(
-                join(root, 'pnpm-lock.yaml'),
-                readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8').replace('parser@1.0.0', 'parser@1.1.0'),
+        if (command === 'pnpm' && args[0] === 'update') rewriteLock(update)
+        if (command === 'pnpm' && args[0] === 'install') {
+            const { overrides = {} } = parse(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'))
+            rewriteLock(
+                Object.fromEntries(
+                    Object.entries(overrides).map(([from, to]) => [
+                        from,
+                        `${from.slice(0, from.lastIndexOf('@'))}@${to}`,
+                    ]),
+                ),
             )
+        }
         return ''
     }
     const { advisories, registry, now } = remediationInputs()
     const fetchJson = async url => {
-        if (url.includes('/v1/vulns/')) return advisories[0]
-        if (url.includes('registry.npmjs.org')) return registry
+        const { hostname, pathname } = new URL(url)
+        if (hostname === 'registry.npmjs.org') {
+            if (failRegistry) throw new Error('Request failed: 503')
+            return registry
+        }
+        if (pathname.startsWith('/v1/vulns/')) return advisories[0]
         return { vulns: [] }
     }
-    return { root, files, options: { root, run, fetchJson, now, log: () => {} } }
+    const report = () => readFileSync(join(root, 'dist/security/remediation-pr.md'), 'utf8')
+    return { root, files, report, options: { root, run, fetchJson, now, log: () => {} } }
 }
+const byName = report => Object.fromEntries(report.packages.map(item => [item.name, item]))
 
 test('an installed prerelease stays unresolved without blocking a stable fix or its reports', async () => {
-    const { root, options } = checkout()
-    const report = await remediate('apply', options)
-    const byName = Object.fromEntries(report.packages.map(item => [item.name, item]))
-    assert.equal(byName.parser.status, 'fixed')
-    assert.deepEqual(byName.parser.resolvedVersions, ['1.1.0'])
-    assert.equal(byName['playwright-core'].status, 'unresolved')
-    assert.match(byName['playwright-core'].reason, /prerelease 1\.64\.0-alpha/)
-    assert.match(readFileSync(join(root, 'dist/security/remediation-pr.md'), 'utf8'), /playwright-core/)
+    const { options, report } = checkout()
+    const packages = byName(await remediate('apply', options))
+    assert.equal(packages.parser.status, 'fixed')
+    assert.deepEqual(packages.parser.resolvedVersions, ['1.1.0'])
+    assert.equal(packages['playwright-core'].status, 'unresolved')
+    assert.match(packages['playwright-core'].reason, /prerelease 1\.64\.0-alpha/)
+    assert.match(report(), /playwright-core/)
 })
 
 test('a final scanner failure restores every dependency input after an applied fix', async () => {
@@ -76,4 +101,28 @@ test('a final scanner failure restores every dependency input after an applied f
     await assert.rejects(remediate('apply', options), /OSV scan failed.*restored/)
     for (const [path, contents] of Object.entries(files))
         assert.equal(readFileSync(join(root, path), 'utf8'), contents)
+})
+
+test('an update to a version the planner did not vet falls back to the vetted override', async () => {
+    const { options } = checkout({ update: { 'parser@1.0.0': 'parser@1.3.0' } })
+    const { parser } = byName(await remediate('apply', options))
+    assert.equal(parser.method, 'scoped override')
+    assert.deepEqual(parser.resolvedVersions, ['1.1.0'])
+})
+
+test('a finding that an earlier fix already removed is not attempted again', async () => {
+    const { options } = checkout({
+        packages: ['parser@1.0.0', 'transitive@1.0.0'],
+        update: { 'parser@1.0.0': 'parser@1.1.0', 'transitive@1.0.0': 'transitive@1.1.0' },
+    })
+    const { transitive } = byName(await remediate('apply', options))
+    assert.equal(transitive.status, 'fixed')
+    assert.equal(transitive.method, 'earlier fix in this run')
+})
+
+test('a failed lookup is reported as a failure, not a missing fix', async () => {
+    const { options, report } = checkout({ failRegistry: true })
+    const { parser } = byName(await remediate('plan', options))
+    assert.equal(parser.status, 'failed')
+    assert.match(report(), /## Unresolved findings\n\n- `parser`: Request failed: 503/)
 })

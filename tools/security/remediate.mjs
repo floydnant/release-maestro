@@ -14,6 +14,7 @@ import {
     npmFindings,
     remediationBody,
     scopedOverrides,
+    targetsGroup,
     verifiedRemediation,
 } from './remediation.mjs'
 
@@ -62,6 +63,7 @@ export const remediate = async (
         for (const [file, bytes] of inputs) writeFileSync(join(root, file), bytes)
     }
     const snapshot = () => new Map(dependencyInputs.map(path => [path, read(path)]))
+    const lockedVersions = name => lockVersions(documents(read('pnpm-lock.yaml', 'utf8')), name)
     const scan = () => {
         // cli.mjs removes old reports and writes findings only after a complete, valid scan.
         run(process.execPath, ['tools/security/cli.mjs', 'scan'], [0, 1])
@@ -93,14 +95,17 @@ export const remediate = async (
     // Read only Dependabot PRs. Never execute code or install packages from a PR branch.
     const existing = process.env.SECURITY_EXISTING_PRS ? json(process.env.SECURITY_EXISTING_PRS) : []
     const mainRevision = run('git', ['rev-parse', 'HEAD']).trim()
-    const gh = path => JSON.parse(run('gh', ['api', `repos/${process.env.GH_REPO}/${path}`]))
+    const gh = (path, ...args) => run('gh', ['api', ...args, `repos/${process.env.GH_REPO}/${path}`])
     const existingLocks = existing
-        .filter(pr => currentPrContainsMain(gh(`compare/${mainRevision}...${pr.headRefOid}`)))
+        .filter(pr => currentPrContainsMain(JSON.parse(gh(`compare/${mainRevision}...${pr.headRefOid}`))))
         .map(pr => ({
             ...pr,
+            // The raw media type still returns lockfiles above the 1 MB JSON contents limit.
             documents: documents(
-                Buffer.from(gh(`contents/pnpm-lock.yaml?ref=${pr.headRefOid}`).content, 'base64').toString(
-                    'utf8',
+                gh(
+                    `contents/pnpm-lock.yaml?ref=${pr.headRefOid}`,
+                    '-H',
+                    'Accept: application/vnd.github.raw+json',
                 ),
             ),
         }))
@@ -120,6 +125,14 @@ export const remediate = async (
         for (const group of npmFindings(findings)) {
             const item = { ...group, status: 'unresolved', reason: 'No eligible published fix; retry daily.' }
             report.packages.push(item)
+            if (!findings.some(finding => targetsGroup(finding, group))) {
+                Object.assign(item, {
+                    status: 'fixed',
+                    method: 'earlier fix in this run',
+                    reason: 'Verified by the full scan',
+                })
+                continue
+            }
             const before = snapshot()
             try {
                 const pr = await coveringPr(group)
@@ -146,7 +159,8 @@ export const remediate = async (
                         log(`ATTEMPT ${group.name}@${target}`)
                         if (mode === 'plan') return {}
                         return applyVerifiedFix(findings, group, {
-                            update: () =>
+                            update: () => {
+                                const locked = lockedVersions(group.name)
                                 run('pnpm', [
                                     'update',
                                     group.name,
@@ -156,13 +170,25 @@ export const remediate = async (
                                     '--ignore-scripts',
                                     '--no-save',
                                     '-r',
-                                ]),
+                                ])
+                                // pnpm picks the highest version in range, which the planner may not have vetted.
+                                const unvetted = lockedVersions(group.name).filter(
+                                    version => !locked.includes(version) && !candidates.includes(version),
+                                )
+                                if (unvetted.length)
+                                    throw new Error(`pnpm update resolved unvetted ${unvetted.join(', ')}`)
+                            },
                             override: () => {
                                 writeFileSync(
                                     join(root, 'pnpm-workspace.yaml'),
                                     scopedOverrides(read('pnpm-workspace.yaml', 'utf8'), group, target),
                                 )
-                                run('pnpm', ['install', '--lockfile-only', '--ignore-scripts'])
+                                run('pnpm', [
+                                    'install',
+                                    '--lockfile-only',
+                                    '--no-frozen-lockfile',
+                                    '--ignore-scripts',
+                                ])
                             },
                             scan,
                             restore: () => write(before),
@@ -188,6 +214,7 @@ export const remediate = async (
                 }
             } catch (error) {
                 write(before)
+                item.status = 'failed'
                 item.reason = error.message
             }
         }

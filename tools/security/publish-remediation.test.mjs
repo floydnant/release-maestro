@@ -20,7 +20,6 @@ const harness = ({
                         ? [{ ref: 'refs/heads/security/automated-remediation', object: { sha: remote } }]
                         : [],
                 )
-            if (args[1].includes('/commits/')) return JSON.stringify({ commit: { author: { name: author } } })
         }
         if (command === 'gh' && args[0] === 'pr' && args[1] === 'list') return JSON.stringify(pr ? [pr] : [])
         if (command === 'git' && args[0] === 'rev-parse') return 'base'
@@ -34,7 +33,7 @@ const harness = ({
 const fixed = { packages: [{ status: 'fixed' }] }
 const botPr = { number: 10, author: { login: 'app/release-maestro-ci' } }
 
-test('publishes a fix with an explicit creation lease and reuses the repository template body', () => {
+test('publishes a fix with an explicit creation lease and the generated PR body', () => {
     const { calls, run } = harness()
     publishRemediation('owner/repo', fixed, run)
     assert(calls.some(c => c.includes('--force-with-lease=refs/heads/security/automated-remediation:')))
@@ -97,4 +96,26 @@ test('a bot-authored commit with an unexpected subject stops publication', () =>
             ? 'tip\trelease-maestro-ci[bot]\trelease-maestro-ci[bot]\tfix: hand-written change'
             : h.run(command, args)
     assert.throws(() => publishRemediation('owner/repo', fixed, run), /human edits/)
+})
+
+test('a failed package keeps the existing branch so a transient error cannot drop an earlier fix', () => {
+    const { calls, run } = harness({ remote: 'prior', pr: botPr })
+    publishRemediation(
+        'owner/repo',
+        { packages: [{ status: 'fixed' }, { name: 'b', status: 'failed' }] },
+        run,
+    )
+    assert(!calls.some(c => c[0] === 'git' && ['commit', 'push'].includes(c[1])))
+    assert(!calls.some(c => c[0] === 'gh' && c[1] === 'pr' && ['edit', 'create'].includes(c[2])))
+})
+
+test('a fork PR from the reserved branch name neither blocks nor receives publication', () => {
+    const fork = { number: 11, author: { login: 'someone' }, isCrossRepository: true }
+    const { calls, run } = harness()
+    const forkRun = (command, args) =>
+        command === 'gh' && args[0] === 'pr' && args[1] === 'list'
+            ? JSON.stringify([fork])
+            : run(command, args)
+    publishRemediation('owner/repo', fixed, forkRun)
+    assert(calls.some(c => c[0] === 'gh' && c[2] === 'create'))
 })

@@ -12,7 +12,7 @@ export const compareVersions = (left, right) => {
 export const npmFindings = findings => {
     const groups = new Map()
     for (const finding of findings.filter(f => f.ecosystem === 'npm' && f.status !== 'informational')) {
-        if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(finding.name))
+        if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i.test(finding.name))
             throw new Error(`Invalid npm package name: ${finding.name}`)
         const group = groups.get(finding.name) ?? { name: finding.name, versions: [], ids: [] }
         group.versions = [...new Set([...group.versions, finding.version])]
@@ -48,10 +48,11 @@ export const eligibleVersions = (group, advisories, registry, ageMinutes, now) =
         .sort(compareVersions)
 }
 
+export const targetsGroup = (finding, group) =>
+    finding.ecosystem === 'npm' && finding.name === group.name && group.ids.includes(finding.id)
+
 export const verifiedRemediation = (before, after, group) => {
-    const relevant = finding =>
-        finding.ecosystem === 'npm' && finding.name === group.name && group.ids.includes(finding.id)
-    if (after.some(relevant)) return false
+    if (after.some(finding => targetsGroup(finding, group))) return false
     // An existing finding at a different package version is conservatively treated as new.
     const key = f => JSON.stringify([f.ecosystem, f.name, f.version, f.id])
     const existing = new Set(before.filter(f => f.status !== 'informational').map(key))
@@ -90,14 +91,21 @@ export const remediationBody = report => {
         'The scanner verifies that each targeted finding disappears without introducing other findings.',
         'Normal CI checks compatibility. Review overrides before merging.',
         'The automation does not change vulnerability exceptions or bypass package freshness and provenance policy.',
-        '',
-        '## Unresolved findings',
-        '',
     )
+    const reasons = status =>
+        report.packages
+            .filter(p => status.includes(p.status))
+            .map(item => `- \`${item.name}\`: ${item.reason}`)
+    for (const [heading, status] of [
+        ['Planned fixes', 'planned'],
+        ['Covered by Dependabot PRs', 'covered'],
+    ]) {
+        const items = reasons([status])
+        if (items.length) lines.push('', `## ${heading}`, '', ...items)
+    }
+    lines.push('', '## Unresolved findings', '')
     const unresolved = [
-        ...report.packages
-            .filter(p => p.status !== 'fixed')
-            .map(item => `- \`${item.name}\`: ${item.reason}`),
+        ...reasons(['unresolved', 'failed']),
         ...report.otherFindings.map(
             item =>
                 `- \`${item.ecosystem} ${item.name}@${item.version}\` ${item.id}: automatic remediation supports npm only.`,
@@ -152,7 +160,7 @@ export const currentPrContainsMain = comparison => ['ahead', 'identical'].includ
 export const scopedOverrides = (source, group, target) => {
     const workspace = parseDocument(source)
     if (workspace.errors.length) throw workspace.errors[0]
-    if (!workspace.has('overrides')) workspace.set('overrides', {})
+    if (!workspace.has('overrides')) workspace.set('overrides', workspace.createNode({}))
     for (const version of group.versions) {
         const key = `${group.name}@${version}`
         if (workspace.hasIn(['overrides', key]))

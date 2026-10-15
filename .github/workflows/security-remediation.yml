@@ -52,6 +52,8 @@ jobs:
               run: |
                   if [ -f dist/security/remediation-pr.md ]; then
                       cat dist/security/remediation-pr.md >> "$GITHUB_STEP_SUMMARY"
+                  else
+                      echo 'Remediation failed before it wrote a report. See the job log.' >> "$GITHUB_STEP_SUMMARY"
                   fi
             # Create the write token only after package resolution and verification finish.
             # App-authenticated pushes and PRs start normal CI, unlike GITHUB_TOKEN writes.
