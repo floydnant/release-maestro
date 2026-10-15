@@ -25,7 +25,7 @@ const harness = ({
         if (command === 'gh' && args[0] === 'pr' && args[1] === 'list') return JSON.stringify(pr ? [pr] : [])
         if (command === 'git' && args[0] === 'rev-parse') return 'base'
         if (command === 'git' && args[0] === 'log')
-            return `prior\t${author}\t${author}\tfix(deps): remediate verified npm vulnerabilities`
+            return `prior\t${author}\t${author}\tdeps: remediate verified npm vulnerabilities`
         if (command === 'git' && args[0] === 'diff') return changed ? 'diff' : ''
         return ''
     }
@@ -84,8 +84,17 @@ test('a human commit below an automation tip also stops publication', () => {
     const h = harness({ remote: 'prior', pr: botPr })
     const run = (command, args) =>
         command === 'git' && args[0] === 'log'
-            ? 'tip\trelease-maestro-ci[bot]\trelease-maestro-ci[bot]\tfix(deps): remediate verified npm vulnerabilities\nolder\tHuman\tHuman\tfix: manual change'
+            ? 'tip\trelease-maestro-ci[bot]\trelease-maestro-ci[bot]\tdeps: remediate verified npm vulnerabilities\nolder\tHuman\tHuman\tfix: manual change'
             : h.run(command, args)
     assert.throws(() => publishRemediation('owner/repo', fixed, run), /human edits/)
     assert(!h.calls.some(c => c[0] === 'git' && c[1] === 'push'))
+})
+
+test('a bot-authored commit with an unexpected subject stops publication', () => {
+    const h = harness({ remote: 'prior', pr: botPr })
+    const run = (command, args) =>
+        command === 'git' && args[0] === 'log'
+            ? 'tip\trelease-maestro-ci[bot]\trelease-maestro-ci[bot]\tfix: hand-written change'
+            : h.run(command, args)
+    assert.throws(() => publishRemediation('owner/repo', fixed, run), /human edits/)
 })

@@ -1,9 +1,11 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { dependencyInputs as inputs } from './remediation.mjs'
 
 const branch = 'security/automated-remediation'
-const inputs = ['package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml']
+// Matches Dependabot's prefix so release-please lists the merge under Dependencies.
+const commitSubject = 'deps: remediate verified npm vulnerabilities'
 const run = (command, args) =>
     execFileSync(command, args, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }).trim()
 export const publishRemediation = (repo, report, runCommand = run) => {
@@ -46,7 +48,7 @@ export const publishRemediation = (repo, report, runCommand = run) => {
                 if (
                     author !== 'release-maestro-ci[bot]' ||
                     committer !== author ||
-                    subject !== 'fix(deps): remediate verified npm vulnerabilities' ||
+                    subject !== commitSubject ||
                     paths.some(path => !inputs.includes(path))
                 )
                     throw new Error(
@@ -60,7 +62,7 @@ export const publishRemediation = (repo, report, runCommand = run) => {
             git(['config', 'user.name', 'release-maestro-ci[bot]'])
             git(['config', 'user.email', 'release-maestro-ci[bot]@users.noreply.github.com'])
             git(['add', '--', ...inputs])
-            git(['commit', '-m', 'fix(deps): remediate verified npm vulnerabilities'])
+            git(['commit', '-m', commitSubject])
             git([
                 'push',
                 `--force-with-lease=refs/heads/${branch}:${remote ?? ''}`,
@@ -72,7 +74,7 @@ export const publishRemediation = (repo, report, runCommand = run) => {
             '--repo',
             repo,
             '--title',
-            'fix(deps): remediate verified npm vulnerabilities',
+            commitSubject,
             '--body-file',
             'dist/security/remediation-pr.md',
         ]

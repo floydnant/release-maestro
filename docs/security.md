@@ -102,23 +102,27 @@ first tries a targeted update across transitive dependencies. If upstream constr
 it retries from the original inputs with an override for each affected version. pnpm enforces the
 existing freshness, provenance, and source policy. Install scripts never run. A full scan must remove
 all targeted advisories without introducing other findings. Failed attempts restore their dependency
-inputs and try later eligible versions. Reports name the versions actually resolved. Findings without an eligible fix remain visible; the automation never extends exceptions.
+inputs and try later eligible versions, and a failed run restores the inputs it started from. Reports
+name the versions actually resolved. Findings without an eligible fix, including findings on installed
+prereleases, remain visible; the automation never extends exceptions.
 
 CI reads open Dependabot PR lockfiles without executing their code. Only heads that contain the
-scanned main revision can cover findings. It defers packages already covered
-by a PR only when none of their proposed versions have known OSV vulnerabilities. Missing fixes and
-failures appear in the run summary and uploaded artifacts. Daily runs retry after releases age.
+scanned main revision can cover findings. It defers packages already covered by a PR only when none
+of their proposed versions have known OSV vulnerabilities. Missing fixes and failures appear in the
+run summary and uploaded artifacts. Daily runs retry after releases age.
 
 After verification, the workflow creates a Release Maestro CI App token using `RELEASE_APP_CLIENT_ID`
 and `RELEASE_APP_PRIVATE_KEY`, the same credentials as release-please. The token grants contents and
-pull request writes. It pushes and opens a ready-for-review PR on `security/automated-remediation`, so
-normal CI runs. Merging remains a maintainer decision, especially for overrides across major versions.
+pull request writes. It pushes and opens a ready-for-review `deps:` PR on
+`security/automated-remediation`, so normal CI runs. Merging remains a maintainer decision,
+especially for overrides across major versions.
 
 Each run rebuilds fixes from the scanned main revision. Identical retries do not push new commits.
 Changed inputs or a changed base update the same PR with an explicit branch lease. A changed main
-revision during preparation stops publication. Unexpected commits anywhere on the automation branch or a PR owned by another actor stop
-publication. Commit authors, committers, subjects, and changed paths identify expected automation
-commits. This check is not a cryptographic proof of authorship. Do not hand-edit the reserved branch. Resume by resolving the human changes and deleting the reserved automation branch.
+revision during preparation stops publication. So do unexpected commits anywhere on the automation
+branch and a PR owned by another actor. Commit authors, committers, subjects, and changed paths
+identify expected automation commits; this check is not a cryptographic proof of authorship. Do not
+hand-edit the reserved branch. To resume, resolve the human changes and delete the branch.
 When main has no npm findings, the workflow closes its obsolete PR. Unresolved findings preserve
 an existing PR so transient preparation failures cannot discard a previous verified fix.
 

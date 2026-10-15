@@ -41,6 +41,7 @@ test('groups accepted and blocked findings, including all vulnerable versions an
         [{ name: 'parser', versions: ['1.0.0', '1.0.1'], ids: ['GHSA-parser', 'GHSA-other'] }],
     )
     assert.throws(() => npmFindings([{ ...findings[0], name: '--config' }]), /Invalid npm/)
+    assert.deepEqual(npmFindings([{ ...findings[0], version: '2.0.0-beta.1' }])[0].versions, ['2.0.0-beta.1'])
 })
 
 test('a partial fix or a new finding at a changed version fails verification despite exceptions', () => {
@@ -94,6 +95,15 @@ test('PR body distinguishes verified fixes, covered findings, and findings witho
     assert.match(body, /^Closes N\/A/)
     assert.match(body, /scoped override/)
     assert.match(body, /formatter.*No published fix/)
+})
+
+test('PR body states when no findings remain unresolved', () => {
+    const { group } = remediationInputs()
+    const body = remediationBody({
+        packages: [{ ...group, target: '1.1.0', status: 'fixed', method: 'lockfile update' }],
+        otherFindings: [],
+    })
+    assert.match(body, /## Unresolved findings\n\nNone\.\n$/)
 })
 
 test('an upstream exact pin falls back to an override after restoring a failed update', () => {

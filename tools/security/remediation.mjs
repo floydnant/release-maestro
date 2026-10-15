@@ -1,7 +1,8 @@
 import { parseDocument } from 'yaml'
 
 // Planning and verification are independent of registry, scanner, and GitHub transports.
-const stable = version => /^\d+\.\d+\.\d+$/.test(version)
+export const dependencyInputs = ['package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml']
+export const isStableVersion = version => /^\d+\.\d+\.\d+$/.test(version)
 export const compareVersions = (left, right) => {
     const a = left.split('.').map(Number)
     const b = right.split('.').map(Number)
@@ -13,7 +14,6 @@ export const npmFindings = findings => {
     for (const finding of findings.filter(f => f.ecosystem === 'npm' && f.status !== 'informational')) {
         if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(finding.name))
             throw new Error(`Invalid npm package name: ${finding.name}`)
-        if (!stable(finding.version)) throw new Error(`Unsupported npm version: ${finding.version}`)
         const group = groups.get(finding.name) ?? { name: finding.name, versions: [], ids: [] }
         group.versions = [...new Set([...group.versions, finding.version])]
         group.ids = [...new Set([...group.ids, finding.id])]
@@ -28,7 +28,7 @@ export const eligibleVersions = (group, advisories, registry, ageMinutes, now) =
         (advisory.affected ?? [])
             .filter(a => a.package?.ecosystem === 'npm' && a.package.name === group.name)
             .flatMap(a => (a.ranges ?? []).flatMap(r => r.events ?? []).map(e => e.fixed))
-            .filter(version => typeof version === 'string' && stable(version)),
+            .filter(version => typeof version === 'string' && isStableVersion(version)),
     )
     if (!fixes.length) return []
     const minimum = fixes.sort(compareVersions)[0]
@@ -37,7 +37,7 @@ export const eligibleVersions = (group, advisories, registry, ageMinutes, now) =
         .filter(version => {
             const published = Date.parse(registry.time?.[version])
             return (
-                stable(version) &&
+                isStableVersion(version) &&
                 compareVersions(version, current) > 0 &&
                 compareVersions(version, minimum) >= 0 &&
                 !registry.versions[version].deprecated &&
@@ -94,12 +94,16 @@ export const remediationBody = report => {
         '## Unresolved findings',
         '',
     )
-    for (const item of report.packages.filter(p => p.status !== 'fixed'))
-        lines.push(`- \`${item.name}\`: ${item.reason}`)
-    for (const item of report.otherFindings)
-        lines.push(
-            `- \`${item.ecosystem} ${item.name}@${item.version}\` ${item.id}: automatic remediation supports npm only.`,
-        )
+    const unresolved = [
+        ...report.packages
+            .filter(p => p.status !== 'fixed')
+            .map(item => `- \`${item.name}\`: ${item.reason}`),
+        ...report.otherFindings.map(
+            item =>
+                `- \`${item.ecosystem} ${item.name}@${item.version}\` ${item.id}: automatic remediation supports npm only.`,
+        ),
+    ]
+    lines.push(...(unresolved.length ? unresolved : ['None.']))
     return `${lines.join('\n')}\n`
 }
 
