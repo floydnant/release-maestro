@@ -38,7 +38,7 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
                   GH_REPO: ${{ github.repository }}
-                  SECURITY_EXISTING_PRS: dist/security/dependabot-prs.json
+                  SECURITY_DEPENDABOT_PRS: dist/security/dependabot-prs.json
               run: make security-remediate
             - name: Upload remediation and vulnerability reports
               if: always()

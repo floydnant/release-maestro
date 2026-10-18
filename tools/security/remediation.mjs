@@ -1,7 +1,7 @@
 import { parseDocument } from 'yaml'
 
-// Pure planning and verification helpers. Registry, scanner, and GitHub transports live in remediate.mjs,
-// so everything here can be tested with plain data.
+// Pure planning and verification helpers. The scripts that call them own every command and network
+// request, so everything here can be tested with plain data.
 
 // The files a remediation may change. Snapshots, restores, and the publisher's commit all use this list.
 export const dependencyInputs = ['package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml']
@@ -18,7 +18,19 @@ export const compareVersions = (left, right) => {
     return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
 }
 
-const isActionable = finding => finding.status !== 'informational'
+export const isActionable = finding => finding.status !== 'informational'
+
+// A verdict that a candidate does not qualify, so the next candidate may be tried. Any other error leaves the
+// outcome unknown, and the package is reported as failed.
+export class RejectedFix extends Error {}
+
+// Network failures say nothing about a candidate. Every other pnpm error, such as a provenance downgrade
+// under `trustPolicy`, is a verdict on it.
+const transientPnpmError =
+    /ERR_PNPM_(?:FETCH_\d+|META_FETCH_FAIL)|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/
+
+export const pnpmVerdict = error =>
+    transientPnpmError.test(error.message) ? error : new RejectedFix(error.message)
 
 // Groups actionable npm findings by package, so one fix can address every advisory and installed version.
 export const npmFindings = findings => {
@@ -40,8 +52,6 @@ export const npmFindings = findings => {
 // - be stable and not deprecated, and
 // - have been published at least `minimumReleaseAge` minutes ago.
 export const eligibleVersions = (group, advisories, registry, ageMinutes, now) => {
-    if (!Number.isFinite(ageMinutes) || ageMinutes < 0) throw new Error('Invalid minimum release age')
-
     const fixes = advisories.flatMap(advisory =>
         (advisory.affected ?? [])
             .filter(a => a.package?.ecosystem === 'npm' && a.package.name === group.name)
@@ -107,8 +117,10 @@ export const remediationBody = report => {
         .filter(item => item.status === 'fixed')
         .flatMap(item => {
             const resolved = item.resolvedVersions ?? [item.target]
+            // An earlier fix can remove a package from the lockfile entirely.
+            const outcome = resolved.length ? `→ ${resolved.join(', ')}` : 'removed from the lockfile'
             return [
-                `- \`${item.name}\`: ${item.versions.join(', ')} → ${resolved.join(', ')}. Method: ${item.method}.`,
+                `- \`${item.name}\`: ${item.versions.join(', ')} ${outcome}. Method: ${item.method}.`,
                 `  Advisories: ${item.ids.join(', ')}.`,
             ]
         })
@@ -125,15 +137,15 @@ export const remediationBody = report => {
         '',
         '## What changed',
         '',
-        'Replace vulnerable npm dependencies with verified fixes that satisfy the repository supply-chain policy.',
-        '',
-        ...fixed,
+        'This PR moves vulnerable npm packages to releases that fix their advisories.',
+        'Each fix removes its targeted advisories and adds no other vulnerability findings.',
+        'The new releases satisfy the repository freshness and provenance policy.',
+        ...(fixed.length ? ['', ...fixed] : []),
         '',
         '## Notes',
         '',
-        'The scanner verifies that each targeted finding disappears without introducing other findings.',
-        'Normal CI checks compatibility. Review overrides before merging.',
-        'The automation does not change vulnerability exceptions or bypass package freshness and provenance policy.',
+        'Normal CI checks compatibility. Review overrides before merging, especially across major versions.',
+        'The automation never extends vulnerability exceptions.',
         ...section('Planned fixes', describe(['planned'])),
         ...section('Covered by Dependabot PRs', describe(['covered'])),
         '',
@@ -164,7 +176,7 @@ export const applyVerifiedFix = (before, group, actions) => {
             actions.override()
             after = actions.scan()
             if (!verifiedRemediation(before, after, group))
-                throw new Error('The rescan retained targeted findings or introduced other findings')
+                throw new RejectedFix('The rescan retained targeted findings or introduced other findings')
             method = 'scoped override'
         }
 
@@ -176,14 +188,16 @@ export const applyVerifiedFix = (before, group, actions) => {
     }
 }
 
-// Tries candidates lowest first and returns the first that is advisory-free and applies cleanly.
-// Returns null when every candidate is skipped or rejected.
+// Tries candidates in order and returns the first that is advisory-free and applies cleanly. Returns null
+// when every candidate is skipped or rejected. An error other than a RejectedFix stops the search, because
+// a later candidate could hit the same unknown failure.
 export const applyFirstEligibleFix = async (candidates, actions) => {
     for (const target of candidates) {
         if (!(await actions.isSafe(target))) continue
         try {
             return { target, ...(await actions.apply(target)) }
         } catch (error) {
+            if (!(error instanceof RejectedFix)) throw error
             actions.rejected(target, error)
         }
     }
@@ -203,7 +217,7 @@ export const scopedOverrides = (source, group, target) => {
     for (const version of group.versions) {
         const key = `${group.name}@${version}`
         if (workspace.hasIn(['overrides', key]))
-            throw new Error(`Existing override needs maintainer review: ${key}`)
+            throw new RejectedFix(`Existing override needs maintainer review: ${key}`)
         workspace.setIn(['overrides', key], target)
     }
     return workspace.toString({ indent: 4, lineWidth: 0, singleQuote: true })

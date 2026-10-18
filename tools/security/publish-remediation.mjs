@@ -4,7 +4,9 @@ import { pathToFileURL } from 'node:url'
 import { dependencyInputs as inputs } from './remediation.mjs'
 
 const branch = 'security/automated-remediation'
+// The Release Maestro CI App appears under one name in commits and another as a PR author.
 const botName = 'release-maestro-ci[bot]'
+const botLogin = 'app/release-maestro-ci'
 // Matches Dependabot's prefix so release-please lists the merge under Dependencies.
 const commitSubject = 'deps: remediate verified npm vulnerabilities'
 
@@ -38,7 +40,7 @@ export const publishRemediation = (repo, report, runCommand = run) => {
     )
     // A fork can reuse the branch name; only a same-repository PR is the automation PR.
     const pr = prs.find(candidate => !candidate.isCrossRepository)
-    if (pr && pr.author.login !== 'app/release-maestro-ci')
+    if (pr && pr.author.login !== botLogin)
         throw new Error('The remediation PR is not owned by Release Maestro CI')
 
     if (!report.packages.some(p => p.status === 'fixed')) {

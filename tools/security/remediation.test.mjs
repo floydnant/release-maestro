@@ -11,6 +11,8 @@ import {
     eligibleVersions,
     lockVersions,
     npmFindings,
+    pnpmVerdict,
+    RejectedFix,
     remediationBody,
     scopedOverrides,
     verifiedRemediation,
@@ -24,7 +26,6 @@ test('waits exactly three days, skips missing timestamps, prereleases, and depre
         '1.1.1',
         '1.2.0',
     ])
-    assert.throws(() => eligibleVersions(group, advisories, registry, undefined, now), /release age/)
 })
 
 test('an advisory without a matching published fix cannot produce a candidate', () => {
@@ -161,13 +162,33 @@ test('policy rejection tries a later eligible release instead of failing every d
     const result = await applyFirstEligibleFix(['1.1.0', '1.1.1', '1.2.0'], {
         isSafe: async () => true,
         apply: target => {
-            if (target === '1.1.0') throw new Error('provenance downgrade')
+            if (target === '1.1.0') throw new RejectedFix('provenance downgrade')
             return { method: 'scoped override', resolvedVersions: [target] }
         },
         rejected: target => rejected.push(target),
     })
     assert.equal(result.target, '1.1.1')
     assert.deepEqual(rejected, ['1.1.0'])
+})
+
+test('an unknown failure stops the search instead of rejecting the candidate', async () => {
+    const attempted = []
+    const search = applyFirstEligibleFix(['1.1.0', '1.1.1'], {
+        isSafe: async () => true,
+        apply: target => {
+            attempted.push(target)
+            throw new Error('OSV scan failed: exit 2')
+        },
+        rejected: () => assert.fail('an unknown failure is not a rejection'),
+    })
+    await assert.rejects(search, /OSV scan failed/)
+    assert.deepEqual(attempted, ['1.1.0'])
+})
+
+test('pnpm network errors stay unknown while other pnpm errors reject the candidate', () => {
+    for (const message of ['ERR_PNPM_FETCH_503 GET https://registry.npmjs.org/parser', 'connect ETIMEDOUT'])
+        assert(!(pnpmVerdict(new Error(message)) instanceof RejectedFix), message)
+    assert(pnpmVerdict(new Error('ERR_PNPM_TRUST_DOWNGRADE parser@1.1.0')) instanceof RejectedFix)
 })
 
 test('stale Dependabot heads cannot cover packages introduced on current main', () => {
@@ -192,6 +213,15 @@ test('the PR reports resolved versions rather than the planner candidate', () =>
     })
     assert.match(body, /→ 1.1.2/)
     assert.doesNotMatch(body, /→ 1.1.0/)
+})
+
+test('the PR says when an earlier fix removed a package from the lockfile', () => {
+    const { group } = remediationInputs()
+    const body = remediationBody({
+        packages: [{ ...group, resolvedVersions: [], status: 'fixed', method: 'earlier fix in this run' }],
+        otherFindings: [],
+    })
+    assert.match(body, /`parser`: 1\.0\.0 removed from the lockfile\./)
 })
 
 test('a newly disclosed advisory in the final scan invalidates an earlier verified fix', () => {

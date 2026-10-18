@@ -9,9 +9,12 @@ import {
     currentPrContainsMain,
     dependencyInputs,
     eligibleVersions,
+    isActionable,
     isStableVersion,
     lockVersions,
     npmFindings,
+    pnpmVerdict,
+    RejectedFix,
     remediationBody,
     scopedOverrides,
     targetsGroup,
@@ -53,8 +56,8 @@ const documents = source =>
     })
 
 // Plans (`plan`) or applies (`apply`) verified fixes for npm findings, one package group at a time, then
-// writes dist/security/remediation.json and remediation-pr.md. In apply mode, a failure restores every
-// dependency input to its state before the run.
+// writes dist/security/remediation.json and remediation-pr.md. In apply mode, a failed package restores the
+// inputs from before its own attempt, and a failure that aborts the run restores the inputs it started from.
 //
 // The command, registry, and clock seams let tests drive the orchestration in a temporary checkout.
 export const remediate = async (
@@ -105,6 +108,8 @@ export const remediate = async (
     const config = parseDocument(read('pnpm-workspace.yaml', 'utf8'))
     if (config.errors.length) throw config.errors[0]
     const age = config.get('minimumReleaseAge')
+    if (!Number.isFinite(age) || age < 0)
+        throw new Error('pnpm-workspace.yaml needs a non-negative minimumReleaseAge in minutes')
 
     const originalInputs = snapshot()
     const originalFindings = scan()
@@ -112,13 +117,13 @@ export const remediate = async (
     let findings = originalFindings
     const report = {
         packages: [],
-        otherFindings: findings.filter(f => f.ecosystem !== 'npm' && f.status !== 'informational'),
+        otherFindings: findings.filter(f => f.ecosystem !== 'npm' && isActionable(f)),
     }
 
     // --- Open Dependabot PRs ---
 
     // Read only Dependabot PRs. Never execute code or install packages from a PR branch.
-    const dependabotPrs = process.env.SECURITY_EXISTING_PRS ? json(process.env.SECURITY_EXISTING_PRS) : []
+    const dependabotPrs = process.env.SECURITY_DEPENDABOT_PRS ? json(process.env.SECURITY_DEPENDABOT_PRS) : []
     const mainRevision = run('git', ['rev-parse', 'HEAD']).trim()
     const dependabotLocks = dependabotPrs
         .filter(pr => currentPrContainsMain(JSON.parse(gh(`compare/${mainRevision}...${pr.headRefOid}`))))
@@ -134,7 +139,7 @@ export const remediate = async (
             ),
         }))
 
-    // A PR covers a group when its lockfile drops every vulnerable version and all its new versions are safe.
+    // A PR covers a group when its lockfile drops every vulnerable version and every version it locks is safe.
     const coveringPr = async group => {
         for (const pr of dependabotLocks) {
             const versions = lockVersions(pr.documents, group.name)
@@ -150,7 +155,7 @@ export const remediate = async (
     // --- Fix strategies, each verified by applyVerifiedFix ---
 
     // Lets pnpm move the package within its existing ranges, without touching package.json.
-    const updateLockfile = (group, candidates) => {
+    const updateLockfile = (group, target) => {
         const locked = lockedVersions(group.name)
         run('pnpm', [
             'update',
@@ -163,9 +168,10 @@ export const remediate = async (
             '-r',
         ])
 
-        // pnpm picks the highest version in range, which the planner may not have vetted.
+        // pnpm picks the highest version in range. Only the target passed the OSV check, so any other new
+        // version sends the attempt to the override.
         const unvetted = lockedVersions(group.name).filter(
-            version => !locked.includes(version) && !candidates.includes(version),
+            version => !locked.includes(version) && version !== target,
         )
         if (unvetted.length) throw new Error(`pnpm update resolved unvetted ${unvetted.join(', ')}`)
     }
@@ -176,13 +182,26 @@ export const remediate = async (
             join(root, 'pnpm-workspace.yaml'),
             scopedOverrides(read('pnpm-workspace.yaml', 'utf8'), group, target),
         )
-        run('pnpm', ['install', '--lockfile-only', '--no-frozen-lockfile', '--ignore-scripts'])
+        try {
+            run('pnpm', ['install', '--lockfile-only', '--no-frozen-lockfile', '--ignore-scripts'])
+        } catch (error) {
+            throw pnpmVerdict(error)
+        }
+    }
+
+    // The policy check is offline, so a failure is always a verdict on the candidate.
+    const checkPolicy = () => {
+        try {
+            run('make', ['dependency-policy-check'])
+        } catch (error) {
+            throw new RejectedFix(error.message)
+        }
     }
 
     // --- One package group ---
 
-    // Records the outcome on `item`. Throws only for failures that leave the outcome unknown,
-    // such as a failed network lookup.
+    // Records the outcome on `item`. Throws only for failures that leave the outcome unknown, such as a failed
+    // network lookup, a scanner crash, or a pnpm network error.
     const remediateGroup = async (group, item, before) => {
         if (!findings.some(finding => targetsGroup(finding, group))) {
             Object.assign(item, {
@@ -218,11 +237,11 @@ export const remediate = async (
                 log(`ATTEMPT ${group.name}@${target}`)
                 if (mode === 'plan') return {}
                 return applyVerifiedFix(findings, group, {
-                    update: () => updateLockfile(group, candidates),
+                    update: () => updateLockfile(group, target),
                     override: () => overrideVersions(group, target),
                     scan,
                     restore: () => write(before),
-                    policy: () => run('make', ['dependency-policy-check']),
+                    policy: checkPolicy,
                 })
             },
             // A rejected attempt has already restored the inputs that `findings` describes.
