@@ -1,16 +1,7 @@
 import { CdkMenuTrigger } from '@angular/cdk/menu'
 import type { ConnectedPosition } from '@angular/cdk/overlay'
-import {
-    afterNextRender,
-    computed,
-    Directive,
-    effect,
-    ElementRef,
-    forwardRef,
-    inject,
-    input,
-    signal,
-} from '@angular/core'
+import { Directive, ElementRef, forwardRef, inject, input } from '@angular/core'
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop'
 import { createMenuPosition, MENU_SIDE, type MenuAlign, type MenuSide } from '@spartan-ng/brain/core'
 import { classes, hlm } from '@spartan-ng/helm/utils'
 
@@ -62,11 +53,6 @@ export class HlmDropdownMenuSubTrigger {
     // A submenu opens beside its parent; the menu config's side is for the top-level menu.
     public readonly side = input<MenuSide>('right')
 
-    private readonly _parentInset = signal<MenuInset>({ start: 0, end: 0, top: 0, bottom: 0 })
-    private readonly _menuPosition = computed(() =>
-        submenuPositions(this.align(), this.side(), this._parentInset()),
-    )
-
     constructor() {
         // CDK sets transform-origin on the submenu content from the resolved position; the content reads it
         // to animate from the anchored corner and to derive its data-side. Cast tolerates @angular/cdk < 21.2
@@ -74,11 +60,15 @@ export class HlmDropdownMenuSubTrigger {
         ;(this._cdkTrigger as { transformOriginSelector?: string }).transformOriginSelector =
             '[data-slot="dropdown-menu-sub"]'
 
-        // CDK creates the overlay on first open, which can only follow this render.
-        afterNextRender({ read: () => this._parentInset.set(this.measureParentInset()) })
-
-        effect(() => {
-            this._cdkTrigger.menuPosition = this._menuPosition()
+        // CDK emits `opened` synchronously just before it creates the overlay from `menuPosition`.
+        // Measure the parent menu then: it is laid out by the time the user opens a submenu. A
+        // measurement taken earlier can reach CDK too late and leave the submenu over its parent.
+        this._cdkTrigger.opened.pipe(takeUntilDestroyed()).subscribe(() => {
+            this._cdkTrigger.menuPosition = submenuPositions(
+                this.align(),
+                this.side(),
+                this.measureParentInset(),
+            )
         })
 
         classes(() => hlm('aria-expanded:bg-action-quiet-hover aria-expanded:text-content-primary'))
