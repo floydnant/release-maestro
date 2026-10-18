@@ -46,25 +46,25 @@ test('defaults to hiding unplayable releases and persists changes without replac
         })
 })
 
-test('saves a whole number of snooze hours and blocks entries outside the range', async ({ page }) => {
+test('saves snooze hours to two decimals and blocks other entries', async ({ page }) => {
     const controller = await createRendererScenario(page, scenarioBuilder().build(), '/settings/feed')
     const dialog = page.getByRole('dialog', { name: 'Settings' })
     const snoozeHours = dialog.getByRole('spinbutton', { name: snoozeLabel })
     const save = dialog.getByRole('button', { name: 'Save', exact: true })
-    const rangeError = dialog.getByRole('alert').filter({ hasText: 'Enter a whole number of hours' })
+    const rangeError = dialog.getByRole('alert').filter({ hasText: 'with at most two decimal places' })
     await expect(dialog.getByRole('heading', { name: 'Snooze' })).toBeVisible()
     await expect(snoozeHours).toHaveValue('16')
     await expect(snoozeHours).toHaveAccessibleDescription(/returns to your feed this many hours/)
     await expect(save).toBeHidden()
 
-    for (const invalid of ['0', '169', '1.5', '']) {
+    for (const invalid of ['0', '169', '1.555', '']) {
         await snoozeHours.fill(invalid)
-        await expect(rangeError).toHaveText('Enter a whole number of hours from 1 to 168.')
+        await expect(rangeError).toHaveText('Enter 1 to 168 hours, with at most two decimal places.')
         await expect(snoozeHours).toHaveAttribute('aria-invalid', 'true')
         await expect(save).toBeDisabled()
     }
 
-    await snoozeHours.fill('24')
+    await snoozeHours.fill('24.5')
     await expect(rangeError).toBeHidden()
     await expect(snoozeHours).toHaveAttribute('aria-invalid', 'false')
     await save.click()
@@ -72,7 +72,7 @@ test('saves a whole number of snooze hours and blocks entries outside the range'
     await expect(snoozeHours).toBeFocused()
     await expect
         .poll(() => controller.lastCall('patch-settings'))
-        .toMatchObject({ payload: { feed: { hideUnplayableReleases: true, snoozeHours: 24 } } })
+        .toMatchObject({ payload: { feed: { hideUnplayableReleases: true, snoozeHours: 24.5 } } })
 })
 
 test('locks the switch while saving', async ({ page }) => {

@@ -33,11 +33,11 @@ describe('appSettingsSchema (write validation)', () => {
         expect(() => appSettingsSchema.parse({ feed: { hideUnplayableReleases: 'false' } })).toThrow()
     })
 
-    it('accepts whole snooze hours from one hour to one week and rejects others', () => {
-        for (const snoozeHours of [1, 16, 168]) {
+    it('accepts snooze hours to two decimals from one hour to one week and rejects others', () => {
+        for (const snoozeHours of [1, 1.5, 1.15, 16, 33.33, 167.99, 168]) {
             expect(appSettingsSchema.parse({ feed: { snoozeHours } }).feed).toEqual({ snoozeHours })
         }
-        for (const snoozeHours of [0, 169, 1.5, '16']) {
+        for (const snoozeHours of [0, 0.99, 168.01, 169, 1.155, 2.675, '16']) {
             expect(() => appSettingsSchema.parse({ feed: { snoozeHours } })).toThrow()
         }
     })

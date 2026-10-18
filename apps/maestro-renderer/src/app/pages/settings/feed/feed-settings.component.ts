@@ -12,6 +12,8 @@ import {
 } from '@angular/core'
 import {
     DEFAULT_FEED_SNOOZE_HOURS,
+    FEED_SNOOZE_HOURS_STEP,
+    feedSnoozeHoursSchema,
     MAX_FEED_SNOOZE_HOURS,
     MIN_FEED_SNOOZE_HOURS,
 } from '@release-maestro/core'
@@ -34,6 +36,7 @@ export class FeedSettingsComponent {
     readonly settingsService = inject(SettingsService)
     readonly minSnoozeHours = MIN_FEED_SNOOZE_HOURS
     readonly maxSnoozeHours = MAX_FEED_SNOOZE_HOURS
+    readonly snoozeHoursStep = FEED_SNOOZE_HOURS_STEP
     private readonly savedFeed = computed(() =>
         this.settingsService.settings.hasValue() ? this.settingsService.settings.value()?.feed : undefined,
     )
@@ -43,16 +46,11 @@ export class FeedSettingsComponent {
     readonly hideUnplayableReleases = linkedSignal(() => this.savedFeed()?.hideUnplayableReleases ?? true)
     /** The field's raw text, so an empty or partial entry can be shown and corrected. */
     readonly snoozeHoursText = linkedSignal(() => String(this.savedSnoozeHours()))
-    /** The entered whole number of hours, or null while the entry is outside the allowed range. */
+    /** The entered hours, or null while the entry is not a duration the settings accept. */
     readonly snoozeHours = computed(() => {
         const text = this.snoozeHoursText().trim()
-        const hours = Number(text)
-        return text !== '' &&
-            Number.isInteger(hours) &&
-            hours >= MIN_FEED_SNOOZE_HOURS &&
-            hours <= MAX_FEED_SNOOZE_HOURS
-            ? hours
-            : null
+        const parsed = feedSnoozeHoursSchema.safeParse(Number(text))
+        return text !== '' && parsed.success ? parsed.data : null
     })
     readonly hasChanges = computed(
         () =>

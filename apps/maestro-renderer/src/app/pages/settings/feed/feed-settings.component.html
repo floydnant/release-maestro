@@ -68,11 +68,11 @@
                     class="feed-snooze-hours | w-24"
                     id="feed-snooze-hours"
                     type="number"
-                    inputmode="numeric"
-                    step="1"
+                    inputmode="decimal"
                     aria-labelledby="feed-snooze-hours-label feed-snooze-hours-unit"
                     [min]="minSnoozeHours"
                     [max]="maxSnoozeHours"
+                    [step]="snoozeHoursStep"
                     [aria-describedby]="
                         snoozeHours() === null
                             ? 'feed-snooze-hours-description feed-snooze-hours-error'
@@ -92,7 +92,7 @@
                     id="feed-snooze-hours-error"
                     role="alert"
                 >
-                    Enter a whole number of hours from {{ minSnoozeHours }} to {{ maxSnoozeHours }}.
+                    Enter {{ minSnoozeHours }} to {{ maxSnoozeHours }} hours, with at most two decimal places.
                 </p>
             }
         </section>

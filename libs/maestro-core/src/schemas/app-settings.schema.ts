@@ -20,7 +20,13 @@ export const DEFAULT_FEED_SNOOZE_HOURS = 16
 export const MIN_FEED_SNOOZE_HOURS = 1
 /** One week. */
 export const MAX_FEED_SNOOZE_HOURS = 168
-const feedSnoozeHoursSchema = z.number().int().min(MIN_FEED_SNOOZE_HOURS).max(MAX_FEED_SNOOZE_HOURS)
+/** Hundredths of an hour; finer steps would be too small to notice. */
+export const FEED_SNOOZE_HOURS_STEP = 0.01
+export const feedSnoozeHoursSchema = z
+    .number()
+    .min(MIN_FEED_SNOOZE_HOURS)
+    .max(MAX_FEED_SNOOZE_HOURS)
+    .multipleOf(FEED_SNOOZE_HOURS_STEP)
 
 const librarySettingsSchema = z.object({
     /** The folders that make up the user's music library. Absent/empty until onboarding/setup. */
