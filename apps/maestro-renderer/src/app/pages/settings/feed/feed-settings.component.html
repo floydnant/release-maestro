@@ -58,8 +58,8 @@
                 >Snooze duration</label
             >
             <p class="mt-1 type-body-sm text-content-muted" id="feed-snooze-hours-description">
-                A snoozed release returns to your feed this many hours after you last saw it. Changes apply
-                the next time you open the feed.
+                A snoozed release returns to your feed this many hours after you last saw it. Changes apply to
+                releases the feed loads after you save.
             </p>
             <div class="mt-3 flex items-center gap-2">
                 <input
@@ -81,7 +81,7 @@
                     [attr.aria-invalid]="snoozeHours() === null"
                     [forceInvalid]="snoozeHours() === null"
                     [disabled]="saving()"
-                    [value]="snoozeHoursText()"
+                    [value]="savedSnoozeHours()"
                     (input)="snoozeHoursText.set(snoozeHoursField.value)"
                 />
                 <span id="feed-snooze-hours-unit" class="type-body-md text-content-secondary">hours</span>

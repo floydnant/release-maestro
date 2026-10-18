@@ -28,10 +28,8 @@ test('defaults to hiding unplayable releases and persists changes without replac
     await expect(save).toBeHidden()
     await expect(filterSwitch).toBeFocused()
     await expect
-        .poll(() => controller.lastCall('patch-settings'))
-        .toMatchObject({
-            payload: { feed: { hideUnplayableReleases: false } },
-        })
+        .poll(async () => (await controller.lastCall('patch-settings'))?.payload)
+        .toEqual({ feed: { hideUnplayableReleases: false } })
     await dialog.getByRole('link', { name: 'Apple Mail', exact: true }).click()
     await expect(dialog.getByRole('textbox', { name: 'Mailbox Name' })).toBeVisible()
     await dialog.getByRole('link', { name: 'Feed', exact: true }).click()
@@ -57,6 +55,11 @@ test('saves snooze hours to two decimals and blocks other entries', async ({ pag
     await expect(snoozeHours).toHaveAccessibleDescription(/returns to your feed this many hours/)
     await expect(save).toBeHidden()
 
+    await snoozeHours.fill('')
+    await snoozeHours.pressSequentially('1e')
+    await expect(rangeError).toBeVisible()
+    expect(await snoozeHours.evaluate((field: HTMLInputElement) => field.validity.badInput)).toBe(true)
+
     for (const invalid of ['0', '169', '1.555', '']) {
         await snoozeHours.fill(invalid)
         await expect(rangeError).toHaveText('Enter 1 to 168 hours, with at most two decimal places.')
@@ -71,8 +74,8 @@ test('saves snooze hours to two decimals and blocks other entries', async ({ pag
     await expect(save).toBeHidden()
     await expect(snoozeHours).toBeFocused()
     await expect
-        .poll(() => controller.lastCall('patch-settings'))
-        .toMatchObject({ payload: { feed: { hideUnplayableReleases: true, snoozeHours: 24.5 } } })
+        .poll(async () => (await controller.lastCall('patch-settings'))?.payload)
+        .toEqual({ feed: { snoozeHours: 24.5 } })
 })
 
 test('locks the switch while saving', async ({ page }) => {

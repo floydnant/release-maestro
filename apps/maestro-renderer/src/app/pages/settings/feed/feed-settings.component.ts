@@ -40,10 +40,15 @@ export class FeedSettingsComponent {
     private readonly savedFeed = computed(() =>
         this.settingsService.settings.hasValue() ? this.settingsService.settings.value()?.feed : undefined,
     )
-    private readonly savedSnoozeHours = computed(
-        () => this.savedFeed()?.snoozeHours ?? DEFAULT_FEED_SNOOZE_HOURS,
+    private readonly savedHideUnplayableReleases = computed(
+        () => this.savedFeed()?.hideUnplayableReleases ?? true,
     )
-    readonly hideUnplayableReleases = linkedSignal(() => this.savedFeed()?.hideUnplayableReleases ?? true)
+    /**
+     * The field binds its value to this, not to the entered text. The browser reports a partial
+     * entry such as "1e" as empty, and writing that back would erase what the user typed.
+     */
+    readonly savedSnoozeHours = computed(() => this.savedFeed()?.snoozeHours ?? DEFAULT_FEED_SNOOZE_HOURS)
+    readonly hideUnplayableReleases = linkedSignal(() => this.savedHideUnplayableReleases())
     /** The field's raw text, so an empty or partial entry can be shown and corrected. */
     readonly snoozeHoursText = linkedSignal(() => String(this.savedSnoozeHours()))
     /** The entered hours, or null while the entry is not a duration the settings accept. */
@@ -55,7 +60,7 @@ export class FeedSettingsComponent {
     readonly hasChanges = computed(
         () =>
             this.settingsService.settings.hasValue() &&
-            (this.hideUnplayableReleases() !== (this.savedFeed()?.hideUnplayableReleases ?? true) ||
+            (this.hideUnplayableReleases() !== this.savedHideUnplayableReleases() ||
                 this.snoozeHours() !== this.savedSnoozeHours()),
     )
     readonly saving = signal(false)
@@ -67,12 +72,18 @@ export class FeedSettingsComponent {
         // Disabling Save while it is pending drops its focus, so return focus once it settles:
         // to the setting that changed after a save removes Save, or to Save to retry a failed one.
         const restoreFocus = event.currentTarget === document.activeElement
+        const hideUnplayableReleases = this.hideUnplayableReleases()
+        const filterChanged = hideUnplayableReleases !== this.savedHideUnplayableReleases()
         const snoozeChanged = snoozeHours !== this.savedSnoozeHours()
         this.saving.set(true)
         this.saveError.set(null)
         try {
+            // Save only what changed, so an untouched setting keeps following its default.
             await this.settingsService.patchSettings({
-                feed: { hideUnplayableReleases: this.hideUnplayableReleases(), snoozeHours },
+                feed: {
+                    ...(filterChanged && { hideUnplayableReleases }),
+                    ...(snoozeChanged && { snoozeHours }),
+                },
             })
         } catch {
             this.saveError.set('Could not save feed settings. Try again.')
