@@ -74,7 +74,7 @@ export const remediate = async (
 
     const output = join(root, 'dist/security')
     const read = (path, encoding) => readFileSync(join(root, path), encoding)
-    const write = inputs => {
+    const restore = inputs => {
         for (const [file, bytes] of inputs) writeFileSync(join(root, file), bytes)
     }
     const snapshot = () => new Map(dependencyInputs.map(path => [path, read(path)]))
@@ -113,11 +113,11 @@ export const remediate = async (
 
     const originalInputs = snapshot()
     const originalFindings = scan()
-    // Each verified fix replaces `findings`, so later groups are judged against the updated inputs.
-    let findings = originalFindings
+    // Each verified fix replaces `currentFindings`, so later groups are judged against the updated inputs.
+    let currentFindings = originalFindings
     const report = {
         packages: [],
-        otherFindings: findings.filter(f => f.ecosystem !== 'npm' && isActionable(f)),
+        otherFindings: originalFindings.filter(f => f.ecosystem !== 'npm' && isActionable(f)),
     }
 
     // --- Open Dependabot PRs ---
@@ -154,23 +154,27 @@ export const remediate = async (
 
     // --- Fix strategies, each verified by applyVerifiedFix ---
 
-    // Lets pnpm move the package within its existing ranges, without touching package.json.
-    const updateLockfile = (group, target) => {
-        const locked = lockedVersions(group.name)
+    const pnpm = args => {
         try {
-            run('pnpm', [
-                'update',
-                group.name,
-                '--depth',
-                '100',
-                '--lockfile-only',
-                '--ignore-scripts',
-                '--no-save',
-                '-r',
-            ])
+            run('pnpm', args)
         } catch (error) {
             throw pnpmVerdict(error)
         }
+    }
+
+    // Lets pnpm move the package within its existing ranges, without touching package.json.
+    const updateLockfile = (group, target) => {
+        const locked = lockedVersions(group.name)
+        pnpm([
+            'update',
+            group.name,
+            '--depth',
+            '100',
+            '--lockfile-only',
+            '--ignore-scripts',
+            '--no-save',
+            '-r',
+        ])
 
         // pnpm picks the highest version in range. Only the target passed the OSV check, so any other new
         // version sends the attempt to the override.
@@ -186,11 +190,7 @@ export const remediate = async (
             join(root, 'pnpm-workspace.yaml'),
             scopedOverrides(read('pnpm-workspace.yaml', 'utf8'), group, target),
         )
-        try {
-            run('pnpm', ['install', '--lockfile-only', '--no-frozen-lockfile', '--ignore-scripts'])
-        } catch (error) {
-            throw pnpmVerdict(error)
-        }
+        pnpm(['install', '--lockfile-only', '--no-frozen-lockfile', '--ignore-scripts'])
     }
 
     // The policy check is offline, so a failure is always a verdict on the candidate.
@@ -204,30 +204,21 @@ export const remediate = async (
 
     // --- One package group ---
 
-    // Records the outcome on `item`. Throws only for failures that leave the outcome unknown, such as a failed
+    // Returns the group's outcome. Throws only for failures that leave the outcome unknown, such as a failed
     // network lookup, a scanner crash, or a pnpm network error.
-    const remediateGroup = async (group, item, before) => {
-        if (!findings.some(finding => targetsGroup(finding, group))) {
-            Object.assign(item, {
-                status: 'fixed',
-                method: 'earlier fix in this run',
-                reason: 'Verified by the full scan',
-            })
-            return
-        }
+    const remediateGroup = async (group, before) => {
+        if (!currentFindings.some(finding => targetsGroup(finding, group)))
+            return { status: 'fixed', reason: 'Verified by the full scan', method: 'earlier fix in this run' }
 
         const pr = await coveringPr(group)
-        if (pr) {
-            item.status = 'covered'
-            item.reason = `Existing Dependabot PR: ${pr.url}`
-            return
-        }
+        if (pr) return { status: 'covered', reason: `Existing Dependabot PR: ${pr.url}` }
 
-        const unsupported = group.versions.filter(version => !isStableVersion(version))
-        if (unsupported.length) {
-            item.reason = `Installed prerelease ${unsupported.join(', ')} needs manual remediation.`
-            return
-        }
+        const prereleases = group.versions.filter(version => !isStableVersion(version))
+        if (prereleases.length)
+            return {
+                status: 'unresolved',
+                reason: `Installed prerelease ${prereleases.join(', ')} needs manual remediation.`,
+            }
 
         const advisories = await Promise.all(
             group.ids.map(id => fetchJson(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`)),
@@ -235,62 +226,57 @@ export const remediate = async (
         const registry = await fetchJson(`https://registry.npmjs.org/${encodeURIComponent(group.name)}`)
         const candidates = eligibleVersions(group, advisories, registry, age, now)
 
+        // The last rejection explains why no candidate was used.
+        let unresolvedReason = 'No eligible published fix; retry daily.'
         const result = await applyFirstEligibleFix(candidates, {
             isSafe: target => safeVersion(group.name, target),
             apply: target => {
                 log(`ATTEMPT ${group.name}@${target}`)
                 if (mode === 'plan') return {}
-                return applyVerifiedFix(findings, group, {
+                return applyVerifiedFix(currentFindings, group, {
                     update: () => updateLockfile(group, target),
                     override: () => overrideVersions(group, target),
                     scan,
-                    restore: () => write(before),
+                    restore: () => restore(before),
                     policy: checkPolicy,
                 })
             },
-            // A rejected attempt has already restored the inputs that `findings` describes.
+            // A rejected attempt has already restored the inputs that `currentFindings` describes.
             rejected: (target, error) => {
-                item.reason = error.message
+                unresolvedReason = error.message
                 log(`RETRY ${group.name}@${target}: ${error.message.split('\n')[0]}`)
             },
         })
-        if (!result) return
+        if (!result) return { status: 'unresolved', reason: unresolvedReason }
 
         const { findings: after, ...applied } = result
-        Object.assign(item, applied)
-        if (mode === 'plan') {
-            item.status = 'planned'
-            item.reason = `Eligible fix: ${item.target}`
-        } else {
-            findings = after
-            item.status = 'fixed'
-            item.reason = 'Verified by the full scan'
-        }
+        if (mode === 'plan')
+            return { status: 'planned', reason: `Eligible fix: ${applied.target}`, ...applied }
+        currentFindings = after
+        return { status: 'fixed', reason: 'Verified by the full scan', ...applied }
     }
 
     // --- Run every group, then re-verify the combined result ---
 
     try {
-        for (const group of npmFindings(findings)) {
-            const item = { ...group, status: 'unresolved', reason: 'No eligible published fix; retry daily.' }
-            report.packages.push(item)
-
+        for (const group of npmFindings(originalFindings)) {
             const before = snapshot()
+            let outcome
             try {
-                await remediateGroup(group, item, before)
+                outcome = await remediateGroup(group, before)
             } catch (error) {
                 // The publisher keeps an existing remediation branch when any group failed.
-                write(before)
-                item.status = 'failed'
-                item.reason = error.message
+                restore(before)
+                outcome = { status: 'failed', reason: error.message }
             }
+            report.packages.push({ ...group, ...outcome })
         }
 
         // Leave reports describing the final inputs, and re-verify every fix against them.
         if (mode === 'apply') {
             const finalFindings = scan()
             const fixed = report.packages.filter(item => item.status === 'fixed')
-            if (fixed.some(group => !verifiedRemediation(originalFindings, finalFindings, group)))
+            if (fixed.some(item => !verifiedRemediation(originalFindings, finalFindings, item)))
                 throw new Error('The final scan invalidated remediation')
 
             const finalLock = documents(read('pnpm-lock.yaml', 'utf8'))
@@ -307,7 +293,7 @@ export const remediate = async (
         return report
     } catch (error) {
         if (mode === 'apply') {
-            write(originalInputs)
+            restore(originalInputs)
             error.message = `${error.message}; all dependency changes were restored`
         }
         throw error

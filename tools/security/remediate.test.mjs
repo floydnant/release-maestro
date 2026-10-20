@@ -90,7 +90,11 @@ const checkout = ({
         return { vulns: [] }
     }
     const report = () => readFileSync(join(root, 'dist/security/remediation-pr.md'), 'utf8')
-    return { root, files, report, options: { root, run, fetchJson, now, log: () => {} } }
+    const assertInputsRestored = () => {
+        for (const [path, contents] of Object.entries(files))
+            assert.equal(readFileSync(join(root, path), 'utf8'), contents, path)
+    }
+    return { root, report, assertInputsRestored, options: { root, run, fetchJson, now, log: () => {} } }
 }
 const byName = report => Object.fromEntries(report.packages.map(item => [item.name, item]))
 
@@ -106,20 +110,18 @@ test('an installed prerelease stays unresolved without blocking a stable fix or 
 
 test('a final scanner failure restores every dependency input after an applied fix', async () => {
     // Scans: initial, after the update, then the final verification.
-    const { root, files, options } = checkout({ failScans: [3] })
+    const { assertInputsRestored, options } = checkout({ failScans: [3] })
     await assert.rejects(remediate('apply', options), /OSV scan failed.*restored/)
-    for (const [path, contents] of Object.entries(files))
-        assert.equal(readFileSync(join(root, path), 'utf8'), contents)
+    assertInputsRestored()
 })
 
 test.each(['remediation.json', 'remediation-pr.md'])(
     'a %s write failure restores every dependency input after a verified override',
     async filename => {
-        const { root, files, options } = checkout({ update: {} })
+        const { root, assertInputsRestored, options } = checkout({ update: {} })
         mkdirSync(join(root, 'dist/security', filename))
         await assert.rejects(remediate('apply', options), { code: 'EISDIR' })
-        for (const [path, contents] of Object.entries(files))
-            assert.equal(readFileSync(join(root, path), 'utf8'), contents)
+        assertInputsRestored()
     },
 )
 
@@ -156,30 +158,28 @@ test('an update to another eligible version than the target falls back to the ve
 })
 
 test('a pnpm network error during an attempt fails the package so the publisher keeps the branch', async () => {
-    const { root, files, options } = checkout({ update: {}, failInstall: 'ERR_PNPM_FETCH_503' })
+    const { assertInputsRestored, options } = checkout({ update: {}, failInstall: 'ERR_PNPM_FETCH_503' })
     const { parser } = byName(await remediate('apply', options))
     assert.equal(parser.status, 'failed')
     assert.match(parser.reason, /ERR_PNPM_FETCH_503/)
-    assert.equal(readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8'), files['pnpm-lock.yaml'])
+    assertInputsRestored()
 })
 
 test('a scanner crash during an attempt fails the package instead of rejecting the candidate', async () => {
     // One scanner crash must stop the attempt even when a fallback scan would succeed.
-    const { root, files, options } = checkout({ failScans: [2] })
+    const { assertInputsRestored, options } = checkout({ failScans: [2] })
     const { parser } = byName(await remediate('apply', options))
     assert.equal(parser.status, 'failed')
     assert.match(parser.reason, /OSV scan failed/)
-    for (const [path, contents] of Object.entries(files))
-        assert.equal(readFileSync(join(root, path), 'utf8'), contents)
+    assertInputsRestored()
 })
 
 test('a targeted update network error fails the package without attempting an override', async () => {
-    const { root, files, options } = checkout({ failUpdate: 'ERR_PNPM_FETCH_503' })
+    const { assertInputsRestored, options } = checkout({ failUpdate: 'ERR_PNPM_FETCH_503' })
     const { parser } = byName(await remediate('apply', options))
     assert.equal(parser.status, 'failed')
     assert.match(parser.reason, /ERR_PNPM_FETCH_503/)
-    for (const [path, contents] of Object.entries(files))
-        assert.equal(readFileSync(join(root, path), 'utf8'), contents)
+    assertInputsRestored()
 })
 
 test('a targeted update policy refusal can still use a verified override', async () => {

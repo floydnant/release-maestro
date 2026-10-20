@@ -107,7 +107,7 @@ export const lockVersions = (documents, name) => [
 
 // Renders the remediation PR body. Its headings follow .github/pull_request_template.md.
 export const remediationBody = report => {
-    const describe = statuses =>
+    const reasons = statuses =>
         report.packages
             .filter(item => statuses.includes(item.status))
             .map(item => `- \`${item.name}\`: ${item.reason}`)
@@ -125,7 +125,7 @@ export const remediationBody = report => {
             ]
         })
     const unresolved = [
-        ...describe(['unresolved', 'failed']),
+        ...reasons(['unresolved', 'failed']),
         ...report.otherFindings.map(
             item =>
                 `- \`${item.ecosystem} ${item.name}@${item.version}\` ${item.id}: automatic remediation supports npm only.`,
@@ -146,8 +146,8 @@ export const remediationBody = report => {
         '',
         'Normal CI checks compatibility. Review overrides before merging, especially across major versions.',
         'The automation never extends vulnerability exceptions.',
-        ...section('Planned fixes', describe(['planned'])),
-        ...section('Covered by Dependabot PRs', describe(['covered'])),
+        ...section('Planned fixes', reasons(['planned'])),
+        ...section('Covered by Dependabot PRs', reasons(['covered'])),
         '',
         '## Unresolved findings',
         '',
@@ -159,30 +159,32 @@ export const remediationBody = report => {
 // Applies one fix and proves it with a full rescan. A rejected lockfile-only update can fall back to a
 // scoped override; an unknown error stops the attempt. Any failure restores its inputs, then rethrows.
 export const applyVerifiedFix = (before, group, actions) => {
-    try {
-        let after
-        let method
+    // Returns the fix when a full rescan verifies it, or null.
+    const rescan = method => {
+        const findings = actions.scan()
+        return verifiedRemediation(before, findings, group) ? { findings, method } : null
+    }
 
+    try {
+        let fix = null
         try {
             actions.update()
-            after = actions.scan()
-            if (verifiedRemediation(before, after, group)) method = 'lockfile update'
+            fix = rescan('lockfile update')
         } catch (error) {
-            if (!(error instanceof RejectedFix)) throw error
             // An unsupported transitive update can still be fixed with a scoped override.
+            if (!(error instanceof RejectedFix)) throw error
         }
 
-        if (!method) {
+        if (!fix) {
             actions.restore()
             actions.override()
-            after = actions.scan()
-            if (!verifiedRemediation(before, after, group))
+            fix = rescan('scoped override')
+            if (!fix)
                 throw new RejectedFix('The rescan retained targeted findings or introduced other findings')
-            method = 'scoped override'
         }
 
         actions.policy()
-        return { findings: after, method }
+        return fix
     } catch (error) {
         actions.restore()
         throw error
