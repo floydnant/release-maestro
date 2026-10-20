@@ -107,7 +107,8 @@ provenance, and source policy. Install scripts never run. A full scan must remov
 advisories without introducing other findings. Every failed attempt restores its dependency inputs.
 A candidate that the rescan, pnpm policy, or the repository policy check rejects gives way to the
 next eligible version. A network error or a scanner failure marks the package as failed instead,
-because it says nothing about the candidate. A failed run restores the inputs it started from.
+because it says nothing about the candidate. A failed run restores the inputs it started from,
+including when it cannot write its reports.
 Reports name the versions actually resolved. Findings without an eligible fix, including findings on
 installed prereleases, remain visible; the automation never extends exceptions.
 
@@ -128,9 +129,11 @@ revision during preparation stops publication. So do unexpected commits anywhere
 branch and a same-repository PR owned by another actor; fork PRs never count as the automation PR.
 Commit authors, committers, subjects, and changed paths identify expected automation commits; this
 check is not a cryptographic proof of authorship. Do not hand-edit the reserved branch. To resume,
-resolve the human changes and delete the branch. When main has no npm findings, the workflow closes
-its obsolete PR. A run without fixes keeps an existing PR, and a run with a failed package keeps the
-existing branch unchanged. A transient failure therefore cannot discard a previous verified fix.
+resolve the human changes and delete the branch. A completed run without verified fixes closes the
+existing PR, including when every package is unresolved or covered by Dependabot. This prevents an
+old PR from retaining a verification claim after its candidate becomes vulnerable. A run with a
+failed package keeps the existing PR and branch unchanged. A transient failure therefore cannot
+discard a previous verified fix. A later successful run can create a new PR.
 
 ## SBOMs
 

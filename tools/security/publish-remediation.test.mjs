@@ -73,10 +73,21 @@ test('no fix creates no branch and closes an obsolete automation PR', () => {
     assert(calls.some(c => c[0] === 'gh' && c[2] === 'close'))
 })
 
-test('unresolved preparation preserves an existing remediation PR', () => {
+test.each(['unresolved', 'covered'])(
+    'a completed run with only %s packages closes the stale remediation PR',
+    status => {
+        const { calls, run } = harness({ remote: 'prior', pr: botPr })
+        publishRemediation('owner/repo', { packages: [{ status }] }, run)
+        assert(calls.some(c => c[0] === 'gh' && c[2] === 'close'))
+        assert(!calls.some(c => c[0] === 'git' && ['commit', 'push'].includes(c[1])))
+    },
+)
+
+test('a run with only failed packages preserves the existing remediation PR', () => {
     const { calls, run } = harness({ pr: botPr })
-    publishRemediation('owner/repo', { packages: [{ status: 'unresolved' }] }, run)
+    publishRemediation('owner/repo', { packages: [{ status: 'failed' }] }, run)
     assert(!calls.some(c => c[0] === 'gh' && c[2] === 'close'))
+    assert(!calls.some(c => c[0] === 'git' && ['commit', 'push'].includes(c[1])))
 })
 
 test('a human commit below an automation tip also stops publication', () => {

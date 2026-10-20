@@ -156,8 +156,8 @@ export const remediationBody = report => {
     return `${lines.join('\n')}\n`
 }
 
-// Applies one fix and proves it with a full rescan. It tries a lockfile-only update first, then falls back
-// to a scoped override. Any failure restores the inputs from before this attempt, then rethrows.
+// Applies one fix and proves it with a full rescan. A rejected lockfile-only update can fall back to a
+// scoped override; an unknown error stops the attempt. Any failure restores its inputs, then rethrows.
 export const applyVerifiedFix = (before, group, actions) => {
     try {
         let after
@@ -167,7 +167,8 @@ export const applyVerifiedFix = (before, group, actions) => {
             actions.update()
             after = actions.scan()
             if (verifiedRemediation(before, after, group)) method = 'lockfile update'
-        } catch {
+        } catch (error) {
+            if (!(error instanceof RejectedFix)) throw error
             // An unsupported transitive update can still be fixed with a scoped override.
         }
 

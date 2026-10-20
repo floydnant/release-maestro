@@ -43,9 +43,11 @@ export const publishRemediation = (repo, report, runCommand = run) => {
     if (pr && pr.author.login !== botLogin)
         throw new Error('The remediation PR is not owned by Release Maestro CI')
 
+    const failed = report.packages.filter(p => p.status === 'failed')
     if (!report.packages.some(p => p.status === 'fixed')) {
-        // Close the PR only when nothing is left to fix. Unresolved findings keep it open for a later run.
-        if (pr && report.packages.length === 0) gh(['pr', 'close', String(pr.number), '--repo', repo])
+        // A completed run supersedes the old verification, even when findings remain unresolved. Unknown
+        // failures cannot invalidate an earlier fix, so preserve its PR until a run completes.
+        if (pr && !failed.length) gh(['pr', 'close', String(pr.number), '--repo', repo])
         console.log('No verified remediation changes to publish')
         return
     }
@@ -80,7 +82,6 @@ export const publishRemediation = (repo, report, runCommand = run) => {
 
     // A failed lookup leaves some fixes unknown. Replacing the branch now could drop a fix an earlier run
     // published, so keep it until a run completes.
-    const failed = report.packages.filter(p => p.status === 'failed')
     if (remote && failed.length) {
         console.log(
             `Preparation failed for ${failed.map(p => p.name).join(', ')}; keeping the existing remediation branch`,

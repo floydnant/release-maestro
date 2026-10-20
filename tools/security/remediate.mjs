@@ -157,23 +157,27 @@ export const remediate = async (
     // Lets pnpm move the package within its existing ranges, without touching package.json.
     const updateLockfile = (group, target) => {
         const locked = lockedVersions(group.name)
-        run('pnpm', [
-            'update',
-            group.name,
-            '--depth',
-            '100',
-            '--lockfile-only',
-            '--ignore-scripts',
-            '--no-save',
-            '-r',
-        ])
+        try {
+            run('pnpm', [
+                'update',
+                group.name,
+                '--depth',
+                '100',
+                '--lockfile-only',
+                '--ignore-scripts',
+                '--no-save',
+                '-r',
+            ])
+        } catch (error) {
+            throw pnpmVerdict(error)
+        }
 
         // pnpm picks the highest version in range. Only the target passed the OSV check, so any other new
         // version sends the attempt to the override.
         const unvetted = lockedVersions(group.name).filter(
             version => !locked.includes(version) && version !== target,
         )
-        if (unvetted.length) throw new Error(`pnpm update resolved unvetted ${unvetted.join(', ')}`)
+        if (unvetted.length) throw new RejectedFix(`pnpm update resolved unvetted ${unvetted.join(', ')}`)
     }
 
     // Pins the vulnerable versions to `target` through pnpm-workspace.yaml overrides.
@@ -292,6 +296,15 @@ export const remediate = async (
             const finalLock = documents(read('pnpm-lock.yaml', 'utf8'))
             for (const item of fixed) item.resolvedVersions = lockVersions(finalLock, item.name)
         }
+
+        // --- Reports ---
+
+        mkdirSync(output, { recursive: true })
+        writeFileSync(join(output, 'remediation.json'), `${JSON.stringify(report, null, 2)}\n`)
+        writeFileSync(join(output, 'remediation-pr.md'), remediationBody(report))
+        for (const item of report.packages) log(`${item.status.toUpperCase()} ${item.name}: ${item.reason}`)
+        log('Reports: dist/security/remediation.json and remediation-pr.md')
+        return report
     } catch (error) {
         if (mode === 'apply') {
             write(originalInputs)
@@ -299,15 +312,6 @@ export const remediate = async (
         }
         throw error
     }
-
-    // --- Reports ---
-
-    mkdirSync(output, { recursive: true })
-    writeFileSync(join(output, 'remediation.json'), `${JSON.stringify(report, null, 2)}\n`)
-    writeFileSync(join(output, 'remediation-pr.md'), remediationBody(report))
-    for (const item of report.packages) log(`${item.status.toUpperCase()} ${item.name}: ${item.reason}`)
-    log('Reports: dist/security/remediation.json and remediation-pr.md')
-    return report
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

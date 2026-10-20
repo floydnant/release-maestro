@@ -21,9 +21,11 @@ afterEach(() => {
 
 // A temporary checkout whose scanner reports a finding for each vulnerable lockfile entry.
 // Groups run in name order. `update` maps lockfile entries that `pnpm update` replaces; `pnpm install` applies
-// overrides unless `failInstall` gives its error. `failScans` lists the scans (counted from 1) that crash.
+// overrides. `failUpdate` and `failInstall` give pnpm errors. `failScans` lists the scans (counted from 1)
+// that crash.
 const checkout = ({
     failScans = [],
+    failUpdate,
     failInstall,
     failRegistry = false,
     workspace = 'minimumReleaseAge: 4320\n',
@@ -59,7 +61,10 @@ const checkout = ({
                 })
             writeFileSync(join(root, 'dist/security/findings.json'), JSON.stringify(findings))
         }
-        if (command === 'pnpm' && args[0] === 'update') rewriteLock(update)
+        if (command === 'pnpm' && args[0] === 'update') {
+            rewriteLock(update)
+            if (failUpdate) throw new Error(`pnpm failed (1): ${failUpdate}`)
+        }
         if (command === 'pnpm' && args[0] === 'install') {
             if (failInstall) throw new Error(`pnpm failed (1): ${failInstall}`)
             const { overrides = {} } = parse(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'))
@@ -107,6 +112,17 @@ test('a final scanner failure restores every dependency input after an applied f
         assert.equal(readFileSync(join(root, path), 'utf8'), contents)
 })
 
+test.each(['remediation.json', 'remediation-pr.md'])(
+    'a %s write failure restores every dependency input after a verified override',
+    async filename => {
+        const { root, files, options } = checkout({ update: {} })
+        mkdirSync(join(root, 'dist/security', filename))
+        await assert.rejects(remediate('apply', options), { code: 'EISDIR' })
+        for (const [path, contents] of Object.entries(files))
+            assert.equal(readFileSync(join(root, path), 'utf8'), contents)
+    },
+)
+
 test('an update to a version the planner did not vet falls back to the vetted override', async () => {
     const { options } = checkout({ update: { 'parser@1.0.0': 'parser@1.3.0' } })
     const { parser } = byName(await remediate('apply', options))
@@ -148,11 +164,30 @@ test('a pnpm network error during an attempt fails the package so the publisher 
 })
 
 test('a scanner crash during an attempt fails the package instead of rejecting the candidate', async () => {
-    // Scans: initial, after the update, then after the override.
-    const { options } = checkout({ failScans: [2, 3] })
+    // One scanner crash must stop the attempt even when a fallback scan would succeed.
+    const { root, files, options } = checkout({ failScans: [2] })
     const { parser } = byName(await remediate('apply', options))
     assert.equal(parser.status, 'failed')
     assert.match(parser.reason, /OSV scan failed/)
+    for (const [path, contents] of Object.entries(files))
+        assert.equal(readFileSync(join(root, path), 'utf8'), contents)
+})
+
+test('a targeted update network error fails the package without attempting an override', async () => {
+    const { root, files, options } = checkout({ failUpdate: 'ERR_PNPM_FETCH_503' })
+    const { parser } = byName(await remediate('apply', options))
+    assert.equal(parser.status, 'failed')
+    assert.match(parser.reason, /ERR_PNPM_FETCH_503/)
+    for (const [path, contents] of Object.entries(files))
+        assert.equal(readFileSync(join(root, path), 'utf8'), contents)
+})
+
+test('a targeted update policy refusal can still use a verified override', async () => {
+    const { options } = checkout({ failUpdate: 'ERR_PNPM_TRUST_DOWNGRADE' })
+    const { parser } = byName(await remediate('apply', options))
+    assert.equal(parser.status, 'fixed')
+    assert.equal(parser.method, 'scoped override')
+    assert.deepEqual(parser.resolvedVersions, ['1.1.0'])
 })
 
 test('a pnpm policy refusal rejects the candidate and leaves the package unresolved', async () => {
