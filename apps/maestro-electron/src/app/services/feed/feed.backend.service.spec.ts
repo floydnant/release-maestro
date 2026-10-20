@@ -1,10 +1,11 @@
 import { lastValueFrom, Subject, toArray } from 'rxjs'
 import { fromPartial } from '@total-typescript/shoehorn'
-import { Email, EmailImportStreamPacket } from '@release-maestro/core'
+import { DEFAULT_FEED_SNOOZE_HOURS, Email, EmailImportStreamPacket } from '@release-maestro/core'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
+import { SettingsBackendService } from '../settings.backend.service'
 import { FeedBackendRepository } from './feed.backend.repository'
 import { FeedBackendService } from './feed.backend.service'
 
@@ -64,6 +65,7 @@ describe('FeedBackendService email import', () => {
             fromPartial<BandcampApiBackendService>({}),
             fromPartial<WebScrapingService>({}),
             feedRepository,
+            fromPartial<SettingsBackendService>({}),
         )
     })
 
@@ -174,7 +176,13 @@ describe('FeedBackendService email import', () => {
             skippedEmails: 1,
         })
         expect(reported).not.toContainEqual(expect.objectContaining({ phase: 'error' }))
-        expect(await feedRepository.listFeedItems(0, 10)).toHaveLength(1)
+        expect(
+            await feedRepository.listFeedItems({
+                index: 0,
+                count: 10,
+                snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+            }),
+        ).toHaveLength(1)
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toEqual(
             checkpoint,
         )
@@ -199,7 +207,13 @@ describe('FeedBackendService email import', () => {
         await expect(next.updates).resolves.toContainEqual(
             expect.objectContaining({ phase: 'completed', totalProcessed: 2, totalImported: 2 }),
         )
-        expect(await feedRepository.listFeedItems(0, 10)).toHaveLength(2)
+        expect(
+            await feedRepository.listFeedItems({
+                index: 0,
+                count: 10,
+                snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+            }),
+        ).toHaveLength(2)
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toEqual(
             new Date('2026-10-01T21:40:12'),
         )
@@ -218,7 +232,13 @@ describe('FeedBackendService email import', () => {
             newlyImported: 0,
             skippedEmails: 2,
         })
-        expect(await feedRepository.listFeedItems(0, 10)).toEqual([])
+        expect(
+            await feedRepository.listFeedItems({
+                index: 0,
+                count: 10,
+                snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+            }),
+        ).toEqual([])
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
     })
 

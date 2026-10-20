@@ -4,6 +4,7 @@ import { provideTranslateService } from '@ngx-translate/core'
 import { fromPartial } from '@total-typescript/shoehorn'
 import { EMPTY } from 'rxjs'
 import { FeedService } from '../../core/services/feed.service'
+import { SettingsService } from '../../core/settings/settings.service'
 import { provideWebAudioPlayerMock } from '../../../test/mocks'
 import { FeedComponent } from './feed.component'
 
@@ -23,6 +24,10 @@ describe(FeedComponent.name, () => {
                 provideRouter([]),
                 audioPlayerProvider,
                 {
+                    provide: SettingsService,
+                    useValue: fromPartial<SettingsService>({ settings: { hasValue: () => false } }),
+                },
+                {
                     provide: FeedService,
                     useValue: {
                         emailImportProgress$: EMPTY,
@@ -41,6 +46,16 @@ describe(FeedComponent.name, () => {
 
     it('should create', () => {
         expect(component).toBeTruthy()
+    })
+
+    it('requests remaining releases from the start while excluding already loaded releases', async () => {
+        await fixture.whenStable()
+        const feed = TestBed.inject(FeedService)
+        component.loadedFeedItemIds.add('already-loaded')
+        component.furthestScrolledIndex.set(1)
+        fixture.detectChanges()
+        await fixture.whenStable()
+        expect(feed.loadFeed).toHaveBeenLastCalledWith(0, 6, ['already-loaded'])
     })
 
     it('starts a new track at the point selected on its seeker', () => {

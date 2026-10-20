@@ -12,8 +12,13 @@ test.describe('settings IPC scenarios', () => {
             .build()
         const controller = await createRendererScenario(page, scenario, '/settings/apple-mail')
 
-        const mailboxInput = page.getByLabel('Mailbox Name')
+        const mailboxInput = page.getByRole('textbox', { name: 'Mailbox Name' })
         await expect(mailboxInput).toHaveValue('Bandcamp Inbox')
+        await expect(mailboxInput).toHaveAccessibleDescription(
+            'The name of the mailbox to import from Apple Mail.',
+        )
+        await page.locator('label[for="setting-mailboxName-input"]').click()
+        await expect(mailboxInput).toBeFocused()
 
         await mailboxInput.fill('New Releases')
         await page.getByRole('button', { name: 'Save' }).click()
@@ -38,7 +43,7 @@ test.describe('settings IPC scenarios', () => {
             .build()
         await createRendererScenario(page, scenario, '/settings/apple-mail')
 
-        const mailboxInput = page.getByLabel('Mailbox Name')
+        const mailboxInput = page.getByRole('textbox', { name: 'Mailbox Name' })
         const saveButton = page.getByRole('button', { name: 'Save' })
 
         await expect(mailboxInput).toHaveValue('Bandcamp Inbox')
@@ -49,5 +54,28 @@ test.describe('settings IPC scenarios', () => {
 
         await saveButton.click()
         await expect(saveButton).toBeHidden()
+    })
+
+    test('debug disclosures work from the keyboard and field help stays associated', async ({ page }) => {
+        await createRendererScenario(page, scenarioBuilder().build(), '/settings/debug')
+
+        const healthPayload = page.getByLabel('Metadata worker health payload')
+        // A native <details> disclosure: its <summary> is the keyboard-operable toggle.
+        const disclosure = page.locator('summary', { hasText: 'Health payload' })
+        await expect(healthPayload).toBeHidden()
+        await disclosure.press('Enter')
+        await expect(disclosure.locator('xpath=..')).toHaveAttribute('open', '')
+        await expect(healthPayload).toBeVisible()
+        await expect(healthPayload).toContainText('"ok": true')
+        await disclosure.press('Space')
+        await expect(healthPayload).toBeHidden()
+        await expect(disclosure).toBeFocused()
+
+        await expect(page.getByLabel('Write tag payload')).toHaveAccessibleDescription(
+            'Writes go through the Rust engine tri-state update contract. Use this only on disposable files.',
+        )
+        await expect(page.getByLabel('Library scan paths')).toHaveAccessibleDescription(
+            'Enter one folder per line, or leave empty to scan the configured library folders. Runs through the shared LibraryScanService (same as onboarding and startup rescans).',
+        )
     })
 })

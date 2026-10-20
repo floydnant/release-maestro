@@ -18,7 +18,7 @@
                 A rescan can re-key an album when its tags change, which leaves a link like this one pointing
                 at nothing.
             </p>
-            <a class="btn-primary" routerLink="/albums">Back to albums</a>
+            <a hlmBtn variant="default" routerLink="/albums">Back to albums</a>
         </div>
     }
 
@@ -27,7 +27,7 @@
             <app-icon name="error" size="28" color="content.danger"></app-icon>
             <p class="type-body-md text-content-primary">Could not load this album</p>
             <p class="max-w-md type-body-sm text-content-secondary">The library did not answer.</p>
-            <a class="btn-neutral" routerLink="/albums">Back to albums</a>
+            <a hlmBtn variant="secondary" routerLink="/albums">Back to albums</a>
         </div>
     }
 
@@ -49,7 +49,7 @@
                     <p class="max-w-md type-body-sm text-content-secondary">
                         {{ result().error || 'The library did not answer.' }}
                     </p>
-                    <button type="button" class="btn-primary" (click)="onRetry()">Try again</button>
+                    <button hlmBtn variant="default" type="button" (click)="onRetry()">Try again</button>
                 </div>
             } @else if (!songWindowMatchesAlbum()) {
                 <div class="flex flex-1 items-center justify-center p-8" role="status">

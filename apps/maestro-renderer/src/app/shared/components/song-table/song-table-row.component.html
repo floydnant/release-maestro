@@ -20,7 +20,7 @@
         @if (row().trackNumber != null) {
             {{ row().trackNumber }}
         } @else {
-            <span class="text-content-muted" title="This file carries no track number">—</span>
+            <span class="text-content-muted" hlmTooltip="This file carries no track number">—</span>
         }
     </span>
 }
@@ -42,8 +42,10 @@
             />
         } @else {
             <span
-                class="flex aspect-square h-full items-center justify-center rounded-sm bg-background-elevated outline-1 outline-background-surface"
-                [class.outline]="selected()"
+                class="flex aspect-square h-full items-center justify-center rounded-sm bg-background-surface"
+                [ngClass]="{
+                    'outline-1 outline-background-canvas': !selected(),
+                }"
             >
                 <app-icon name="musicNote" size="14" color="content.muted"></app-icon>
             </span>
@@ -62,32 +64,37 @@
     >
         @if (!row().present) {
             <button
+                hlmBtn
+                variant="ghost"
+                size="none"
                 type="button"
                 tabindex="-1"
-                class="grid size-5 shrink-0 place-items-center rounded-sm hover:bg-action-quiet-hover"
+                class="size-5 shrink-0 rounded-sm"
                 aria-label="Missing — show only missing tracks"
-                title="Missing — this file is no longer where the library saw it. Show only missing tracks."
+                hlmTooltip="Missing — this file is no longer where the library saw it. Show only missing tracks."
                 (click)="onMissingBadge($event)"
             >
                 <app-icon name="missingSong" size="14" color="content.warning"></app-icon>
             </button>
         }
-        <span class="truncate" [title]="row().title">{{ row().title }}</span>
+        <span class="truncate" [hlmOverflowTooltip]="row().title">{{ row().title }}</span>
     </span>
 }
 
 @if (shown().has('artist')) {
     <span
-        class="song-table__artist | shrink-0 truncate px-2"
+        class="song-table__artist | shrink-0 truncate px-2 text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.artist"
-        [title]="row().artistText || ''"
+        [hlmOverflowTooltip]="row().artistText || ''"
     >
         @if (row().artistCredit.length) {
             @for (segment of row().artistCredit; track segment.artistId; let last = $last) {
                 <a
+                    hlmBtn
+                    variant="link"
                     tabindex="-1"
-                    class="max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                    class="inline-block max-w-full truncate align-middle"
                     [routerLink]="['/artists', segment.artistId]"
                     (click)="onDetailLink($event)"
                 >
@@ -105,15 +112,17 @@
 
 @if (shown().has('album')) {
     <span
-        class="song-table__album | shrink-0 truncate px-2"
+        class="song-table__album | shrink-0 truncate px-2 text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.album"
-        [title]="row().albumTitle || ''"
+        [hlmOverflowTooltip]="row().albumTitle || ''"
     >
         @if (row().albumId && row().albumTitle) {
             <a
+                hlmBtn
+                variant="link"
                 tabindex="-1"
-                class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                class="inline-block max-w-full truncate align-middle"
                 [routerLink]="['/albums', row().albumId]"
                 (click)="onDetailLink($event)"
             >
@@ -127,22 +136,24 @@
 
 @if (shown().has('genre')) {
     <span
-        class="song-table__genre | flex shrink-0 items-center truncate px-2"
+        class="song-table__genre | flex shrink-0 items-center truncate px-2 text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.genre"
-        [title]="row().genreText || ''"
+        [hlmOverflowTooltip]="row().genreText || ''"
     >
         @for (genre of row().genres; track genre.id; let last = $last) {
             <a
+                hlmBtn
+                variant="link"
                 tabindex="-1"
-                class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary no-underline underline-offset-2 hover:text-content-action hover:underline"
+                class="inline-block max-w-full truncate align-middle"
                 [routerLink]="['/genres', genre.id]"
                 (click)="onDetailLink($event)"
             >
                 {{ genre.name }}
             </a>
             @if (!last) {
-                <span class="text-content-secondary">, </span>
+                <span>, </span>
             }
         } @empty {
             <span class="text-content-muted">—</span>
@@ -192,15 +203,17 @@
 
 @if (shown().has('recordLabel')) {
     <span
-        class="song-table__record-label | shrink-0 truncate px-2"
+        class="song-table__record-label | shrink-0 truncate px-2 text-content-secondary"
         role="gridcell"
         [style.width.px]="widths.recordLabel"
-        [title]="row().recordLabelText || ''"
+        [hlmOverflowTooltip]="row().recordLabelText || ''"
     >
         @if (row().recordLabelId && row().recordLabelText) {
             <a
+                hlmBtn
+                variant="link"
                 tabindex="-1"
-                class="inline-block max-w-full truncate rounded-sm align-middle text-content-secondary underline-offset-2 hover:text-content-action hover:underline"
+                class="inline-block max-w-full truncate align-middle"
                 [routerLink]="['/record-labels', row().recordLabelId]"
                 (click)="onDetailLink($event)"
             >

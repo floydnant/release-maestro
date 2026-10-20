@@ -3,12 +3,46 @@ name: frontend-design
 description: Build and refine Release Maestro renderer UI to a production-grade standard. Use this skill for any user-facing change in `apps/maestro-renderer` — new pages, components, dialogs, empty/loading/error states, or restyling and polishing existing UI.
 ---
 
-Release Maestro already has an aesthetic, and it lives in the design system. This skill is about
-executing inside that system with care: correct tokens, real hierarchy, complete states, and
-accessibility built in — not about inventing a new visual direction.
+Release Maestro uses Spartan UI components adapted to its design system. Reuse those components,
+semantic tokens and established compositions when building or refining renderer screens.
 
-The user provides frontend requirements: a component, page, dialog, or interface to build or refine.
-They may include context about the purpose, the audience, or technical constraints.
+## Use shared Spartan components
+
+- Source every standard control (anything a component library would ship: buttons, fields, menus,
+  overlays, pickers, toggles, tabs, sliders) in this order:
+    1. **Shared UI.** `apps/maestro-renderer/src/app/shared/ui/` holds the adapted Helm families; its
+       directory listing is the inventory. Use their variants before adding product-level styling.
+       Repeated changes to appearance belong in the shared component defaults.
+    2. **Spartan.** When shared UI lacks the control, match the use case against the Helm families at
+       the pinned tag in [upstream.json](../../../apps/maestro-renderer/src/app/shared/ui/upstream.json)
+       (`gh api 'repos/spartan-ng/spartan/contents/libs/helm?ref=<tag>' --jq '.[].name'`). Upstream
+       ships far more than this repo has copied, such as combobox, popover, command, sheet,
+       toggle-group, slider, tabs and scroll-area. Add a matching family to shared UI by following
+       [shared UI maintenance](../../../apps/maestro-renderer/src/app/shared/ui/README.md), which also
+       governs updating an existing family, then use it from there.
+    3. **Product markup.** Build the control yourself only when no Helm family covers the behavior,
+       or when the element keeps a look a family would have to fight (see below). Name the families
+       you ruled out in the handoff or PR description.
+- A migration preserves the existing visuals. Compare the previous padding, content height,
+  typography and interaction states before choosing a variant. Single-line controls share one fixed
+  height from the shared defaults; do not size them with vertical padding.
+  Invisible click targets use `variant="plain" size="none"` and retain their existing layout;
+  seeking targets and sortable headings do not get hover backgrounds. The component library supplies
+  behavior without imposing a new visual treatment.
+- If keeping the existing look means cancelling most of a component's classes, the element is not
+  that component. Keep its own markup instead of applying the directive and overriding it.
+- Text links use `variant="link"` for internal navigation and `variant="external-link"` for links
+  that leave the app. Truncated text gets `hlmOverflowTooltip`, which only appears while the text is
+  cut off; `hlmTooltip` is for labelling or explaining a control.
+- Brain supplies the packaged interaction behavior. Helm source is local and editable. Keep data
+  fetching, domain state and recovery actions in product components; compose their controls from
+  shared UI.
+- Preserve the fetched viewport window and query/range selection in
+  [ADR 0004](../../../docs/adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md).
+  Apply shared controls inside those grids without changing their geometry or keyboard model.
+- Navigation stays in actual links with RouterLink and the history behavior in
+  [ADR 0006](../../../docs/adr/0006-only-route-changes-are-history-steps.md). A content-panel tabs
+  widget is for local panels; route tabs keep their navigation semantics.
 
 ## Use the design system and Tailwind
 
@@ -24,8 +58,9 @@ They may include context about the purpose, the audience, or technical constrain
   `src/app/shared/design-tokens.generated.ts`, and the
   electron copy — is written by `apps/maestro-renderer/tools/design-tokens.cjs`. Regenerate with `make design-tokens`; the renderer's build, lint, and test targets already depend on `design-tokens-check`, so a stale or
   contrast-failing token set fails those runs.
-- Use Tailwind utility classes by default, including the project's configured semantic tokens,
-  variants, and arbitrary values when needed.
+- Use Tailwind for product layout and domain-specific composition, including the project's
+  configured semantic tokens, variants and arbitrary values when needed. Shared UI owns standard
+  control appearance.
 - Do not add a custom CSS class when Tailwind can express the result. Custom CSS is a last resort for
   behavior that genuinely cannot be expressed with Tailwind and is expected to be rare. Keep any
   justified exception minimal and scoped.
@@ -40,7 +75,7 @@ CSS-style name, then a `|`, then the styling classes.
 
 ```html
 <div class="feed-entry | flex items-center gap-3 p-4">
-    <button class="track-play-btn | grid size-6 place-items-center rounded-sm"></button>
+    <button hlmBtn variant="ghost" size="icon" class="track-play-btn |" aria-label="Play track"></button>
 </div>
 ```
 
@@ -69,7 +104,12 @@ TypeScript class operation can produce is enumerable. Prefer literal branches in
 otherwise use a component member with literal branches or a string-literal union. Return whole class
 names — gluing a runtime fragment into one is not resolvable.
 
-Follow the diagnostic's named edit before suppressing. Suppress only for the bare
+Copied Helm class merging accepts caller classes, so its helpers and internal bindings cannot
+return a closed union. Keep that boundary inside `shared/ui`, validate the library's literal class
+lists through its scoped lint rules, and explain each necessary suppression there. Product callers
+still supply closed, validated class lists. See the [shared UI guide](../../../apps/maestro-renderer/src/app/shared/ui/README.md).
+
+In product code, follow the diagnostic's named edit before suppressing. Suppress only for the bare
 `Runtime-built class list`, or to defer a named edit against a tracked issue. State the closed
 vocabulary, unresolved shape, and reason for deferral; the
 [`design-system` specimen](../../../apps/maestro-renderer/src/app/pages/design-system/design-system.component.html)
@@ -149,5 +189,5 @@ from how you use them.
   cursors, parallax, or ornamental scroll effects.
 - Assuming a light theme. The token set is dark-only; use semantic tokens rather than literal colors
   so the app stays theme-correct.
-- Reaching for a third-party UI or animation library when the design system and Tailwind cover it.
+- Adding another component library or a global theme that duplicates the existing semantic tokens.
 - Building a screen that only handles the happy path.

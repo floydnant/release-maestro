@@ -34,7 +34,9 @@ the `/triage` skill for the states and labels.
 
 ## Verification
 
-ALWAYS verify after changing code, starting with the narrowest relevant check.
+Choose verification by change risk and delivery scope. During active collaboration, a focused check
+can be enough for the current slice. For a completed task, cover the changed behavior; for a PR,
+use CI for broad gates. Reuse valid results and rerun only when later edits could invalidate them.
 The `Makefile` is authoritative for repo-wide commands; `pnpm exec nx show project <project> --web false`
 is authoritative for the effective targets of one project. Command examples in docs and skills are
 intentional convenience summaries.
@@ -68,8 +70,9 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
 ## Code patterns
 
 - [frontend-design](.agents/skills/frontend-design/SKILL.md) — how the UI looks. Required for any
-  user-facing change in `apps/maestro-renderer`: design-system tokens and Tailwind first,
-  accessibility built in, no bespoke visual direction. Never hand-edit a `*.generated.*` file; design
+  user-facing change in `apps/maestro-renderer`: controls from `shared/ui` or added there from
+  Spartan, design-system tokens and Tailwind first, accessibility built in, no bespoke visual
+  direction. Never hand-edit a `*.generated.*` file; design
   tokens are generated from three source JSON files. Class lists are written
   `descriptor | utilities` — a semantic name for the element, then the styling.
 - [angular-patterns](.agents/skills/angular-patterns/SKILL.md) — how renderer code is built. Signals

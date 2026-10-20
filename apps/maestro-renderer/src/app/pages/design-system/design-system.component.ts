@@ -1,5 +1,7 @@
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component } from '@angular/core'
+import { HlmCard } from '@spartan-ng/helm/card'
+import { SpartanSpecimenComponent } from './spartan-specimen.component'
 import {
     contrastPairs,
     foundationColorIdentifiers,
@@ -17,7 +19,7 @@ import {
 
 @Component({
     selector: 'app-design-system',
-    imports: [CommonModule],
+    imports: [CommonModule, SpartanSpecimenComponent, HlmCard],
     templateUrl: './design-system.component.html',
     styleUrls: ['./design-system.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,

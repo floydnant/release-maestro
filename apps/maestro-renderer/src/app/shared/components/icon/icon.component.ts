@@ -2,8 +2,12 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core'
 import { NgIcon, provideIcons } from '@ng-icons/core'
 import {
     octCheckCircleFill,
+    octCheck,
+    octChevronDown,
+    octGear,
     octChevronLeft,
     octChevronRight,
+    octChevronUp,
     octDash,
     octFileDirectory,
     octFileDirectoryFill,
@@ -13,6 +17,8 @@ import {
     octScreenFull,
     octScreenNormal,
     octSearch,
+    octSortAsc,
+    octSortDesc,
     octTriangleDown,
     octTriangleUp,
     octUnlink,
@@ -29,6 +35,10 @@ import { solarAlarmSleep } from '@ng-icons/solar-icons/outline'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 const icons = {
+    check: octCheck,
+    chevronDown: octChevronDown,
+    settings: octGear,
+    chevronUp: octChevronUp,
     success: octCheckCircleFill,
     windowMinimize: octDash,
     folder: octFileDirectory,
@@ -40,6 +50,8 @@ const icons = {
     search: octSearch,
     sortDescending: octTriangleDown,
     sortAscending: octTriangleUp,
+    sortOrderDescending: octSortDesc,
+    sortOrderAscending: octSortAsc,
     missingSong: octUnlink,
     externalLink: octLinkExternal,
     unavailableAlbum: octUnlink,

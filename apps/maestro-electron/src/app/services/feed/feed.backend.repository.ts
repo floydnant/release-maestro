@@ -8,14 +8,6 @@ import {
 } from '../../database/drizzle.schema'
 
 /**
- * The time after which a feed item should be shown again if it was marked as snoozed.
- *
- * Deliberately shorter than a day: the UI promises "show again tomorrow", and a full 24h would push
- * the item past the same time next day, so a user with a routine would keep missing it.
- */
-const FEED_ITEM_SNOOZE_TIME_MS = 1000 * 60 * 60 * 16
-
-/**
  * Don't create view history entries for feed items that were viewed in the last 3 minutes.
  * This is to prevent spamming the view history when the user is scrolling up and down the feed.
  */
@@ -30,22 +22,38 @@ export class FeedBackendRepository {
         await this.db.db.insert(feedItemsTable).values(feedItemsToIngest).onConflictDoNothing()
     }
 
-    async listFeedItems(index: number, count: number): Promise<FeedItemMaster[]> {
+    async listFeedItems({
+        index,
+        count,
+        excludedIds = [],
+        snoozeHours,
+    }: {
+        index: number
+        count: number
+        excludedIds?: string[]
+        snoozeHours: number
+    }): Promise<FeedItemMaster[]> {
+        const snoozedBefore = new Date(Date.now() - snoozeHours * 60 * 60 * 1000)
         const items = await this.db.db
             .select()
             .from(feedItemsTable)
             .where(
-                or(
-                    isNull(feedItemsTable.lastViewedAt),
-                    and(
-                        eq(feedItemsTable.isSnoozed, true),
-                        lt(feedItemsTable.lastViewedAt, new Date(Date.now() - FEED_ITEM_SNOOZE_TIME_MS)),
+                and(
+                    excludedIds.length > 0
+                        ? sql`${feedItemsTable.id} not in (select value from json_each(${JSON.stringify(excludedIds)}))`
+                        : undefined,
+                    or(
+                        isNull(feedItemsTable.lastViewedAt),
+                        and(
+                            eq(feedItemsTable.isSnoozed, true),
+                            lt(feedItemsTable.lastViewedAt, snoozedBefore),
+                        ),
                     ),
                 ),
             )
             .orderBy(desc(feedItemsTable.eventDate))
             .limit(count)
-            .offset(index * count)
+            .offset(index)
 
         return items as FeedItemMaster[] // TODO: Add proper schema validation
     }

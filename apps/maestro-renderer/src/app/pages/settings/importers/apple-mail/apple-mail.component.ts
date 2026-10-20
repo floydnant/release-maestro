@@ -8,13 +8,15 @@ import {
     viewChild,
 } from '@angular/core'
 import { FormsModule } from '@angular/forms'
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmInput } from '@spartan-ng/helm/input'
 import { FeedService } from '../../../../core/services/feed.service'
 import { SettingsService } from '../../../../core/settings/settings.service'
 import { ProgressRingComponent } from '../../../../shared/components/progress-ring/progress-ring.component'
 
 @Component({
     selector: 'app-apple-mail',
-    imports: [FormsModule, ProgressRingComponent],
+    imports: [FormsModule, ProgressRingComponent, HlmButton, HlmInput],
     templateUrl: './apple-mail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
 })

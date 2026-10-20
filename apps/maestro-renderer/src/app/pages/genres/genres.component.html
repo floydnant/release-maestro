@@ -10,16 +10,19 @@
          lays its cells out on. -->
     <div class="genre-sort | flex items-center gap-6 border-b border-border-subtle px-6">
         <button
+            hlmBtn
+            variant="plain"
+            size="none"
             type="button"
-            class="flex min-w-0 flex-1 items-center gap-1 py-2 type-label-sm text-content-primary"
+            class="flex min-w-0 flex-1 items-center justify-start gap-1 py-2 type-label-sm text-content-primary"
             (click)="onSort()"
             [attr.aria-label]="query().sort.direction === 'asc' ? 'Sort genres Z to A' : 'Sort genres A to Z'"
         >
             Name
             <app-icon
                 [name]="query().sort.direction === 'asc' ? 'sortAscending' : 'sortDescending'"
-                size="12"
-                color="content.action"
+                size="14"
+                color="content.primary"
             ></app-icon>
         </button>
         <!-- Hidden from assistive tech: each cell below spells its own unit out, so

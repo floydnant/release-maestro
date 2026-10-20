@@ -40,8 +40,12 @@ export class FeedService {
         this.electronService.ipcRenderer.send('email-import-abort')
     }
 
-    async loadFeed(index: number, count: number): Promise<HydratedFeedItem[]> {
-        const result = await this.electronService.ipcRenderer.invoke('load-feed', { index, count })
+    async loadFeed(index: number, count: number, excludedIds: string[] = []): Promise<HydratedFeedItem[]> {
+        const result = await this.electronService.ipcRenderer.invoke('load-feed', {
+            index,
+            count,
+            excludedIds,
+        })
         if (!Array.isArray(result)) {
             throw new UiSideException(result.message, result.userFacingMessage ?? USE_SAME_MESSAGE)
         }
