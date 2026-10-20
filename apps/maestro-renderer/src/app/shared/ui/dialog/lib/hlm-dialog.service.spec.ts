@@ -1,7 +1,7 @@
 import { OverlayContainer } from '@angular/cdk/overlay'
 import { ChangeDetectionStrategy, Component, TemplateRef, viewChild } from '@angular/core'
 import { TestBed } from '@angular/core/testing'
-import { firstValueFrom } from 'rxjs'
+import { firstValueFrom, map } from 'rxjs'
 import { HlmDialogService } from './hlm-dialog.service'
 
 @Component({
@@ -31,11 +31,13 @@ describe('HlmDialogService', () => {
 
         expect(overlay.textContent).toContain('Confirm album import')
         const close = jest.spyOn(ref, 'close')
+        const closingPhase = firstValueFrom(ref.closing$.pipe(map(() => ref.phase())))
         const result = firstValueFrom(ref.closed$)
         overlay.querySelector<HTMLButtonElement>('button')?.click()
         expect(close).toHaveBeenCalledWith('confirmed')
         TestBed.tick()
 
+        await expect(closingPhase).resolves.toBe('closing')
         await expect(result).resolves.toBe('confirmed')
         expect(ref.phase()).toBe('closed')
         expect(overlay.querySelector('[role="dialog"]')).toBeNull()
