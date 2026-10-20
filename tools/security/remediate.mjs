@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseAllDocuments, parseDocument } from 'yaml'
@@ -23,15 +23,16 @@ import {
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-// Runs a command synchronously and returns stdout. Exit codes outside `allowed` throw.
+// Runs a command synchronously. Structured output callers read stdout; scanner diagnostics need stderr too.
 const runIn =
     cwd =>
-    (command, args, allowed = [0]) => {
+    (command, args, { allowed = [0], includeStderr = false } = {}) => {
         const result = spawnSync(command, args, { cwd, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 })
         if (result.error) throw result.error
+        const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
         if (!allowed.includes(result.status))
-            throw new Error(`${command} failed (${result.status}): ${result.stderr || result.stdout}`)
-        return result.stdout
+            throw new Error(`${command} failed (${result.status}): ${output}`)
+        return includeStderr ? output : result.stdout
     }
 
 // GETs JSON, or POSTs `body` as JSON when one is given.
@@ -80,11 +81,32 @@ export const remediate = async (
     const snapshot = () => new Map(dependencyInputs.map(path => [path, read(path)]))
     const lockedVersions = name => lockVersions(documents(read('pnpm-lock.yaml', 'utf8')), name)
     const gh = (path, ...args) => run('gh', ['api', ...args, `repos/${process.env.GH_REPO}/${path}`])
+    // A new run or a rollback invalidates reports describing the previous dependency inputs.
+    const discardReports = () => {
+        for (const file of ['remediation.json', 'remediation-pr.md', 'osv.json', 'findings.json'])
+            rmSync(join(output, file), { force: true })
+    }
 
     const scan = () => {
-        // cli.mjs removes old reports and writes findings only after a complete, valid scan.
-        run(process.execPath, ['tools/security/cli.mjs', 'scan'], [0, 1])
-        return json(join(output, 'findings.json'))
+        let diagnostics = ''
+        try {
+            // Exit 1 can mean findings or a scanner failure. Only a valid report establishes completion.
+            diagnostics = run(process.execPath, ['tools/security/cli.mjs', 'scan'], {
+                allowed: [0, 1],
+                includeStderr: true,
+            })
+            const findings = json(join(output, 'findings.json'))
+            if (!Array.isArray(findings)) throw new Error('Scanner findings report must be an array')
+            return findings
+        } catch (error) {
+            discardReports()
+            throw new Error(
+                `Security scan failed: ${error.message}${diagnostics ? `\n${diagnostics}` : ''}`,
+                {
+                    cause: error,
+                },
+            )
+        }
     }
 
     // A version is safe when OSV knows no active (non-withdrawn) advisory for it.
@@ -101,6 +123,7 @@ export const remediate = async (
 
     // --- Preflight and baseline ---
 
+    discardReports()
     if (mode === 'apply' && run('git', ['status', '--porcelain', '--', ...dependencyInputs]).trim())
         throw new Error('Commit dependency input changes before applying remediation')
     run('make', ['dependency-policy-check'])
@@ -292,9 +315,13 @@ export const remediate = async (
         log('Reports: dist/security/remediation.json and remediation-pr.md')
         return report
     } catch (error) {
-        if (mode === 'apply') {
-            restore(originalInputs)
-            error.message = `${error.message}; all dependency changes were restored`
+        try {
+            if (mode === 'apply') {
+                restore(originalInputs)
+                error.message = `${error.message}; all dependency changes were restored`
+            }
+        } finally {
+            discardReports()
         }
         throw error
     }

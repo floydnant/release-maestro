@@ -109,6 +109,9 @@ A candidate that the rescan, pnpm policy, or the repository policy check rejects
 next eligible version. A network error or a scanner failure marks the package as failed instead,
 because it says nothing about the candidate. A failed run restores the inputs it started from,
 including when it cannot write its reports.
+Each run clears earlier remediation and scan reports before preflight. A failed apply run removes
+reports that describe discarded changes. Scanner failures include the command's stdout and stderr in their
+diagnostics when no valid findings report was written.
 Reports name the versions actually resolved. Findings without an eligible fix, including findings on
 installed prereleases, remain visible; the automation never extends exceptions.
 

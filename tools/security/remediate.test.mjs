@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, test } from '@jest/globals'
@@ -97,6 +98,76 @@ const checkout = ({
     return { root, report, assertInputsRestored, options: { root, run, fetchJson, now, log: () => {} } }
 }
 const byName = report => Object.fromEntries(report.packages.map(item => [item.name, item]))
+const reportFiles = ['remediation.json', 'remediation-pr.md', 'findings.json', 'osv.json']
+
+test.each([
+    ['missing', null],
+    ['invalid', 'invalid JSON'],
+    ['non-array', '{}'],
+])(
+    'a scanner report that is %s includes the command stdout and stderr in the failure',
+    async (_reportState, contents) => {
+        const { root, options, assertInputsRestored } = checkout()
+        writeFileSync(join(root, 'Makefile'), 'dependency-policy-check:\n')
+        mkdirSync(join(root, 'tools/security'), { recursive: true })
+        const writeReport =
+            contents === null
+                ? ''
+                : `writeFileSync('dist/security/findings.json', ${JSON.stringify(contents)})`
+        writeFileSync(
+            join(root, 'tools/security/cli.mjs'),
+            `import { writeFileSync } from 'node:fs'
+${writeReport}
+console.log('Scanner diagnostic on stdout')
+console.error('Scanner connection failed on stderr')
+process.exitCode = 1
+`,
+        )
+        for (const args of [
+            ['init', '--quiet'],
+            ['add', '--', 'package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml'],
+            [
+                '-c',
+                'user.name=Test',
+                '-c',
+                'user.email=test@example.com',
+                '-c',
+                'commit.gpgSign=false',
+                'commit',
+                '--quiet',
+                '-m',
+                'fixture',
+            ],
+        ]) {
+            const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
+            assert.equal(result.status, 0, result.stderr)
+        }
+
+        await assert.rejects(remediate('apply', { ...options, run: undefined }), error => {
+            assert.match(error.message, /Scanner diagnostic on stdout/)
+            assert.match(error.message, /Scanner connection failed on stderr/)
+            return true
+        })
+        assertInputsRestored()
+    },
+)
+
+test.each(['preflight', 'baseline'])(
+    'a %s failure cannot leave reports from an earlier successful run',
+    async failure => {
+        const { root, options } = checkout({ failScans: failure === 'baseline' ? [1] : [] })
+        for (const file of reportFiles)
+            writeFileSync(join(root, 'dist/security', file), 'Old report describing verified fixes')
+        const run = options.run
+        options.run = (command, ...args) => {
+            if (failure === 'preflight' && command === 'make') throw new Error('Preflight failed')
+            return run(command, ...args)
+        }
+
+        await assert.rejects(remediate('apply', options), /Preflight failed|OSV scan failed/)
+        for (const file of reportFiles) assert(!existsSync(join(root, 'dist/security', file)), file)
+    },
+)
 
 test('an installed prerelease stays unresolved without blocking a stable fix or its reports', async () => {
     const { options, report } = checkout()
@@ -110,18 +181,31 @@ test('an installed prerelease stays unresolved without blocking a stable fix or 
 
 test('a final scanner failure restores every dependency input after an applied fix', async () => {
     // Scans: initial, after the update, then the final verification.
-    const { assertInputsRestored, options } = checkout({ failScans: [3] })
+    const { root, assertInputsRestored, options } = checkout({ failScans: [3] })
     await assert.rejects(remediate('apply', options), /OSV scan failed.*restored/)
     assertInputsRestored()
+    for (const file of reportFiles) assert(!existsSync(join(root, 'dist/security', file)), file)
 })
 
 test.each(['remediation.json', 'remediation-pr.md'])(
     'a %s write failure restores every dependency input after a verified override',
     async filename => {
         const { root, assertInputsRestored, options } = checkout({ update: {} })
-        mkdirSync(join(root, 'dist/security', filename))
+        const run = options.run
+        options.run = (command, args, ...rest) => {
+            const output = run(command, args, ...rest)
+            // Obstruct report writing after the override changes the inputs. Cleanup can unlink this
+            // junction without touching its target, including on Windows.
+            if (command === 'pnpm' && args[0] === 'install')
+                symlinkSync(root, join(root, 'dist/security', filename), 'junction')
+            return output
+        }
         await assert.rejects(remediate('apply', options), { code: 'EISDIR' })
         assertInputsRestored()
+        for (const file of reportFiles) assert(!existsSync(join(root, 'dist/security', file)), file)
+
+        options.run = run
+        assert.equal(byName(await remediate('apply', options)).parser.status, 'fixed')
     },
 )
 
