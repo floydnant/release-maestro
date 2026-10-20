@@ -19,7 +19,7 @@
         "@angular/forms": "22.2.0",
         "@angular/language-service": "22.2.0",
         "@angular/platform-browser": "22.2.0",
-        "@angular/router": "22.2.0",
+        "@angular/router": "22.2.1",
         "@ng-icons/core": "36.1.0",
         "@ng-icons/octicons": "36.1.0",
         "@ng-icons/solar-icons": "36.1.0",
