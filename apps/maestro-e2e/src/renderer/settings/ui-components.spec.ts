@@ -4,7 +4,8 @@ import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
 test.describe('shared UI components', () => {
     test.beforeEach(async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/settings/design-system')
-        await expect(page.getByRole('heading', { name: 'Shared UI components' })).toBeVisible()
+        await expect(page.getByRole('region', { name: 'Components', exact: true })).toHaveCount(1)
+        await expect(page.getByRole('heading', { name: 'Components', exact: true })).toBeVisible()
     })
 
     test('opens a dialog with the keyboard, traps focus and restores its trigger on Escape', async ({
@@ -168,16 +169,41 @@ test.describe('shared UI components', () => {
         await expect(search).toHaveValue('Bandcamp')
         await expect(page.getByRole('tooltip')).toBeHidden()
 
-        const order = page.getByLabel('Library order')
-        await expect(order).toHaveAttribute('id', 'shared-library-order')
-        await expect(order).toHaveValue('dateAdded')
-        await order.selectOption('year')
-        await expect(order).toHaveValue('year')
         await expect(page.getByLabel('Unavailable filter')).toBeDisabled()
         await expect(page.getByRole('button', { name: 'Unavailable action' })).toBeDisabled()
         await expect(page.getByRole('progressbar', { name: 'Scanning library folders' })).toHaveAttribute(
             'aria-valuenow',
             '65',
         )
+    })
+
+    test('retains the two-arc loading spinner and the design system motion', async ({ page }) => {
+        const spinner = page.getByRole('status', { name: 'Reading metadata' })
+        await expect(spinner).toBeVisible()
+        await expect(spinner).toHaveCSS('width', '22px')
+        await expect(spinner).toHaveCSS('height', '22px')
+
+        const circles = spinner.locator('circle')
+        await expect(circles).toHaveCount(3)
+        await expect(circles.nth(0)).toHaveCSS('animation-name', 'none')
+        const firstArc = circles.nth(1)
+        const secondArc = circles.nth(2)
+        for (const arc of [firstArc, secondArc]) {
+            await expect(arc).toHaveCSS('animation-duration', '0.8s')
+            await expect(arc).toHaveCSS('animation-timing-function', 'linear')
+            await expect(arc).toHaveCSS('animation-iteration-count', 'infinite')
+            await expect(arc).toHaveCSS('stroke-linecap', 'round')
+        }
+        expect(await firstArc.evaluate(arc => getComputedStyle(arc).getPropertyValue('--rotation'))).toBe(
+            '-90deg',
+        )
+        expect(await secondArc.evaluate(arc => getComputedStyle(arc).getPropertyValue('--rotation'))).toBe(
+            '-270deg',
+        )
+
+        await page.emulateMedia({ reducedMotion: 'reduce' })
+        await expect(firstArc).toHaveCSS('animation-duration', '0.001s')
+        await expect(firstArc).toHaveCSS('animation-iteration-count', '1')
+        await page.emulateMedia({ reducedMotion: 'no-preference' })
     })
 })

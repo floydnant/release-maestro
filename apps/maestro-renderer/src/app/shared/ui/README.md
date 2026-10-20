@@ -22,28 +22,49 @@ Shared defaults use the existing generated semantic tokens, system typography an
 interaction states. Adjust those defaults here when several callers need the same change. Product
 templates use Tailwind for layout and domain-specific composition.
 
-Preserve existing control geometry when adopting these components. Regular buttons use the original
-`px-3 py-1.5` padding and content height. Inputs and textareas keep native sizing. Explicit icon sizes
-are for controls whose established layout uses those sizes. A click target that has no button
+Every single-line control (buttons, icon buttons, inputs, select triggers, and menu and select
+items) has one fixed height, `--foundation-size-control-sm`, so controls side by side line up
+regardless of border or type. Size them by height, never by vertical padding plus line height: that is how bordered and borderless
+controls drift apart by a pixel or two. `xs`/`icon-xs` serve title-bar and table chrome, `lg`/`icon-lg`
+standalone actions that are meant to stand out. Textareas keep native sizing. A click target that has no button
 appearance uses `variant="plain" size="none"`, with its existing layout and typography. Seeking
-targets and sortable headings must not acquire hover backgrounds.
+targets and sortable headings must not acquire hover backgrounds. Only filled variants show a
+disabled fill; quiet and text variants dim their content.
+
+History buttons use `variant="history"`. Their background appears only on pointer hover; keyboard
+focus keeps the shared focus ring without a background.
+
+Use a shared component where it supplies the element's appearance or behavior. When a caller would
+have to cancel most of a component's classes to keep the existing look, the element is not that
+component: keep its own markup, as the track grid, catalog rows, album tiles, stat tiles and inline
+error messages do. Native `<details>` stays the disclosure control for raw diagnostic payloads.
 
 Sidebar links use the `navigation` button variant. Angular's `RouterLinkActive` sets
-`aria-current="page"`, and the shared variant supplies the active appearance. The `link` variant
-allows inline links to shrink inside bounded library cells.
+`aria-current="page"`, and the shared variant supplies the active appearance.
 
-History controls use the `history` variant and the shared `pointer-hover` state. Only pointer hover
-fills their background; keyboard focus keeps the focus ring without that fill.
+Text links come in two variants, neither takes a button size, and both rest in the text colors
+rather than an accent. `link` is for internal navigation to library entities and settings: it
+inherits the surrounding color and turns foreground with an underline on hover. Where an internal
+link sits in running text, add `underline decoration-content-muted hover:decoration-current` so it
+reads as a link at rest. `external-link` is for links that leave the app: foreground text with a
+muted standing underline, taking the action accent only on hover, matching links in imported release
+copy.
 
-The track grid composes the role-qualified table directives with its existing windowing and row
-layout. Scan progress keeps its outcome segments and circular geometry inside `HlmProgress`;
-indeterminate work uses `HlmSpinner`. Feed playback composes the same progress primitives inside
-the seek button.
+`HlmProgress` keeps Brain's value, maximum, value text, indeterminate state and direction support.
+`HlmProgressSegment` adds semantic outcome colors and widths measured against the parent's maximum.
+The progress bar glows by default; `glow="hover"` limits it to hover and `glow="off"` disables it.
+Feed playback composes the progress primitives inside the seek button. Circular scan progress keeps
+its geometry in app markup; indeterminate work uses `HlmSpinner`.
 
 `HlmSpinner` retains the application's two-arc SVG, requested diameter, stroke and colors, and
 ambient rotation. Its per-ring rotation offsets require the scoped animation stylesheet.
 
-Tooltips wait 600ms, wrap long paths, and fit within 24rem and the viewport. Brain 1.5.0 has a pinned
+Tooltips wait 600ms, wrap long paths, and fit within 24rem and the viewport. `hlmTooltip` labels or
+explains a control; when the control's accessible name already contains the tooltip text, it is not
+also announced as a description. `hlmOverflowTooltip` reveals truncated text and shows only while
+its host, or something inside it, is clipping — measured on hover and focus — so fully visible text
+never repeats in a tooltip. Do not put a tooltip on text whose full value is visible elsewhere, or
+on roving-focus grid items where every arrow key would open one. Brain 1.5.0 has a pinned
 patch in `patches/@spartan-ng__brain@1.5.0.patch`: capture document scroll and dismiss the tooltip,
 including pending displays and retained content hover. Its original window listener misses nested
 scroll panels. Review and remove this patch when an upstream upgrade fixes that behavior; rerun the
@@ -54,9 +75,8 @@ the native static attribute and exposes `[tabindex]` for dynamic values. Disable
 `-1`; enabling restores the caller value. Use the directive input for a dynamic tabindex because
 Brain's host binding can overwrite `[attr.tabindex]`.
 
-Inputs, textareas and native selects accept `aria-describedby`; Brain combines those caller IDs
-with descriptions registered by the enclosing Field. Native selects forward the IDs to their inner
-`select`. The dialog service accepts component classes and `TemplateRef`; a template's `let-dialog`
+Inputs and textareas accept `aria-describedby`; Brain combines those caller IDs
+with descriptions registered by the enclosing Field. The dialog service accepts component classes and `TemplateRef`; a template's `let-dialog`
 receives the supplied context and `close(result)` action.
 
 Product components own music data, scan state, recovery actions and navigation. Their fetched
@@ -66,6 +86,10 @@ Route tabs remain links with the history behavior in
 [ADR 0006](../../../../../../docs/adr/0006-only-route-changes-are-history-steps.md).
 
 ## Add or update a component
+
+When a screen needs a standard control this directory lacks, check whether a Helm family at the
+pinned tag covers the use case before building product markup. Upstream ships many families not yet
+copied here, and adding one is the default.
 
 The Brain runtime and copied Helm source start at Spartan 1.5.0. Check the root `package.json` and
 [upstream.json](upstream.json) for the versions currently in use.

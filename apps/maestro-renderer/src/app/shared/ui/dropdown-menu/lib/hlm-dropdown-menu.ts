@@ -32,7 +32,7 @@ export class HlmDropdownMenu {
     constructor() {
         classes(() =>
             hlm(
-                'min-w-32 rounded-lg border border-border-default bg-background-elevated p-1 text-content-primary shadow-lg type-body-sm my-[calc(var(--foundation-spacing-1)*var(--side-offset))] overflow-x-hidden overflow-y-auto outline-none',
+                'min-w-32 rounded-lg border border-border-subtle bg-background-surface p-1 text-content-primary shadow-lg type-body-sm my-[calc(var(--foundation-spacing-1)*var(--side-offset))] overflow-x-hidden overflow-y-auto outline-none',
             ),
         )
 

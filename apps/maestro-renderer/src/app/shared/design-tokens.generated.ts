@@ -210,6 +210,7 @@ export const typographyVariantIdentifiers = [
     "section-title",
     "body-md",
     "body-sm",
+    "body-xs",
     "label-md",
     "label-sm",
     "code-sm"

@@ -6,6 +6,7 @@ import {
     cleanupTaggedLibraries,
     type TaggedTrackSpec,
 } from '../fixtures/tagged-library.fixture'
+import { chooseAlbumSort } from '../support/album-sort-control'
 import { launchReleaseMaestro } from './launch-release-maestro'
 
 /**
@@ -83,7 +84,7 @@ const scanAndOpenAlbums = async (
     // assert. The default is date added, which comes from filesystem creation times —
     // real, but not what these tests are about. The one test that *is* about it puts the
     // grid back on it, and the track list's assertions sort for the same reason.
-    await page.getByLabel('Sort by').selectOption('title')
+    await chooseAlbumSort(page, 'Title')
     await expect.poll(albumTitles).toEqual(['Afterglow', 'Daybreak', 'Filaments', 'Undertow'])
 }
 
@@ -141,7 +142,7 @@ test('a scanned library becomes a browsable, sortable albums grid', async ({}, t
         .poll(async () => daybreak.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
         .toBeGreaterThan(0)
     // Sorting runs in SQL, off the indexes the migration added.
-    await page.getByLabel('Sort by').selectOption('year')
+    await chooseAlbumSort(page, 'Year')
     await expect.poll(albumTitles).toEqual(['Filaments', 'Afterglow', 'Daybreak', 'Undertow'])
 
     // The record label is denormalized onto `albums` rather than joined per query, and the
@@ -151,7 +152,7 @@ test('a scanned library becomes a browsable, sortable albums grid', async ({}, t
     // is a random UUID, so the order *within* a group of equal values is genuinely
     // arbitrary — asserting it would pass or fail on which UUIDs a given scan happened to
     // mint.
-    await page.getByLabel('Sort by').selectOption('recordLabel')
+    await chooseAlbumSort(page, 'Record label')
     await expect.poll(async () => (await albumTitles()).slice(0, 2)).toEqual(['Afterglow', 'Daybreak'])
     expect((await albumTitles()).slice(2).sort()).toEqual(['Filaments', 'Undertow'])
 })

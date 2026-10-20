@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing'
-import { HlmSpinner } from './hlm-spinner'
 import { semanticColor } from '../../../design-tokens.generated'
+import { HlmSpinner } from './hlm-spinner'
 
 describe(HlmSpinner.name, () => {
     it('preserves the existing loading ring at its default size', async () => {

@@ -1,13 +1,5 @@
 /* Spartan 1.5 state variants. Helm classes use our semantic tokens directly;
    the upstream theme and resets are intentionally not imported. */
-@custom-variant pointer-hover {
-    @media (hover: hover) {
-        &:not(:disabled):hover {
-            @slot;
-        }
-    }
-}
-
 @custom-variant data-open (&:where([data-state='open'], [data-open]:not([data-open='false'])));
 @custom-variant data-closed (&:where([data-state='closed'], [data-closed]:not([data-closed='false'])));
 @custom-variant data-checked (&:where([data-state='checked'], [data-checked]:not([data-checked='false'])));
@@ -35,4 +27,19 @@
 .cdk-overlay-backdrop:not(.cdk-overlay-transparent-backdrop) {
     opacity: 1;
     transition: none;
+}
+
+/* A progress segment supplies its semantic color; the parent controls its glow state. */
+[data-slot='progress-segment'] {
+    transition:
+        box-shadow var(--duration-slow),
+        width var(--duration-ambient) var(--ease-standard);
+}
+
+[data-slot='progress']:is([data-glow='always'], [data-glow='hover']:hover) [data-slot='progress-segment'] {
+    box-shadow: 0 0 12px color-mix(in srgb, var(--color) 55%, transparent);
+    transition:
+        box-shadow var(--duration-fast),
+        width var(--duration-ambient) var(--ease-emphasized),
+        border-radius var(--duration-ambient);
 }

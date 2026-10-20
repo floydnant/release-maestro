@@ -36,7 +36,7 @@ export class HlmDropdownMenuItem {
     constructor() {
         classes(() =>
             hlm(
-                'gap-2 rounded-md px-2 py-1.5 type-body-sm focus:bg-action-quiet-hover data-[inset=true]:ps-8 data-[variant=destructive]:text-content-danger data-[variant=destructive]:focus:bg-status-danger-background group/dropdown-menu-item relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
+                'gap-2 rounded-md px-2 h-(--foundation-size-control-sm) type-body-sm focus:bg-action-quiet-hover data-[inset=true]:ps-8 data-[variant=destructive]:text-content-danger data-[variant=destructive]:focus:bg-status-danger-background group/dropdown-menu-item relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
             ),
         )
     }

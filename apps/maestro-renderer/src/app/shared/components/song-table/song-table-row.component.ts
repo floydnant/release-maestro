@@ -1,6 +1,9 @@
+import { NgClass } from '@angular/common'
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { RouterLink } from '@angular/router'
 import type { SongRow } from '@release-maestro/core'
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmOverflowTooltip, HlmTooltip } from '@spartan-ng/helm/tooltip'
 import { isSelectionModifierHeld } from '../../browse/song-selection'
 import { fileUrl } from '../../utils/file-url.util'
 import { formatBpm, formatDateShort, formatDuration } from '../../utils/formatting.utils'
@@ -33,7 +36,7 @@ import {
     selector: 'app-song-table-row',
     templateUrl: './song-table-row.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent, RouterLink],
+    imports: [NgClass, HlmButton, HlmOverflowTooltip, HlmTooltip, IconComponent, RouterLink],
     host: { class: 'contents' },
 })
 export class SongTableRowComponent {

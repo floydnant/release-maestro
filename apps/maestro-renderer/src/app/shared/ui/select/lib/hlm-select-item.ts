@@ -1,7 +1,7 @@
-import { IconComponent } from '../../../components/icon/icon.component'
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core'
 import { BrnSelectItem } from '@spartan-ng/brain/select'
 import { classes, hlm } from '@spartan-ng/helm/utils'
+import { IconComponent } from '../../../components/icon/icon.component'
 
 @Component({
     selector: 'hlm-select-item',
@@ -24,7 +24,7 @@ export class HlmSelectItem {
     constructor() {
         classes(() =>
             hlm(
-                'gap-2 rounded-md py-1.5 ps-2 pe-8 type-body-sm data-highlighted:bg-action-quiet-hover relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
+                'gap-2 rounded-md px-1.5 h-(--foundation-size-control-sm) ps-2 pe-8 type-body-sm data-highlighted:bg-action-quiet-hover relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_app-icon]:pointer-events-none [&_app-icon]:shrink-0',
             ),
         )
     }

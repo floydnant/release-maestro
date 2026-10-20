@@ -1,4 +1,3 @@
-import { IconComponent } from '../../../components/icon/icon.component'
 import type { BooleanInput } from '@angular/cdk/coercion'
 import type { ComponentType } from '@angular/cdk/portal'
 import { NgComponentOutlet, NgTemplateOutlet } from '@angular/common'
@@ -13,6 +12,7 @@ import {
 } from '@angular/core'
 import { BrnDialogRef, injectBrnDialogContext } from '@spartan-ng/brain/dialog'
 import { HlmButton } from '@spartan-ng/helm/button'
+import { IconComponent } from '../../../components/icon/icon.component'
 
 import { classes, hlm } from '@spartan-ng/helm/utils'
 import { HlmDialogClose } from './hlm-dialog-close'
@@ -42,7 +42,7 @@ type HlmDialogContentContext = {
         }
 
         @if (showCloseButton()) {
-            <button hlmBtn variant="ghost" size="icon-sm" class="absolute inset-e-3 top-3" hlmDialogClose>
+            <button hlmBtn variant="ghost" size="icon" class="absolute inset-e-3 top-3" hlmDialogClose>
                 <span class="sr-only">{{ closeLabel() }}</span>
                 <app-icon name="close" />
             </button>
@@ -74,7 +74,7 @@ export class HlmDialogContent {
     constructor() {
         classes(() =>
             hlm([
-                'grid w-lg max-w-[calc(100vw-2rem)] gap-4 rounded-xl border border-border-default bg-background-elevated p-6 text-content-primary shadow-lg duration-fast ease-standard relative mx-auto outline-none sm:mx-0',
+                'grid w-lg max-w-[calc(100vw-2rem)] gap-4 rounded-xl border border-border-subtle bg-background-surface p-6 text-content-primary shadow-lg duration-fast ease-standard relative mx-auto outline-none sm:mx-0',
                 this._dynamicComponentClass,
             ]),
         )

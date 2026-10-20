@@ -103,10 +103,3 @@
     place-items: center;
     padding: var(--foundation-spacing-3);
 }
-
-button:disabled {
-    cursor: not-allowed;
-    background: var(--color-action-primary-disabled);
-    color: var(--color-content-muted);
-    box-shadow: none;
-}

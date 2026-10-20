@@ -1,3 +1,4 @@
+import { HlmOverflowTooltip } from '@spartan-ng/helm/tooltip'
 import { NgClass } from '@angular/common'
 import {
     afterNextRender,
@@ -186,7 +187,7 @@ const pixels = (value: string): number => {
     selector: 'app-album-grid',
     templateUrl: './album-grid.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent, RouterLink, NgClass],
+    imports: [HlmOverflowTooltip, IconComponent, RouterLink, NgClass],
     host: { class: 'flex min-h-0 min-w-0 flex-1 flex-col' },
 })
 export class AlbumGridComponent {

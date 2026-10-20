@@ -6,7 +6,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card'
 import { HlmDialogImports } from '@spartan-ng/helm/dialog'
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu'
 import { HlmInputImports } from '@spartan-ng/helm/input'
-import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select'
+import { HlmLabel } from '@spartan-ng/helm/label'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
 import { HlmSelectImports } from '@spartan-ng/helm/select'
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner'
@@ -21,7 +21,7 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
         HlmDialogImports,
         HlmDropdownMenuImports,
         HlmInputImports,
-        HlmNativeSelectImports,
+        HlmLabel,
         HlmProgressImports,
         HlmSelectImports,
         HlmSpinnerImports,
@@ -31,7 +31,6 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SpartanSpecimenComponent {
-    readonly order = signal<string | null | undefined>('dateAdded')
     readonly libraryView = signal<ReturnType<BrnSelect<string>['value']>>('Tracks')
     readonly savedFolderLabel = signal<string | null>(null)
     readonly selectedAction = signal<string | null>(null)
