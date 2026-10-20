@@ -16,7 +16,7 @@ implementation changes; the compatibility ranges alone do not establish them.
 
 ## Selected implementation
 
-Release Maestro uses the real `@spartan-ng/brain` 1.5.0 runtime and editable Helm source under
+Release Maestro uses the real `@spartan-ng/brain` 1.8.0 runtime and editable Helm source under
 [shared/ui](../../apps/maestro-renderer/src/app/shared/ui/). Canonical
 `@spartan-ng/helm/<family>` imports resolve to those local files through the root TypeScript alias.
 The local component defaults map directly to Release Maestro's generated semantic tokens. Shared
@@ -108,19 +108,19 @@ The CLI also copies dependent components. For example, Context Menu requires Dro
 
 ## Version compatibility
 
-The current stable release is 1.5.0, published 2026-09-21. The [published Brain manifest](https://registry.npmjs.org/@spartan-ng/brain/1.5.0) and [tagged source manifest](https://github.com/spartan-ng/spartan/blob/v1.5.0/libs/brain/package.json) agree on these peer ranges.
+The installed Brain release is 1.8.0, published 2026-10-16. The [published Brain manifest](https://registry.npmjs.org/@spartan-ng/brain/1.8.0) and [tagged source manifest](https://github.com/spartan-ng/spartan/blob/v1.8.0/libs/brain/package.json) agree on these peer ranges.
 
-| Dependency                | Brain 1.5.0 requirement | Release Maestro                                             |
+| Dependency                | Brain 1.8.0 requirement | Release Maestro                                             |
 | ------------------------- | ----------------------- | ----------------------------------------------------------- |
-| Angular core/common/forms | `>=21.0.0 <23.0.0`      | `22.2.0`, within range                                      |
-| Angular CDK               | `>=21.0.0 <23.0.0`      | `22.2.0`, within range                                      |
+| Angular core/common/forms | `>=21.0.0 <23.0.0`      | `22.2.3`, within range                                      |
+| Angular CDK               | `>=21.0.0 <23.0.0`      | `22.2.3`, within range                                      |
 | Tailwind CSS              | `>=4.0.0`               | `4.3.3`, within range                                       |
 | RxJS                      | `>=6.6.0`               | `7.8.2`, also satisfies Helm components requesting `^7.8.0` |
 | clsx                      | `>=2.0.0`               | New direct dependency                                       |
 | tw-animate-css            | `>=1.0.0`               | New dependency when using the preset                        |
 | Luxon                     | `>=3.0.0`, optional     | Needed only if using the Luxon date adapter                 |
 
-Spartan's [support policy](https://www.spartan.ng/documentation/version-support) explicitly lists Angular 21 and 22 and supports the two latest Angular majors. Existing Angular 22 versions do not require a downgrade for Brain 1.5.0.
+Spartan's [support policy](https://www.spartan.ng/documentation/version-support) explicitly lists Angular 21 and 22 and supports the two latest Angular majors. Existing Angular 22 versions do not require a downgrade for Brain 1.8.0.
 
 Helm can add dependencies beyond Brain. The [component manifest](https://github.com/spartan-ng/spartan/blob/v1.5.0/libs/cli/src/generators/ui/supported-ui-libraries.json) requests `class-variance-authority ^0.7.0`, `clsx ^2.1.1`, and, for several components, ng-icons `>=32.0.0 <34.0.0`. The repo's existing ng-icons `36.1.0` falls outside that range. This is a generator-default mismatch; the selected integration adapts the local Helm source to the existing icon API rather than applying those dependency changes verbatim. A compatible ng-icons 33 package supports Angular 22, but downgrading the project's icons would need its own assessment. See the [ng-icons 33.0.0 manifest](https://registry.npmjs.org/@ng-icons/core/33.0.0). The CLI also adds Tailwind Merge and animation CSS. See [dependency generation](https://github.com/spartan-ng/spartan/blob/v1.5.0/libs/cli/src/generators/base/lib/build-dependency-array.ts).
 

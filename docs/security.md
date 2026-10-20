@@ -71,10 +71,12 @@ checks date formats rather than whether the date has passed. Keep exceptions wit
 30 days, review extensions in a PR, and remove them after fixes. Never regenerate the baseline
 automatically or suppress whole packages. Acceptance does not establish safety.
 
-Nx pins Axios, brace-expansion, and smol-toml to vulnerable versions. Exact-version overrides in
-`pnpm-workspace.yaml` replace them with Axios 1.20.0, brace-expansion 5.0.12, and smol-toml 1.9.1.
-Remove the overrides when the installed Nx versions use fixed dependencies. Automated remediation PRs
-can add further scoped overrides; each PR body names the packages it overrides.
+Nx pins Axios, brace-expansion, smol-toml, follow-redirects, and Undici to vulnerable versions.
+Angular's build package pins Vite to an affected version. Exact-version overrides in
+`pnpm-workspace.yaml` select Axios 1.20.0, brace-expansion 5.0.12, smol-toml 1.9.1,
+follow-redirects 1.16.1, Undici 7.30.1, and Vite 8.3.4. Remove an override when upstream uses a
+fixed version. Automated remediation PRs can add further scoped overrides; each PR body names
+the packages it overrides.
 
 Release-please checks main before creating a release. The Release workflow checks the immutable
 tag commit before building or publishing installers, including manual publications and retries.

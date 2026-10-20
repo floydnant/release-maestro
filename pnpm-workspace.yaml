@@ -73,14 +73,15 @@ minimumReleaseAgeExclude:
     - jest-snapshot@30.5.2
     - jest-watcher@30.5.2
     - jest@30.5.2
-    - jsdoc-type-pratt-parser@9.2.2
 minimumReleaseAgeExcludePrune: true
 
-# Nx pins these vulnerable versions exactly. Replace only the affected versions with fixes.
+# Upstream tools pin these vulnerable versions. Replace only the affected versions with fixes.
 overrides:
     axios@1.18.1: 1.20.0
     brace-expansion@5.0.8: 5.0.12
-    brace-expansion@5.0.9: 5.0.12
     smol-toml@1.6.1: 1.9.1
+    follow-redirects@1.16.0: 1.16.1
+    undici@7.29.0: 7.30.1
+    vite@8.3.0: 8.3.4
 patchedDependencies:
-    '@spartan-ng/brain@1.5.0': patches/@spartan-ng__brain@1.5.0.patch
+    '@spartan-ng/brain@1.8.0': patches/@spartan-ng__brain@1.8.0.patch

@@ -1,6 +1,7 @@
 import { OverlayContainer } from '@angular/cdk/overlay'
 import { ChangeDetectionStrategy, Component, TemplateRef, viewChild } from '@angular/core'
 import { TestBed } from '@angular/core/testing'
+import { firstValueFrom } from 'rxjs'
 import { HlmDialogService } from './hlm-dialog.service'
 
 @Component({
@@ -18,7 +19,7 @@ class DialogServiceTest {
 }
 
 describe('HlmDialogService', () => {
-    it('renders a template with its context and lets it close with a result', () => {
+    it('renders a template with its context and lets it close with a result', async () => {
         const fixture = TestBed.createComponent(DialogServiceTest)
         fixture.detectChanges()
         const overlay = TestBed.inject(OverlayContainer).getContainerElement()
@@ -30,9 +31,13 @@ describe('HlmDialogService', () => {
 
         expect(overlay.textContent).toContain('Confirm album import')
         const close = jest.spyOn(ref, 'close')
+        const result = firstValueFrom(ref.closed$)
         overlay.querySelector<HTMLButtonElement>('button')?.click()
         expect(close).toHaveBeenCalledWith('confirmed')
-        expect(ref.phase()).toBe('closing')
-        ref.forceClose()
+        TestBed.tick()
+
+        await expect(result).resolves.toBe('confirmed')
+        expect(ref.phase()).toBe('closed')
+        expect(overlay.querySelector('[role="dialog"]')).toBeNull()
     })
 })
