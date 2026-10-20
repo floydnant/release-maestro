@@ -42,8 +42,9 @@ to onboarding. Override `get-settings` when onboarding is the scenario under tes
 
 ## Fast iteration
 
-Filtered runs are encouraged while iterating. They do not replace the relevant project or suite check
-before handoff.
+Filtered runs are useful during iteration and can be enough for a handoff during active collaboration.
+Choose any broader check by the changed behavior and delivery scope in
+[`verification-loop`](../.agents/skills/verification-loop/SKILL.md).
 
 Jest-based unit test, filtered by file and test name:
 
@@ -72,9 +73,11 @@ pnpm exec nx run maestro-e2e:e2e-production -- \
   --grep "library routes are available"
 ```
 
-## Widen before handoff
+## Checks for completed work
 
-Run the narrowest relevant check first, then widen according to the changed boundary:
+Choose from these checks according to the changed boundary and the handoff. The list is not a
+sequence to run in full. For a PR, CI supplies broad gates for the pushed commit; run local checks
+for risks that need earlier feedback or are outside CI.
 
 ```bash
 pnpm exec nx test maestro-renderer     # one project's unit suite
