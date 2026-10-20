@@ -10,13 +10,22 @@ import {
     signal,
     viewChild,
 } from '@angular/core'
+import {
+    FEED_SNOOZE_HOURS_DECIMALS,
+    FEED_SNOOZE_HOURS_STEP,
+    feedSnoozeHoursSchema,
+    MAX_FEED_SNOOZE_HOURS,
+    MIN_FEED_SNOOZE_HOURS,
+    resolveFeedSettings,
+} from '@release-maestro/core'
 import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmInput } from '@spartan-ng/helm/input'
 import { HlmSwitch } from '@spartan-ng/helm/switch'
 import { SettingsService } from '../../../core/settings/settings.service'
 
 @Component({
     selector: 'app-feed-settings',
-    imports: [HlmButton, HlmSwitch],
+    imports: [HlmButton, HlmInput, HlmSwitch],
     templateUrl: './feed-settings.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -24,31 +33,62 @@ export class FeedSettingsComponent {
     private readonly injector = inject(Injector)
     private readonly filterSwitch = viewChild.required(HlmSwitch)
     private readonly saveButton = viewChild<ElementRef<HTMLButtonElement>>('saveButton')
+    private readonly snoozeHoursField = viewChild<ElementRef<HTMLInputElement>>('snoozeHoursField')
     readonly settingsService = inject(SettingsService)
-    readonly hideUnplayableReleases = linkedSignal(() =>
-        this.settingsService.settings.hasValue()
-            ? (this.settingsService.settings.value()?.feed?.hideUnplayableReleases ?? true)
-            : true,
+    readonly minSnoozeHours = MIN_FEED_SNOOZE_HOURS
+    readonly maxSnoozeHours = MAX_FEED_SNOOZE_HOURS
+    readonly snoozeHoursStep = FEED_SNOOZE_HOURS_STEP
+    readonly snoozeHoursDecimals = FEED_SNOOZE_HOURS_DECIMALS
+    private readonly savedFeed = computed(() =>
+        resolveFeedSettings(
+            this.settingsService.settings.hasValue()
+                ? this.settingsService.settings.value()?.feed
+                : undefined,
+        ),
     )
+    private readonly savedHideUnplayableReleases = computed(() => this.savedFeed().hideUnplayableReleases)
+    /**
+     * The field binds its value to this, not to the entered text. The browser reports a partial
+     * entry such as "1e" as empty, and writing that back would erase what the user typed.
+     */
+    readonly savedSnoozeHours = computed(() => this.savedFeed().snoozeHours)
+    readonly hideUnplayableReleases = linkedSignal(() => this.savedHideUnplayableReleases())
+    /** The field's raw text, so an empty or partial entry can be shown and corrected. */
+    readonly snoozeHoursText = linkedSignal(() => String(this.savedSnoozeHours()))
+    /** The entered hours, or null while the entry is not a duration the settings accept. */
+    readonly snoozeHours = computed(() => {
+        const text = this.snoozeHoursText().trim()
+        const parsed = feedSnoozeHoursSchema.safeParse(Number(text))
+        return text !== '' && parsed.success ? parsed.data : null
+    })
+    readonly snoozeHoursInvalid = computed(() => this.snoozeHours() === null)
     readonly hasChanges = computed(
         () =>
             this.settingsService.settings.hasValue() &&
-            this.hideUnplayableReleases() !==
-                (this.settingsService.settings.value()?.feed?.hideUnplayableReleases ?? true),
+            (this.hideUnplayableReleases() !== this.savedHideUnplayableReleases() ||
+                this.snoozeHours() !== this.savedSnoozeHours()),
     )
     readonly saving = signal(false)
     readonly saveError = signal<string | null>(null)
 
     async saveSettings(event: MouseEvent): Promise<void> {
-        if (!this.hasChanges() || this.saving()) return
+        const snoozeHours = this.snoozeHours()
+        if (!this.hasChanges() || this.saving() || snoozeHours === null) return
         // Disabling Save while it is pending drops its focus, so return focus once it settles:
-        // to the switch after a save removes Save, or to Save to retry a failed one.
+        // to the setting that changed after a save removes Save, or to Save to retry a failed one.
         const restoreFocus = event.currentTarget === document.activeElement
+        const hideUnplayableReleases = this.hideUnplayableReleases()
+        const filterChanged = hideUnplayableReleases !== this.savedHideUnplayableReleases()
+        const snoozeChanged = snoozeHours !== this.savedSnoozeHours()
         this.saving.set(true)
         this.saveError.set(null)
         try {
+            // Save only what changed, so an untouched setting keeps following its default.
             await this.settingsService.patchSettings({
-                feed: { hideUnplayableReleases: this.hideUnplayableReleases() },
+                feed: {
+                    ...(filterChanged && { hideUnplayableReleases }),
+                    ...(snoozeChanged && { snoozeHours }),
+                },
             })
         } catch {
             this.saveError.set('Could not save feed settings. Try again.')
@@ -59,6 +99,7 @@ export class FeedSettingsComponent {
                     () => {
                         const saveButton = this.saveButton()
                         if (saveButton) saveButton.nativeElement.focus()
+                        else if (snoozeChanged) this.snoozeHoursField()?.nativeElement.focus()
                         else this.filterSwitch().focus()
                     },
                     { injector: this.injector },

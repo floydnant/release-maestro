@@ -3,6 +3,7 @@ import type { AppSettings } from '@release-maestro/core'
 import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
 
 const filterLabel = 'Hide releases with no playable tracks'
+const snoozeLabel = 'Snooze duration hours'
 
 test('defaults to hiding unplayable releases and persists changes without replacing other settings', async ({
     page,
@@ -20,15 +21,15 @@ test('defaults to hiding unplayable releases and persists changes without replac
     await filterSwitch.press('Space')
     await expect(filterSwitch).not.toBeChecked()
     await filterSwitch.press('Tab')
+    await expect(dialog.getByRole('spinbutton', { name: snoozeLabel })).toBeFocused()
+    await page.keyboard.press('Tab')
     await expect(save).toBeFocused()
     await save.press('Enter')
     await expect(save).toBeHidden()
     await expect(filterSwitch).toBeFocused()
     await expect
-        .poll(() => controller.lastCall('patch-settings'))
-        .toMatchObject({
-            payload: { feed: { hideUnplayableReleases: false } },
-        })
+        .poll(async () => (await controller.lastCall('patch-settings'))?.payload)
+        .toEqual({ feed: { hideUnplayableReleases: false } })
     await dialog.getByRole('link', { name: 'Apple Mail', exact: true }).click()
     await expect(dialog.getByRole('textbox', { name: 'Mailbox Name' })).toBeVisible()
     await dialog.getByRole('link', { name: 'Feed', exact: true }).click()
@@ -41,6 +42,40 @@ test('defaults to hiding unplayable releases and persists changes without replac
         .toMatchObject({
             payload: { feed: { hideUnplayableReleases: true } },
         })
+})
+
+test('saves snooze hours to two decimals and blocks other entries', async ({ page }) => {
+    const controller = await createRendererScenario(page, scenarioBuilder().build(), '/settings/feed')
+    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const snoozeHours = dialog.getByRole('spinbutton', { name: snoozeLabel })
+    const save = dialog.getByRole('button', { name: 'Save', exact: true })
+    const rangeError = dialog.getByRole('alert').filter({ hasText: 'with at most 2 decimal places' })
+    await expect(dialog.getByRole('heading', { name: 'Snooze' })).toBeVisible()
+    await expect(snoozeHours).toHaveValue('16')
+    await expect(snoozeHours).toHaveAccessibleDescription(/returns to your feed this many hours/)
+    await expect(save).toBeHidden()
+
+    await snoozeHours.fill('')
+    await snoozeHours.pressSequentially('1e')
+    await expect(rangeError).toBeVisible()
+    expect(await snoozeHours.evaluate((field: HTMLInputElement) => field.validity.badInput)).toBe(true)
+
+    for (const invalid of ['0', '169', '1.555', '16.000000000000004', '']) {
+        await snoozeHours.fill(invalid)
+        await expect(rangeError).toHaveText('Enter 1 to 168 hours, with at most 2 decimal places.')
+        await expect(snoozeHours).toHaveAttribute('aria-invalid', 'true')
+        await expect(save).toBeDisabled()
+    }
+
+    await snoozeHours.fill('24.5')
+    await expect(rangeError).toBeHidden()
+    await expect(snoozeHours).toHaveAttribute('aria-invalid', 'false')
+    await save.click()
+    await expect(save).toBeHidden()
+    await expect(snoozeHours).toBeFocused()
+    await expect
+        .poll(async () => (await controller.lastCall('patch-settings'))?.payload)
+        .toEqual({ feed: { snoozeHours: 24.5 } })
 })
 
 test('locks the switch while saving', async ({ page }) => {

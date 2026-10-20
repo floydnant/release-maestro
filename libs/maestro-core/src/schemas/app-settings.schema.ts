@@ -10,6 +10,25 @@ const emailPluginConfigSchema = z
     } satisfies Record<EmailVendor, z.ZodObject>)
     .partial()
 
+/**
+ * Hours a snoozed release stays out of the feed after its last view.
+ *
+ * The default is deliberately shorter than a day: snoozing reads as "show again tomorrow", and a full
+ * 24h would push the item past the same time next day, so a user with a routine would keep missing it.
+ */
+export const DEFAULT_FEED_SNOOZE_HOURS = 16
+export const MIN_FEED_SNOOZE_HOURS = 1
+/** One week. */
+export const MAX_FEED_SNOOZE_HOURS = 168
+/** Hundredths of an hour; finer steps would be too small to notice. */
+export const FEED_SNOOZE_HOURS_DECIMALS = 2
+export const FEED_SNOOZE_HOURS_STEP = 10 ** -FEED_SNOOZE_HOURS_DECIMALS
+export const feedSnoozeHoursSchema = z
+    .number()
+    .min(MIN_FEED_SNOOZE_HOURS)
+    .max(MAX_FEED_SNOOZE_HOURS)
+    .refine(hours => Number(hours.toFixed(FEED_SNOOZE_HOURS_DECIMALS)) === hours)
+
 const librarySettingsSchema = z.object({
     /** The folders that make up the user's music library. Absent/empty until onboarding/setup. */
     folders: z.string().array().optional(),
@@ -25,11 +44,21 @@ export type LibrarySettings = z.infer<typeof librarySettingsSchema>
  */
 export const appSettingsSchema = z.object({
     library: librarySettingsSchema.prefault({}),
-    /** Missing filter preferences use the enabled default, including older stores. */
-    feed: z.object({ hideUnplayableReleases: z.boolean().optional() }).optional(),
+    /** Missing feed preferences use their defaults, including in older stores. */
+    feed: z
+        .object({
+            hideUnplayableReleases: z.boolean().optional(),
+            snoozeHours: feedSnoozeHoursSchema.optional(),
+        })
+        .optional(),
     emailPluginConfig: emailPluginConfigSchema.catch({}),
 })
 export type AppSettings = z.infer<typeof appSettingsSchema>
+
+export const resolveFeedSettings = (feed?: AppSettings['feed']) => ({
+    hideUnplayableReleases: feed?.hideUnplayableReleases ?? true,
+    snoozeHours: feed?.snoozeHours ?? DEFAULT_FEED_SNOOZE_HOURS,
+})
 
 /**
  * Tolerant variant for *reading* a possibly stale/hand-edited store: individually
@@ -43,7 +72,10 @@ export type AppSettings = z.infer<typeof appSettingsSchema>
  */
 export const storedAppSettingsSchema = z.object({
     feed: z
-        .object({ hideUnplayableReleases: z.boolean().optional().catch(undefined) })
+        .object({
+            hideUnplayableReleases: z.boolean().optional().catch(undefined),
+            snoozeHours: feedSnoozeHoursSchema.optional().catch(undefined),
+        })
         .optional()
         .catch(undefined),
     library: z
