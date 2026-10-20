@@ -6,12 +6,17 @@ SKIP_NX_CACHE := false
 E2E_REPORT := electron
 PNPM := pnpm
 ARTIFACT_DIR := dist/executables
+TOOLS_TEST_ARGS ?=
 
-.PHONY: security security-tools security-policy-check sbom sbom-release
+.PHONY: security security-tools security-policy-check security-remediation-plan security-remediate sbom sbom-release
 security-tools: ## Download checksum-pinned security tools for this platform
 	node tools/security/cli.mjs install
 security: ## Scan both lockfiles for known vulnerabilities (requires network)
 	node tools/security/cli.mjs scan
+security-remediation-plan: ## Scan and preview eligible npm fixes without changing dependency inputs
+	node tools/security/remediate.mjs plan
+security-remediate: ## Apply and verify npm fixes on committed dependency inputs
+	node tools/security/remediate.mjs apply
 security-policy-check: ## Validate vulnerability exception fields and date formats
 	node tools/security/cli.mjs policy
 sbom: ## Generate repository and runtime CycloneDX SBOMs in dist/security
@@ -93,7 +98,7 @@ install-dmg: package ## Install the packaged app (macOS) using the DMG
 test: test-tools ## Run all tests
 	$(PNPM) exec nx run-many -t test --skipNxCache=$(SKIP_NX_CACHE)
 test-tools: ## Run repository tools tests
-	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand
+	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand $(TOOLS_TEST_ARGS)
 test-watch: ## Run all tests in watch mode
 	$(PNPM) exec nx run-many -t test -- --watch
 test-core: ## Run core library tests

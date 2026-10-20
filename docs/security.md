@@ -55,12 +55,13 @@ and have no dependency-submission write permission. This supplies the transitive
 GitHub's current graph. Submitted dependencies
 receive [Dependabot alerts and security updates](https://docs.github.com/en/rest/dependency-graph/dependency-submission). `.github/dependabot.yml` groups security updates
 for npm, Cargo, and GitHub Actions. Security updates are triggered by alerts rather than the
-weekly version-update schedule or the daily OSV scan. Dependabot cannot fix every OSV finding,
-exact upstream pin, or advisory without a patch. Remaining findings need maintainer follow-up;
-fix PRs run normal CI and are reviewed before merging. GitHub's documented pnpm support currently
-ends at v10; this repository uses v12. Recent Dependabot PRs have updated the lockfile successfully,
-but that does not establish complete remediation coverage. Dependency submission fills graph
-coverage; it cannot guarantee that Dependabot can resolve a compatible fix.
+weekly version-update schedule or the daily OSV scan. Dependabot cannot fix every OSV finding, exact
+upstream pin, or advisory without a patch. [Automated remediation](#automated-remediation) retries
+the remaining npm findings; other findings need maintainer follow-up. Fix PRs run normal CI and are
+reviewed before merging. GitHub's documented pnpm support currently ends at v10; this repository
+uses v12. Recent Dependabot PRs have updated the lockfile successfully, but that does not establish
+complete remediation coverage. Dependency submission fills graph coverage; it cannot guarantee that
+Dependabot can resolve a compatible fix.
 
 `tools/security/exceptions.json` accepts 9 existing findings until November 2, 2026.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, and UTC expiry date.
@@ -72,7 +73,8 @@ automatically or suppress whole packages. Acceptance does not establish safety.
 
 Nx pins Axios and brace-expansion to vulnerable versions. Exact-version overrides in
 `pnpm-workspace.yaml` replace them with Axios 1.20.0 and brace-expansion 5.0.12. Remove the
-overrides when the installed Nx versions use fixed dependencies.
+overrides when the installed Nx versions use fixed dependencies. Automated remediation PRs can add
+further scoped overrides; each PR body names the packages it overrides.
 
 Release-please checks main before creating a release. The Release workflow checks the immutable
 tag commit before building or publishing installers, including manual publications and retries.
@@ -80,6 +82,61 @@ Both use `make security`; see [releasing](releasing.md).
 
 `make security` runs separately from `make sure` because advisories require network access and
 can change without code changes.
+
+## Automated remediation
+
+The Security remediation workflow runs daily on main and supports manual main runs. It retries npm
+findings that Dependabot cannot fix, including accepted findings. Cargo findings remain in the report
+for maintainer follow-up. Dependabot continues to handle normal version and security updates.
+
+```bash
+make security-remediation-plan # Scan and preview eligible fixes without changing dependency inputs
+make security-remediate        # Apply and verify fixes; dependency inputs must be committed
+```
+
+Run the apply command in a disposable checkout. It changes `pnpm-lock.yaml` and can add scoped
+exact-version overrides to `pnpm-workspace.yaml`. It does not commit or publish local changes.
+Both commands write `dist/security/remediation.json` and `remediation-pr.md`.
+
+The planner selects stable, non-deprecated registry releases with known publish times that satisfy
+`minimumReleaseAge`. It queries OSV to reject candidates with known vulnerabilities. The apply
+command first tries a targeted update across transitive dependencies. If the update resolves a
+version the planner did not select, or upstream constraints retain a finding, it retries from the
+original inputs with an override for each affected version. pnpm enforces the existing freshness,
+provenance, and source policy. Install scripts never run. A full scan must remove all targeted
+advisories without introducing other findings. Every failed attempt restores its dependency inputs.
+A candidate that the rescan, pnpm policy, or the repository policy check rejects gives way to the
+next eligible version. A network error or a scanner failure marks the package as failed instead,
+because it says nothing about the candidate. A failed run restores the inputs it started from,
+including when it cannot write its reports.
+Each run clears earlier remediation and scan reports before preflight. A failed apply run removes
+reports that describe discarded changes. Scanner failures include the command's stdout and stderr in their
+diagnostics when no valid findings report was written.
+Reports name the versions actually resolved. Findings without an eligible fix, including findings on
+installed prereleases, remain visible; the automation never extends exceptions.
+
+CI reads open Dependabot PR lockfiles without executing their code. Only heads that contain the
+scanned main revision can cover findings. It defers packages already covered by a PR only when none
+of their proposed versions have known OSV vulnerabilities. Missing fixes and failures appear in the
+run summary and uploaded artifacts. Daily runs retry after releases age.
+
+After verification, the workflow creates a Release Maestro CI App token using `RELEASE_APP_CLIENT_ID`
+and `RELEASE_APP_PRIVATE_KEY`, the same credentials as release-please. The token grants contents and
+pull request writes. It pushes and opens a ready-for-review `deps:` PR on
+`security/automated-remediation`, so normal CI runs. Merging remains a maintainer decision,
+especially for overrides across major versions.
+
+Each run rebuilds fixes from the scanned main revision. Identical retries do not push new commits.
+Changed inputs or a changed base update the same PR with an explicit branch lease. A changed main
+revision during preparation stops publication. So do unexpected commits anywhere on the automation
+branch and a same-repository PR owned by another actor; fork PRs never count as the automation PR.
+Commit authors, committers, subjects, and changed paths identify expected automation commits; this
+check is not a cryptographic proof of authorship. Do not hand-edit the reserved branch. To resume,
+resolve the human changes and delete the branch. A completed run without verified fixes closes the
+existing PR, including when every package is unresolved or covered by Dependabot. This prevents an
+old PR from retaining a verification claim after its candidate becomes vulnerable. A run with a
+failed package keeps the existing PR and branch unchanged. A transient failure therefore cannot
+discard a previous verified fix. A later successful run can create a new PR.
 
 ## SBOMs
 

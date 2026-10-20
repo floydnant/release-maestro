@@ -54,6 +54,12 @@ pnpm exec nx test maestro-renderer --runInBand \
   --testNamePattern="includes debug"
 ```
 
+Repository tools tests, filtered by file:
+
+```bash
+make test-tools TOOLS_TEST_ARGS=--testPathPatterns=security
+```
+
 Playwright spec and title filtering through Nx:
 
 ```bash
@@ -101,6 +107,9 @@ so uncommitted changes are not included.
 `make test-tools` runs the focused repository tools suite. `make test` and `make sure` include it.
 It includes the security gate, exception expiry, checksum verification, SBOM dependency scope, and
 GitHub dependency-snapshot graph tests.
+The tools suite also covers remediation freshness, rollback, complete advisory removal, and PR
+retry behavior.
+Use `make security-remediation-plan` for a live advisory preview without changing dependency inputs.
 Run `make security` separately for current npm and Rust vulnerability advisories, and `make sbom`
 for dependency inventories. See [security checks](security.md) for setup, CI, and exception policy.
 

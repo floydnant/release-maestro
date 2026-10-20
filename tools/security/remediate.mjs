@@ -1,0 +1,335 @@
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { parseAllDocuments, parseDocument } from 'yaml'
+import {
+    applyFirstEligibleFix,
+    applyVerifiedFix,
+    currentPrContainsMain,
+    dependencyInputs,
+    eligibleVersions,
+    isActionable,
+    isStableVersion,
+    lockVersions,
+    npmFindings,
+    pnpmVerdict,
+    RejectedFix,
+    remediationBody,
+    scopedOverrides,
+    targetsGroup,
+    verifiedRemediation,
+} from './remediation.mjs'
+
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+
+// Runs a command synchronously. Structured output callers read stdout; scanner diagnostics need stderr too.
+const runIn =
+    cwd =>
+    (command, args, { allowed = [0], includeStderr = false } = {}) => {
+        const result = spawnSync(command, args, { cwd, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 })
+        if (result.error) throw result.error
+        const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
+        if (!allowed.includes(result.status))
+            throw new Error(`${command} failed (${result.status}): ${output}`)
+        return includeStderr ? output : result.stdout
+    }
+
+// GETs JSON, or POSTs `body` as JSON when one is given.
+const request = async (url, body) => {
+    const response = await fetch(url, {
+        signal: AbortSignal.timeout(30_000),
+        ...(body
+            ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+            : {}),
+    })
+    if (!response.ok) throw new Error(`Request failed: ${response.status} ${url}`)
+    return response.json()
+}
+
+const json = path => JSON.parse(readFileSync(path, 'utf8'))
+
+// pnpm-lock.yaml can hold several YAML documents, so parse all of them.
+const documents = source =>
+    parseAllDocuments(source).map(document => {
+        if (document.errors.length) throw document.errors[0]
+        return document.toJS()
+    })
+
+// Plans (`plan`) or applies (`apply`) verified fixes for npm findings, one package group at a time, then
+// writes dist/security/remediation.json and remediation-pr.md. In apply mode, a failed package restores the
+// inputs from before its own attempt, and a failure that aborts the run restores the inputs it started from.
+//
+// The command, registry, and clock seams let tests drive the orchestration in a temporary checkout.
+export const remediate = async (
+    mode,
+    {
+        root = repositoryRoot,
+        run = runIn(root),
+        fetchJson = request,
+        now = new Date(),
+        log = console.log,
+    } = {},
+) => {
+    if (!['plan', 'apply'].includes(mode)) throw new Error('Usage: remediate.mjs plan|apply')
+
+    const output = join(root, 'dist/security')
+    const read = (path, encoding) => readFileSync(join(root, path), encoding)
+    const restore = inputs => {
+        for (const [file, bytes] of inputs) writeFileSync(join(root, file), bytes)
+    }
+    const snapshot = () => new Map(dependencyInputs.map(path => [path, read(path)]))
+    const lockedVersions = name => lockVersions(documents(read('pnpm-lock.yaml', 'utf8')), name)
+    const gh = (path, ...args) => run('gh', ['api', ...args, `repos/${process.env.GH_REPO}/${path}`])
+    // A new run or a rollback invalidates reports describing the previous dependency inputs.
+    const discardReports = () => {
+        for (const file of ['remediation.json', 'remediation-pr.md', 'osv.json', 'findings.json'])
+            rmSync(join(output, file), { force: true })
+    }
+
+    const scan = () => {
+        let diagnostics = ''
+        try {
+            // Exit 1 can mean findings or a scanner failure. Only a valid report establishes completion.
+            diagnostics = run(process.execPath, ['tools/security/cli.mjs', 'scan'], {
+                allowed: [0, 1],
+                includeStderr: true,
+            })
+            const findings = json(join(output, 'findings.json'))
+            if (!Array.isArray(findings)) throw new Error('Scanner findings report must be an array')
+            return findings
+        } catch (error) {
+            discardReports()
+            throw new Error(
+                `Security scan failed: ${error.message}${diagnostics ? `\n${diagnostics}` : ''}`,
+                {
+                    cause: error,
+                },
+            )
+        }
+    }
+
+    // A version is safe when OSV knows no active (non-withdrawn) advisory for it.
+    // A paginated response means the list is incomplete, so it never counts as safe.
+    const safeVersion = async (name, version) => {
+        const response = await fetchJson('https://api.osv.dev/v1/query', {
+            package: { name, ecosystem: 'npm' },
+            version,
+        })
+        if (response.vulns !== undefined && !Array.isArray(response.vulns))
+            throw new Error('Invalid OSV response')
+        return !response.next_page_token && !(response.vulns ?? []).some(v => !v.withdrawn)
+    }
+
+    // --- Preflight and baseline ---
+
+    discardReports()
+    if (mode === 'apply' && run('git', ['status', '--porcelain', '--', ...dependencyInputs]).trim())
+        throw new Error('Commit dependency input changes before applying remediation')
+    run('make', ['dependency-policy-check'])
+
+    const config = parseDocument(read('pnpm-workspace.yaml', 'utf8'))
+    if (config.errors.length) throw config.errors[0]
+    const age = config.get('minimumReleaseAge')
+    if (!Number.isFinite(age) || age < 0)
+        throw new Error('pnpm-workspace.yaml needs a non-negative minimumReleaseAge in minutes')
+
+    const originalInputs = snapshot()
+    const originalFindings = scan()
+    // Each verified fix replaces `currentFindings`, so later groups are judged against the updated inputs.
+    let currentFindings = originalFindings
+    const report = {
+        packages: [],
+        otherFindings: originalFindings.filter(f => f.ecosystem !== 'npm' && isActionable(f)),
+    }
+
+    // --- Open Dependabot PRs ---
+
+    // Read only Dependabot PRs. Never execute code or install packages from a PR branch.
+    const dependabotPrs = process.env.SECURITY_DEPENDABOT_PRS ? json(process.env.SECURITY_DEPENDABOT_PRS) : []
+    const mainRevision = run('git', ['rev-parse', 'HEAD']).trim()
+    const dependabotLocks = dependabotPrs
+        .filter(pr => currentPrContainsMain(JSON.parse(gh(`compare/${mainRevision}...${pr.headRefOid}`))))
+        .map(pr => ({
+            ...pr,
+            // The raw media type still returns lockfiles above the 1 MB JSON contents limit.
+            documents: documents(
+                gh(
+                    `contents/pnpm-lock.yaml?ref=${pr.headRefOid}`,
+                    '-H',
+                    'Accept: application/vnd.github.raw+json',
+                ),
+            ),
+        }))
+
+    // A PR covers a group when its lockfile drops every vulnerable version and every version it locks is safe.
+    const coveringPr = async group => {
+        for (const pr of dependabotLocks) {
+            const versions = lockVersions(pr.documents, group.name)
+            if (versions.some(version => group.versions.includes(version))) continue
+
+            let safe = true
+            for (const version of versions) if (!(await safeVersion(group.name, version))) safe = false
+            if (safe) return pr
+        }
+        return null
+    }
+
+    // --- Fix strategies, each verified by applyVerifiedFix ---
+
+    const pnpm = args => {
+        try {
+            run('pnpm', args)
+        } catch (error) {
+            throw pnpmVerdict(error)
+        }
+    }
+
+    // Lets pnpm move the package within its existing ranges, without touching package.json.
+    const updateLockfile = (group, target) => {
+        const locked = lockedVersions(group.name)
+        pnpm([
+            'update',
+            group.name,
+            '--depth',
+            '100',
+            '--lockfile-only',
+            '--ignore-scripts',
+            '--no-save',
+            '-r',
+        ])
+
+        // pnpm picks the highest version in range. Only the target passed the OSV check, so any other new
+        // version sends the attempt to the override.
+        const unvetted = lockedVersions(group.name).filter(
+            version => !locked.includes(version) && version !== target,
+        )
+        if (unvetted.length) throw new RejectedFix(`pnpm update resolved unvetted ${unvetted.join(', ')}`)
+    }
+
+    // Pins the vulnerable versions to `target` through pnpm-workspace.yaml overrides.
+    const overrideVersions = (group, target) => {
+        writeFileSync(
+            join(root, 'pnpm-workspace.yaml'),
+            scopedOverrides(read('pnpm-workspace.yaml', 'utf8'), group, target),
+        )
+        pnpm(['install', '--lockfile-only', '--no-frozen-lockfile', '--ignore-scripts'])
+    }
+
+    // The policy check is offline, so a failure is always a verdict on the candidate.
+    const checkPolicy = () => {
+        try {
+            run('make', ['dependency-policy-check'])
+        } catch (error) {
+            throw new RejectedFix(error.message)
+        }
+    }
+
+    // --- One package group ---
+
+    // Returns the group's outcome. Throws only for failures that leave the outcome unknown, such as a failed
+    // network lookup, a scanner crash, or a pnpm network error.
+    const remediateGroup = async (group, before) => {
+        if (!currentFindings.some(finding => targetsGroup(finding, group)))
+            return { status: 'fixed', reason: 'Verified by the full scan', method: 'earlier fix in this run' }
+
+        const pr = await coveringPr(group)
+        if (pr) return { status: 'covered', reason: `Existing Dependabot PR: ${pr.url}` }
+
+        const prereleases = group.versions.filter(version => !isStableVersion(version))
+        if (prereleases.length)
+            return {
+                status: 'unresolved',
+                reason: `Installed prerelease ${prereleases.join(', ')} needs manual remediation.`,
+            }
+
+        const advisories = await Promise.all(
+            group.ids.map(id => fetchJson(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`)),
+        )
+        const registry = await fetchJson(`https://registry.npmjs.org/${encodeURIComponent(group.name)}`)
+        const candidates = eligibleVersions(group, advisories, registry, age, now)
+
+        // The last rejection explains why no candidate was used.
+        let unresolvedReason = 'No eligible published fix; retry daily.'
+        const result = await applyFirstEligibleFix(candidates, {
+            isSafe: target => safeVersion(group.name, target),
+            apply: target => {
+                log(`ATTEMPT ${group.name}@${target}`)
+                if (mode === 'plan') return {}
+                return applyVerifiedFix(currentFindings, group, {
+                    update: () => updateLockfile(group, target),
+                    override: () => overrideVersions(group, target),
+                    scan,
+                    restore: () => restore(before),
+                    policy: checkPolicy,
+                })
+            },
+            // A rejected attempt has already restored the inputs that `currentFindings` describes.
+            rejected: (target, error) => {
+                unresolvedReason = error.message
+                log(`RETRY ${group.name}@${target}: ${error.message.split('\n')[0]}`)
+            },
+        })
+        if (!result) return { status: 'unresolved', reason: unresolvedReason }
+
+        const { findings: after, ...applied } = result
+        if (mode === 'plan')
+            return { status: 'planned', reason: `Eligible fix: ${applied.target}`, ...applied }
+        currentFindings = after
+        return { status: 'fixed', reason: 'Verified by the full scan', ...applied }
+    }
+
+    // --- Run every group, then re-verify the combined result ---
+
+    try {
+        for (const group of npmFindings(originalFindings)) {
+            const before = snapshot()
+            let outcome
+            try {
+                outcome = await remediateGroup(group, before)
+            } catch (error) {
+                // The publisher keeps an existing remediation branch when any group failed.
+                restore(before)
+                outcome = { status: 'failed', reason: error.message }
+            }
+            report.packages.push({ ...group, ...outcome })
+        }
+
+        // Leave reports describing the final inputs, and re-verify every fix against them.
+        if (mode === 'apply') {
+            const finalFindings = scan()
+            const fixed = report.packages.filter(item => item.status === 'fixed')
+            if (fixed.some(item => !verifiedRemediation(originalFindings, finalFindings, item)))
+                throw new Error('The final scan invalidated remediation')
+
+            const finalLock = documents(read('pnpm-lock.yaml', 'utf8'))
+            for (const item of fixed) item.resolvedVersions = lockVersions(finalLock, item.name)
+        }
+
+        // --- Reports ---
+
+        mkdirSync(output, { recursive: true })
+        writeFileSync(join(output, 'remediation.json'), `${JSON.stringify(report, null, 2)}\n`)
+        writeFileSync(join(output, 'remediation-pr.md'), remediationBody(report))
+        for (const item of report.packages) log(`${item.status.toUpperCase()} ${item.name}: ${item.reason}`)
+        log('Reports: dist/security/remediation.json and remediation-pr.md')
+        return report
+    } catch (error) {
+        try {
+            if (mode === 'apply') {
+                restore(originalInputs)
+                error.message = `${error.message}; all dependency changes were restored`
+            }
+        } finally {
+            discardReports()
+        }
+        throw error
+    }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    remediate(process.argv[2]).catch(error => {
+        console.error(error.message)
+        process.exitCode = 1
+    })
+}
