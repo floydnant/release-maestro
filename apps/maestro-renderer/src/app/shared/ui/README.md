@@ -39,8 +39,9 @@ have to cancel most of a component's classes to keep the existing look, the elem
 component: keep its own markup, as the track grid, catalog rows, album tiles, stat tiles and inline
 error messages do. Native `<details>` stays the disclosure control for raw diagnostic payloads.
 
-Sidebar links use the `navigation` button variant. Angular's `RouterLinkActive` sets
-`aria-current="page"`, and the shared variant supplies the active appearance.
+Sidebar links use `hlmSidebarMenuButton` or `hlmSidebarMenuSubButton` from the shared sidebar family.
+Angular's `RouterLinkActive` sets `aria-current="page"`, and the shared directives supply the active
+appearance. Settings links use `settingsLink(section)` to open the dialog over the current page.
 
 Text links come in two variants, neither takes a button size, and both rest in the text colors
 rather than an accent. `link` is for internal navigation to library entities and settings: it
