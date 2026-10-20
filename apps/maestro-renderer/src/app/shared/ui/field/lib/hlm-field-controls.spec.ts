@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core'
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core'
 import { TestBed } from '@angular/core/testing'
-import { HlmField, HlmFieldDescription, HlmFieldLabel } from '@spartan-ng/helm/field'
+import { HlmField, HlmFieldDescription, HlmFieldError, HlmFieldLabel } from '@spartan-ng/helm/field'
 import { HlmNativeSelect } from '@spartan-ng/helm/native-select'
 import { HlmInput } from '@spartan-ng/helm/input'
 import { HlmTextarea } from '@spartan-ng/helm/textarea'
@@ -34,7 +34,55 @@ class FieldControlsTest {}
 })
 class NativeSelectFieldTest {}
 
+@Component({
+    selector: 'hlm-forced-error-test',
+    imports: [HlmField, HlmInput, HlmFieldDescription, HlmFieldError],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    template: `
+        <div hlmField>
+            <input hlmInput aria-label="Title" />
+            <p hlmFieldDescription id="field-hint">Use the release title.</p>
+            @if (showError()) {
+                <hlm-field-error [id]="errorId()" [forceShow]="forceShow()">Could not save.</hlm-field-error>
+            }
+        </div>
+    `,
+})
+class ForcedErrorTest {
+    readonly forceShow = signal(true)
+    readonly errorId = signal('save-error')
+    readonly showError = signal(true)
+}
+
 describe('Helm field controls', () => {
+    it('associates a visible forced error with its control and removes stale associations', async () => {
+        const fixture = TestBed.createComponent(ForcedErrorTest)
+        fixture.detectChanges()
+        await fixture.whenStable()
+
+        const control: HTMLInputElement = fixture.nativeElement.querySelector('input')
+        const error: HTMLElement = fixture.nativeElement.querySelector('hlm-field-error')
+        expect(error.hidden).toBe(false)
+        expect(control.getAttribute('aria-describedby')).toBe('field-hint save-error')
+
+        fixture.componentInstance.forceShow.set(false)
+        fixture.detectChanges()
+        await fixture.whenStable()
+        expect(error.hidden).toBe(true)
+        expect(control.getAttribute('aria-describedby')).toBe('field-hint')
+
+        fixture.componentInstance.forceShow.set(true)
+        fixture.componentInstance.errorId.set('retry-error')
+        fixture.detectChanges()
+        await fixture.whenStable()
+        expect(control.getAttribute('aria-describedby')).toBe('field-hint retry-error')
+
+        fixture.componentInstance.showError.set(false)
+        fixture.detectChanges()
+        await fixture.whenStable()
+        expect(control.getAttribute('aria-describedby')).toBe('field-hint')
+    })
+
     it('keeps the caller label target and id outside a Field', () => {
         const fixture = TestBed.createComponent(FieldControlsTest)
         fixture.detectChanges()
