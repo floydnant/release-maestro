@@ -37,14 +37,12 @@
                 </nav>
             </div>
 
-            <div class="sidebar__content | flex min-h-0 flex-1 flex-col p-4">
-                <nav>
-                    <ul class="flex flex-col gap-1">
-                        <li>
+            <div hlmSidebarContent class="sidebar__content | p-2">
+                <nav class="sidebar__nav |" aria-label="Main">
+                    <ul hlmSidebarMenu>
+                        <li hlmSidebarMenuItem>
                             <a
-                                hlmBtn
-                                variant="navigation"
-                                class="w-full"
+                                hlmSidebarMenuButton
                                 routerLink="/home"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
@@ -52,90 +50,76 @@
                                 >Home</a
                             >
                         </li>
-                        <li>
+                        <li hlmSidebarMenuItem>
                             <a
-                                hlmBtn
-                                variant="navigation"
-                                class="w-full"
+                                hlmSidebarMenuButton
                                 routerLink="/feed"
                                 routerLinkActive=""
                                 ariaCurrentWhenActive="page"
                                 >Feed</a
                             >
                         </li>
-                        <li>
-                            <a
-                                hlmBtn
-                                variant="navigation"
-                                class="w-full"
-                                routerLink="/tracks"
-                                routerLinkActive=""
-                                ariaCurrentWhenActive="page"
-                                >Tracks</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                hlmBtn
-                                variant="navigation"
-                                class="w-full"
-                                routerLink="/albums"
-                                routerLinkActive=""
-                                ariaCurrentWhenActive="page"
-                                >Albums</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                hlmBtn
-                                variant="navigation"
-                                class="w-full"
-                                routerLink="/artists"
-                                routerLinkActive=""
-                                ariaCurrentWhenActive="page"
-                                >Artists</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                hlmBtn
-                                variant="navigation"
-                                class="w-full"
-                                routerLink="/record-labels"
-                                routerLinkActive=""
-                                ariaCurrentWhenActive="page"
-                                >Record labels</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                hlmBtn
-                                variant="navigation"
-                                class="w-full"
-                                routerLink="/genres"
-                                routerLinkActive=""
-                                ariaCurrentWhenActive="page"
-                                >Genres</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                hlmBtn
-                                variant="navigation"
-                                class="w-full"
-                                routerLink="/settings"
-                                routerLinkActive=""
-                                ariaCurrentWhenActive="page"
-                                >Settings</a
-                            >
-                        </li>
                     </ul>
+                    <div hlmSidebarGroup class="px-0">
+                        <div hlmSidebarGroupLabel id="sidebar-group-library">Library</div>
+                        <ul hlmSidebarMenu aria-labelledby="sidebar-group-library">
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/tracks"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Tracks</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/albums"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Albums</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/artists"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Artists</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/record-labels"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Record labels</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/genres"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Genres</a
+                                >
+                            </li>
+                        </ul>
+                    </div>
                 </nav>
 
                 @if (showLibrarySetupCta()) {
-                    <hr />
-                    <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
-                    <a hlmBtn class="mt-2 w-full" routerLink="/import">Set up library</a>
+                    <div hlmSidebarSeparator class="-mx-2"></div>
+                    <div class="sidebar__setup-cta | px-3 pt-2">
+                        <p class="type-body-sm text-content-secondary">
+                            Your music library isn't set up yet.
+                        </p>
+                        <a hlmBtn class="mt-2 w-full" routerLink="/import">Set up library</a>
+                    </div>
                 }
 
                 <div class="flex h-full items-center justify-center">
@@ -151,6 +135,18 @@
                         </button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Settings are about the app, not the library, so they sit apart at the bottom. -->
+            <div hlmSidebarFooter class="sidebar__footer | border-t border-border-subtle">
+                <ul hlmSidebarMenu>
+                    <li hlmSidebarMenuItem>
+                        <a hlmSidebarMenuButton [routerLink]="settingsLink('library-folders')">
+                            <app-icon name="settings" size="16" aria-hidden="true"></app-icon>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
             </div>
         </aside>
     }
@@ -389,4 +385,7 @@
             <router-outlet></router-outlet>
         </main>
     </div>
+
+    <!-- Settings open as a dialog over whatever page is showing. -->
+    <router-outlet name="modal"></router-outlet>
 </div>

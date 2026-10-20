@@ -28,7 +28,9 @@ const remPadding = (
 test.describe('existing control appearance', () => {
     test('keeps the arrow cursor on styled links and disclosures', async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/settings/debug')
-        const navigationLink = page.getByRole('link', { name: 'Settings', exact: true })
+        const navigationLink = page
+            .getByRole('dialog', { name: 'Settings' })
+            .getByRole('link', { name: 'Library folders', exact: true })
         await navigationLink.hover()
         await expect(navigationLink).toHaveCSS('cursor', 'default')
         const disclosure = page.locator('summary', { hasText: 'Health payload' })
@@ -41,7 +43,7 @@ test.describe('existing control appearance', () => {
         await expect(forward).toBeDisabled()
         await expect(forward).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
 
-        await page.getByRole('link', { name: 'Settings', exact: true }).click()
+        await page.getByRole('link', { name: 'Feed', exact: true }).click()
         const back = page.getByRole('button', { name: 'Back', exact: true })
         await expect(back).toBeEnabled()
         await page.mouse.move(0, 0)

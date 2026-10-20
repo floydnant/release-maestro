@@ -4,11 +4,12 @@ import { createRendererScenario, scenarioBuilder } from '../scenario-harness'
 test.describe('existing field appearance', () => {
     test('keeps the mailbox label, help and input at the original spacing', async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/settings/apple-mail')
-        const label = page.getByText('Mailbox Name', { exact: true })
+        // The visible label is "Name"; the Mailbox heading supplies the rest of the input's name.
+        const label = page.locator('label[for="setting-mailboxName-input"]')
         const description = page.getByText('The name of the mailbox to import from Apple Mail.', {
             exact: true,
         })
-        const input = page.getByLabel('Mailbox Name')
+        const input = page.getByRole('textbox', { name: 'Mailbox Name' })
         await expect(input).toBeVisible()
         await expect(input).toHaveAccessibleDescription('The name of the mailbox to import from Apple Mail.')
 

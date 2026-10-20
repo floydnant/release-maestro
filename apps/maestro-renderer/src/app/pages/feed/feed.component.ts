@@ -27,6 +27,7 @@ import {
     formatDuration,
     formatReleaseDateRelative,
 } from '../../shared/utils/formatting.utils'
+import { settingsLink } from '../settings/settings-link'
 
 const NUM_PREFETCH_ITEMS = 5
 const SEEK_BY_SECONDS = 30
@@ -67,6 +68,7 @@ export class FeedComponent {
     electronService = inject(ElectronService)
     feedService = inject(FeedService)
     audioPlayer = inject(WebAudioPlayer)
+    readonly settingsLink = settingsLink
     readonly playbackProgressLabel = (value: number, max: number) =>
         `${formatDuration(value)} of ${formatDuration(max)}`
 

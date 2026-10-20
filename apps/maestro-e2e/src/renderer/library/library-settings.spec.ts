@@ -74,7 +74,7 @@ test.describe('library settings scenarios', () => {
                 value: { status: reading, albums: [], lastScan: null },
             })
             .build()
-        const controller = await createRendererScenario(page, scenario, '/settings/library')
+        const controller = await createRendererScenario(page, scenario, '/settings/library-folders')
 
         await expect(page.getByText('Reading tracks… 1/2')).toBeVisible()
         await expect(page.getByRole('button', { name: 'Rescan now' })).toBeDisabled()
@@ -106,7 +106,7 @@ test.describe('library settings scenarios', () => {
             kind: 'resolve',
             value: { library: { folders: [], onboardingSkipped: true }, emailPluginConfig: {} },
         })
-        await page.getByRole('link', { name: 'Home' }).click()
+        await page.keyboard.press('Escape')
         await expect(page).toHaveURL(/\/home$/)
     })
 
@@ -128,7 +128,7 @@ test.describe('library settings scenarios', () => {
                 ],
             })
             .build()
-        await createRendererScenario(page, scenario, '/settings/library')
+        await createRendererScenario(page, scenario, '/settings/library-folders')
 
         await expect(page.getByText(/Folder not found \(is the drive connected\?\)/)).toBeVisible()
         await expect(page.getByText('Its tracks are marked missing.')).toBeVisible()
@@ -151,7 +151,7 @@ test.describe('library settings scenarios', () => {
                 ],
             })
             .build()
-        await createRendererScenario(page, scenario, '/settings/library')
+        await createRendererScenario(page, scenario, '/settings/library-folders')
 
         await expect(page.getByText(/Skipping, already covered by \/music/)).toBeVisible()
         await expect(page.getByRole('button', { name: /Rescan now|Save and rescan/ })).toBeEnabled()
@@ -166,7 +166,7 @@ test.describe('library settings scenarios', () => {
                 value: { status: scanStatus(terminal), albums: [], lastScan: null },
             })
             .build()
-        await createRendererScenario(page, scenario, '/settings/library')
+        await createRendererScenario(page, scenario, '/settings/library-folders')
 
         await expect(page.getByLabel('Latest scan result')).toContainText('Completed')
         await expect(page.getByLabel('Latest scan result')).toContainText('1 failed')
@@ -197,7 +197,7 @@ test.describe('library settings scenarios', () => {
                 value: { status: scanStatus(terminal), albums: [], lastScan: null },
             })
             .build()
-        await createRendererScenario(page, scenario, '/settings/library')
+        await createRendererScenario(page, scenario, '/settings/library-folders')
 
         const lastFailure = page.getByText('broken-track-20.mp3')
         await expect(lastFailure).not.toBeInViewport()
@@ -226,7 +226,7 @@ test.describe('library settings scenarios', () => {
                 },
             })
             .build()
-        await createRendererScenario(page, scenario, '/settings/library')
+        await createRendererScenario(page, scenario, '/settings/library-folders')
 
         await expect(page.getByText(/Last scan: .*10 tracks/)).toBeVisible()
         await expect(page.getByRole('heading', { name: 'Failed files' })).toBeHidden()
@@ -250,7 +250,7 @@ test.describe('library settings scenarios', () => {
                 value: { status: scanStatus(terminal), albums: [], lastScan: null },
             })
             .build()
-        await createRendererScenario(page, scenario, '/settings/library')
+        await createRendererScenario(page, scenario, '/settings/library-folders')
 
         await expect(page.getByLabel('Latest scan result')).toContainText('Failed')
         await expect(page.getByText('The metadata engine stopped responding')).toBeVisible()
@@ -276,7 +276,7 @@ test.describe('library settings scenarios', () => {
                 value: { status: scanStatus(terminal), albums: [], lastScan: null },
             })
             .build()
-        await createRendererScenario(page, scenario, '/settings/library')
+        await createRendererScenario(page, scenario, '/settings/library-folders')
 
         await expect(page.getByLabel('Latest scan result')).toContainText('Completed')
         await expect(page.getByLabel('Latest scan result')).toContainText('42 missing')
