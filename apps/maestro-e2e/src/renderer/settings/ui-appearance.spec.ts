@@ -35,9 +35,7 @@ test.describe('existing control appearance', () => {
         await expect(disclosure).toHaveCSS('cursor', 'default')
     })
 
-    test('history buttons share the quiet control states and stay unfilled while disabled', async ({
-        page,
-    }) => {
+    test('history buttons fill only on pointer hover and retain a keyboard focus ring', async ({ page }) => {
         await createRendererScenario(page, scenarioBuilder().build(), '/home')
         const forward = page.getByRole('button', { name: 'Forward', exact: true })
         await expect(forward).toBeDisabled()
@@ -54,7 +52,8 @@ test.describe('existing control appearance', () => {
         await page.mouse.move(0, 0)
         await page.getByRole('link', { name: 'Home', exact: true }).press('Shift+Tab')
         await expect(back).toBeFocused()
-        await expect(back).toHaveCSS('background-color', hovered)
+        await expect(back).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+        await expect(back).not.toHaveCSS('box-shadow', 'none')
     })
 
     test('gives every single-line control one height, whatever its border or type', async ({ page }) => {

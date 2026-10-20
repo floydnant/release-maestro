@@ -23,7 +23,7 @@ describe(HlmSpinner.name, () => {
             expect(circle.getAttribute('cy')).toBe('11')
         }
         for (const arc of circles.slice(1)) {
-            expect(arc.getAttribute('stroke')).toBe(semanticColor('content.primary'))
+            expect(arc.getAttribute('stroke')).toBe(semanticColor('content.action'))
             expect(Number(arc.getAttribute('stroke-dashoffset'))).toBeCloseTo(9.6 * Math.PI)
         }
         expect(element.querySelector('app-icon')).toBeNull()

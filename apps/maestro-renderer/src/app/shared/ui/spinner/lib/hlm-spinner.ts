@@ -53,7 +53,7 @@ export class HlmSpinner {
     public readonly ariaLabel = input<string>('Loading', { alias: 'aria-label' })
     public readonly diameter = input(22)
     public readonly strokeWidth = input(2.5)
-    public readonly color = input<string | undefined>(semanticColor('content.primary'))
+    public readonly color = input<string | undefined>(semanticColor('content.action'))
     public readonly bgColor = input<string | undefined>(semanticColor('border.subtle'))
 
     protected readonly position = computed(() => this.diameter() / 2)

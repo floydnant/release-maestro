@@ -31,6 +31,9 @@ appearance uses `variant="plain" size="none"`, with its existing layout and typo
 targets and sortable headings must not acquire hover backgrounds. Only filled variants show a
 disabled fill; quiet and text variants dim their content.
 
+History buttons use `variant="history"`. Their background appears only on pointer hover; keyboard
+focus keeps the shared focus ring without a background.
+
 Use a shared component where it supplies the element's appearance or behavior. When a caller would
 have to cancel most of a component's classes to keep the existing look, the element is not that
 component: keep its own markup, as the track grid, catalog rows, album tiles, stat tiles and inline

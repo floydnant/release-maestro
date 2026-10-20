@@ -39,6 +39,7 @@
         "Content-sized controls and a plain button variant preserve existing appearance",
         "Internal and external text link variants inherit surrounding typography",
         "Disabled fill applies only to filled button variants",
+        "History button backgrounds use native pointer hover while keeping the shared keyboard focus ring",
         "Card is a plain panel unless composed from header/content/footer parts",
         "Native textarea rows and explicit field spacing preserve original form layout",
         "Tooltips use a 600ms delay and wrap within 24rem and the viewport",

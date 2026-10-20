@@ -26,6 +26,9 @@ describe('ProgressRingComponent', () => {
         expect(meter?.getAttribute('width')).toBe('25')
         expect(meter?.getAttribute('height')).toBe('25')
         expect(meter?.querySelector('.progress-ring')?.getAttribute('r')).toBe('7.5')
+        expect(meter?.querySelector('.progress-ring')?.getAttribute('stroke')).toBe(
+            semanticColor('content.action'),
+        )
         expect(Number(meter?.querySelector('.progress-ring')?.getAttribute('stroke-dashoffset'))).toBeCloseTo(
             3.75 * Math.PI,
         )
