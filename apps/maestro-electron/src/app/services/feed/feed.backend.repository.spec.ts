@@ -1,3 +1,4 @@
+import { DEFAULT_FEED_SNOOZE_HOURS } from '@release-maestro/core'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { bandcampFeedItem } from '../../../test/fixtures/feed.fixture'
 import { FeedBackendRepository } from './feed.backend.repository'
@@ -29,9 +30,16 @@ describe('FeedBackendRepository exclusions', () => {
             ])
             const excludedIds = Array.from({ length: 40000 }, (_, index) => `excluded-${index}`)
             excludedIds.push('excluded')
-            expect((await repository.listFeedItems(0, 5, excludedIds)).map(item => item.id)).toEqual([
-                'remaining',
-            ])
+            expect(
+                (
+                    await repository.listFeedItems({
+                        index: 0,
+                        count: 5,
+                        excludedIds,
+                        snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+                    })
+                ).map(item => item.id),
+            ).toEqual(['remaining'])
         } finally {
             database.sqlite.close()
         }
@@ -54,7 +62,9 @@ describe('FeedBackendRepository snooze', () => {
             const viewedAt = Date.now()
             const idsAfterHours = async (hours: number) => {
                 jest.spyOn(Date, 'now').mockReturnValue(viewedAt + hours * 60 * 60 * 1000)
-                return (await repository.listFeedItems(0, 5, [], 2)).map(item => item.id)
+                return (await repository.listFeedItems({ index: 0, count: 5, snoozeHours: 2 })).map(
+                    item => item.id,
+                )
             }
 
             expect(await idsAfterHours(1.9)).toEqual([])

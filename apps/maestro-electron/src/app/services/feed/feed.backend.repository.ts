@@ -1,5 +1,5 @@
 import { and, count, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm'
-import { DEFAULT_FEED_SNOOZE_HOURS, EmailVendor, FeedItemMaster } from '@release-maestro/core'
+import { EmailVendor, FeedItemMaster } from '@release-maestro/core'
 import { DatabaseClient } from '../../database/database.client'
 import {
     feedEmailImportCheckpointsTable,
@@ -22,12 +22,17 @@ export class FeedBackendRepository {
         await this.db.db.insert(feedItemsTable).values(feedItemsToIngest).onConflictDoNothing()
     }
 
-    async listFeedItems(
-        index: number,
-        count: number,
-        excludedIds: string[] = [],
-        snoozeHours = DEFAULT_FEED_SNOOZE_HOURS,
-    ): Promise<FeedItemMaster[]> {
+    async listFeedItems({
+        index,
+        count,
+        excludedIds = [],
+        snoozeHours,
+    }: {
+        index: number
+        count: number
+        excludedIds?: string[]
+        snoozeHours: number
+    }): Promise<FeedItemMaster[]> {
         const snoozedBefore = new Date(Date.now() - snoozeHours * 60 * 60 * 1000)
         const items = await this.db.db
             .select()

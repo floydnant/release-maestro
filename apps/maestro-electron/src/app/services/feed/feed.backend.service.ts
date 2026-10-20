@@ -9,6 +9,7 @@ import {
     assertUnreachable,
     isUsefulUrlFromBandcampEmail,
     mapBandcampReleaseFeedItemToHydratedFeedItem,
+    resolveFeedSettings,
 } from '@release-maestro/core'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import {
@@ -244,7 +245,8 @@ export class FeedBackendService {
 
     async hydrateFeed(
         items: BandcampFeedItem[],
-        hideUnplayableReleases = this.settingsService.getSettings().feed?.hideUnplayableReleases ?? true,
+        hideUnplayableReleases = resolveFeedSettings(this.settingsService.getSettings().feed)
+            .hideUnplayableReleases,
     ): Promise<HydratedFeedItem[]> {
         console.log('Hydrating feed items')
         const promises = items.map(async item => {
@@ -284,19 +286,20 @@ export class FeedBackendService {
     }
 
     async loadFeed(index: number, count: number, excludedIds: string[] = []): Promise<HydratedFeedItem[]> {
-        const feedSettings = this.settingsService.getSettings().feed
-        const hideUnplayableReleases = feedSettings?.hideUnplayableReleases ?? true
+        const { hideUnplayableReleases, snoozeHours } = resolveFeedSettings(
+            this.settingsService.getSettings().feed,
+        )
         const items: HydratedFeedItem[] = []
         const scannedIds = [...excludedIds]
         // Hidden releases remain unviewed. Continue past them to fill the visible page.
         while (items.length < count) {
             const remaining = count - items.length
-            const candidates = await this.feedBackendRepository.listFeedItems(
+            const candidates = await this.feedBackendRepository.listFeedItems({
                 index,
-                remaining,
-                scannedIds,
-                feedSettings?.snoozeHours,
-            )
+                count: remaining,
+                excludedIds: scannedIds,
+                snoozeHours,
+            })
             if (candidates.length === 0) break
             items.push(...(await this.hydrateFeed(candidates, hideUnplayableReleases)))
             scannedIds.push(...candidates.map(item => item.id))

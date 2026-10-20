@@ -49,7 +49,7 @@ test('saves snooze hours to two decimals and blocks other entries', async ({ pag
     const dialog = page.getByRole('dialog', { name: 'Settings' })
     const snoozeHours = dialog.getByRole('spinbutton', { name: snoozeLabel })
     const save = dialog.getByRole('button', { name: 'Save', exact: true })
-    const rangeError = dialog.getByRole('alert').filter({ hasText: 'with at most two decimal places' })
+    const rangeError = dialog.getByRole('alert').filter({ hasText: 'with at most 2 decimal places' })
     await expect(dialog.getByRole('heading', { name: 'Snooze' })).toBeVisible()
     await expect(snoozeHours).toHaveValue('16')
     await expect(snoozeHours).toHaveAccessibleDescription(/returns to your feed this many hours/)
@@ -60,9 +60,9 @@ test('saves snooze hours to two decimals and blocks other entries', async ({ pag
     await expect(rangeError).toBeVisible()
     expect(await snoozeHours.evaluate((field: HTMLInputElement) => field.validity.badInput)).toBe(true)
 
-    for (const invalid of ['0', '169', '1.555', '']) {
+    for (const invalid of ['0', '169', '1.555', '16.000000000000004', '']) {
         await snoozeHours.fill(invalid)
-        await expect(rangeError).toHaveText('Enter 1 to 168 hours, with at most two decimal places.')
+        await expect(rangeError).toHaveText('Enter 1 to 168 hours, with at most 2 decimal places.')
         await expect(snoozeHours).toHaveAttribute('aria-invalid', 'true')
         await expect(save).toBeDisabled()
     }

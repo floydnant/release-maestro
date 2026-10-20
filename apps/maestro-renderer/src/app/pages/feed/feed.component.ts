@@ -11,7 +11,7 @@ import {
 } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
-import { assertUnreachable, DEFAULT_FEED_SNOOZE_HOURS, HydratedFeedItem } from '@release-maestro/core'
+import { assertUnreachable, HydratedFeedItem, resolveFeedSettings } from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
@@ -75,9 +75,9 @@ export class FeedComponent {
     /** How long a snoozed release stays away, from Settings → Feed. */
     private readonly snoozeDuration = computed(() => {
         const settings = this.settingsService.settings
-        const hours =
-            (settings.hasValue() ? settings.value()?.feed?.snoozeHours : undefined) ??
-            DEFAULT_FEED_SNOOZE_HOURS
+        const { snoozeHours: hours } = resolveFeedSettings(
+            settings.hasValue() ? settings.value()?.feed : undefined,
+        )
         return hours === 1 ? '1 hour' : `${hours} hours`
     })
     readonly snoozeHint = computed(() => `Snooze: show this release again in ${this.snoozeDuration()}`)

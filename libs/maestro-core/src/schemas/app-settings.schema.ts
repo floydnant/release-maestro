@@ -21,12 +21,13 @@ export const MIN_FEED_SNOOZE_HOURS = 1
 /** One week. */
 export const MAX_FEED_SNOOZE_HOURS = 168
 /** Hundredths of an hour; finer steps would be too small to notice. */
-export const FEED_SNOOZE_HOURS_STEP = 0.01
+export const FEED_SNOOZE_HOURS_DECIMALS = 2
+export const FEED_SNOOZE_HOURS_STEP = 10 ** -FEED_SNOOZE_HOURS_DECIMALS
 export const feedSnoozeHoursSchema = z
     .number()
     .min(MIN_FEED_SNOOZE_HOURS)
     .max(MAX_FEED_SNOOZE_HOURS)
-    .multipleOf(FEED_SNOOZE_HOURS_STEP)
+    .refine(hours => Number(hours.toFixed(FEED_SNOOZE_HOURS_DECIMALS)) === hours)
 
 const librarySettingsSchema = z.object({
     /** The folders that make up the user's music library. Absent/empty until onboarding/setup. */
@@ -53,6 +54,11 @@ export const appSettingsSchema = z.object({
     emailPluginConfig: emailPluginConfigSchema.catch({}),
 })
 export type AppSettings = z.infer<typeof appSettingsSchema>
+
+export const resolveFeedSettings = (feed?: AppSettings['feed']) => ({
+    hideUnplayableReleases: feed?.hideUnplayableReleases ?? true,
+    snoozeHours: feed?.snoozeHours ?? DEFAULT_FEED_SNOOZE_HOURS,
+})
 
 /**
  * Tolerant variant for *reading* a possibly stale/hand-edited store: individually

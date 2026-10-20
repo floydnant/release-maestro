@@ -74,25 +74,26 @@
                     [max]="maxSnoozeHours"
                     [step]="snoozeHoursStep"
                     [aria-describedby]="
-                        snoozeHours() === null
+                        snoozeHoursInvalid()
                             ? 'feed-snooze-hours-description feed-snooze-hours-error'
                             : 'feed-snooze-hours-description'
                     "
-                    [attr.aria-invalid]="snoozeHours() === null"
-                    [forceInvalid]="snoozeHours() === null"
+                    [attr.aria-invalid]="snoozeHoursInvalid()"
+                    [forceInvalid]="snoozeHoursInvalid()"
                     [disabled]="saving()"
                     [value]="savedSnoozeHours()"
                     (input)="snoozeHoursText.set(snoozeHoursField.value)"
                 />
                 <span id="feed-snooze-hours-unit" class="type-body-md text-content-secondary">hours</span>
             </div>
-            @if (snoozeHours() === null) {
+            @if (snoozeHoursInvalid()) {
                 <p
                     class="feed-snooze-hours-error | mt-2 type-body-sm text-content-danger"
                     id="feed-snooze-hours-error"
                     role="alert"
                 >
-                    Enter {{ minSnoozeHours }} to {{ maxSnoozeHours }} hours, with at most two decimal places.
+                    Enter {{ minSnoozeHours }} to {{ maxSnoozeHours }} hours, with at most
+                    {{ snoozeHoursDecimals }} decimal places.
                 </p>
             }
         </section>
@@ -103,7 +104,7 @@
                     hlmBtn
                     class="feed-settings-save |"
                     type="button"
-                    [disabled]="saving() || snoozeHours() === null"
+                    [disabled]="saving() || snoozeHoursInvalid()"
                     (click)="saveSettings($event)"
                 >
                     {{ saving() ? 'Saving…' : 'Save' }}

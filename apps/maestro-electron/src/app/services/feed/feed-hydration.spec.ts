@@ -1,4 +1,4 @@
-import { AppSettings } from '@release-maestro/core'
+import { AppSettings, DEFAULT_FEED_SNOOZE_HOURS } from '@release-maestro/core'
 import { fromPartial } from '@total-typescript/shoehorn'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { bandcampFeedItem, scrapedRelease } from '../../../test/fixtures/feed.fixture'
@@ -54,7 +54,15 @@ describe('feed hydration playable-track filter', () => {
             const items = await seed('hidden')
             scrape.mockResolvedValue(scrapedRelease(urls))
             await expect(service.hydrateFeed(items)).resolves.toEqual([])
-            expect((await repository.listFeedItems(0, 1))[0]?.lastViewedAt).toBeNull()
+            expect(
+                (
+                    await repository.listFeedItems({
+                        index: 0,
+                        count: 1,
+                        snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+                    })
+                )[0]?.lastViewedAt,
+            ).toBeNull()
         },
     )
 
@@ -83,7 +91,9 @@ describe('feed hydration playable-track filter', () => {
     it('returns an empty page when every candidate is hidden, without recording views', async () => {
         await seed('one', 'two', 'three')
         await expect(service.loadFeed(0, 2)).resolves.toEqual([])
-        expect(await repository.listFeedItems(0, 5)).toHaveLength(3)
+        expect(
+            await repository.listFeedItems({ index: 0, count: 5, snoozeHours: DEFAULT_FEED_SNOOZE_HOURS }),
+        ).toHaveLength(3)
         expect(database.db.query.feedItemHistoryEntriesTable.findMany().sync()).toEqual([])
     })
 
@@ -146,6 +156,10 @@ describe('feed hydration playable-track filter', () => {
         settings.patchSettings({ feed: { hideUnplayableReleases: false } })
         const items = await service.loadFeed(0, 5)
         expect(items[0]?.error).not.toBeNull()
-        expect((await repository.listFeedItems(0, 1))[0]?.lastViewedAt).toBeNull()
+        expect(
+            (
+                await repository.listFeedItems({ index: 0, count: 1, snoozeHours: DEFAULT_FEED_SNOOZE_HOURS })
+            )[0]?.lastViewedAt,
+        ).toBeNull()
     })
 })

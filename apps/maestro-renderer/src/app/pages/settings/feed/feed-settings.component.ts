@@ -11,11 +11,12 @@ import {
     viewChild,
 } from '@angular/core'
 import {
-    DEFAULT_FEED_SNOOZE_HOURS,
+    FEED_SNOOZE_HOURS_DECIMALS,
     FEED_SNOOZE_HOURS_STEP,
     feedSnoozeHoursSchema,
     MAX_FEED_SNOOZE_HOURS,
     MIN_FEED_SNOOZE_HOURS,
+    resolveFeedSettings,
 } from '@release-maestro/core'
 import { HlmButton } from '@spartan-ng/helm/button'
 import { HlmInput } from '@spartan-ng/helm/input'
@@ -37,17 +38,20 @@ export class FeedSettingsComponent {
     readonly minSnoozeHours = MIN_FEED_SNOOZE_HOURS
     readonly maxSnoozeHours = MAX_FEED_SNOOZE_HOURS
     readonly snoozeHoursStep = FEED_SNOOZE_HOURS_STEP
+    readonly snoozeHoursDecimals = FEED_SNOOZE_HOURS_DECIMALS
     private readonly savedFeed = computed(() =>
-        this.settingsService.settings.hasValue() ? this.settingsService.settings.value()?.feed : undefined,
+        resolveFeedSettings(
+            this.settingsService.settings.hasValue()
+                ? this.settingsService.settings.value()?.feed
+                : undefined,
+        ),
     )
-    private readonly savedHideUnplayableReleases = computed(
-        () => this.savedFeed()?.hideUnplayableReleases ?? true,
-    )
+    private readonly savedHideUnplayableReleases = computed(() => this.savedFeed().hideUnplayableReleases)
     /**
      * The field binds its value to this, not to the entered text. The browser reports a partial
      * entry such as "1e" as empty, and writing that back would erase what the user typed.
      */
-    readonly savedSnoozeHours = computed(() => this.savedFeed()?.snoozeHours ?? DEFAULT_FEED_SNOOZE_HOURS)
+    readonly savedSnoozeHours = computed(() => this.savedFeed().snoozeHours)
     readonly hideUnplayableReleases = linkedSignal(() => this.savedHideUnplayableReleases())
     /** The field's raw text, so an empty or partial entry can be shown and corrected. */
     readonly snoozeHoursText = linkedSignal(() => String(this.savedSnoozeHours()))
@@ -57,6 +61,7 @@ export class FeedSettingsComponent {
         const parsed = feedSnoozeHoursSchema.safeParse(Number(text))
         return text !== '' && parsed.success ? parsed.data : null
     })
+    readonly snoozeHoursInvalid = computed(() => this.snoozeHours() === null)
     readonly hasChanges = computed(
         () =>
             this.settingsService.settings.hasValue() &&
