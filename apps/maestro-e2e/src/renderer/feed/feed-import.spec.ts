@@ -126,7 +126,7 @@ test.describe('completed import feed refresh', () => {
             trigger: 'auto',
         })
 
-        await expect(page.getByRole('status', { name: 'Email import' })).toHaveText('Added 1 release')
+        await expect(page.getByRole('status', { name: 'Email import' })).toHaveText('1 new release')
         await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
         await expect(page.getByRole('link', { name: newlyAddedRelease.data.releaseName })).toHaveCount(0)
         await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
@@ -296,8 +296,8 @@ test.describe('auto import', () => {
 
     for (const { newlyImported, summary } of [
         { newlyImported: 0, summary: 'No new releases' },
-        { newlyImported: 1, summary: 'Added 1 release' },
-        { newlyImported: 3, summary: 'Added 3 releases' },
+        { newlyImported: 1, summary: '1 new release' },
+        { newlyImported: 3, summary: '3 new releases' },
     ]) {
         test(`summarizes a completed auto import: ${summary}`, async ({ page }) => {
             const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
@@ -315,7 +315,7 @@ test.describe('auto import', () => {
     }
 
     for (const { newlyImported, skippedEmails, summary } of [
-        { newlyImported: 1, skippedEmails: 1, summary: 'Added 1 release. 1 email will be retried.' },
+        { newlyImported: 1, skippedEmails: 1, summary: '1 new release. 1 email will be retried.' },
         { newlyImported: 0, skippedEmails: 2, summary: '2 emails will be retried.' },
     ]) {
         test(`summarizes skipped emails calmly: ${summary}`, async ({ page }) => {

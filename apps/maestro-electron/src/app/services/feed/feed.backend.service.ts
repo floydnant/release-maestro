@@ -18,6 +18,7 @@ import {
 import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
+import { SettingsBackendService } from '../settings.backend.service'
 import { FeedBackendRepository } from './feed.backend.repository'
 
 /**
@@ -27,6 +28,8 @@ import { FeedBackendRepository } from './feed.backend.repository'
  * creating duplicate feed items.
  */
 const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
+const UNPLAYABLE_RELEASE_RECHECK_MS = 1000 * 60 * 5
+const MAX_UNPLAYABLE_RELEASE_CHECKS = 1000
 
 const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): BandcampFeedItem | null => {
     if (email.type == 'EMAIL.BANDCAMP_NEW_RELEASE') {
@@ -56,11 +59,13 @@ const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): Bandcam
 }
 
 export class FeedBackendService {
+    private readonly unplayableReleaseChecks = new Map<string, number>()
     constructor(
         private emailRepo: EmailBackendRepository,
         private bandcampApiService: BandcampApiBackendService,
         private webScrapingService: WebScrapingService,
         private feedBackendRepository: FeedBackendRepository,
+        private settingsService: SettingsBackendService,
     ) {}
 
     async triggerEmailImport(abortSignal: AbortSignal): Promise<Observable<EmailImportProgress>> {
@@ -237,24 +242,61 @@ export class FeedBackendService {
         }
     }
 
-    async hydrateFeed(items: BandcampFeedItem[]): Promise<HydratedFeedItem[]> {
+    async hydrateFeed(
+        items: BandcampFeedItem[],
+        hideUnplayableReleases = this.settingsService.getSettings().feed?.hideUnplayableReleases ?? true,
+    ): Promise<HydratedFeedItem[]> {
         console.log('Hydrating feed items')
         const promises = items.map(async item => {
-            if (item.type == 'BANDCAMP.TRALBUM') return await this.hydrateBandcampFeedItem(item)
+            const checkedAt = this.unplayableReleaseChecks.get(item.id)
+            if (
+                hideUnplayableReleases &&
+                checkedAt !== undefined &&
+                Date.now() - checkedAt < UNPLAYABLE_RELEASE_RECHECK_MS
+            )
+                return null
+
+            if (item.type == 'BANDCAMP.TRALBUM') {
+                const hydrated = await this.hydrateBandcampFeedItem(item)
+                this.unplayableReleaseChecks.delete(item.id)
+                if (!hydrated.error && !hydrated.data.tracks.some(track => !!track.streamUrl)) {
+                    this.unplayableReleaseChecks.set(item.id, Date.now())
+                    if (this.unplayableReleaseChecks.size > MAX_UNPLAYABLE_RELEASE_CHECKS) {
+                        const oldestId = this.unplayableReleaseChecks.keys().next().value
+                        if (oldestId !== undefined) this.unplayableReleaseChecks.delete(oldestId)
+                    }
+                }
+                return hydrated
+            }
 
             return assertUnreachable(item.type as never, 'Unhandled feed item type:')
         })
         const hydratedFeedItems = await Promise.all(promises)
         console.log('Hydrated', hydratedFeedItems.length, 'feed items')
 
-        return hydratedFeedItems
+        return hydratedFeedItems.filter(
+            (item): item is HydratedFeedItem =>
+                item !== null &&
+                (!hideUnplayableReleases ||
+                    item.error !== null ||
+                    item.data.tracks.some(track => !!track.streamUrl)),
+        )
     }
 
-    async loadFeed(index: number, count: number): Promise<HydratedFeedItem[]> {
-        // @TODO: how would we merge multiple feeds? how do we rank/prioritize items?
-        const preHydrationFeed = await this.feedBackendRepository.listFeedItems(index, count)
-
-        return await this.hydrateFeed(preHydrationFeed as BandcampFeedItem[])
+    async loadFeed(index: number, count: number, excludedIds: string[] = []): Promise<HydratedFeedItem[]> {
+        const hideUnplayableReleases = this.settingsService.getSettings().feed?.hideUnplayableReleases ?? true
+        const items: HydratedFeedItem[] = []
+        const scannedIds = [...excludedIds]
+        // Hidden releases remain unviewed. Continue past them to fill the visible page.
+        while (items.length < count) {
+            const remaining = count - items.length
+            const candidates = await this.feedBackendRepository.listFeedItems(index, remaining, scannedIds)
+            if (candidates.length === 0) break
+            items.push(...(await this.hydrateFeed(candidates, hideUnplayableReleases)))
+            scannedIds.push(...candidates.map(item => item.id))
+            if (candidates.length < remaining) break
+        }
+        return items
     }
 
     async hasFeed(): Promise<boolean> {
