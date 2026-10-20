@@ -1,0 +1,182 @@
+<section aria-labelledby="shared-ui-heading" class="shared-ui-specimen | grid gap-6">
+    <div>
+        <h2 id="shared-ui-heading" class="type-section-title">Shared UI components</h2>
+        <p class="mt-2 type-body-sm text-content-secondary">
+            Reusable controls use the same colors, density, focus states and motion as the application.
+        </p>
+    </div>
+
+    <section hlmCard>
+        <div hlmCardHeader>
+            <h3 hlmCardTitle>Actions and overlays</h3>
+            <p hlmCardDescription>Button variants, a keyboard-accessible dialog and a focus tooltip.</p>
+        </div>
+        <div hlmCardContent class="flex flex-wrap items-center gap-3">
+            <hlm-dialog>
+                <button type="button" hlmBtn hlmDialogTrigger>Preview folder import</button>
+                <hlm-dialog-content *hlmDialogPortal="let context">
+                    <hlm-dialog-header>
+                        <h3 hlmDialogTitle>Folder import preview</h3>
+                        <p hlmDialogDescription>Choose a label for this library folder.</p>
+                    </hlm-dialog-header>
+                    <div class="grid gap-2">
+                        <label class="type-label-md" for="preview-folder-label">Folder label</label>
+                        <input
+                            #folderLabel
+                            hlmInput
+                            id="preview-folder-label"
+                            value="New releases"
+                            autocomplete="off"
+                        />
+                    </div>
+                    <hlm-dialog-footer>
+                        <button type="button" hlmBtn variant="outline" (click)="context.close()">
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            hlmBtn
+                            (click)="savedFolderLabel.set(folderLabel.value); context.close()"
+                        >
+                            Save label
+                        </button>
+                    </hlm-dialog-footer>
+                </hlm-dialog-content>
+            </hlm-dialog>
+            <button type="button" hlmBtn variant="secondary">Secondary action</button>
+            <button type="button" hlmBtn variant="outline">Outline action</button>
+            <button type="button" hlmBtn variant="ghost">Quiet action</button>
+            <button type="button" hlmBtn variant="destructive">Danger action</button>
+            <button type="button" hlmBtn disabled>Unavailable action</button>
+            <button type="button" hlmBtn variant="outline" [hlmDropdownMenuTrigger]="libraryActions">
+                Preview library actions
+            </button>
+            <ng-template #libraryActions>
+                <div hlmDropdownMenu aria-label="Library actions">
+                    <button type="button" hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="scanActions">
+                        Scan options
+                        <hlm-dropdown-menu-item-sub-indicator aria-hidden="true" />
+                    </button>
+                    <button
+                        type="button"
+                        hlmDropdownMenuItem
+                        (triggered)="selectedAction.set('Open library settings')"
+                    >
+                        Open library settings
+                    </button>
+                </div>
+            </ng-template>
+            <ng-template #scanActions>
+                <div hlmDropdownMenuSub aria-label="Scan options">
+                    <button
+                        type="button"
+                        hlmDropdownMenuItem
+                        (triggered)="selectedAction.set('Scan configured folders')"
+                    >
+                        Scan configured folders
+                    </button>
+                    <button type="button" hlmDropdownMenuItem disabled>Cancel current scan</button>
+                </div>
+            </ng-template>
+            <button
+                type="button"
+                hlmBtn
+                variant="outline"
+                hlmTooltip="The library stays available while folders are scanned."
+            >
+                About library scans
+            </button>
+            <button
+                type="button"
+                hlmBtn
+                variant="outline"
+                hlmTooltip="/Users/floyd/Music/Bandcamp/Label catalogue/2026/remastered/artist-with-a-long-unbroken-album-directory-name-that-still-needs-to-fit-inside-the-tooltip.flac"
+            >
+                Library path details
+            </button>
+        </div>
+        @if (savedFolderLabel(); as label) {
+            <p hlmCardFooter role="status" class="type-body-sm text-content-secondary">
+                Folder label saved: {{ label }}
+            </p>
+        }
+        @if (selectedAction(); as action) {
+            <p hlmCardFooter role="status" class="type-body-sm text-content-secondary">
+                Action selected: {{ action }}
+            </p>
+        }
+    </section>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+        <section hlmCard>
+            <div hlmCardHeader>
+                <h3 hlmCardTitle>Library controls</h3>
+                <p hlmCardDescription>
+                    Native and custom controls retain their labels and keyboard behavior.
+                </p>
+            </div>
+            <div hlmCardContent class="grid gap-4">
+                <div class="grid gap-2">
+                    <label class="type-label-md" for="shared-release-search">Search releases</label>
+                    <input
+                        hlmInput
+                        id="shared-release-search"
+                        placeholder="Artist, label, or release"
+                        autocomplete="off"
+                    />
+                </div>
+                <div class="grid gap-2">
+                    <label class="type-label-md" for="shared-library-order">Library order</label>
+                    <hlm-native-select selectId="shared-library-order" [(value)]="order">
+                        <option value="dateAdded">Date added</option>
+                        <option value="title">Title</option>
+                        <option value="year">Release year</option>
+                    </hlm-native-select>
+                </div>
+                <div class="grid gap-2">
+                    <label class="type-label-md" for="shared-library-view">Library view</label>
+                    <hlm-select [(value)]="libraryView">
+                        <hlm-select-trigger buttonId="shared-library-view">
+                            <hlm-select-value />
+                        </hlm-select-trigger>
+                        <hlm-select-content *hlmSelectPortal>
+                            <hlm-select-item value="Tracks">Tracks</hlm-select-item>
+                            <hlm-select-item value="Albums">Albums</hlm-select-item>
+                            <hlm-select-item value="Artists">Artists</hlm-select-item>
+                        </hlm-select-content>
+                    </hlm-select>
+                </div>
+                <div class="grid gap-2">
+                    <label class="type-label-md" for="shared-disabled-input">Unavailable filter</label>
+                    <input hlmInput id="shared-disabled-input" disabled value="Library scan in progress" />
+                </div>
+            </div>
+        </section>
+
+        <section hlmCard>
+            <div hlmCardHeader>
+                <h3 hlmCardTitle>Import feedback</h3>
+                <p hlmCardDescription>Statuses and progress remain readable at the application's density.</p>
+            </div>
+            <div hlmCardContent class="grid gap-4">
+                <div class="flex flex-wrap gap-2">
+                    <span hlmBadge>Announced today</span>
+                    <span hlmBadge variant="secondary">In library</span>
+                    <span hlmBadge variant="outline">Queued</span>
+                    <span hlmBadge variant="destructive">Needs attention</span>
+                </div>
+                <div class="grid gap-2">
+                    <p id="shared-scan-progress" class="type-label-md">Scanning library folders</p>
+                    <hlm-progress [value]="65" aria-labelledby="shared-scan-progress">
+                        <hlm-progress-indicator />
+                    </hlm-progress>
+                    <p class="type-body-sm text-content-secondary">65% complete</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <hlm-spinner aria-label="Reading metadata" />
+                    <span class="type-body-sm text-content-secondary">Reading metadata</span>
+                </div>
+            </div>
+        </section>
+    </div>
+</section>

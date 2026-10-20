@@ -25,16 +25,24 @@ The validators are registered at `error` in the renderer's
 [`eslint.config.mjs`](../../apps/maestro-renderer/eslint.config.mjs), which turns on typed member
 resolution and explains why registration is per-project.
 
-| Option               | Default    | Meaning                                                                                                                      |
-| -------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `tailwindStylesheet` | required   | The Tailwind v4 stylesheet that defines the utility and theme authority.                                                     |
-| `globalStylesheets`  | `[]`       | Stylesheets whose authored classes count as known everywhere.                                                                |
-| `reportDynamic`      | `true`     | Report class lists that cannot be enumerated. Off silences the whole category.                                               |
-| `resolveTypes`       | `false`    | Resolve an otherwise unenumerable component member through a `TypeChecker`. See [Dynamic class lists](#dynamic-class-lists). |
-| `tsconfig`           | discovered | The project `resolveTypes` builds from.                                                                                      |
+| Option                      | Default    | Meaning                                                                                                                      |
+| --------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `tailwindStylesheet`        | required   | The Tailwind v4 stylesheet that defines the utility and theme authority.                                                     |
+| `globalStylesheets`         | `[]`       | Stylesheets whose authored classes count as known everywhere.                                                                |
+| `reportDynamic`             | `true`     | Report class lists that cannot be enumerated. Off silences the whole category.                                               |
+| `resolveTypes`              | `false`    | Resolve an otherwise unenumerable component member through a `TypeChecker`. See [Dynamic class lists](#dynamic-class-lists). |
+| `tsconfig`                  | discovered | The project `resolveTypes` builds from.                                                                                      |
+| `additionalClassAttributes` | `[]`       | Additional template attributes or component inputs that carry styling classes for an inner element.                          |
 
-`resolveTypes` and `tsconfig` affect `valid-template-classnames` only. The imperative rule reads type
+`additionalClassAttributes`, `resolveTypes` and `tsconfig` affect `valid-template-classnames` only. The imperative rule reads type
 information from the TypeScript parser program already configured for renderer lint.
+
+Configure class-bearing component inputs explicitly; other input names remain outside class
+validation. For example, `{ additionalClassAttributes: ['innerClass', 'iconClass'] }` validates
+static attributes and bound expressions with the same CSS authorities and closed member resolution
+as `[class]`. These inner-element overrides contain styling only; place a semantic descriptor on
+the component's normal `class` attribute. The built-in `class`, `ngClass` and `routerLinkActive`
+behavior stays unchanged.
 
 ## Imperative classes
 

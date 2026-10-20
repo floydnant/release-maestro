@@ -1,5 +1,8 @@
 @import 'tailwindcss' source(none);
+@import '@angular/cdk/overlay-prebuilt.css' layer(cdk-overlay);
+@import 'tw-animate-css';
 @import './styles/design-tokens.generated.css';
+@import './styles/spartan.css';
 
 @source './**/*.html';
 @source './**/*.ts';
@@ -152,7 +155,7 @@ body {
 }
 
 @layer components {
-    a:not(:where([class*='btn'])) {
+    a:not(:where([hlmBtn], [class*='btn'])) {
         @apply cursor-default text-content-action underline;
         text-underline-offset: 0.18em;
     }
