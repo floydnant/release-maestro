@@ -33,9 +33,10 @@ description: Playwright E2E readiness and test authoring guidance.
   `launch-release-maestro.ts`. The visible, unfocused window stays available for ad hoc
   screenshots when the user wants an on-demand visual; keep those one-off captures out of committed
   behavioral specs
-- iterate on one spec or test title when useful, then widen to the relevant suite before handoff;
-  use the target-specific commands in `docs/testing.md#fast-iteration`; for a suspected race, repeat
-  the smallest slice with `--repeat-each` and `--retries=0`
+- iterate on one spec or test title when useful; use `verification-loop` to decide whether the
+  changed behavior and handoff call for a suite run. Commands are in
+  `docs/testing.md#fast-iteration`. For a suspected race,
+  repeat the smallest slice with `--repeat-each` and `--retries=0`
 - all suites type-check before they run (`maestro-e2e:e2e`, `:e2e-production`, and `:e2e-renderer`
   depend on `maestro-e2e:typecheck`), because Playwright transpiles without semantic checking
 - to point the renderer suite at an already-running server, set `BASE_URL`; otherwise the instance
