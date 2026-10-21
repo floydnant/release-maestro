@@ -38,6 +38,19 @@ const formatUnverifiedListeners = (listeners, color) =>
         ? `${label('unverified listeners', color)}: ${listeners.map(({ port, pids }) => `${port} (PIDs ${pids.join(', ') || 'unknown'})`).join('; ')}; stop manually`
         : null
 
+const formatUnmanagedProcesses = ({ unmanagedProcesses = [], processDiscovery }, color) =>
+    [
+        ...unmanagedProcesses.map(
+            process =>
+                `${label(process.role, color)}: PID ${process.pid}, worktree ${process.path}, ports ${process.ports.join(', ') || 'not listening'}, ${process.stoppable ? 'dev-stop can stop this process' : 'stop manually'}`,
+        ),
+        processDiscovery && processDiscovery !== 'available'
+            ? `Unregistered process discovery ${processDiscovery}; this list contains registered holders only.`
+            : null,
+    ]
+        .filter(Boolean)
+        .join('\n')
+
 export const developmentAppName = instance => `Release Maestro dev [${slotLabel(instance)}]`
 
 export const formatDevelopmentSummary = (instance, { color = false } = {}) =>
@@ -51,7 +64,10 @@ export const formatDevelopmentSummary = (instance, { color = false } = {}) =>
     ].join('\r\n')
 
 export const formatDevelopmentStatus = (status, { color = false } = {}) => {
-    if (!status.bundle) return `${status.state}: ${status.path}`
+    if (!status.bundle)
+        return [`${status.state}: ${status.path}`, formatUnmanagedProcesses(status, color)]
+            .filter(Boolean)
+            .join('\n')
     return [
         `${state(status.state, color)} (${health(status.health, color)}) [${slotLabel(status)}]`,
         `${label('worktree', color)}: ${status.path}`,
@@ -64,33 +80,38 @@ export const formatDevelopmentStatus = (status, { color = false } = {}) => {
         `${label('resources', color)}: ${status.claims.join(', ')}`,
         `${label('holders', color)}:\n${formatHolders(status.holders, color)}`,
         formatUnverifiedListeners(status.unverifiedListeners, color),
+        formatUnmanagedProcesses(status, color),
     ]
         .filter(Boolean)
         .join('\n')
 }
 
-export const formatInstanceList = ({ instances }, { color = false } = {}) => {
-    if (instances.length === 0) return 'No instances.'
-    return instances
-        .map(instance => {
-            const description =
-                instance.kind === 'development'
-                    ? `development [${slotLabel(instance)}]`
-                    : `${instance.workflow} [${slotLabel(instance)}]`
-            return [
-                `${paint(description, ansi.bold, color)}: ${state(instance.state, color)} (${health(instance.health, color)})`,
-                `  ${label('worktree', color)}: ${instance.path}`,
-                `  ${label('identity', color)}: ${instance.worktreeId}`,
-                `  ${label('renderer', color)}: ${instance.bundle.renderer}`,
-                `  ${label('CDP', color)}: ${instance.bundle.cdp}`,
-                `  ${label('inspector', color)}: ${instance.bundle.inspector}`,
-                `  ${label('holders', color)}:\n${formatHolders(instance.holders, color)}`,
-                formatUnverifiedListeners(instance.unverifiedListeners, color),
-            ]
-                .filter(Boolean)
-                .join('\n')
-        })
-        .join('\n\n')
+export const formatInstanceList = (listed, { color = false } = {}) => {
+    const { instances } = listed
+    const registered =
+        instances.length === 0
+            ? 'No registered instances.'
+            : instances
+                  .map(instance => {
+                      const description =
+                          instance.kind === 'development'
+                              ? `development [${slotLabel(instance)}]`
+                              : `${instance.workflow} [${slotLabel(instance)}]`
+                      return [
+                          `${paint(description, ansi.bold, color)}: ${state(instance.state, color)} (${health(instance.health, color)})`,
+                          `  ${label('worktree', color)}: ${instance.path}`,
+                          `  ${label('identity', color)}: ${instance.worktreeId}`,
+                          `  ${label('renderer', color)}: ${instance.bundle.renderer}`,
+                          `  ${label('CDP', color)}: ${instance.bundle.cdp}`,
+                          `  ${label('inspector', color)}: ${instance.bundle.inspector}`,
+                          `  ${label('holders', color)}:\n${formatHolders(instance.holders, color)}`,
+                          formatUnverifiedListeners(instance.unverifiedListeners, color),
+                      ]
+                          .filter(Boolean)
+                          .join('\n')
+                  })
+                  .join('\n\n')
+    return [registered, formatUnmanagedProcesses(listed, color)].filter(Boolean).join('\n\n')
 }
 
 const formatLogValue = value => (typeof value === 'string' ? value : JSON.stringify(value))
