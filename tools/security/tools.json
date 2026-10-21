@@ -1,61 +1,61 @@
 {
     "osv-scanner": {
         "repository": "google/osv-scanner",
-        "version": "2.6.0",
+        "version": "2.7.0",
         "platforms": {
             "darwin-amd64": {
                 "asset": "osv-scanner_darwin_amd64",
-                "sha256": "60c5296637e977b28eeda5c7f13573e447659a632922737f94d11fa7e30ad6ca"
+                "sha256": "e82c5df7ab0a42dff29a1cd0660711447b56b4c0483ff66ad8634df10fd81a45"
             },
             "darwin-arm64": {
                 "asset": "osv-scanner_darwin_arm64",
-                "sha256": "98c460dcd37de25819babd757d04542045b6243113e209edcd4d89fedb0256b4"
+                "sha256": "d4926ef8da134332543be276dff157e4c170f99ad91fc48e89448a8816bdf70b"
             },
             "linux-amd64": {
                 "asset": "osv-scanner_linux_amd64",
-                "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
+                "sha256": "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b"
             },
             "linux-arm64": {
                 "asset": "osv-scanner_linux_arm64",
-                "sha256": "2c71403eb443d05891c4f268c3ad771cf4f16e5443463fd7851ef8f454d3c7e4"
+                "sha256": "4061ef4c021ed3c47f203b818f337e351336cc5cd67c0274fc36bd1dfc728dd7"
             },
             "windows-amd64": {
                 "asset": "osv-scanner_windows_amd64.exe",
-                "sha256": "e0ed7644118b717b028c249ee9d3515024e55e8510747ca08906eb96765354d6"
+                "sha256": "9964ed64ec9a387391eb4cc006ad5c531154821aef29b793e02c448de4686438"
             },
             "windows-arm64": {
                 "asset": "osv-scanner_windows_arm64.exe",
-                "sha256": "ca1379da0e408279ef2c85cde0846a903495738a91c7b065a208048437c1686c"
+                "sha256": "3e630381c1f1fd3c9c4d447e6ff2ef6c737083371722773db8337eead0f97962"
             }
         }
     },
     "syft": {
         "repository": "anchore/syft",
-        "version": "1.54.0",
+        "version": "1.55.0",
         "platforms": {
             "darwin-amd64": {
-                "asset": "syft_1.54.0_darwin_amd64.tar.gz",
-                "sha256": "22b71725e388a4c0de385249c4bc1044f78a870f2894f34b43ba957e792145d7"
+                "asset": "syft_1.55.0_darwin_amd64.tar.gz",
+                "sha256": "e2e5831cbabaec9a36fe65c34755c1113982c842a685edce3ce0b54a0ded8003"
             },
             "darwin-arm64": {
-                "asset": "syft_1.54.0_darwin_arm64.tar.gz",
-                "sha256": "7e0bdad94c569fc6d5785c9a657bbae3d4c4e140ccb5eace3d0b5b6bc2b6dbcf"
+                "asset": "syft_1.55.0_darwin_arm64.tar.gz",
+                "sha256": "1217c258bd5eb91ef3189cf22a82e02f9cac07e4ce934350f428e93aff674625"
             },
             "linux-amd64": {
-                "asset": "syft_1.54.0_linux_amd64.tar.gz",
-                "sha256": "54a87372498168b2d033e876fd41fa4e8035b872699e525a57046e1f2f09c860"
+                "asset": "syft_1.55.0_linux_amd64.tar.gz",
+                "sha256": "bb65249542db5fedeeb4d3f9b018b75e7264dbfbbb10486f044581a92f90490d"
             },
             "linux-arm64": {
-                "asset": "syft_1.54.0_linux_arm64.tar.gz",
-                "sha256": "ee6d4566373a05b344bc6b5f1706f14419bf9338ba39ff686e247deefe9b8818"
+                "asset": "syft_1.55.0_linux_arm64.tar.gz",
+                "sha256": "929bd163db2d7cd2255d3bcb8967208079813d7b46b0c952f7b794d8e2c7d304"
             },
             "windows-amd64": {
-                "asset": "syft_1.54.0_windows_amd64.zip",
-                "sha256": "77f4b472779058e819eec9a054753a5071a996aaa40db31a290f8b256748593f"
+                "asset": "syft_1.55.0_windows_amd64.zip",
+                "sha256": "ada4c9b93af575f479ce80fce6629897272a2d41f300a14bc49bace020767ca2"
             },
             "windows-arm64": {
-                "asset": "syft_1.54.0_windows_arm64.zip",
-                "sha256": "0fdfa61470a69b99ace491df1fd7ef9803439c15d4d3d19a0bcb139d8b9fba4e"
+                "asset": "syft_1.55.0_windows_arm64.zip",
+                "sha256": "f52f7796e41e4d1ae511c228c99239fd09887077336dcb7a8c2aa7046ed7c816"
             }
         }
     }

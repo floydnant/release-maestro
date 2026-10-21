@@ -24,11 +24,11 @@ jobs:
             tag: ${{ steps.release.outputs.tag }}
             sha: ${{ steps.release.outputs.sha }}
         steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: main
                   fetch-depth: 0
-            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
               with:
                   node-version-file: '.node-version'
             - name: Resolve published release
@@ -51,11 +51,11 @@ jobs:
         permissions:
             contents: write
         steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ needs.resolve.outputs.sha }}
                   persist-credentials: false
-            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
               with:
                   node-version-file: '.node-version'
             - name: Download all platform installers
