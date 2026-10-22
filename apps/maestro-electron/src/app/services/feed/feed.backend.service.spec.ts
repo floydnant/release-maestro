@@ -1,6 +1,11 @@
 import { lastValueFrom, Subject, toArray } from 'rxjs'
 import { fromPartial } from '@total-typescript/shoehorn'
-import { DEFAULT_FEED_SNOOZE_HOURS, Email, EmailImportStreamPacket } from '@release-maestro/core'
+import {
+    DEFAULT_FEED_SNOOZE_HOURS,
+    Email,
+    EmailImportStreamPacket,
+    FetchFailedException,
+} from '@release-maestro/core'
 // eslint-disable-next-line @nx/enforce-module-boundaries -- Shared synthetic fixtures live in fixtures/, per docs/testing.md.
 import {
     fansBoughtMusicEmail,
@@ -104,6 +109,75 @@ describe('FeedBackendService email import', () => {
         return { updates, abortController }
     }
 
+    it('limits parent lookups while importing an email with many purchased tracks', async () => {
+        let active = 0
+        let peak = 0
+        scrapeTralbumInfo.mockImplementation(async () => {
+            active++
+            peak = Math.max(peak, active)
+            await new Promise<void>(resolve => setImmediate(resolve))
+            active--
+            return {
+                ...scrapedBandcampAlbum,
+                type: 'track',
+                parentAlbumUrl: 'https://test.bandcamp.com/album/first',
+            }
+        })
+        const { updates } = await runImport()
+        emails$.next({
+            current: 1,
+            total: 1,
+            email: {
+                ...fansBoughtMusicEmail,
+                htmlBody: Array.from(
+                    { length: 12 },
+                    (_, index) => `<a href="https://test.bandcamp.com/track/purchase-${index}">Track</a>`,
+                ).join(''),
+            },
+        })
+        emails$.complete()
+
+        await expect(updates).resolves.toContainEqual(expect.objectContaining({ phase: 'completed' }))
+        expect(peak).toBe(4)
+        expect(scrapeTralbumInfo).toHaveBeenCalledTimes(12)
+    })
+
+    it('retries a temporary network lookup failure before completing the import', async () => {
+        scrapeTralbumInfo.mockRejectedValueOnce(
+            new FetchFailedException(
+                'Failed to fetch tralbum',
+                'https://other.bandcamp.com/track/second',
+                new Error('Temporary DNS failure'),
+                'Retry',
+            ),
+        )
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
+        emails$.complete()
+
+        await expect(updates).resolves.toContainEqual(expect.objectContaining({ phase: 'completed' }))
+        expect(scrapeTralbumInfo).toHaveBeenCalledTimes(2)
+        await expect(
+            feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp'),
+        ).resolves.not.toBeNull()
+    })
+
+    it('stops the exporter when a processing failure makes the remaining export unusable', async () => {
+        loadEmails.mockImplementation(async (_vendor, signal) => {
+            signal.addEventListener('abort', () => emails$.complete(), { once: true })
+            return emails$
+        })
+        scrapeTralbumInfo.mockRejectedValue(new Error('Lookup failed'))
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 100, email: fansBoughtMusicEmail })
+        for (let current = 2; current <= 50; current++)
+            emails$.next(packet('2026-10-01T21:40:12', current, 100))
+
+        await expect(updates).resolves.toContainEqual({ phase: 'error', errorMessage: 'Lookup failed' })
+        expect(loadEmails.mock.calls[0]?.[1].aborted).toBe(true)
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
+    })
+
     it('groups bought tracks under their album and attributes each track to its fans', async () => {
         scrapeTralbumInfo.mockImplementation(async url => ({
             ...scrapedGroupedAlbum,
@@ -195,7 +269,7 @@ describe('FeedBackendService email import', () => {
     it('cancels a pending parent lookup without advancing the checkpoint', async () => {
         const abortController = new AbortController()
         scrapeTralbumInfo.mockImplementation((_url, signal) => {
-            expect(signal).toBe(abortController.signal)
+            expect(signal).toBe(loadEmails.mock.calls[0]?.[1])
             return new Promise((_resolve, reject) => {
                 signal?.addEventListener('abort', () => reject(new Error('Aborted')), { once: true })
                 abortController.abort()
