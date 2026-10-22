@@ -28,7 +28,6 @@ import {
     BandcampApiRateLimitedException,
 } from '../bandcamp/bandcamp-api.exceptions'
 import { EmailBackendRepository } from '../email/email.backend.repository'
-import { WebScrapingService } from '../web-scraping/web-scraping.service'
 import { SettingsBackendService } from '../settings.backend.service'
 import { FeedBackendRepository } from './feed.backend.repository'
 import { FeedBackendService } from './feed.backend.service'
@@ -72,7 +71,6 @@ describe('FeedBackendService email import', () => {
     let mailboxName: string | null
     let service: FeedBackendService
     let scrapeTralbumInfo: jest.MockedFunction<BandcampApiBackendService['scrapeTralbumInfo']>
-    let getLinkMetaDataBatch: jest.MockedFunction<WebScrapingService['getLinkMetaDataBatch']>
 
     beforeEach(() => {
         feedRepository = new FeedBackendRepository(createMigratedTestDatabase().client)
@@ -93,14 +91,9 @@ describe('FeedBackendService email import', () => {
             ...scrapedBandcampAlbum,
             type: url.includes('/track/') ? 'track' : 'album',
         }))
-        getLinkMetaDataBatch = jest.fn<
-            ReturnType<WebScrapingService['getLinkMetaDataBatch']>,
-            Parameters<WebScrapingService['getLinkMetaDataBatch']>
-        >(async () => ({}))
         service = new FeedBackendService(
             emailRepository,
             fromPartial<BandcampApiBackendService>({ scrapeTralbumInfo }),
-            fromPartial<WebScrapingService>({ getLinkMetaDataBatch }),
             feedRepository,
             fromPartial<SettingsBackendService>({ getSettings: () => ({}) }),
         )
@@ -425,7 +418,6 @@ describe('FeedBackendService email import', () => {
             mayaFan,
             riverFan,
         ])
-        expect(getLinkMetaDataBatch).not.toHaveBeenCalled()
     })
 
     it('deduplicates fan purchases on reimport and against new-release notifications', async () => {
@@ -520,7 +512,7 @@ describe('FeedBackendService email import', () => {
         ).toEqual([])
     })
 
-    it('hydrates a page with many Bandcamp links without waiting for every optional preview', async () => {
+    it('hydrates releases with URL fallbacks without fetching their link previews', async () => {
         jest.useFakeTimers()
         const html = `<title>Preview</title><div data-tralbum='${JSON.stringify({
             current: { title: 'Album', type: 'album', id: 1 },
@@ -532,7 +524,6 @@ describe('FeedBackendService email import', () => {
             const realService = new FeedBackendService(
                 fromPartial<EmailBackendRepository>({}),
                 new BandcampApiBackendService(http),
-                new WebScrapingService(http),
                 feedRepository,
                 fromPartial<SettingsBackendService>({ getSettings: () => ({}) }),
             )
@@ -557,6 +548,9 @@ describe('FeedBackendService email import', () => {
             const hydrated = realService.hydrateFeed(items, false)
             await jest.advanceTimersByTimeAsync(4000)
             await expect(hydrated).resolves.toHaveLength(5)
+            for (const item of await hydrated) {
+                expect(item.data.links.every(link => link.title === link.url)).toBe(true)
+            }
             expect(fetchMock).toHaveBeenCalledTimes(5)
             expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/album/'))).toHaveLength(5)
         } finally {

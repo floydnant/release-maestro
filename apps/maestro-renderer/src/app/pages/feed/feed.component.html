@@ -277,10 +277,13 @@
                                 <!-- @TODO: abstract this into a <link-meta-previews /> -->
                                 <ul class="links | mt-5 flex flex-wrap gap-1 type-body-sm">
                                     @for (link of feedItem.data.links; track $index) {
+                                        @let preview = linkPreviews()[link.url];
+                                        @let linkTitle = preview?.title || link.title;
+                                        @let favicon = preview?.favicon ?? link.favicon;
                                         <li class="flex w-full">
                                             <ng-template #linkTemplate>
                                                 <div class="type-body-sm">
-                                                    {{ link.title }}
+                                                    {{ linkTitle }}
 
                                                     <p class="mt-0.5 type-body-xs text-content-secondary">
                                                         {{ link.url }}
@@ -296,15 +299,22 @@
                                                 class="max-w-full justify-start gap-1.5 px-2 type-body-sm hover:text-content-primary"
                                                 [hlmTooltip]="linkTemplate"
                                             >
-                                                <img
-                                                    class="favicon |"
-                                                    [src]="link.favicon"
-                                                    alt="Favicon for {{ link.title }}"
-                                                    width="16"
-                                                    height="16"
-                                                />
+                                                @if (favicon) {
+                                                    <img
+                                                        class="favicon |"
+                                                        [src]="favicon"
+                                                        alt="Favicon for {{ linkTitle }}"
+                                                        width="16"
+                                                        height="16"
+                                                    />
+                                                } @else {
+                                                    <!-- Holds the favicon's place while the preview loads -->
+                                                    <span
+                                                        class="favicon-placeholder | size-4 shrink-0"
+                                                    ></span>
+                                                }
 
-                                                <span class="inline-block truncate">{{ link.title }}</span>
+                                                <span class="inline-block truncate">{{ linkTitle }}</span>
                                             </a>
                                         </li>
                                     }

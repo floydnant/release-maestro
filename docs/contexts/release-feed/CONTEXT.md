@@ -116,8 +116,13 @@ processing failure stops the remaining export before the import reports its fina
 **Bandcamp request cooldown**:
 A temporary pause after Bandcamp rejects excessive requests. Imports and feed hydration share the
 same pause across Bandcamp pages. Imports can wait and retry; the feed reports unavailable data
-while retaining the release link and purchase attribution. Optional link previews reuse previously
-fetched Bandcamp pages without adding requests.
+while retaining the release link and purchase attribution. Link previews share the same pacing and
+cooldown, so loading them cannot bypass a pause.
+
+**Link preview**:
+The title and favicon shown for a link from a notification. Previews load after the release appears
+and update its links without delaying playback. Repeated links reuse parsed metadata or a release
+page already fetched by the app. An unavailable page keeps its original URL as the label.
 
 **Feed source item**:
 A parsed notification, before it becomes a feed item. This is the boundary type: one source item can

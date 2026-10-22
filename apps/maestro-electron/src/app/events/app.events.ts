@@ -10,6 +10,7 @@ import {
     asAppIpcMain,
     emailImportTriggerSchema,
     FeedLoadError,
+    loadLinkPreviewsRequestSchema,
     LibraryBrowseIpcChannel,
     LibraryIpcChannel,
     MetadataIpcChannel,
@@ -20,6 +21,7 @@ import { LibraryFoldersService } from '../services/library/library-folders.servi
 import { LibraryScanService } from '../services/library/library-scan.service'
 import { MetadataBackendService } from '../services/metadata/metadata.backend.service'
 import { SettingsBackendService } from '../services/settings.backend.service'
+import { WebScrapingService } from '../services/web-scraping/web-scraping.service'
 
 const ipc = asAppIpcMain(ipcMain)
 
@@ -91,6 +93,13 @@ ipc.handle('load-feed', async (_event, { index, count, excludedIds }) => {
 
         throw err
     })
+})
+
+// Link previews load independently so optional pages cannot delay release playback.
+ipc.handle('load-link-previews', async (_event, request) => {
+    const { urls } = loadLinkPreviewsRequestSchema.parse(request)
+    const webScrapingService = await diContainer.get(WebScrapingService)
+    return webScrapingService.getLinkMetaDataBatch(urls)
 })
 
 // Check if feed has items
