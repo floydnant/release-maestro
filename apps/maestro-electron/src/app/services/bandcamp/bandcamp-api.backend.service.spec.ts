@@ -28,6 +28,25 @@ describe('BandcampApiBackendService release links', () => {
 
     afterEach(() => jest.restoreAllMocks())
 
+    it.each(['/', '/album/', '/track/elemento', null, undefined])(
+        'keeps a track without an album when album_url is %s',
+        async albumUrl => {
+            jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+                new Response(
+                    `<div data-tralbum='${JSON.stringify({
+                        album_url: albumUrl,
+                        current: { title: 'Elemento', type: 'track', id: 123 },
+                        trackinfo: [],
+                    })}'></div>`,
+                ),
+            )
+
+            const result = await new BandcampApiBackendService().scrapeTralbumInfo(releaseUrl)
+            expect(result.parentAlbumUrl).toBeNull()
+            expect(result.type).toBe('track')
+        },
+    )
+
     it('opens the parent album from the track credits on Bandcamp', async () => {
         const result = await new BandcampApiBackendService().scrapeTralbumInfo(releaseUrl)
         const $ = load(result.about)

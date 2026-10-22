@@ -107,16 +107,22 @@ export class BandcampApiBackendService {
 
         // @TODO: we could scrape the collectors info too (people supporting the release)
 
+        const parentUrl =
+            tralbumData.current.type === 'track' && tralbumData.album_url
+                ? URL.parse(tralbumData.album_url, result.url || url)
+                : null
+        const parentAlbumUrl =
+            parentUrl && /^\/album\/[^/]+\/?$/.test(parentUrl.pathname)
+                ? normalizeBandcampReleaseUrl(parentUrl.href)
+                : null
+
         return {
             artworkUrl,
             title: tralbumData?.current.title || null,
             artist: tralbumData?.current.artist || null,
             releaseDate: tralbumData?.album_release_date || tralbumData?.current.release_date || null,
             type: tralbumData?.current.type || 'album',
-            parentAlbumUrl:
-                tralbumData?.current.type === 'track' && tralbumData.album_url
-                    ? normalizeBandcampReleaseUrl(tralbumData.album_url, result.url || url)
-                    : null,
+            parentAlbumUrl,
             id: tralbumData?.current.id || null,
             about: about + credits,
             aboutLinks: [...aboutLinks, ...creditsLinks],
