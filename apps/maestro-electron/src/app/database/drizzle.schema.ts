@@ -1,4 +1,5 @@
 import { EmailVendor, type ExternalRefs } from '@release-maestro/core'
+import { sql } from 'drizzle-orm'
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export { ExternalRefKeys } from '@release-maestro/core'
@@ -174,6 +175,12 @@ export const songsTable = sqliteTable(
         modifiedAt: integer('modified_at', { mode: 'timestamp_ms' }).notNull(),
         createdAt: integer('created_at', { mode: 'timestamp_ms' }),
         addedAt: integer('added_at', { mode: 'timestamp_ms' }),
+        /** Scan chronology is independent of Added. Null means pre-upgrade history is unknown. */
+        firstSeenAt: integer('first_seen_at', { mode: 'timestamp_ms' }),
+        /** Includes successful probes of originals outside the configured folders. */
+        lastAvailableAt: integer('last_available_at', { mode: 'timestamp_ms' })
+            .notNull()
+            .default(sql`0`),
         fileFingerprint: text('file_fingerprint').notNull(),
         scannedFileFingerprint: text('scanned_file_fingerprint'),
         present: integer('present', { mode: 'boolean' }).notNull().default(true),
@@ -217,6 +224,9 @@ export const songsTable = sqliteTable(
         codec: text('codec'),
 
         metadataHash: text('metadata_hash'),
+        contentHash: text('content_hash'),
+        // A proven rename whose identity merge is waiting for a complete scan.
+        moveOriginId: text('move_origin_id'),
         /**
          * Which revision of the normaliser produced this row's derived columns. Null
          * for rows written before the column existed, which is why a version mismatch
@@ -235,6 +245,8 @@ export const songsTable = sqliteTable(
         uniqueIndex('songs_path_key').on(table.path),
         index('songs_present_idx').on(table.present),
         index('songs_file_fingerprint_idx').on(table.fileFingerprint),
+        index('songs_content_hash_size_idx').on(table.contentHash, table.size),
+        index('songs_size_idx').on(table.size),
         index('songs_album_id_idx').on(table.albumId),
 
         // One index per sortable browse column. Browse queries move windows through an

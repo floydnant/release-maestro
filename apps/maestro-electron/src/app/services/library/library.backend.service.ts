@@ -16,7 +16,12 @@ export class LibraryBackendService {
         private readonly metadata: MetadataBackendService,
     ) {}
 
-    scan(paths: string[], abortSignal?: AbortSignal, initialScan = false): Observable<LibraryScanUpdate> {
+    scan(
+        paths: string[],
+        abortSignal?: AbortSignal,
+        initialScan = false,
+        unavailableFolders: string[] = [],
+    ): Observable<LibraryScanUpdate> {
         return new Observable<LibraryScanUpdate>(subscriber => {
             const run = async () => {
                 const scanStartedAt = this.repository.nextScanSeenAt()
@@ -25,129 +30,150 @@ export class LibraryBackendService {
                 let changed = 0
                 let newCount = 0
                 let errors = 0
-                let prescanErrors = 0
+                let discoveryComplete = false
+                let readsComplete = false
                 let normalizationIssues = 0
-
-                await new Promise<void>((resolve, reject) => {
-                    this.metadata.prescan(paths, abortSignal).subscribe({
-                        next: (update: MetadataPrescanUpdate) => {
-                            if (update.phase == 'batch') {
-                                const comparison = this.repository.processPrescanBatch(
-                                    update.items,
-                                    scanStartedAt,
-                                    initialScan,
-                                )
-                                unchanged += comparison.unchanged
-                                changed += comparison.changed
-                                newCount += comparison.new
-                                subscriber.next({
-                                    phase: 'discovery',
-                                    discovered: unchanged + changed + newCount,
-                                    new: newCount,
-                                    changed,
-                                    unchanged,
-                                })
-                            } else if (update.phase == 'completed') {
-                                prescanCount = update.count
-                                prescanErrors = update.errors
-                            } else if (update.phase == 'itemError') {
-                                errors += 1
-                                subscriber.next(update)
-                            } else if (update.phase == 'error') {
-                                subscriber.next(update)
-                                reject(new Error(update.error.message))
-                            }
-                        },
-                        error: reject,
-                        complete: resolve,
-                    })
-                })
-
-                // Absent-file reconciliation only runs when it is provably safe:
-                //  - not cancelled (a cancelled discovery has not seen every file), and
-                //  - discovery had no errors (an unreadable subtree must not mark
-                //    its files as missing).
-                if (abortSignal?.aborted) return
-                const missing = prescanErrors == 0 ? this.repository.markNotSeenPresent(scanStartedAt) : 0
-                const { extractorVersion } = await this.metadata.ping()
-                if (abortSignal?.aborted) return
-                const metadataReadTotal = this.repository.countSongsNeedingMetadata(
-                    scanStartedAt,
-                    extractorVersion,
-                )
-                const refreshTotal = this.repository.countSongsNeedingVersionRefresh(
-                    scanStartedAt,
-                    extractorVersion,
-                )
-                let metadataReadDone = 0
                 let ingested = 0
-                let afterPath: string | null = null
+                let missing = 0
+                const changedPaths = new Set<string>()
+                const failedReadPaths = new Set<string | null>()
 
-                subscriber.next({ phase: 'started', total: metadataReadTotal, refreshTotal })
+                try {
+                    await new Promise<void>((resolve, reject) => {
+                        this.metadata.prescan(paths, abortSignal).subscribe({
+                            next: (update: MetadataPrescanUpdate) => {
+                                if (update.phase == 'batch') {
+                                    const comparison = this.repository.processPrescanBatch(
+                                        update.items,
+                                        scanStartedAt,
+                                        initialScan,
+                                    )
+                                    unchanged += comparison.unchanged
+                                    changed += comparison.changed
+                                    newCount += comparison.new
+                                    for (const path of comparison.changedPaths) changedPaths.add(path)
+                                    subscriber.next({
+                                        phase: 'discovery',
+                                        discovered: unchanged + changed + newCount,
+                                        new: newCount,
+                                        changed,
+                                        unchanged,
+                                    })
+                                } else if (update.phase == 'completed') {
+                                    prescanCount = update.count
+                                    discoveryComplete = update.errors == 0
+                                } else if (update.phase == 'itemError') {
+                                    errors += 1
+                                    subscriber.next(update)
+                                } else if (update.phase == 'error') {
+                                    subscriber.next(update)
+                                    reject(new Error(update.error.message))
+                                }
+                            },
+                            error: reject,
+                            complete: resolve,
+                        })
+                    })
 
-                while (!abortSignal?.aborted) {
-                    const facts = this.repository.listSongsNeedingMetadata(
+                    if (abortSignal?.aborted) return
+                    const { extractorVersion } = await this.metadata.ping()
+                    if (abortSignal?.aborted) return
+                    const metadataReadTotal = this.repository.countSongsNeedingMetadata(
                         scanStartedAt,
-                        afterPath,
-                        DEEP_READ_BATCH_SIZE,
                         extractorVersion,
                     )
-                    if (facts.length == 0) break
-                    const lastFact = facts[facts.length - 1]
-                    if (!lastFact) break
-                    afterPath = lastFact.path
-                    const factsByPath = new Map(facts.map(fact => [fact.path, fact]))
+                    const refreshTotal = this.repository.countSongsNeedingVersionRefresh(
+                        scanStartedAt,
+                        extractorVersion,
+                    )
+                    let metadataReadDone = 0
+                    let afterPath: string | null = null
 
-                    await this.readAndIngestBatch(facts, abortSignal, update => {
-                        if (update.phase == 'item') {
-                            const fact = factsByPath.get(update.metadata.path)
-                            if (!fact) {
-                                errors += 1
-                                subscriber.next({
-                                    phase: 'itemError',
-                                    path: update.metadata.path,
-                                    code: 'INTERNAL_ERROR',
-                                    error: 'Prescan facts missing for metadata result',
-                                })
-                            } else {
-                                const openIssues = this.repository.ingestMetadata(
-                                    update.metadata,
-                                    fact,
-                                    new Date(),
-                                    extractorVersion,
-                                )
-                                ingested += 1
-                                subscriber.next(update)
-                                if (openIssues > 0) {
-                                    // Count distinct tracks with issues, not the issues themselves.
-                                    normalizationIssues += 1
-                                    subscriber.next({ phase: 'normalization', normalizationIssues })
+                    subscriber.next({ phase: 'started', total: metadataReadTotal, refreshTotal })
+
+                    while (!abortSignal?.aborted) {
+                        const facts = this.repository.listSongsNeedingMetadata(
+                            scanStartedAt,
+                            afterPath,
+                            DEEP_READ_BATCH_SIZE,
+                            extractorVersion,
+                        )
+                        if (facts.length == 0) break
+                        const lastFact = facts[facts.length - 1]
+                        if (!lastFact) break
+                        afterPath = lastFact.path
+                        const factsByPath = new Map(facts.map(fact => [fact.path, fact]))
+
+                        await this.readAndIngestBatch(facts, abortSignal, update => {
+                            if (update.phase == 'item') {
+                                const fact = factsByPath.get(update.metadata.path)
+                                if (!fact) {
+                                    errors += 1
+                                    failedReadPaths.add(null)
+                                    subscriber.next({
+                                        phase: 'itemError',
+                                        path: update.metadata.path,
+                                        code: 'INTERNAL_ERROR',
+                                        error: 'Prescan facts missing for metadata result',
+                                    })
+                                } else {
+                                    const openIssues = this.repository.ingestMetadata(
+                                        update.metadata,
+                                        fact,
+                                        new Date(Math.max(Date.now(), scanStartedAt.getTime())),
+                                        extractorVersion,
+                                    )
+                                    ingested += 1
+                                    subscriber.next(update)
+                                    if (openIssues > 0) {
+                                        // Count distinct tracks with issues, not the issues themselves.
+                                        normalizationIssues += 1
+                                        subscriber.next({ phase: 'normalization', normalizationIssues })
+                                    }
                                 }
+                                metadataReadDone += 1
+                                subscriber.next({
+                                    phase: 'progress',
+                                    done: metadataReadDone,
+                                    total: metadataReadTotal,
+                                })
+                            } else if (update.phase == 'itemError') {
+                                failedReadPaths.add(update.path)
+                                errors += 1
+                                metadataReadDone += 1
+                                subscriber.next(update)
+                                subscriber.next({
+                                    phase: 'progress',
+                                    done: metadataReadDone,
+                                    total: metadataReadTotal,
+                                })
+                            } else if (update.phase == 'error') {
+                                subscriber.next(update)
                             }
-                            metadataReadDone += 1
-                            subscriber.next({
-                                phase: 'progress',
-                                done: metadataReadDone,
-                                total: metadataReadTotal,
-                            })
-                        } else if (update.phase == 'itemError') {
-                            errors += 1
-                            metadataReadDone += 1
-                            subscriber.next(update)
-                            subscriber.next({
-                                phase: 'progress',
-                                done: metadataReadDone,
-                                total: metadataReadTotal,
-                            })
-                        } else if (update.phase == 'error') {
-                            subscriber.next(update)
-                        }
+                        })
+                    }
+                    readsComplete = true
+                } finally {
+                    const reconciliation = await this.repository.reconcileScan({
+                        seenAt: scanStartedAt,
+                        complete: discoveryComplete && readsComplete,
+                        changedPaths,
+                        failedReadPaths,
+                        unavailableFolders,
+                        abortSignal,
                     })
+                    newCount += reconciliation.adjustments.new
+                    changed += reconciliation.adjustments.changed
+                    unchanged += reconciliation.adjustments.unchanged
+                    missing = reconciliation.missing
+                    if (reconciliation.normalizationIssues != null) {
+                        normalizationIssues = reconciliation.normalizationIssues
+                        subscriber.next({ phase: 'normalization', normalizationIssues })
+                    }
                 }
 
                 if (abortSignal?.aborted) return
-                // A cancelled scan may have ingested a song before it stopped. A later
-                // scan must collect entities left behind even when it reads no files.
+
                 this.repository.removeUnusedCatalogEntities()
 
                 subscriber.next({

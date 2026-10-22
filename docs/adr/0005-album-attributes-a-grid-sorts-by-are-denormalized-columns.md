@@ -25,10 +25,11 @@ the grid would spend the whole scan ordered by dates that contradict the detail 
 - **The write side owns a read-side concern**, which is the cost. `LibraryBackendRepository`
   recomputes `date_added` for both the album a song joins and the one it left, in the same transaction
   as the song upsert. Recomputed rather than adjusted: an adjustment would have to know whether the
-  song was already on the album, and a re-read of an unchanged file means it was. Reconciliation
-  touches neither column — a missing song is still a song on the record.
-- **A migration adding one has to backfill it**, because the write side only recomputes an album when
-  one of its songs is re-read, and an unchanged file is never re-read.
+  song was already on the album, and a re-read of an unchanged file means it was. Marking a song
+  missing touches neither column — it is still a song on the record. Move reconciliation recomputes
+  `date_added` for both affected albums in the same transaction that preserves the original song ID.
+- **A migration adding one has to backfill it**, because the write side only recomputes affected albums
+  during song ingestion or move reconciliation. Unchanged albums would otherwise retain stale values.
 - **Only the query plan can catch the ordering regressing**, since a live aggregate returns identical
   rows — `library-browse.scale.spec.ts`. That the columns are _true_ is the Electron E2E's, the only
   layer that runs ingest, and `date_added` needs a fixture whose albums are **interleaved**: with each

@@ -1,6 +1,7 @@
 import { SongMetadata } from '@release-maestro/core'
 
 export const newSongFixture = (overrides: Partial<SongMetadata> = {}): SongMetadata => ({
+    contentHash: 'a'.repeat(64),
     title: 'Song',
     artist: null,
     albumTitle: null,
