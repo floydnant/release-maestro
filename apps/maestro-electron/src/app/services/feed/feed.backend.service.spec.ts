@@ -6,10 +6,18 @@ import {
     fansBoughtMusicEmail,
     newReleaseEmail,
     scrapedBandcampAlbum,
+    adamFan,
+    mayaFan,
+    riverFan,
+    groupedFansBoughtMusicEmail,
+    scrapedGroupedAlbum,
 } from '../../../../../../fixtures/feed.fixture'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
-import { BandcampApiFailedToFetchTralbumException } from '../bandcamp/bandcamp-api.exceptions'
+import {
+    BandcampApiFailedToFetchTralbumException,
+    BandcampApiMalformedTralbumDataException,
+} from '../bandcamp/bandcamp-api.exceptions'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
 import { SettingsBackendService } from '../settings.backend.service'
@@ -96,6 +104,112 @@ describe('FeedBackendService email import', () => {
         return { updates, abortController }
     }
 
+    it('groups bought tracks under their album and attributes each track to its fans', async () => {
+        scrapeTralbumInfo.mockImplementation(async url => ({
+            ...scrapedGroupedAlbum,
+            type: url.includes('/track/') ? 'track' : 'album',
+            parentAlbumUrl: url.includes('/track/') ? 'https://test.bandcamp.com/album/first' : null,
+        }))
+        const { updates } = await runImport()
+        emails$.next({
+            current: 1,
+            total: 1,
+            email: {
+                ...groupedFansBoughtMusicEmail,
+                htmlBody: groupedFansBoughtMusicEmail.htmlBody.replaceAll(
+                    'https://test.bandcamp.com',
+                    'http://test.bandcamp.com',
+                ),
+            },
+        })
+        emails$.complete()
+
+        await expect(updates).resolves.toContainEqual({
+            phase: 'completed',
+            totalProcessed: 1,
+            totalImported: 1,
+            newlyImported: 1,
+        })
+        const hydrated = await service.loadFeed(0, 10)
+        expect(hydrated).toHaveLength(1)
+        expect(hydrated[0]?.data).toMatchObject({
+            releaseUrl: 'https://test.bandcamp.com/album/first',
+            releaseType: 'album',
+            fans: [adamFan, mayaFan, riverFan],
+        })
+        expect(hydrated[0]?.data.tracks.map(track => track.fans)).toEqual([
+            [adamFan, mayaFan, riverFan],
+            [adamFan, mayaFan],
+        ])
+    })
+
+    it('leaves an offline album lookup uncovered so the next import can retry it', async () => {
+        scrapeTralbumInfo.mockRejectedValueOnce(new Error('Offline'))
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 1, email: groupedFansBoughtMusicEmail })
+        emails$.complete()
+
+        await expect(updates).resolves.toContainEqual({ phase: 'error', errorMessage: 'Offline' })
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
+        expect(await service.hasFeed()).toBe(false)
+    })
+
+    it('reports a lookup error after the exporter drains its remaining progress', async () => {
+        scrapeTralbumInfo.mockRejectedValue(new Error('Offline'))
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 51, email: groupedFansBoughtMusicEmail })
+        for (let current = 2; current <= 50; current++) {
+            emails$.next(packet('2026-10-01T21:40:12', current, 51))
+        }
+        // The first batch fails while Apple Mail is still exporting the rest.
+        await new Promise<void>(resolve => setImmediate(resolve))
+        emails$.next(packet('2026-10-01T21:40:12', 51, 51))
+        emails$.complete()
+
+        const reported = await updates
+        expect(reported.at(-1)).toEqual({ phase: 'error', errorMessage: 'Offline' })
+        expect(reported.filter(update => update.phase === 'error')).toHaveLength(1)
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
+    })
+
+    it.each([
+        new BandcampApiFailedToFetchTralbumException('https://other.bandcamp.com/track/second', 404),
+        new BandcampApiMalformedTralbumDataException(
+            'https://other.bandcamp.com/track/second',
+            new Error('No tralbum data'),
+        ),
+    ])('keeps a bought track and its fans when its parent cannot be read: %s', async error => {
+        scrapeTralbumInfo.mockRejectedValue(error)
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
+        emails$.complete()
+
+        await expect(updates).resolves.toContainEqual(expect.objectContaining({ phase: 'completed' }))
+        const hydrated = await service.loadFeed(0, 10)
+        expect(hydrated.find(item => item.data.releaseType === 'track')?.data).toMatchObject({
+            releaseUrl: 'https://other.bandcamp.com/track/second',
+            fans: [mayaFan, riverFan],
+        })
+    })
+
+    it('cancels a pending parent lookup without advancing the checkpoint', async () => {
+        const abortController = new AbortController()
+        scrapeTralbumInfo.mockImplementation((_url, signal) => {
+            expect(signal).toBe(abortController.signal)
+            return new Promise((_resolve, reject) => {
+                signal?.addEventListener('abort', () => reject(new Error('Aborted')), { once: true })
+                abortController.abort()
+            })
+        })
+        const { updates } = await runImport(abortController)
+        emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
+        emails$.complete()
+
+        await expect(updates).resolves.toContainEqual({ phase: 'cancelled' })
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
+        expect(await service.hasFeed()).toBe(false)
+    })
+
     it('imports and hydrates each distinct album and track from a fan-purchase notification', async () => {
         const { updates } = await runImport()
         emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
@@ -134,16 +248,16 @@ describe('FeedBackendService email import', () => {
         for (const item of hydrated) {
             expect(item.sourceType).toBe('EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC')
             expect(item.data.emailId).toBe(fansBoughtMusicEmail.messageId)
-            expect(item.data.tracks).toEqual(scrapedBandcampAlbum.tracks)
+            expect(item.data.tracks).toEqual(
+                scrapedBandcampAlbum.tracks.map(track => ({ ...track, fans: item.data.fans })),
+            )
             expect(item.data.iframeUrl).toContain(`/${item.data.releaseType}=123/`)
         }
         expect(hydrated.map(item => item.data.releaseType).sort()).toEqual(['album', 'track'])
-        expect(hydrated.find(item => item.data.releaseType === 'album')?.data.fanNames).toEqual([
-            'Adam Pitts',
-        ])
-        expect(hydrated.find(item => item.data.releaseType === 'track')?.data.fanNames).toEqual([
-            'Maya',
-            'River & Rain',
+        expect(hydrated.find(item => item.data.releaseType === 'album')?.data.fans).toEqual([adamFan])
+        expect(hydrated.find(item => item.data.releaseType === 'track')?.data.fans).toEqual([
+            mayaFan,
+            riverFan,
         ])
         expect(getLinkMetaDataBatch).not.toHaveBeenCalled()
     })
@@ -207,8 +321,8 @@ describe('FeedBackendService email import', () => {
             error: { message: 'The Bandcamp track or album could not be found' },
         })
         expect(failed?.data.releaseName).toBe(failed?.data.releaseUrl)
-        expect(failed?.data.fanNames.length).toBeGreaterThan(0)
-        expect(hydrated.find(item => !item.error)?.data.tracks).toEqual(scrapedBandcampAlbum.tracks)
+        expect(failed?.data.fans.length).toBeGreaterThan(0)
+        expect(hydrated.find(item => !item.error)?.data.tracks).toMatchObject(scrapedBandcampAlbum.tracks)
     })
 
     it('imports no releases from a fan notification without release links', async () => {

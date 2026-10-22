@@ -1,7 +1,122 @@
-import { DEFAULT_FEED_SNOOZE_HOURS } from '@release-maestro/core'
+import { BandcampFeedItem, DEFAULT_FEED_SNOOZE_HOURS } from '@release-maestro/core'
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Shared synthetic fixtures live in fixtures/, per docs/testing.md.
+import {
+    adamFan,
+    mayaFan,
+    riverFan,
+    fansBoughtMusicFeedItem,
+    newReleaseEmail,
+} from '../../../../../../fixtures/feed.fixture'
+import { feedItemHistoryEntriesTable, feedItemsTable } from '../../database/drizzle.schema'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { bandcampFeedItem } from '../../../test/fixtures/feed.fixture'
 import { FeedBackendRepository } from './feed.backend.repository'
+
+describe('FeedBackendRepository album purchases', () => {
+    it('merges fans across notifications and reimports using their profile identity', async () => {
+        const database = createMigratedTestDatabase()
+        try {
+            const repository = new FeedBackendRepository(database.client)
+            await repository.ingestFeedItems([fansBoughtMusicFeedItem])
+            const later: BandcampFeedItem = {
+                ...fansBoughtMusicFeedItem,
+                id: 'later-notification',
+                data: {
+                    ...fansBoughtMusicFeedItem.data,
+                    purchases: [
+                        {
+                            tralbumUrl: fansBoughtMusicFeedItem.data.tralbumUrl,
+                            fans: [{ ...adamFan, imageUrl: null }, mayaFan],
+                        },
+                        { tralbumUrl: 'https://test.bandcamp.com/track/first-track', fans: [riverFan] },
+                    ],
+                },
+            }
+            await repository.ingestFeedItems([later, later])
+
+            const items = await repository.listFeedItems({
+                index: 0,
+                count: 5,
+                snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+            })
+            expect(items).toHaveLength(1)
+            expect(items[0]?.id).toBe(fansBoughtMusicFeedItem.id)
+            expect(items[0]?.data.purchases).toEqual([
+                { tralbumUrl: fansBoughtMusicFeedItem.data.tralbumUrl, fans: [adamFan, mayaFan] },
+                { tralbumUrl: 'https://test.bandcamp.com/track/first-track', fans: [riverFan] },
+            ])
+        } finally {
+            database.sqlite.close()
+        }
+    })
+
+    it('collapses existing track entries into their album without discarding view history', async () => {
+        const database = createMigratedTestDatabase()
+        try {
+            const repository = new FeedBackendRepository(database.client)
+            const albumUrl = fansBoughtMusicFeedItem.data.tralbumUrl
+            const trackUrls = [
+                'https://test.bandcamp.com/track/z-earlier',
+                'https://test.bandcamp.com/track/a-later',
+            ]
+            const tracks: BandcampFeedItem[] = trackUrls.map((url, index) => ({
+                ...bandcampFeedItem(`track-${index}`, new Date(Date.UTC(2026, 9, 1))),
+                dedupeIdentifier: url.replace('https:', 'http:'),
+                source: {
+                    ...newReleaseEmail,
+                    type: 'EMAIL.BANDCAMP_NEW_RELEASE',
+                    releaseUrl: url,
+                    releaseType: 'track',
+                    links: [],
+                },
+                data: {
+                    tralbumUrl: url,
+                    tralbumType: 'track',
+                    purchases: [{ tralbumUrl: url, fans: [mayaFan] }],
+                },
+            }))
+            await repository.ingestFeedItems(tracks)
+            await repository.markFeedItemViewed('track-0', 'BANDCAMP.TRALBUM', true)
+            await repository.markFeedItemViewed('track-1', 'BANDCAMP.TRALBUM', false)
+            const viewedAt = database.db.select().from(feedItemsTable).all()[0]?.lastViewedAt
+            await repository.ingestFeedItems([
+                {
+                    ...fansBoughtMusicFeedItem,
+                    data: {
+                        ...fansBoughtMusicFeedItem.data,
+                        purchases: trackUrls.map(tralbumUrl => ({ tralbumUrl, fans: [riverFan] })),
+                    },
+                },
+            ])
+
+            const stored = database.db.select().from(feedItemsTable).all()
+            expect(stored).toHaveLength(1)
+            expect(stored[0]).toMatchObject({
+                id: 'track-0',
+                dedupeIdentifier: albumUrl,
+                isSnoozed: true,
+                lastViewedAt: viewedAt,
+            })
+            const history = database.db.select().from(feedItemHistoryEntriesTable).all()
+            expect(history).toHaveLength(2)
+            expect(history.every(entry => entry.feedItemId === 'track-0')).toBe(true)
+
+            // An open window still holds track-1. Its exclusion and snooze follow the retained ID.
+            expect(
+                await repository.listFeedItems({
+                    index: 0,
+                    count: 5,
+                    excludedIds: ['track-1'],
+                    snoozeHours: 0,
+                }),
+            ).toEqual([])
+            await repository.markFeedItemViewed('track-1', 'BANDCAMP.TRALBUM', false)
+            expect(database.db.select().from(feedItemsTable).all()[0]?.isSnoozed).toBe(false)
+        } finally {
+            database.sqlite.close()
+        }
+    })
+})
 
 describe('FeedBackendRepository email import checkpoint', () => {
     it('never moves a checkpoint backwards', async () => {

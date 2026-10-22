@@ -72,12 +72,18 @@
                             />
 
                             <!-- @TODO: the height on this is very fragile, keep it up to date and come up with a better approach -->
+                            <!-- Rows share the list's columns, so durations line up whether or not a track has buyers. -->
                             <ul
-                                class="tracks | mt-3 max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] overflow-y-auto"
+                                class="tracks | mt-3 grid max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] content-start gap-x-1 overflow-y-auto"
+                                [ngClass]="
+                                    feedItem.data.fans.length
+                                        ? 'grid-cols-[auto_minmax(0,1fr)_auto]'
+                                        : 'grid-cols-[auto_minmax(0,1fr)]'
+                                "
                             >
                                 @for (track of feedItem.data.tracks; track $index) {
                                     <li
-                                        class="track | relative flex min-h-6 items-center gap-1 type-body-sm"
+                                        class="track | relative col-span-full grid min-h-6 grid-cols-subgrid items-center type-body-sm"
                                         [attr.data-track-index]="$index"
                                         [ngClass]="{
                                             'text-content-muted': !track.streamUrl,
@@ -172,20 +178,25 @@
                                                     {{ $index + 1 }}.
                                                 }
                                             </span>
-                                            <span
-                                                class="min-w-0 grow truncate"
-                                                [hlmOverflowTooltip]="track.title"
-                                                >{{ track.title }}</span
-                                            >
-                                            <span class="shrink-0">
-                                                {{ track.duration ? formatDuration(track.duration) : '' }}
+                                            <span class="flex min-w-0 items-center gap-1">
+                                                <span
+                                                    class="min-w-0 grow truncate"
+                                                    [hlmOverflowTooltip]="track.title"
+                                                    >{{ track.title }}</span
+                                                >
+                                                <span class="shrink-0">
+                                                    {{ track.duration ? formatDuration(track.duration) : '' }}
+                                                </span>
                                             </span>
+                                        }
+                                        @if (track.fans.length) {
+                                            <app-fan-avatar-stack class="ps-1" [fans]="track.fans" />
                                         }
                                     </li>
                                 }
 
                                 <div
-                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-linear-to-b from-transparent to-background-canvas"
+                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 col-span-full size-full h-12 bg-linear-to-b from-transparent to-background-canvas"
                                 ></div>
                             </ul>
                         </div>
@@ -210,21 +221,12 @@
                                     </div>
                                 }
 
-                                @if (feedItem.sourceType === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC') {
-                                    @let fanPurchaseLabel =
-                                        'Bought by ' +
-                                        (feedItem.data.fanNames.length
-                                            ? feedItem.data.fanNames.join(', ')
-                                            : 'fans you follow');
-                                    <span
-                                        hlmBadge
-                                        variant="secondary"
-                                        tabindex="0"
-                                        [hlmOverflowTooltip]="fanPurchaseLabel"
-                                        class="fan-names | mb-2 max-w-full"
-                                    >
-                                        <span class="truncate">{{ fanPurchaseLabel }}</span>
-                                    </span>
+                                @if (feedItem.data.fans.length) {
+                                    <app-fan-avatar-stack
+                                        class="mb-2"
+                                        variant="release"
+                                        [fans]="feedItem.data.fans"
+                                    />
                                 }
 
                                 <h1 class="tralbum-title | type-hero-title">

@@ -219,8 +219,12 @@ describe('AppleMailRepository', () => {
             const [packet] = await result
             expect(packet?.email?.htmlBody).toBe(html)
             expect(packet?.email && parseBandcampEmail(packet.email)).toMatchObject({
-                tralbumUrls: ['https://test.bandcamp.com/album/first'],
-                purchases: [{ tralbumUrl: 'https://test.bandcamp.com/album/first', fanNames: ['André'] }],
+                purchases: [
+                    {
+                        tralbumUrl: 'https://test.bandcamp.com/album/first',
+                        fans: [{ name: 'André', profileUrl: 'https://bandcamp.com/andre', imageUrl: null }],
+                    },
+                ],
             })
         },
     )
