@@ -1,21 +1,27 @@
+import { setTimeout as waitForRetry } from 'node:timers/promises'
 import {
     bufferCount,
     concatMap,
     concatWith,
     defer,
     filter,
+    from,
     ignoreElements,
     materialize,
+    lastValueFrom,
     merge,
+    mergeMap,
     Observable,
     switchMap,
     tap,
+    toArray,
 } from 'rxjs'
 import {
     BandcampEmailFeedSourceItem,
     BandcampFeedItem,
     BandcampPurchase,
     EmailImportProgress,
+    FetchFailedException,
     HydratedBandcampReleaseFeedItem,
     HydratedFeedItem,
     isTruthy,
@@ -45,6 +51,8 @@ import { FeedBackendRepository } from './feed.backend.repository'
 const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
 const UNPLAYABLE_RELEASE_RECHECK_MS = 1000 * 60 * 5
 const MAX_UNPLAYABLE_RELEASE_CHECKS = 1000
+const MAX_PARENT_ALBUM_LOOKUPS = 4
+const PARENT_ALBUM_LOOKUP_RETRY_MS = [250, 1000]
 
 const createBandcampFeedItem = (
     email: BandcampEmailFeedSourceItem,
@@ -84,6 +92,30 @@ export class FeedBackendService {
         private settingsService: SettingsBackendService,
     ) {}
 
+    private async resolveParentAlbumUrl(releaseUrl: string, signal: AbortSignal): Promise<string> {
+        for (let attempt = 0; ; attempt++) {
+            try {
+                const track = await this.bandcampApiService.scrapeTralbumInfo(releaseUrl, signal)
+                return track.parentAlbumUrl ?? releaseUrl
+            } catch (error) {
+                if (
+                    error instanceof BandcampApiMalformedTralbumDataException ||
+                    (error instanceof BandcampApiFailedToFetchTralbumException &&
+                        [404, 410].includes(error.status))
+                )
+                    return releaseUrl
+
+                const retryDelay = PARENT_ALBUM_LOOKUP_RETRY_MS[attempt]
+                const retryable =
+                    error instanceof FetchFailedException ||
+                    (error instanceof BandcampApiFailedToFetchTralbumException &&
+                        [429, 500, 502, 503, 504].includes(error.status))
+                if (signal.aborted || retryDelay === undefined || !retryable) throw error
+                await waitForRetry(retryDelay, undefined, { signal })
+            }
+        }
+    }
+
     async triggerEmailImport(abortSignal: AbortSignal): Promise<Observable<EmailImportProgress>> {
         console.log('Running email import...')
 
@@ -91,6 +123,8 @@ export class FeedBackendService {
         let totalProcessed = 0
         let totalImported = 0
         let skippedEmails = 0
+        const processingFailure = new AbortController()
+        const workSignal = AbortSignal.any([abortSignal, processingFailure.signal])
 
         const vendor = 'APPLE_MAIL'
         const mailboxName = this.emailRepo.getMailboxName(vendor)
@@ -107,25 +141,13 @@ export class FeedBackendService {
             if (!releaseUrl.includes('/track/')) return Promise.resolve(releaseUrl)
             let resolved = parentAlbums.get(releaseUrl)
             if (!resolved) {
-                resolved = this.bandcampApiService
-                    .scrapeTralbumInfo(releaseUrl, abortSignal)
-                    .then(track => track.parentAlbumUrl ?? releaseUrl)
-                    .catch(error => {
-                        if (
-                            error instanceof BandcampApiMalformedTralbumDataException ||
-                            (error instanceof BandcampApiFailedToFetchTralbumException &&
-                                [404, 410].includes(error.status))
-                        ) {
-                            return releaseUrl
-                        }
-                        throw error
-                    })
+                resolved = this.resolveParentAlbumUrl(releaseUrl, workSignal)
                 parentAlbums.set(releaseUrl, resolved)
             }
             return resolved
         }
 
-        const emails$ = await this.emailRepo.loadEmails(vendor, abortSignal, mailboxName, receivedSince)
+        const emails$ = await this.emailRepo.loadEmails(vendor, workSignal, mailboxName, receivedSince)
 
         return merge(
             emails$.pipe(
@@ -179,13 +201,20 @@ export class FeedBackendService {
                             email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'
                                 ? email.purchases
                                 : [{ tralbumUrl: email.releaseUrl, fans: [] }]
-                        const resolved = await Promise.all(
-                            purchases.map(async purchase => ({
-                                purchase,
-                                releaseUrl: await resolveReleaseUrl(purchase.tralbumUrl),
-                            })),
+                        const resolved = await lastValueFrom(
+                            from(purchases).pipe(
+                                mergeMap(
+                                    async (purchase, index) => ({
+                                        purchase,
+                                        index,
+                                        releaseUrl: await resolveReleaseUrl(purchase.tralbumUrl),
+                                    }),
+                                    MAX_PARENT_ALBUM_LOOKUPS,
+                                ),
+                                toArray(),
+                            ),
                         )
-                        for (const { purchase, releaseUrl } of resolved) {
+                        for (const { purchase, releaseUrl } of resolved.sort((a, b) => a.index - b.index)) {
                             const attribution =
                                 email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' ? [purchase] : []
                             const previous = releases.get(releaseUrl)
@@ -239,6 +268,7 @@ export class FeedBackendService {
                     }
                     if (notification.kind == 'E') {
                         if (abortSignal.aborted) return { phase: 'cancelled' as const }
+                        processingFailure.abort()
                         console.error('Error during email import:', notification.error)
 
                         return {
