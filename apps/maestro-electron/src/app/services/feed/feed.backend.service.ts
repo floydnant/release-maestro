@@ -35,6 +35,7 @@ import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.serv
 import {
     BandcampApiFailedToFetchTralbumException,
     BandcampApiMalformedTralbumDataException,
+    BandcampApiRateLimitedException,
 } from '../bandcamp/bandcamp-api.exceptions'
 import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { EmailBackendRepository } from '../email/email.backend.repository'
@@ -95,7 +96,7 @@ export class FeedBackendService {
     private async resolveParentAlbumUrl(releaseUrl: string, signal: AbortSignal): Promise<string> {
         for (let attempt = 0; ; attempt++) {
             try {
-                const track = await this.bandcampApiService.scrapeTralbumInfo(releaseUrl, signal)
+                const track = await this.bandcampApiService.scrapeTralbumInfo(releaseUrl, signal, 'import')
                 return track.parentAlbumUrl ?? releaseUrl
             } catch (error) {
                 if (
@@ -109,7 +110,7 @@ export class FeedBackendService {
                 const retryable =
                     error instanceof FetchFailedException ||
                     (error instanceof BandcampApiFailedToFetchTralbumException &&
-                        [429, 500, 502, 503, 504].includes(error.status))
+                        [500, 502, 503, 504].includes(error.status))
                 if (signal.aborted || retryDelay === undefined || !retryable) throw error
                 await waitForRetry(retryDelay, undefined, { signal })
             }
@@ -323,6 +324,7 @@ export class FeedBackendService {
                 this.bandcampApiService.scrapeTralbumInfo(item.data.tralbumUrl).catch(error => {
                     if (
                         error instanceof BandcampApiFailedToFetchTralbumException ||
+                        error instanceof BandcampApiRateLimitedException ||
                         error instanceof BandcampApiMalformedTralbumDataException
                     ) {
                         console.log(error)

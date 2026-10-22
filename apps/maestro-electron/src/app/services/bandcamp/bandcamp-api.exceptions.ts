@@ -1,6 +1,15 @@
-import { Exception } from '@release-maestro/core'
+import { Exception, USE_SAME_MESSAGE } from '@release-maestro/core'
 
 export class BandcampApiException extends Exception {}
+
+export class BandcampApiRateLimitedException extends BandcampApiException {
+    constructor(
+        public url: string,
+        public retryAt: Date,
+    ) {
+        super('Bandcamp is limiting requests. Please try again later.', USE_SAME_MESSAGE)
+    }
+}
 
 export class BandcampApiFailedToFetchTralbumException extends BandcampApiException {
     constructor(
