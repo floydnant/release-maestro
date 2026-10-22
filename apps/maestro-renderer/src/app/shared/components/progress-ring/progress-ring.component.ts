@@ -1,13 +1,16 @@
 import { ChangeDetectionStrategy, Component, input, Input, ViewEncapsulation } from '@angular/core'
+import { HlmSpinner } from '@spartan-ng/helm/spinner'
 import { semanticColor, SemanticColorIdentifier } from '../../design-tokens.generated'
 
 @Component({
     selector: 'app-progress-ring',
-    imports: [],
+    imports: [HlmSpinner],
     templateUrl: './progress-ring.component.html',
     styleUrls: ['./progress-ring.component.css'],
+    // Flex keeps the ring out of a text line box, so the host is exactly the ring's size and
+    // centres with the label beside it.
     host: {
-        class: 'inline-block',
+        class: 'inline-flex shrink-0',
     },
     changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
@@ -18,6 +21,7 @@ export class ProgressRingComponent {
 
     @Input() progress = 0
     @Input() mode: 'progress' | 'spinning' = 'progress'
+    ariaLabel = input('Progress', { alias: 'aria-label' })
 
     color = input<string | undefined, SemanticColorIdentifier | undefined>(semanticColor('content.action'), {
         transform: value => value && semanticColor(value),
@@ -39,8 +43,7 @@ export class ProgressRingComponent {
         return this.radius * 2 * Math.PI
     }
     get offset() {
-        const progress = this.mode == 'progress' ? this.progress : 20
-        return this.circumference - (progress / 100) * this.circumference
+        return this.circumference - (this.progress / 100) * this.circumference
     }
     get strokeDasharray() {
         return `${this.circumference} ${this.circumference}`

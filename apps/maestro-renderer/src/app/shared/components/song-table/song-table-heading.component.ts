@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import type { SongSort, SongSortField } from '@release-maestro/core'
+import { HlmButton } from '@spartan-ng/helm/button'
 import { IconComponent } from '../icon/icon.component'
 
 /**
@@ -17,7 +18,7 @@ import { IconComponent } from '../icon/icon.component'
 @Component({
     selector: 'app-song-table-heading',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent],
+    imports: [HlmButton, IconComponent],
     host: {
         role: 'columnheader',
         class: 'block border-b border-border-subtle',
@@ -25,8 +26,11 @@ import { IconComponent } from '../icon/icon.component'
     },
     template: `
         <button
+            hlmBtn
+            variant="plain"
+            size="none"
             type="button"
-            class="type-label-sm flex w-full items-center gap-1 p-2 text-content-muted"
+            class="flex w-full items-center justify-start gap-1 p-2 type-label-sm text-content-muted"
             [class.justify-end]="numeric()"
             [class.text-content-primary]="isActive()"
             [attr.aria-label]="'Sort by ' + (sortLabel() ?? label())"
@@ -36,8 +40,8 @@ import { IconComponent } from '../icon/icon.component'
             @if (isActive()) {
                 <app-icon
                     [name]="sort().direction === 'asc' ? 'sortAscending' : 'sortDescending'"
-                    size="12"
-                    color="content.action"
+                    size="14"
+                    color="content.primary"
                 ></app-icon>
             }
         </button>

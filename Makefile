@@ -1,10 +1,28 @@
-.PHONY: dev dev-allocate dev-release dev-reallocate dev-status dev-list dev-stop dev-recover dev-log dev-instance-self-test serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-tools test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node version help
+.PHONY: dev dev-allocate dev-release dev-reallocate dev-status dev-list dev-stop dev-recover dev-log dev-instance-self-test serve-renderer build build-prod build-engine generate-icons package package-dir run-packaged install-packaged test test-tools test-watch test-core test-electron test-renderer test-engine design-tokens design-tokens-watch design-tokens-check e2e e2e-production e2e-renderer e2e-show-report typecheck-e2e lint format f format-check dependency-policy-check agents-check sure affected db-generate db-studio db-check db-truncate-library clean install rebuild-electron rebuild-node help
 
 ICON_DIR := apps/maestro-renderer/src/assets/icons
 ICON_SOURCE := $(ICON_DIR)/app-icon.png
 SKIP_NX_CACHE := false
 E2E_REPORT := electron
 PNPM := pnpm
+ARTIFACT_DIR := dist/executables
+TOOLS_TEST_ARGS ?=
+
+.PHONY: security security-tools security-policy-check security-remediation-plan security-remediate sbom sbom-release
+security-tools: ## Download checksum-pinned security tools for this platform
+	node tools/security/cli.mjs install
+security: ## Scan both lockfiles for known vulnerabilities (requires network)
+	node tools/security/cli.mjs scan
+security-remediation-plan: ## Scan and preview eligible npm fixes without changing dependency inputs
+	node tools/security/remediate.mjs plan
+security-remediate: ## Apply and verify npm fixes on committed dependency inputs
+	node tools/security/remediate.mjs apply
+security-policy-check: ## Validate vulnerability exception fields and date formats
+	node tools/security/cli.mjs policy
+sbom: ## Generate repository and runtime CycloneDX SBOMs in dist/security
+	node tools/security/cli.mjs sbom
+sbom-release: ## Generate source and artifact SBOMs for an existing package (ARTIFACT_DIR=path)
+	node tools/security/cli.mjs sbom "$(ARTIFACT_DIR)"
 
 # Development
 dev: ## Start dev server (electron + renderer with hot reload)
@@ -69,7 +87,7 @@ open-dmg: ## Open the generated DMG file (macOS)
 	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
 	open "$$dmgPath"
 install-dmg: package ## Install the packaged app (macOS) using the DMG
-	dmgPath="$$(find dist/executables -name '*.dmg' -print -quit | tr -d '\n')" && \
+	dmgPath="$$(find dist/executables -name '*-universal.dmg' -print -quit | tr -d '\n')" && \
 	hdiutil attach "$$dmgPath" && \
 	volumeName="$$(find /Volumes -d -name "Release Maestro *-universal" -print -quit | tr -d '\n')" && \
 	appPath="$$volumeName/Release Maestro.app" && \
@@ -80,7 +98,7 @@ install-dmg: package ## Install the packaged app (macOS) using the DMG
 test: test-tools ## Run all tests
 	$(PNPM) exec nx run-many -t test --skipNxCache=$(SKIP_NX_CACHE)
 test-tools: ## Run repository tools tests
-	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand
+	NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' $(PNPM) exec jest --config tools/jest.config.cjs --runInBand $(TOOLS_TEST_ARGS)
 test-watch: ## Run all tests in watch mode
 	$(PNPM) exec nx run-many -t test -- --watch
 test-core: ## Run core library tests
@@ -161,9 +179,6 @@ rebuild-electron: ## Rebuild native dependencies (e.g. after Electron version ch
 	$(PNPM) exec electron-rebuild -f -w better-sqlite3
 rebuild-node: ## Rebuild native dependencies for Node.js (e.g. after Node version change)
 	$(PNPM) rebuild better-sqlite3
-
-version: ## Generate changelog and update version
-	$(PNPM) exec conventional-changelog -i CHANGELOG.md -s -r 0 && $(PNPM) exec prettier --write CHANGELOG.md && git add CHANGELOG.md
 
 # Help
 help: ## Show this help

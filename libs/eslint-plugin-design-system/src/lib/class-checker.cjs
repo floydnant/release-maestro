@@ -17,6 +17,8 @@ const { createTailwindAuthority } = require('./tailwind-authority.cjs')
  *   relative `@import`s are followed
  * @property {boolean} [reportDynamic] whether to report class lists that cannot be resolved
  *   statically. Defaults to true; turning it off is for narrowing a test, not for production use.
+ * @property {string[]} [additionalClassAttributes] template attributes or inputs carrying styling
+ *   classes for an inner element. Defaults to none; applies only to the template rule.
  */
 
 /**
@@ -72,6 +74,11 @@ const sharedSchema = {
         tailwindStylesheet: { type: 'string' },
         globalStylesheets: { type: 'array', items: { type: 'string' } },
         reportDynamic: { type: 'boolean' },
+        additionalClassAttributes: {
+            type: 'array',
+            items: { type: 'string', minLength: 1 },
+            uniqueItems: true,
+        },
 
         /**
          * Resolve a component member through a `TypeChecker` when its class list is not enumerable

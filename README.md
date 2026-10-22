@@ -7,11 +7,19 @@
 
 A desktop app for your music. Scan your local collection into a searchable library, and track new releases from Bandcamp by importing notifications from your inbox — browse both with cover art and full metadata, without leaving the app.
 
+## Download
+
+Download the latest installer from [GitHub releases](https://github.com/floydnant/release-maestro/releases):
+
+- [macOS, Apple Silicon and Intel](https://github.com/floydnant/release-maestro/releases/latest/download/Release-Maestro-macOS-universal.dmg)
+- [Windows, x64](https://github.com/floydnant/release-maestro/releases/latest/download/Release-Maestro-Windows-x64.exe)
+- [Linux, x64](https://github.com/floydnant/release-maestro/releases/latest/download/Release-Maestro-Linux-x86_64.AppImage)
+
 ## Tech Stack
 
 | Layer      | Technology                           |
 | ---------- | ------------------------------------ |
-| Frontend   | Angular, Tailwind CSS, ng-primitives |
+| Frontend   | Angular, Tailwind CSS, Spartan UI    |
 | Backend    | Electron, Node.js                    |
 | Audio tags | Rust (metadata-engine sidecar)       |
 | Database   | SQLite (better-sqlite3), Drizzle ORM |
@@ -38,7 +46,9 @@ make dev
 
 Node.js, pnpm, and Rust are required. `.node-version` selects the development and CI Node.js
 version, while `package.json` declares the supported range and project pnpm release. Use `pnpm`
-normally; pnpm downloads and runs the project's declared release when necessary. `make install`
+normally; pnpm downloads and runs the project's declared release when necessary.
+If an older pnpm fails to switch versions with `ENOEXEC` on macOS, install the declared release
+with `npm install --global --allow-scripts=pnpm pnpm@12.14.0`, then retry. `make install`
 installs the root package from the lockfile, fetches the locked Rust crates, and installs Playwright
 Chromium with its system dependencies. Linux system dependencies may require sudo. Chromium
 requires an OS supported by the installed Playwright version.
@@ -73,6 +83,11 @@ make format-check  # non-mutating formatting check
 make e2e           # full Electron E2E against the development build
 make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
+make security     # scan npm and Rust dependencies for known vulnerabilities
+make security-remediation-plan # preview eligible npm security fixes
+make security-remediate # apply verified fixes in a disposable checkout
+make sbom         # generate repository and runtime CycloneDX inventories
+make sbom-release # add an artifact inventory after make package
 ```
 
 `make sure` mutates formatting. Electron E2E and renderer E2E may run together. Electron E2E uses
@@ -99,6 +114,24 @@ There is no repo-wide typecheck target; `build` is the type gate for app code. S
   glossaries in [docs/contexts/](docs/contexts/), and which projects each context spans
 - [docs/adr/](docs/adr/) — architectural decisions and the reasoning behind non-obvious ones
 - [docs/testing.md](docs/testing.md) — test layers, E2E conventions, fixtures
+- [docs/security.md](docs/security.md) — vulnerability gates, exceptions, and SBOM outputs
+
+## Renderer UI
+
+Standard controls use Spartan UI. Its Brain runtime is an npm dependency; editable Helm components
+live in [shared/ui](apps/maestro-renderer/src/app/shared/ui/). Their defaults use Release Maestro's
+generated semantic tokens, system typography and desktop interaction states. Customize those shared
+defaults once so buttons, fields, cards and overlays stay consistent across screens.
+
+Product components still own music data, scan state, windowed grids and navigation. The UI library
+does not change [browse windowing and selection](docs/adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md)
+or [route history](docs/adr/0006-only-route-changes-are-history-steps.md). The design-system specimen
+shows the shared components and their interaction states.
+
+For new controls and component updates, follow
+[frontend-design](.agents/skills/frontend-design/SKILL.md). The
+[library evaluation](docs/research/angular-ui-libraries.md) records the selection and compatibility
+checks.
 
 ## Projects
 
@@ -138,6 +171,12 @@ Produces platform-specific distributables in `dist/executables/`:
 | Windows  | NSIS installer (x64) |
 | Linux    | AppImage             |
 
+Merge the release-please PR to publish a version. The release workflow tests and
+builds this commit on all three platforms, then attaches the installers to its
+GitHub release. Dependency changes produce patch bumps.
+See [the release guide](docs/releasing.md) for App setup, commit types,
+and retrying a failed publication.
+
 ## Database
 
 Release Maestro uses SQLite with Drizzle ORM. Migrations live in `drizzle/` and are applied automatically on startup.
@@ -164,3 +203,6 @@ Copyright (c) 2026 Floyd Haremsa. All rights reserved for the original,
 project-specific code in this repository. A small set of scaffold-derived files
 is excluded pending rewrite and/or third-party notice cleanup. See
 [LICENSE.md](LICENSE.md).
+
+Copied Spartan Helm components retain their upstream
+[MIT license](apps/maestro-renderer/src/app/shared/ui/LICENSE).

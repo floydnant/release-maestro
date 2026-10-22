@@ -1,27 +1,35 @@
 <label class="type-label-sm text-content-muted" for="album-sort-field">Sort by</label>
 
-<!-- The selected option is marked on the option, not bound as the select's `value`.
-     Binding the value applies it before `@for` has rendered any options, so the select
-     silently keeps its first one — which made a shared `?sort=` link open the grid in the
-     right order under the wrong label. -->
-<select id="album-sort-field" class="input py-0.5 pr-2" (change)="onFieldChange($event)">
-    @for (option of options; track option.field) {
-        <option [value]="option.field" [selected]="option.field === sort().field">
-            {{ option.label }}
-        </option>
-    }
-</select>
+<hlm-select [value]="sort().field" [itemToString]="optionLabel" (valueChange)="onFieldChange($event)">
+    <hlm-select-trigger buttonId="album-sort-field">
+        <!-- Every label shares the value's grid cell, so the trigger is as wide as the longest
+             option and the direction toggle beside it stays put when the field changes. -->
+        <span class="grid justify-items-start">
+            <hlm-select-value class="col-start-1 row-start-1" />
+            @for (option of options; track option.field) {
+                <span class="invisible col-start-1 row-start-1" aria-hidden="true">{{ option.label }}</span>
+            }
+        </span>
+    </hlm-select-trigger>
+    <hlm-select-content *hlmSelectPortal>
+        @for (option of options; track option.field) {
+            <hlm-select-item [value]="option.field">{{ option.label }}</hlm-select-item>
+        }
+    </hlm-select-content>
+</hlm-select>
 
 <button
+    hlmBtn
+    variant="ghost"
+    size="icon"
     type="button"
-    class="btn-nkd-neutral gap-1 px-1.5"
     [attr.aria-label]="directionLabel()"
-    [title]="directionLabel()"
+    [hlmTooltip]="directionLabel()"
     (click)="directionToggle.emit()"
 >
     <app-icon
-        [name]="isAscending() ? 'sortAscending' : 'sortDescending'"
-        size="14"
-        color="content.action"
+        [name]="isAscending() ? 'sortOrderAscending' : 'sortOrderDescending'"
+        size="16"
+        color="content.primary"
     ></app-icon>
 </button>

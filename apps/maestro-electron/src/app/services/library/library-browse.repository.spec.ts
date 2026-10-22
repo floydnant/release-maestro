@@ -11,12 +11,12 @@ import {
     type SongQuery,
 } from '@release-maestro/core'
 import Database from 'better-sqlite3'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import { DatabaseClient } from '../../database/database.client'
 import * as schema from '../../database/drizzle.schema'
 import {
     albumArtistsTable,
@@ -141,7 +141,7 @@ describe('LibraryBrowseRepository', () => {
         sqlite.pragma('foreign_keys = ON')
         db = drizzle(sqlite, { schema })
         migrate(db, { migrationsFolder })
-        repository = new LibraryBrowseRepository({ db } as unknown as DatabaseClient)
+        repository = new LibraryBrowseRepository(fromPartial({ db }))
     })
 
     afterEach(() => sqlite.close())

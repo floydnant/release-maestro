@@ -1,3 +1,6 @@
+import { HlmBadge } from '@spartan-ng/helm/badge'
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmInput } from '@spartan-ng/helm/input'
 import { DecimalPipe } from '@angular/common'
 import {
     ChangeDetectionStrategy,
@@ -13,6 +16,7 @@ import { RouterLink } from '@angular/router'
 import { type CatalogEntityRef } from '@release-maestro/core'
 import type { BrowseStatus } from '../../browse/browse-query'
 import { IconComponent } from '../icon/icon.component'
+import { settingsLink } from '../../../pages/settings/settings-link'
 
 /**
  * The chrome every browse surface shares: title and count, search, the applied
@@ -61,13 +65,14 @@ export interface BrowseFilterState {
     selector: 'app-browse-shell',
     templateUrl: './browse-shell.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, IconComponent, RouterLink],
+    imports: [HlmButton, HlmBadge, HlmInput, DecimalPipe, IconComponent, RouterLink],
     host: {
         class: 'flex min-h-0 min-w-0 flex-1 flex-col',
         '(document:keydown)': 'onDocumentKeydown($event)',
     },
 })
 export class BrowseShellComponent {
+    readonly settingsLink = settingsLink
     state = input.required<BrowseShellState>()
     filters = input.required<BrowseFilterState>()
 

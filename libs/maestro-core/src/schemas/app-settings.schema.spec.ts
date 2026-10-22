@@ -23,9 +23,45 @@ describe('appSettingsSchema (write validation)', () => {
         expect(() => appSettingsSchema.parse({ library: { onboardingSkipped: 'yes' } })).toThrow()
         expect(() => appSettingsSchema.parse({ library: 'not-an-object' })).toThrow()
     })
+
+    it('accepts either feed filter preference and rejects invalid writes', () => {
+        for (const hideUnplayableReleases of [true, false]) {
+            expect(appSettingsSchema.parse({ feed: { hideUnplayableReleases } }).feed).toEqual({
+                hideUnplayableReleases,
+            })
+        }
+        expect(() => appSettingsSchema.parse({ feed: { hideUnplayableReleases: 'false' } })).toThrow()
+    })
+
+    it('accepts snooze hours to two decimals from one hour to one week and rejects others', () => {
+        for (const snoozeHours of [1, 1.5, 1.15, 16, 33.33, 167.99, 168]) {
+            expect(appSettingsSchema.parse({ feed: { snoozeHours } }).feed).toEqual({ snoozeHours })
+        }
+        for (const snoozeHours of [0, 0.99, 168.01, 169, 1.155, 2.675, 16.000000000000004, '16']) {
+            expect(() => appSettingsSchema.parse({ feed: { snoozeHours } })).toThrow()
+        }
+    })
 })
 
 describe('storedAppSettingsSchema (tolerant read)', () => {
+    it('drops invalid feed preferences so consumers use the enabled default', () => {
+        expect(storedAppSettingsSchema.parse({ feed: { hideUnplayableReleases: 'false' } }).feed).toEqual({
+            hideUnplayableReleases: undefined,
+        })
+        expect(storedAppSettingsSchema.parse({ feed: 'corrupted' }).feed).toBeUndefined()
+        expect(storedAppSettingsSchema.parse({ feed: { hideUnplayableReleases: false } }).feed).toEqual({
+            hideUnplayableReleases: false,
+        })
+    })
+    it.each([0, 16.000000000000004])(
+        'drops invalid snooze hours %s but keeps the filter preference',
+        snoozeHours => {
+            expect(
+                storedAppSettingsSchema.parse({ feed: { hideUnplayableReleases: false, snoozeHours } }).feed,
+            ).toEqual({ hideUnplayableReleases: false, snoozeHours: undefined })
+        },
+    )
+
     it('drops individually invalid fields instead of failing the read', () => {
         const parsed = storedAppSettingsSchema.parse({
             library: { folders: 'corrupted', onboardingSkipped: true },

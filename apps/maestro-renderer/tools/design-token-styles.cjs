@@ -6,45 +6,22 @@ const tokenPrefix = /^--(?:color|foundation|type)-/
 const red = message => `\u001B[31m${message}\u001B[39m`
 
 // Read declarations from the expected generated output, never from product CSS overrides.
-const tokenPolicy = (css, tailwind) => {
+const tokenPolicy = css => {
     const tokens = new Set()
+    const replacements = new Map()
     postcss.parse(css).walkDecls(declaration => {
         if (tokenPrefix.test(declaration.prop)) tokens.add(declaration.prop)
+        if (declaration.parent.type !== 'atrule' || declaration.parent.name !== 'theme') return
+        const match = /^var\((--[^)]+)\)$/.exec(declaration.value)
+        if (match && !match[1].startsWith('--foundation-color-')) {
+            // Component CSS keeps the public motion alias used before the v4 migration.
+            const name = declaration.prop.replace('--transition-duration-', '--duration-')
+            replacements.set(match[1], `var(${name})`)
+        }
     })
-    const replacements = new Map()
-    const namespaces = {
-        colors: 'color',
-        spacing: 'spacing',
-        borderRadius: 'radius',
-        opacity: 'opacity',
-        boxShadow: 'shadow',
-        transitionDuration: 'duration',
-        transitionTimingFunction: 'ease',
-    }
-    const visit = (value, segments = []) => {
-        if (typeof value === 'string') {
-            const match = /^var\((--[^)]+)\)$/.exec(value)
-            if (match) {
-                const [group, ...path] = segments
-                const namespace = namespaces[group]
-                if (namespace) replacements.set(match[1], `var(--${namespace}-${path.join('-')})`)
-            }
-        } else if (value && typeof value === 'object') {
-            for (const [key, child] of Object.entries(value)) visit(child, [...segments, key])
-        }
-    }
-    visit(tailwind)
-    for (const [name, value] of Object.entries(tailwind.fontSize ?? {})) {
-        if (!Array.isArray(value)) continue
-        const size = /^var\((--[^)]+)\)$/.exec(value[0])?.[1]
-        if (size) replacements.set(size, `var(--text-${name})`)
-        for (const [property, suffix] of [
-            ['lineHeight', 'line-height'],
-            ['letterSpacing', 'letter-spacing'],
-        ]) {
-            const token = /^var\((--[^)]+)\)$/.exec(value[1]?.[property])?.[1]
-            if (token) replacements.set(token, `var(--text-${name}--${suffix})`)
-        }
+    // Semantic colors have the same public name in CSS and Tailwind.
+    for (const token of tokens) {
+        if (token.startsWith('--color-')) replacements.set(token, `var(${token})`)
     }
     return { tokens, replacements }
 }

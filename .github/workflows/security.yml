@@ -1,0 +1,123 @@
+name: 'Security'
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+    schedule:
+        - cron: '23 6 * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    pr-dependencies:
+        if: github.event_name == 'pull_request'
+        name: Compare dependency vulnerabilities
+        uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        permissions:
+            actions: read
+            contents: read
+            security-events: write
+        with:
+            fail-on-vuln: true
+            # Compare the lockfiles without executing package code or accepting repository suppressions.
+            # /dev/null is an empty config available on the reusable workflow's Linux runner, including
+            # on the base revision before this repository had security tooling.
+            scan-args: |-
+                --no-call-analysis
+                --no-resolve
+                --all-packages
+                --all-vulns
+                --config=/dev/null
+                --lockfile=pnpm-lock.yaml
+                --lockfile=apps/metadata-engine/Cargo.lock
+
+    pr-gate:
+        name: Dependency vulnerabilities
+        needs: pr-dependencies
+        if: always() && github.event_name == 'pull_request'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require a successful comparison
+              env:
+                  SCAN_RESULT: ${{ needs.pr-dependencies.result }}
+              run: test "$SCAN_RESULT" = success
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: ./.github/actions/setup-node
+              with:
+                  install-command: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Validate exception structure
+              run: make security-policy-check
+            # Match combined and component-specific release-please PR branches.
+            # Keep the full scan inside the required gate so release blockers prevent merging.
+            - name: Check release readiness
+              if: startsWith(github.head_ref, 'release-please--')
+              run: make security
+            - name: Upload release readiness reports
+              if: always() && startsWith(github.head_ref, 'release-please--')
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: release-pr-vulnerabilities
+                  path: |
+                      dist/security/osv.json
+                      dist/security/findings.json
+                  if-no-files-found: ignore
+
+    dependencies:
+        name: Full dependency vulnerabilities
+        if: github.event_name != 'pull_request'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: ./.github/actions/setup-node
+              with:
+                  install-command: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Scan dependency vulnerabilities
+              run: make security
+            - name: Upload vulnerability reports
+              if: always()
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: dependency-vulnerabilities
+                  path: dist/security/*.json
+                  if-no-files-found: ignore
+
+    sbom:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: ./.github/actions/setup-node
+              with:
+                  install-command: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Fetch locked Rust crates
+              run: cargo fetch --locked --manifest-path apps/metadata-engine/Cargo.toml
+            - name: Generate dependency inventories
+              run: make sbom
+            - name: Upload source SBOMs
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: source-sbom
+                  path: dist/security/
+                  if-no-files-found: error
+
+    submit-dependencies:
+        name: Submit dependencies to Dependabot
+        needs: sbom
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Download dependency snapshot
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+              with:
+                  name: source-sbom
+                  path: snapshot
+            - name: Update GitHub dependency graph
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+              run: gh api --method POST "repos/$GH_REPO/dependency-graph/snapshots" --input snapshot/github-snapshot.json

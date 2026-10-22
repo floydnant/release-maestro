@@ -84,6 +84,13 @@
             "lineHeight": "{typography.lineHeight.normal}",
             "letterSpacing": "{typography.letterSpacing.normal}"
         },
+        "body-xs": {
+            "family": "{typography.family.sans}",
+            "size": "{typography.size.xs}",
+            "weight": "{typography.weight.regular}",
+            "lineHeight": "{typography.lineHeight.normal}",
+            "letterSpacing": "{typography.letterSpacing.normal}"
+        },
         "label-md": {
             "family": "{typography.family.sans}",
             "size": "{typography.size.sm}",

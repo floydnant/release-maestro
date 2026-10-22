@@ -33,6 +33,7 @@
         "repo": "release-maestro"
     },
     "win": {
+        "artifactName": "Release-Maestro-Windows-${arch}.${ext}",
         "icon": "dist/assets/icons/favicon.ico",
         "target": [
             {
@@ -45,6 +46,7 @@
         "splashImage": "dist/assets/icons/electron.bmp"
     },
     "mac": {
+        "artifactName": "Release-Maestro-macOS-${arch}.${ext}",
         "icon": "dist/assets/icons/favicon.icns",
         "x64ArchFiles": "**/{metadata-engine,better-sqlite3/prebuilds/darwin-{arm64,x64}.node}",
         "target": [
@@ -62,6 +64,7 @@
         ]
     },
     "linux": {
+        "artifactName": "Release-Maestro-Linux-${arch}.${ext}",
         "icon": "dist/assets/icons/favicon.512x512.png",
         "target": ["AppImage"]
     }

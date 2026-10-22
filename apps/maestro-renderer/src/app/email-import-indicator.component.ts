@@ -10,6 +10,8 @@ import {
     signal,
 } from '@angular/core'
 import { EmailImportProgressUpdate } from '@release-maestro/core'
+import { HlmButtonImports } from '@spartan-ng/helm/button'
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { IconComponent } from './shared/components/icon/icon.component'
 import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
 import { MinDwellPacer } from './shared/utils/min-dwell-pacer'
@@ -32,7 +34,7 @@ const SUMMARY_VISIBLE_MS = 4000
     templateUrl: './email-import-indicator.component.html',
     host: { class: 'contents' },
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent, ProgressRingComponent],
+    imports: [IconComponent, ProgressRingComponent, HlmButtonImports, HlmTooltipImports],
 })
 export class EmailImportIndicatorComponent {
     /** The latest import update. Each one is a new object, which is how a summary is told apart. */
@@ -69,7 +71,7 @@ export class EmailImportIndicatorComponent {
         const count = view.newlyImported
         const skippedEmails = view.skippedEmails ?? 0
         if (skippedEmails > 0) {
-            const added = count > 0 ? `Added ${count} ${count === 1 ? 'release' : 'releases'}. ` : ''
+            const added = count > 0 ? `${count} new ${count === 1 ? 'release' : 'releases'}. ` : ''
             return {
                 icon: 'success',
                 color: 'content.secondary',
@@ -81,7 +83,7 @@ export class EmailImportIndicatorComponent {
         return {
             icon: 'success',
             color: count > 0 ? 'content.success' : 'content.secondary',
-            text: count > 0 ? `Added ${count} ${count === 1 ? 'release' : 'releases'}` : 'No new releases',
+            text: count > 0 ? `${count} new ${count === 1 ? 'release' : 'releases'}` : 'No new releases',
             title: '',
         } as const
     })

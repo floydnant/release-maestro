@@ -1,4 +1,4 @@
-const { flatten, generate, normalizeLineEndings, resolveValue } = require('./design-tokens.cjs')
+const { checkGenerated, flatten, generate, normalizeLineEndings, resolveValue } = require('./design-tokens.cjs')
 
 const foundations = {
     color: {
@@ -91,7 +91,7 @@ const tokenSources = {
     contrastPairs: [],
 }
 const output = generate(tokenSources)
-const policy = tokenPolicy(output.css, JSON.parse(output.tailwind))
+const policy = tokenPolicy(output.css)
 const componentFile = 'src/app/example.component.css'
 const scan = (source, file = componentFile) => scanStyleSource({ file, source, policy })
 const component = styles =>
@@ -132,10 +132,10 @@ it('uses the same camelCase normalization in declarations, aliases, Tailwind and
     vm.runInNewContext(outputText, { exports })
     expect(generated.css).toContain('--foundation-typography-font-stretch-semi-expanded: 112.5%')
     expect(generated.css).toContain('--color-focus-ring: var(--foundation-color-deep-blue)')
-    expect(JSON.parse(generated.tailwind).colors.focusRing).toBe('var(--color-focus-ring)')
+    expect(generated.css).toContain('--color-focus-ring: var(--foundation-color-deep-blue)')
     expect(generated.css).toContain('--type-body-compact-size: 12px')
     expect(generated.css).toContain('font-size: var(--type-body-compact-size)')
-    expect(JSON.parse(generated.tailwind).fontSize.bodyCompact[0]).toBe('var(--type-body-compact-size)')
+    expect(generated.css).toContain('--text-bodyCompact: var(--type-body-compact-size)')
     expect(exports.foundationToken('typography.fontStretch.semiExpanded')).toBe(
         'var(--foundation-typography-font-stretch-semi-expanded)',
     )
@@ -377,4 +377,90 @@ it('continues checking literal styles alongside unresolved metadata spreads', ()
         'dynamic-styles',
         'unknown-token',
     ])
+})
+
+const { execFileSync } = require('node:child_process')
+const stylesheetPath = path.resolve(__dirname, '../src/styles.css')
+
+it('compiles token scales and typography utilities without a compatibility config', () => {
+    const css = fs.readFileSync(stylesheetPath, 'utf8')
+    expect(css).not.toContain('@config')
+    // Tailwind registers Node loader hooks. Run it outside Jest's sandboxed module loader.
+    const candidates = [
+        'p-1.5', 'bg-background-surface', 'shadow-sm', 'opacity-30', 'opacity-20',
+        'duration-fast', 'ease-standard', 'text-body-md', 'type-body-md', 'hover:type-body-md',
+        'rounded', 'shadow', 'p-7', 'max-h-72', 'rounded-2xl', 'shadow-xl',
+    ]
+    const result = JSON.parse(execFileSync(process.execPath, ['-e', `
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const { __unstable__loadDesignSystem, compile } = require('@tailwindcss/node')
+        ;(async () => {
+            const stylesheet = process.argv[1]
+            const names = JSON.parse(process.argv[2])
+            const css = fs.readFileSync(stylesheet, 'utf8')
+            const options = { base: path.dirname(stylesheet), onDependency() {} }
+            const designSystem = await __unstable__loadDesignSystem(css, options)
+            const compiler = await compile(css, options)
+            const typography = compiler.build([])
+            console.log(JSON.stringify({ rules: designSystem.candidatesToCss(names), typography, compiled: compiler.build(names) }))
+        })().catch(error => { console.error(error); process.exitCode = 1 })
+    `, stylesheetPath, JSON.stringify(candidates)], { encoding: 'utf8' }))
+    const rule = name => result.rules[candidates.indexOf(name)]
+    expect(rule('p-1.5')).toContain('padding: var(--foundation-spacing-1-5)')
+    expect(rule('bg-background-surface')).toContain('background-color: var(--color-background-surface)')
+    expect(rule('shadow-sm')).toContain('--tw-shadow: var(--foundation-shadow-sm)')
+    expect(rule('opacity-30')).toContain('opacity: var(--foundation-opacity-30)')
+    expect(rule('opacity-20')).toContain('opacity: 20%')
+    expect(rule('duration-fast')).toContain('transition-duration: var(--foundation-motion-duration-fast)')
+    expect(rule('ease-standard')).toContain('var(--ease-standard)')
+    expect(rule('text-body-md')).toContain('font-size: var(--type-body-md-size)')
+    expect(rule('type-body-md')).toContain('font-weight: var(--type-body-md-weight)')
+    expect(rule('hover:type-body-md')).toContain('font-family: var(--type-body-md-family)')
+    for (const name of ['rounded', 'shadow', 'p-7', 'max-h-72', 'rounded-2xl', 'shadow-xl']) {
+        expect(rule(name)).toBeNull()
+    }
+    expect(result.compiled).toContain('--duration-fast: var(--foundation-motion-duration-fast)')
+    expect(result.compiled).toContain('--spacing-1_5: var(--foundation-spacing-1-5)')
+    // The specimen constructs these class names at runtime, so source scanning cannot find them.
+    for (const name of Object.keys(tokenSources.semantic.typography)) {
+        expect(result.typography).toContain(`.type-${name} {`)
+    }
+})
+
+it('publishes every source scale and resets only the replaced scales', () => {
+    const root = postcss.parse(output.css)
+    const theme = new Map()
+    root.walkAtRules('theme', rule => rule.walkDecls(declaration => theme.set(declaration.prop, declaration.value)))
+    for (const [group, namespace] of [
+        ['spacing', 'spacing'], ['radius', 'radius'], ['shadow', 'shadow'], ['opacity', 'opacity'],
+    ]) {
+        expect(theme.get(`--${namespace}-*`)).toBe('initial')
+        for (const name of Object.keys(tokenSources.foundations[group])) {
+            expect(theme.get(`--${namespace}-${name.replace(/\./g, '_')}`)).toMatch(/^var\(--foundation-/)
+        }
+    }
+    expect(theme.get('--spacing')).toBe('initial')
+    expect(theme.has('--color-*')).toBe(false)
+    expect(theme.has('--text-*')).toBe(false)
+    for (const name of Object.keys(tokenSources.semantic.typography)) {
+        expect(theme.get(`--text-${name}`)).toContain('-size)')
+        expect(theme.get(`--text-${name}--line-height`)).toContain('-line-height)')
+        expect(theme.get(`--text-${name}--letter-spacing`)).toContain('-letter-spacing)')
+        expect(output.css).toContain(`@utility type-${name}`)
+    }
+})
+
+it('detects stale generated CSS and accepts the current artifacts', () => {
+    expect(() => checkGenerated()).not.toThrow()
+    const generatedPath = path.resolve(__dirname, '../src/styles/design-tokens.generated.css')
+    const read = fs.readFileSync
+    const spy = jest.spyOn(fs, 'readFileSync').mockImplementation((file, ...args) =>
+        file === generatedPath ? '/* stale */' : read(file, ...args),
+    )
+    try {
+        expect(() => checkGenerated()).toThrow(`Generated design tokens are stale: ${path.join('src', 'styles', 'design-tokens.generated.css')}`)
+    } finally {
+        spy.mockRestore()
+    }
 })

@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common'
 import {
     ChangeDetectionStrategy,
     Component,
+    computed,
     ElementRef,
     HostListener,
     inject,
@@ -10,10 +11,14 @@ import {
 } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
-import { assertUnreachable, HydratedFeedItem } from '@release-maestro/core'
+import { assertUnreachable, HydratedFeedItem, resolveFeedSettings } from '@release-maestro/core'
+import { HlmButtonImports } from '@spartan-ng/helm/button'
+import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
+import { HlmProgressImports } from '@spartan-ng/helm/progress'
 import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
+import { SettingsService } from '../../core/settings/settings.service'
 import { FeedService } from '../../core/services/feed.service'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
@@ -24,6 +29,7 @@ import {
     formatDuration,
     formatReleaseDateRelative,
 } from '../../shared/utils/formatting.utils'
+import { settingsLink } from '../settings/settings-link'
 
 const NUM_PREFETCH_ITEMS = 5
 const SEEK_BY_SECONDS = 30
@@ -55,12 +61,31 @@ type FeedState =
         ProgressRingComponent,
         IconComponent,
         RouterModule,
+        HlmButtonImports,
+        HlmTooltipImports,
+        HlmProgressImports,
     ],
 })
 export class FeedComponent {
     electronService = inject(ElectronService)
     feedService = inject(FeedService)
     audioPlayer = inject(WebAudioPlayer)
+    readonly settingsLink = settingsLink
+    private readonly settingsService = inject(SettingsService)
+    /** How long a snoozed release stays away, from Settings → Feed. */
+    private readonly snoozeDuration = computed(() => {
+        const settings = this.settingsService.settings
+        const { snoozeHours: hours } = resolveFeedSettings(
+            settings.hasValue() ? settings.value()?.feed : undefined,
+        )
+        return hours === 1 ? '1 hour' : `${hours} hours`
+    })
+    readonly snoozeHint = computed(() => `Snooze: show this release again in ${this.snoozeDuration()}`)
+    readonly unsnoozeHint = computed(
+        () => `Snoozed for ${this.snoozeDuration()}. Unsnooze so it does not come back.`,
+    )
+    readonly playbackProgressLabel = (value: number, max: number) =>
+        `${formatDuration(value)} of ${formatDuration(max)}`
 
     feedEntries = viewChildren<ElementRef<HTMLElement>>('feedEntry')
     currentFeedIndex = signal(0)
@@ -103,10 +128,9 @@ export class FeedComponent {
                         furthestScrolledIndex + NUM_PREFETCH_ITEMS - Math.max(lastLoadedItemIndex, 0)
 
                     try {
-                        const items = await this.feedService.loadFeed(
-                            lastLoadedItemIndex + 1,
-                            itemCountToFetch,
-                        )
+                        const items = await this.feedService.loadFeed(0, itemCountToFetch, [
+                            ...this.loadedFeedItemIds,
+                        ])
                         const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
                         if (items.length != newItems.length) {
                             console.warn(

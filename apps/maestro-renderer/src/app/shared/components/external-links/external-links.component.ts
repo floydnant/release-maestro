@@ -1,3 +1,4 @@
+import { HlmButton } from '@spartan-ng/helm/button'
 import { ChangeDetectionStrategy, Component, input } from '@angular/core'
 import type { ExternalLink } from '../../browse/external-links'
 import { IconComponent } from '../icon/icon.component'
@@ -7,7 +8,7 @@ import { IconComponent } from '../icon/icon.component'
     selector: 'app-external-links',
     templateUrl: './external-links.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent],
+    imports: [HlmButton, IconComponent],
 })
 export class ExternalLinksComponent {
     links = input.required<ExternalLink[]>()

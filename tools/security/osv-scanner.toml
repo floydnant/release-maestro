@@ -1,0 +1,2 @@
+# Do not suppress findings in OSV. The repository gate applies version-specific,
+# expiring exceptions from exceptions.json after retaining the complete scan report.

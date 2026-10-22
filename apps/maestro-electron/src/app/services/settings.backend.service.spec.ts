@@ -1,4 +1,5 @@
 import { AppSettings } from '@release-maestro/core'
+import { fromAny } from '@total-typescript/shoehorn'
 import { InMemoryStore } from '../utils/persistent-store.util'
 import { SettingsBackendService } from './settings.backend.service'
 
@@ -49,16 +50,16 @@ describe('SettingsBackendService', () => {
     it('rejects invalid payloads without touching the store', () => {
         service.setSettings({ library: { folders: ['/music'] }, emailPluginConfig: {} })
 
-        expect(() => service.patchSettings({ library: { folders: 'nope' as unknown as string[] } })).toThrow()
-        expect(() => service.setSettings({ library: { folders: [42] } } as unknown as AppSettings)).toThrow()
+        expect(() => service.patchSettings(fromAny({ library: { folders: 'nope' } }))).toThrow()
+        expect(() => service.setSettings(fromAny({ library: { folders: [42] } }))).toThrow()
 
         expect(service.getSettings().library.folders).toEqual(['/music'])
     })
 
     it('reads a store with individually corrupted fields without throwing', () => {
-        store.store = {
+        store.store = fromAny({
             library: { folders: 'corrupted', onboardingSkipped: true },
-        } as unknown as AppSettings
+        })
 
         const settings = service.getSettings()
 
@@ -67,7 +68,7 @@ describe('SettingsBackendService', () => {
     })
 
     it('reads a store whose whole library group is corrupted without throwing', () => {
-        store.store = { library: 'corrupted' } as unknown as AppSettings
+        store.store = fromAny({ library: 'corrupted' })
 
         expect(service.getSettings().library).toEqual({})
     })

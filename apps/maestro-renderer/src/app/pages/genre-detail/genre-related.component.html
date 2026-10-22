@@ -3,13 +3,13 @@
         <p class="type-body-sm text-content-secondary">
             Could not load {{ label().toLowerCase() }} for this genre
         </p>
-        <button type="button" class="btn-neutral" (click)="onRetry()">Try again</button>
+        <button hlmBtn variant="secondary" type="button" (click)="onRetry()">Try again</button>
     </div>
 }
 @if (!result().loaded && result().status === 'loading') {
-    <p class="type-body-sm p-8 text-content-secondary" role="status">Loading {{ label().toLowerCase() }}…</p>
+    <p class="p-8 type-body-sm text-content-secondary" role="status">Loading {{ label().toLowerCase() }}…</p>
 } @else if (result().loaded && result().total === 0) {
-    <p class="type-body-sm p-8 text-content-secondary">No {{ label().toLowerCase() }} linked to this genre</p>
+    <p class="p-8 type-body-sm text-content-secondary">No {{ label().toLowerCase() }} linked to this genre</p>
 } @else if (result().loaded) {
     <app-catalog-list
         [label]="label()"

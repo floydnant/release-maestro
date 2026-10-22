@@ -11,9 +11,11 @@
                     aria-label="History"
                 >
                     <button
-                        class="history-back-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed disabled:cursor-default disabled:text-content-muted"
+                        hlmBtn
+                        variant="history"
+                        size="icon-xs"
+                        class="history-back-button | rounded-md disabled:cursor-default"
                         type="button"
-                        title="Back"
                         aria-label="Back"
                         [disabled]="!history.canGoBack()"
                         (click)="history.back()"
@@ -21,9 +23,11 @@
                         <app-icon name="navigationBack" size="18"></app-icon>
                     </button>
                     <button
-                        class="history-forward-button | inline-flex size-6 items-center justify-center rounded-md text-content-secondary transition-colors duration-fast ease-standard hover:bg-action-quiet-hover hover:text-content-primary active:bg-action-quiet-pressed disabled:cursor-default disabled:text-content-muted"
+                        hlmBtn
+                        variant="history"
+                        size="icon-xs"
+                        class="history-forward-button | rounded-md disabled:cursor-default"
                         type="button"
-                        title="Forward"
                         aria-label="Forward"
                         [disabled]="!history.canGoForward()"
                         (click)="history.forward()"
@@ -33,93 +37,116 @@
                 </nav>
             </div>
 
-            <div class="sidebar__content | flex min-h-0 flex-1 flex-col p-4">
-                <nav>
-                    <ul class="flex flex-col gap-1">
-                        <li>
+            <div hlmSidebarContent class="sidebar__content | p-2">
+                <nav class="sidebar__nav |" aria-label="Main">
+                    <ul hlmSidebarMenu>
+                        <li hlmSidebarMenuItem>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmSidebarMenuButton
                                 routerLink="/home"
-                                routerLinkActive="active-link"
+                                routerLinkActive=""
+                                ariaCurrentWhenActive="page"
                                 [routerLinkActiveOptions]="{ exact: true }"
                                 >Home</a
                             >
                         </li>
-                        <li>
+                        <li hlmSidebarMenuItem>
                             <a
-                                class="btn-nkd-neutral w-full justify-start"
+                                hlmSidebarMenuButton
                                 routerLink="/feed"
-                                routerLinkActive="active-link"
+                                routerLinkActive=""
+                                ariaCurrentWhenActive="page"
                                 >Feed</a
                             >
                         </li>
-                        <li>
-                            <a
-                                class="btn-nkd-neutral w-full justify-start"
-                                routerLink="/tracks"
-                                routerLinkActive="active-link"
-                                >Tracks</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                class="btn-nkd-neutral w-full justify-start"
-                                routerLink="/albums"
-                                routerLinkActive="active-link"
-                                >Albums</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                class="btn-nkd-neutral w-full justify-start"
-                                routerLink="/artists"
-                                routerLinkActive="active-link"
-                                >Artists</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                class="btn-nkd-neutral w-full justify-start"
-                                routerLink="/record-labels"
-                                routerLinkActive="active-link"
-                                >Record labels</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                class="btn-nkd-neutral w-full justify-start"
-                                routerLink="/genres"
-                                routerLinkActive="active-link"
-                                >Genres</a
-                            >
-                        </li>
-                        <li>
-                            <a
-                                class="btn-nkd-neutral w-full justify-start"
-                                routerLink="/settings"
-                                routerLinkActive="active-link"
-                                >Settings</a
-                            >
-                        </li>
                     </ul>
+                    <div hlmSidebarGroup class="px-0">
+                        <div hlmSidebarGroupLabel id="sidebar-group-library">Library</div>
+                        <ul hlmSidebarMenu aria-labelledby="sidebar-group-library">
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/tracks"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Tracks</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/albums"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Albums</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/artists"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Artists</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/record-labels"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Record labels</a
+                                >
+                            </li>
+                            <li hlmSidebarMenuItem>
+                                <a
+                                    hlmSidebarMenuButton
+                                    routerLink="/genres"
+                                    routerLinkActive=""
+                                    ariaCurrentWhenActive="page"
+                                    >Genres</a
+                                >
+                            </li>
+                        </ul>
+                    </div>
                 </nav>
 
                 @if (showLibrarySetupCta()) {
-                    <hr />
-                    <p class="type-body-sm text-content-secondary">Your music library isn't set up yet.</p>
-                    <a class="mt-2 btn-primary block text-center" routerLink="/import">Set up library</a>
+                    <div hlmSidebarSeparator class="-mx-2"></div>
+                    <div class="sidebar__setup-cta | px-3 pt-2">
+                        <p class="type-body-sm text-content-secondary">
+                            Your music library isn't set up yet.
+                        </p>
+                        <a hlmBtn class="mt-2 w-full" routerLink="/import">Set up library</a>
+                    </div>
                 }
 
                 <div class="flex h-full items-center justify-center">
                     <div class="flex flex-col gap-3">
                         <button
-                            class="btn-neutral w-full"
+                            hlmBtn
+                            variant="secondary"
+                            class="w-full"
+                            type="button"
                             (click)="audioPlayer.isPlaying() ? audioPlayer.pause() : audioPlayer.play()"
                         >
                             {{ audioPlayer.isPlaying() ? 'PAUSE' : 'PLAY' }}
                         </button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Settings are about the app, not the library, so they sit apart at the bottom. -->
+            <div hlmSidebarFooter class="sidebar__footer | border-t border-border-subtle">
+                <ul hlmSidebarMenu>
+                    <li hlmSidebarMenuItem>
+                        <a hlmSidebarMenuButton [routerLink]="settingsLink('library-folders')">
+                            <app-icon name="settings" size="16" aria-hidden="true"></app-icon>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
             </div>
         </aside>
     }
@@ -139,7 +166,7 @@
                 @if (scanIndicator(); as scan) {
                     @if (scan.phase !== 'completed') {
                         <p
-                            class="scan-indicator | type-body-sm flex items-center gap-1 px-2 text-content-secondary"
+                            class="scan-indicator | flex items-center gap-1 px-2 type-body-sm text-content-secondary"
                         >
                             @if (scan.phase === 'reading') {
                                 <app-progress-ring
@@ -147,7 +174,7 @@
                                     [diameter]="25"
                                     [strokeWidth]="2.5"
                                     color="content.success"
-                                    bgColor="background.surface"
+                                    bgColor="background.canvas"
                                     [progress]="libraryScanPercent()"
                                 ></app-progress-ring>
                             } @else {
@@ -156,7 +183,7 @@
                                     [diameter]="25"
                                     [strokeWidth]="2.5"
                                     color="content.secondary"
-                                    bgColor="background.surface"
+                                    bgColor="background.canvas"
                                 ></app-progress-ring>
                             }
 
@@ -174,10 +201,13 @@
                         </p>
                         @if (libraryService.isScanning()) {
                             <button
-                                class="scan-cancel | btn-nkd-neutral size-6 self-center p-0 [-webkit-app-region:no-drag]"
+                                hlmBtn
+                                variant="ghost"
+                                size="icon-xs"
+                                class="scan-cancel | self-center [-webkit-app-region:no-drag]"
                                 type="button"
                                 aria-label="Cancel scan"
-                                title="Cancel scan"
+                                hlmTooltip="Cancel scan"
                                 (click)="cancelScan($event)"
                             >
                                 <app-icon name="close" size="14" aria-hidden="true"></app-icon>
@@ -312,25 +342,37 @@
                 <!-- Keep native :hover semantics. The project's hover: variant also matches keyboard focus. -->
                 <div class="title-bar__controls | flex [-webkit-app-region:no-drag]">
                     <button
-                        class="title-bar__button | inline-flex h-full w-[2.875rem] items-center justify-center text-content-muted transition-[background-color,color] duration-fast ease-standard [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
+                        hlmBtn
+                        variant="plain"
+                        size="none"
+                        class="title-bar__button | h-full w-[2.875rem] text-content-muted [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
                         type="button"
-                        title="Minimize"
+                        aria-label="Minimize"
+                        hlmTooltip="Minimize"
                         (click)="minimizeWindow()"
                     >
                         <app-icon name="windowMinimize" size="14"></app-icon>
                     </button>
                     <button
-                        class="title-bar__button | inline-flex h-full w-[2.875rem] items-center justify-center text-content-muted transition-[background-color,color] duration-fast ease-standard [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
+                        hlmBtn
+                        variant="plain"
+                        size="none"
+                        class="title-bar__button | h-full w-[2.875rem] text-content-muted [&:hover]:bg-action-quiet-hover [&:hover]:text-content-primary"
                         type="button"
-                        title="Maximize"
+                        aria-label="Maximize"
+                        hlmTooltip="Maximize"
                         (click)="toggleMaximizeWindow()"
                     >
                         <app-icon name="windowMaximize" size="14"></app-icon>
                     </button>
                     <button
-                        class="title-bar__button--close | inline-flex h-full w-[2.875rem] items-center justify-center text-content-muted transition-[background-color,color] duration-fast ease-standard [&:hover]:bg-status-danger-background [&:hover]:text-status-danger-content"
+                        hlmBtn
+                        variant="plain"
+                        size="none"
+                        class="title-bar__button--close | h-full w-[2.875rem] text-content-muted [&:hover]:bg-status-danger-background [&:hover]:text-status-danger-content"
                         type="button"
-                        title="Close"
+                        aria-label="Close"
+                        hlmTooltip="Close"
                         (click)="closeWindow()"
                     >
                         <app-icon name="close" size="14"></app-icon>
@@ -343,4 +385,7 @@
             <router-outlet></router-outlet>
         </main>
     </div>
+
+    <!-- Settings open as a dialog over whatever page is showing. -->
+    <router-outlet name="modal"></router-outlet>
 </div>

@@ -16,6 +16,13 @@ import {
     SongWindowResult,
 } from '@release-maestro/core'
 import { audioFixtureUrl } from '../fixtures/audio.fixture'
+import {
+    coverArtDataUrl,
+    coverArtSvg,
+    FIXTURE_COVER_ROOT,
+    fixtureCoverPath,
+    installFixtureCoverArt,
+} from '../fixtures/cover-art.fixture'
 import { createScenarioRuntime } from './scenario-runtime'
 
 type MainIpcChannel = keyof MainIpcContract & string
@@ -326,7 +333,7 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
         releaseName: 'Gecko',
         band: {
             name: 'Shiva Chandra',
-            imageUrl: null,
+            imageUrl: coverArtDataUrl('shiva chandra'),
             location: 'Berlin, Germany',
             bio: 'Quiet electronics and patient melodies.',
             links: [{ url: 'https://example.bandcamp.com', text: 'Bandcamp' }],
@@ -337,8 +344,7 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
         links: [],
         unsubscribeUrl: null,
         unsubscribeText: '',
-        imageUrl:
-            'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300"%3E%3Crect width="300" height="300" fill="%23232f3e"/%3E%3C/svg%3E',
+        imageUrl: coverArtDataUrl('gecko'),
         iframeUrl: null,
         tracks: [
             {
@@ -390,9 +396,10 @@ export const createSongRow = (overrides: Partial<SongRow> = {}): SongRow => {
 
 /** A handful of rows that disagree on every sortable column. */
 export const createSongRows = (): SongRow[] => [
-    createSongRow(),
+    createSongRow({ coverPath: fixtureCoverPath('daybreak') }),
     createSongRow({
         id: 'song-2',
+        coverPath: fixtureCoverPath('afterglow'),
         path: '/scenario/music/dusk.mp3',
         title: 'Dusk',
         artistText: 'Night Cartel',
@@ -433,13 +440,13 @@ export const createSongRows = (): SongRow[] => [
 ]
 
 /**
- * One album tile. No cover path by default: a `file://` src would 404 in a browser
- * scenario, and the placeholder is what the tile renders instead.
+ * One album tile, with stand-in cover art (see `cover-art.fixture`). Pass `coverPath: null`
+ * for the placeholder tile.
  */
 export const createAlbumRow = (overrides: Partial<AlbumRow> = {}): AlbumRow => ({
     id: 'album-1',
     title: 'Daybreak',
-    coverPath: null,
+    coverPath: fixtureCoverPath('daybreak'),
     albumArtistText: 'Aurora Fields',
     albumArtists: [{ id: 'artist-1', name: 'Aurora Fields' }],
     year: 2019,
@@ -461,11 +468,13 @@ export const createAlbumRows = (): AlbumRow[] => [
         recordLabelId: 'label-2',
         recordLabelText: 'Hardwire',
         songCount: 12,
+        coverPath: fixtureCoverPath('afterglow'),
     }),
     createAlbumRow({
         id: 'album-3',
         // Everything absent that can be, which is the row the tile's fallbacks are for.
         title: 'Untitled Tape',
+        coverPath: null,
         albumArtistText: null,
         albumArtists: [],
         year: null,
@@ -478,7 +487,7 @@ export const createAlbumRows = (): AlbumRow[] => [
 export const createAlbumDetail = (overrides: Partial<AlbumDetail> = {}): AlbumDetail => ({
     id: 'album-1',
     title: 'Daybreak',
-    coverPath: null,
+    coverPath: fixtureCoverPath('daybreak'),
     albumArtistText: 'Aurora Fields',
     albumArtists: [{ id: 'artist-1', name: 'Aurora Fields' }],
     year: 2019,
@@ -883,6 +892,9 @@ export const createRendererScenario = async (
     // source alongside the installer so the browser uses the helpers Jest exercises.
     await page.addInitScript({
         content: `(${initializeScenario.toString()})(${createScenarioRuntime.toString()}, ${JSON.stringify(serializeScenarioValue(scenario))})`,
+    })
+    await page.addInitScript({
+        content: `(${installFixtureCoverArt.toString()})(${coverArtSvg.toString()}, ${JSON.stringify(FIXTURE_COVER_ROOT)})`,
     })
 
     await page.goto(path, { waitUntil: 'domcontentloaded' })

@@ -126,7 +126,7 @@ test.describe('completed import feed refresh', () => {
             trigger: 'auto',
         })
 
-        await expect(page.getByRole('status', { name: 'Email import' })).toHaveText('Added 1 release')
+        await expect(page.getByRole('status', { name: 'Email import' })).toHaveText('1 new release')
         await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
         await expect(page.getByRole('link', { name: newlyAddedRelease.data.releaseName })).toHaveCount(0)
         await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
@@ -153,7 +153,7 @@ test.describe('manual import', () => {
             appleMailSettings('Bandcamp'),
             '/settings/apple-mail',
         )
-        const settingsPage = page.getByRole('main')
+        const settingsPage = page.getByRole('dialog', { name: 'Settings' })
         const importNow = settingsPage.getByRole('button', { name: 'Import now' })
 
         await importNow.click()
@@ -171,8 +171,11 @@ test.describe('manual import', () => {
             trigger: 'manual',
         })
         await expect(settingsPage.getByText('Importing emails 2/5')).toBeVisible()
-        // The title bar shows a manual import too, so it stays visible on other pages
-        await expect(page.getByRole('banner').getByText('Importing emails 2/5')).toBeVisible()
+        // The title bar shows a manual import too, so it stays visible on other pages. The open
+        // settings dialog hides it from the accessibility tree, not from view.
+        await expect(
+            page.getByRole('banner', { includeHidden: true }).getByText('Importing emails 2/5'),
+        ).toBeVisible()
 
         const cancel = settingsPage.getByRole('button', { name: 'Cancel import' })
         await cancel.focus()
@@ -220,7 +223,9 @@ test.describe('manual import', () => {
             await controller.emit('email-import-progress', { ...update, trigger: 'manual' })
 
             await expect(page.getByRole('status', { name: 'Last email import' })).toHaveText(text)
-            await expect(page.getByRole('status', { name: 'Email import', exact: true })).toHaveText(/^\s*$/)
+            await expect(
+                page.getByRole('status', { name: 'Email import', exact: true, includeHidden: true }),
+            ).toHaveText(/^\s*$/)
         })
     }
 
@@ -236,7 +241,7 @@ test.describe('manual import', () => {
         const importNow = page.getByRole('button', { name: 'Import now' })
         await expect(importNow).toBeEnabled()
 
-        await page.getByLabel('Mailbox Name').fill('Releases')
+        await page.getByRole('textbox', { name: 'Mailbox Name' }).fill('Releases')
 
         await expect(importNow).toBeDisabled()
         await expect(page.getByText('Save the mailbox name to import from it.')).toBeVisible()
@@ -250,7 +255,7 @@ test.describe('manual import', () => {
         await page.getByRole('link', { name: 'Settings', exact: true }).click()
         await page.getByRole('link', { name: 'Apple Mail' }).click()
 
-        await expect(page.getByRole('main').getByText('Checking mail…')).toBeVisible()
+        await expect(page.getByRole('dialog', { name: 'Settings' }).getByText('Checking mail…')).toBeVisible()
         await expect(page.getByRole('button', { name: 'Import now' })).toBeDisabled()
     })
 })
@@ -291,8 +296,8 @@ test.describe('auto import', () => {
 
     for (const { newlyImported, summary } of [
         { newlyImported: 0, summary: 'No new releases' },
-        { newlyImported: 1, summary: 'Added 1 release' },
-        { newlyImported: 3, summary: 'Added 3 releases' },
+        { newlyImported: 1, summary: '1 new release' },
+        { newlyImported: 3, summary: '3 new releases' },
     ]) {
         test(`summarizes a completed auto import: ${summary}`, async ({ page }) => {
             const controller = await createRendererScenario(page, rendererScenarios.feed.emptyNoSetup())
@@ -310,7 +315,7 @@ test.describe('auto import', () => {
     }
 
     for (const { newlyImported, skippedEmails, summary } of [
-        { newlyImported: 1, skippedEmails: 1, summary: 'Added 1 release. 1 email will be retried.' },
+        { newlyImported: 1, skippedEmails: 1, summary: '1 new release. 1 email will be retried.' },
         { newlyImported: 0, skippedEmails: 2, summary: '2 emails will be retried.' },
     ]) {
         test(`summarizes skipped emails calmly: ${summary}`, async ({ page }) => {

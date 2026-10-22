@@ -1,3 +1,6 @@
+import { HlmButton } from '@spartan-ng/helm/button'
+import { HlmSelectImports } from '@spartan-ng/helm/select'
+import { HlmTooltip } from '@spartan-ng/helm/tooltip'
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core'
 import { AlbumSortField, type AlbumSort } from '@release-maestro/core'
 import { IconComponent } from '../icon/icon.component'
@@ -6,9 +9,9 @@ import { IconComponent } from '../icon/icon.component'
  * The albums grid's sort control.
  *
  * A grid has no column headers, so the sort has to be stated somewhere — this is the
- * one piece of browse chrome the track list did not already need. It is a native
- * `<select>` plus a direction toggle rather than a menu, because that is the control the
- * platform already makes keyboard- and screen-reader-operable.
+ * one piece of browse chrome the track list did not already need. It is a select plus a
+ * direction toggle; the shared select supplies the listbox keyboard and screen-reader
+ * behavior, and draws in the app's own theme rather than the platform's.
  *
  * Field and direction are separate controls rather than ten combined options. A user
  * changing "year" to "title" almost never means to change the direction with it, and a
@@ -37,7 +40,7 @@ const SORT_OPTIONS: SortOption[] = [
     selector: 'app-album-sort-bar',
     templateUrl: './album-sort-bar.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [IconComponent],
+    imports: [HlmButton, HlmTooltip, HlmSelectImports, IconComponent],
     host: { class: 'flex shrink-0 items-center gap-2 px-4 py-2' },
 })
 export class AlbumSortBarComponent {
@@ -53,13 +56,18 @@ export class AlbumSortBarComponent {
 
     protected readonly options = SORT_OPTIONS
 
+    /** The select shows the chosen option's label, not the field identifier it holds. */
+    protected readonly optionLabel = (field: AlbumSortField) =>
+        SORT_OPTIONS.find(option => option.field === field)?.label ?? field
+
     protected isAscending = computed(() => this.sort().direction == 'asc')
 
     protected directionLabel = computed(() =>
         this.isAscending() ? 'Sorted ascending — sort descending' : 'Sorted descending — sort ascending',
     )
 
-    protected onFieldChange(event: Event): void {
-        this.sortField.emit((event.target as HTMLSelectElement).value as AlbumSortField)
+    protected onFieldChange(value: AlbumSortField | null | undefined): void {
+        const option = this.options.find(option => option.field === value)
+        if (option) this.sortField.emit(option.field)
     }
 }

@@ -3,15 +3,15 @@
         <p class="artist-record-labels__error-message | type-body-sm text-content-secondary">
             Could not load record labels for this artist
         </p>
-        <button type="button" class="btn-neutral" (click)="onRetry()">Try again</button>
+        <button hlmBtn variant="secondary" type="button" (click)="onRetry()">Try again</button>
     </div>
 }
 @if (!result().loaded && result().status === 'loading') {
-    <p class="artist-record-labels__loading | type-body-sm p-8 text-content-secondary" role="status">
+    <p class="artist-record-labels__loading | p-8 type-body-sm text-content-secondary" role="status">
         Loading record labels…
     </p>
 } @else if (result().loaded && result().total === 0) {
-    <p class="artist-record-labels__empty | type-body-sm p-8 text-content-secondary">
+    <p class="artist-record-labels__empty | p-8 type-body-sm text-content-secondary">
         No record labels linked to this artist
     </p>
 } @else if (result().loaded) {

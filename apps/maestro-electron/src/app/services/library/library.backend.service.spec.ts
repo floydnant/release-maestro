@@ -1,8 +1,7 @@
 import { firstValueFrom, from, Observable, Subject, toArray } from 'rxjs'
+import { fromPartial } from '@total-typescript/shoehorn'
 import { MetadataPrescanUpdate, MetadataScanUpdate, PrescanFileFact } from '@release-maestro/core'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
-import { MetadataBackendService } from '../metadata/metadata.backend.service'
-import { LibraryBackendRepository } from './library.backend.repository'
 import { LibraryBackendService } from './library.backend.service'
 
 const fact: PrescanFileFact = {
@@ -42,10 +41,7 @@ describe('LibraryBackendService', () => {
                 ]),
             ),
         }
-        const service = new LibraryBackendService(
-            repository as unknown as LibraryBackendRepository,
-            metadataService as unknown as MetadataBackendService,
-        )
+        const service = new LibraryBackendService(fromPartial(repository), fromPartial(metadataService))
 
         const updates = await firstValueFrom(service.scan(['/music']).pipe(toArray()))
 
@@ -86,10 +82,7 @@ describe('LibraryBackendService', () => {
             ),
             readFiles: jest.fn(),
         }
-        const service = new LibraryBackendService(
-            repository as unknown as LibraryBackendRepository,
-            metadataService as unknown as MetadataBackendService,
-        )
+        const service = new LibraryBackendService(fromPartial(repository), fromPartial(metadataService))
 
         const updates = await firstValueFrom(service.scan(['/music']).pipe(toArray()))
 
@@ -107,10 +100,7 @@ describe('LibraryBackendService', () => {
             prescan: jest.fn(() => prescan$.asObservable()),
             readFiles: jest.fn(),
         }
-        const service = new LibraryBackendService(
-            repository as unknown as LibraryBackendRepository,
-            metadataService as unknown as MetadataBackendService,
-        )
+        const service = new LibraryBackendService(fromPartial(repository), fromPartial(metadataService))
 
         const updatesPromise = firstValueFrom(
             service.scan(['/music'], abortController.signal).pipe(toArray()),

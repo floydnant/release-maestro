@@ -1,0 +1,74 @@
+name: 'Security remediation'
+
+on:
+    schedule:
+        - cron: '53 6 * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    pull-requests: read
+
+concurrency:
+    group: security-remediation-main
+    cancel-in-progress: false
+
+jobs:
+    remediate:
+        if: github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: main
+                  fetch-depth: 0
+                  persist-credentials: false
+            - uses: ./.github/actions/setup-node
+              with:
+                  install-command: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Find existing Dependabot PRs
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+              run: |
+                  mkdir -p dist/security
+                  gh pr list --author 'app/dependabot' --base main --limit 100 --json headRefOid,url > dist/security/dependabot-prs.json
+            - name: Prepare and verify fixes
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+                  SECURITY_DEPENDABOT_PRS: dist/security/dependabot-prs.json
+              run: make security-remediate
+            - name: Upload remediation and vulnerability reports
+              if: always()
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: security-remediation
+                  path: dist/security/
+                  if-no-files-found: ignore
+            - name: Write run summary
+              if: always()
+              run: |
+                  if [ -f dist/security/remediation-pr.md ]; then
+                      cat dist/security/remediation-pr.md >> "$GITHUB_STEP_SUMMARY"
+                  else
+                      echo 'Remediation failed before it wrote a report. See the job log.' >> "$GITHUB_STEP_SUMMARY"
+                  fi
+            # Create the write token only after package resolution and verification finish.
+            # App-authenticated pushes and PRs start normal CI, unlike GITHUB_TOKEN writes.
+            - name: Create Release Maestro CI App token
+              id: app-token
+              uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+              with:
+                  client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  permission-contents: write
+                  permission-pull-requests: write
+            - name: Publish remediation PR as Release Maestro CI
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  GH_REPO: ${{ github.repository }}
+              run: |
+                  gh auth setup-git
+                  node tools/security/publish-remediation.mjs

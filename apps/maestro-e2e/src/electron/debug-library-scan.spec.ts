@@ -100,6 +100,9 @@ test('scans a temp library and persists reconciliation state across scans', asyn
     await expect(metric(page, 'Missing songs')).toHaveText('0')
     await expect(metric(page, 'Scan errors')).toHaveText('0')
     await expect(metric(page, 'Imported items')).toHaveText('1')
+    // A native <details> disclosure; Playwright gives its <summary> no button role.
+    await page.locator('summary', { hasText: 'Raw terminal result' }).click()
+    await expect(metric(page, 'Raw scan summary')).toBeVisible()
     await expect(metric(page, 'Raw scan summary')).toContainText('"new": 1')
 
     await page.getByRole('button', { name: 'Start Scan' }).click()
@@ -110,6 +113,9 @@ test('scans a temp library and persists reconciliation state across scans', asyn
     await expect(metric(page, 'Missing songs')).toHaveText('0')
     await expect(metric(page, 'Scan errors')).toHaveText('0')
     await expect(metric(page, 'Scan status')).toHaveText('completed')
+    // A native <details> disclosure; Playwright gives its <summary> no button role.
+    await page.locator('summary', { hasText: 'Raw terminal result' }).click()
+    await expect(metric(page, 'Raw scan summary')).toBeVisible()
     await expect(metric(page, 'Raw scan summary')).toContainText('"unchanged": 1')
 })
 
