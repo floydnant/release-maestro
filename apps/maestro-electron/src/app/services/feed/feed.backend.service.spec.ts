@@ -512,13 +512,17 @@ describe('FeedBackendService email import', () => {
         ).toEqual([])
     })
 
-    it('hydrates releases with URL fallbacks without fetching their link previews', async () => {
+    it('hydrates a cold feed page concurrently without waiting for link previews', async () => {
         jest.useFakeTimers()
         const html = `<title>Preview</title><div data-tralbum='${JSON.stringify({
             current: { title: 'Album', type: 'album', id: 1 },
             trackinfo: [],
         })}'></div>`
-        const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(html))
+        const fetchMock = jest
+            .spyOn(globalThis, 'fetch')
+            .mockImplementation(
+                () => new Promise(resolve => setTimeout(() => resolve(new Response(html)), 100)),
+            )
         try {
             const http = new BandcampHttpClient()
             const realService = new FeedBackendService(
@@ -546,7 +550,10 @@ describe('FeedBackendService email import', () => {
                 }
             })
             const hydrated = realService.hydrateFeed(items, false)
-            await jest.advanceTimersByTimeAsync(4000)
+            const finished = jest.fn()
+            void hydrated.then(finished)
+            await jest.advanceTimersByTimeAsync(100)
+            expect(finished).toHaveBeenCalledTimes(1)
             await expect(hydrated).resolves.toHaveLength(5)
             for (const item of await hydrated) {
                 expect(item.data.links.every(link => link.title === link.url)).toBe(true)
