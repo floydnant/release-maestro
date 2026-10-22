@@ -1,0 +1,51 @@
+diff --git a/src/executors/execute/executor.js b/src/executors/execute/executor.js
+index 14f98b0de9e50119114aee2ac2adae34f580dc9d..b1fc10e34bba9d2730f34aed115c182176a7d48b 100644
+--- a/src/executors/execute/executor.js
++++ b/src/executors/execute/executor.js
+@@ -89,9 +89,10 @@ function killProcess() {
+         if (!subProcess) {
+             return;
+         }
++        const processToStop = subProcess;
+         const promisifiedTreeKill = (0, util_1.promisify)(tree_kill_1.default);
+         try {
+-            yield promisifiedTreeKill(subProcess.pid, 'SIGTERM');
++            yield promisifiedTreeKill(processToStop.pid, 'SIGTERM');
+         }
+         catch (err) {
+             if (Array.isArray(err) && err[0] && err[2]) {
+@@ -103,10 +104,34 @@ function killProcess() {
+             }
+         }
+         finally {
++            // tree-kill's callback means signals were sent, not that Electron exited.
++            // On macOS Electron can survive after its GPU and network children die.
++            if (processToStop.exitCode === null && processToStop.signalCode === null) {
++                processToStop.kill('SIGTERM');
++            }
++            if (!(yield waitForExit(processToStop, 2000))) {
++                processToStop.kill('SIGKILL');
++                if (!(yield waitForExit(processToStop, 2000))) {
++                    throw new Error(`Electron process ${processToStop.pid} did not exit before restart.`);
++                }
++            }
+             subProcess = null;
+         }
+     });
+ }
++function waitForExit(child, timeoutMs) {
++    if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
++    return new Promise(resolve => {
++        const done = exited => {
++            clearTimeout(timer);
++            child.removeListener('exit', onExit);
++            resolve(exited);
++        };
++        const onExit = () => done(true);
++        const timer = setTimeout(() => done(false), timeoutMs);
++        child.once('exit', onExit);
++    });
++}
+ function startBuild(options, context) {
+     return tslib_1.__asyncGenerator(this, arguments, function* startBuild_1() {
+         var _a, e_2, _b, _c;

@@ -88,3 +88,4 @@ overrides:
     serialize-javascript@6.0.2: 7.0.5
 patchedDependencies:
     '@spartan-ng/brain@1.8.0': patches/@spartan-ng__brain@1.8.0.patch
+    nx-electron@22.0.0: patches/nx-electron@22.0.0.patch
