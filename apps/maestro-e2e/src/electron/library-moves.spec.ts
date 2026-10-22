@@ -118,7 +118,7 @@ test('renames, folder moves and missing-first relocation preserve track IDs and 
     await expect(page.getByRole('heading', { name: 'Your library is ready' })).toBeVisible()
     await page.getByRole('button', { name: 'Take me to my library' }).click()
     await page.getByRole('link', { name: 'Settings', exact: true }).click()
-    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await page.getByRole('link', { name: 'Library folders', exact: true }).click()
     const original = await songs(page)
     const identity = (rows: typeof original) =>
         rows.map(({ id, title, dateAdded }) => ({ id, title, dateAdded }))
@@ -172,13 +172,15 @@ test('renames, folder moves and missing-first relocation preserve track IDs and 
     await expect.poll(async () => (await scanStatus(page)).phase).toBe('completed')
     expect(identity(await songs(page))).toEqual(identities)
     await page.getByRole('link', { name: 'Settings', exact: true }).click()
-    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await page.getByRole('link', { name: 'Library folders', exact: true }).click()
     expect(await rescan(page)).toMatchObject({ new: 0, changed: 0, missing: 0 })
 
     // Return all files to their original paths, including the renamed one.
     await restorePaths(original, first.id, renamed, returned, newFolder, storage)
     expect(await rescan(page)).toMatchObject({ new: 0, missing: 0 })
     expect(await songs(page)).toEqual(original)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'Settings' })).toBeHidden()
     await page.getByRole('link', { name: 'Tracks', exact: true }).click()
     await expect(
         page.getByRole('status', { name: 'Result count' }).filter({ hasText: '6 tracks' }),
@@ -188,7 +190,7 @@ test('renames, folder moves and missing-first relocation preserve track IDs and 
     // A genuine copy is a second track. Losing the original later must not merge their IDs.
     await copyFile(first.path, join(library, 'copy.mp3'))
     await page.getByRole('link', { name: 'Settings', exact: true }).click()
-    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await page.getByRole('link', { name: 'Library folders', exact: true }).click()
     await rescan(page)
     const copies = await songs(page)
     expect(copies).toHaveLength(7)
@@ -215,7 +217,7 @@ test('a copy keeps its identity after a partial import excludes its original fol
     const unreadable = join(copiedLibrary, 'broken.mp3')
     await writeFile(unreadable, 'invalid audio bytes')
     await page.getByRole('link', { name: 'Settings', exact: true }).click()
-    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await page.getByRole('link', { name: 'Library folders', exact: true }).click()
     await page.getByRole('button', { name: 'Remove folder', exact: true }).click()
     await chooseFolder(app, copiedLibrary)
     await page.getByRole('button', { name: 'Add folders…' }).click()
