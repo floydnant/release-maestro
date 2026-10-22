@@ -60,25 +60,31 @@
             }
         </div>
 
-        @if (importUpdate(); as update) {
-            @if (update.phase === 'started' || update.phase === 'processing') {
-                <div class="email-import-progress | mt-3 flex flex-wrap items-center gap-3">
-                    <p class="flex items-center gap-2 type-body-sm text-content-secondary">
-                        <app-progress-ring
-                            mode="spinning"
-                            [diameter]="16"
-                            [strokeWidth]="2"
-                        ></app-progress-ring>
-                        @if (update.phase === 'processing') {
-                            Importing emails {{ update.current }}/{{ update.total }}
-                        } @else {
-                            Checking mail…
-                        }
-                    </p>
-                    <button hlmBtn variant="ghost" type="button" (click)="cancelImport($event)">
-                        Cancel import
-                    </button>
-                </div>
+        @if (runningImport(); as update) {
+            <div class="email-import-progress | mt-3 flex flex-wrap items-center gap-3">
+                <p class="flex items-center gap-2 type-body-sm text-content-secondary">
+                    <app-progress-ring mode="spinning" [diameter]="16" [strokeWidth]="2"></app-progress-ring>
+                    {{ runningImportText() }}
+                </p>
+                <button
+                    hlmBtn
+                    variant="ghost"
+                    type="button"
+                    [attr.aria-describedby]="update.phase === 'finishing' ? 'email-import-finishing' : null"
+                    (click)="cancelImport($event)"
+                >
+                    Cancel import
+                </button>
+            </div>
+            @if (update.phase === 'finishing') {
+                <!-- No count or estimate: lookups can wait on Bandcamp for a long time -->
+                <p
+                    id="email-import-finishing"
+                    class="email-import-finishing | mt-1 type-body-sm text-content-muted"
+                >
+                    Apple Mail has finished exporting. Adding the releases from these emails can take a while.
+                    If you cancel, the next import includes them again.
+                </p>
             }
         }
 

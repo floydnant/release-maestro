@@ -43,6 +43,10 @@ export type EmailImportProgress =
           message: string
       }
     | {
+          /** The export has ended; queued email processing and persistence are still running. */
+          phase: 'finishing'
+      }
+    | {
           phase: 'completed'
           totalProcessed: number
           totalImported: number
