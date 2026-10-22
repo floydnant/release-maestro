@@ -193,7 +193,7 @@ describe('library normalization', () => {
         it('is stable for an unchanged tag, which is what keeps an album findable', () => {
             // The key is stored under a unique index and is how an album is matched on
             // the next scan. Anything that changes it re-keys every album already in
-            // the database and orphans its songs, so this pins it against drift.
+            // the database and moves songs into a different album, so this pins it against drift.
             const metadata = newSongFixture({ year: 2019, date: '2019-05-01' })
 
             expect(albumIdentityKey(metadata)).toBe(albumIdentityKey(newSongFixture({ ...metadata })))
