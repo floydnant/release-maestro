@@ -327,7 +327,7 @@ export class FeedBackendService {
     ): Promise<HydratedFeedItem[]> {
         console.log('Hydrating feed items')
         const promises = items.map(async item => {
-            const checkedAt = this.unplayableReleaseChecks.get(item.id)
+            const checkedAt = this.unplayableReleaseChecks.get(item.data.tralbumUrl)
             if (
                 hideUnplayableReleases &&
                 checkedAt !== undefined &&
@@ -337,12 +337,12 @@ export class FeedBackendService {
 
             if (item.type == 'BANDCAMP.TRALBUM') {
                 const hydrated = await this.hydrateBandcampFeedItem(item)
-                this.unplayableReleaseChecks.delete(item.id)
+                this.unplayableReleaseChecks.delete(item.data.tralbumUrl)
                 if (!hydrated.error && !hydrated.data.tracks.some(track => !!track.streamUrl)) {
-                    this.unplayableReleaseChecks.set(item.id, Date.now())
+                    this.unplayableReleaseChecks.set(item.data.tralbumUrl, Date.now())
                     if (this.unplayableReleaseChecks.size > MAX_UNPLAYABLE_RELEASE_CHECKS) {
-                        const oldestId = this.unplayableReleaseChecks.keys().next().value
-                        if (oldestId !== undefined) this.unplayableReleaseChecks.delete(oldestId)
+                        const oldestUrl = this.unplayableReleaseChecks.keys().next().value
+                        if (oldestUrl !== undefined) this.unplayableReleaseChecks.delete(oldestUrl)
                     }
                 }
                 return hydrated
