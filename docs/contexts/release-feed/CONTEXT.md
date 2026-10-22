@@ -37,8 +37,11 @@ _Avoid_: sync, fetch, download
 
 **Import**:
 One pass that turns exported emails into feed items. Only one runs at a time (`EmailImportService`).
-It streams progress to every window as `started`, then `processing` for each email (none when nothing
-was exported), then exactly one `completed`, `cancelled`, or `error`, and reports both `totalImported` (how many the pass covered) and
+It streams progress to every window as `started`, then `processing` for each exported email (none
+when nothing was exported). After export ends, `finishing` keeps the import visibly active while
+queued release processing and saving settle. It remains cancellable in this phase. Exactly one
+`completed`, `cancelled`, or `error` ends the import. A completed import reports both
+`totalImported` (how many the pass covered) and
 `newlyImported` (how many were not already in the feed) — a user re-running an import may
 legitimately see a nonzero total and a zero new count, because it re-reads the overlap before its
 _import checkpoint_. Each update carries its trigger. The title bar shows every import, but paces and
