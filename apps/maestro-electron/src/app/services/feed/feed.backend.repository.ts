@@ -4,6 +4,7 @@ import {
     FeedItemMaster,
     feedItemMasterSchema,
     mergeBandcampPurchases,
+    normalizeBandcampReleaseUrl,
 } from '@release-maestro/core'
 import { DatabaseClient } from '../../database/database.client'
 import {
@@ -35,34 +36,55 @@ export class FeedBackendRepository {
 
         const mergedItems = new Map<string, string>()
         this.db.db.transaction(tx => {
+            // Index normalized identities once per batch. Existing announcements can still carry
+            // HTTP, tracking fragments or trailing slashes from earlier parser versions.
+            const identities = new Map<string, Set<string>>()
+            const identityKey = (type: string, url: string) =>
+                `${type}:${normalizeBandcampReleaseUrl(url) ?? url}`
+            const rememberIdentity = (id: string, type: string, url: string) => {
+                const key = identityKey(type, url)
+                const ids = identities.get(key) ?? new Set<string>()
+                ids.add(id)
+                identities.set(key, ids)
+            }
+            for (const item of tx
+                .select({
+                    id: feedItemsTable.id,
+                    type: feedItemsTable.type,
+                    dedupeIdentifier: feedItemsTable.dedupeIdentifier,
+                })
+                .from(feedItemsTable)
+                .all()) {
+                rememberIdentity(item.id, item.type, item.dedupeIdentifier)
+            }
             for (const incoming of feedItemsToIngest) {
                 const urls = [
+                    incoming.dedupeIdentifier,
+                    ...incoming.data.purchases.map(purchase => purchase.tralbumUrl),
+                    ...(incoming.source.type === 'EMAIL.BANDCAMP_NEW_RELEASE'
+                        ? [incoming.source.releaseUrl]
+                        : []),
+                ]
+                const ids = [
                     ...new Set(
-                        [
-                            incoming.dedupeIdentifier,
-                            ...incoming.data.purchases.map(purchase => purchase.tralbumUrl),
-                            ...(incoming.source.type === 'EMAIL.BANDCAMP_NEW_RELEASE'
-                                ? [incoming.source.releaseUrl]
-                                : []),
-                        ].flatMap(url => [url, url.replace(/^https:/, 'http:')]),
+                        urls.flatMap(url => [...(identities.get(identityKey(incoming.type, url)) ?? [])]),
                     ),
                 ]
                 const existing = tx
                     .select()
                     .from(feedItemsTable)
-                    .where(
-                        and(
-                            eq(feedItemsTable.type, incoming.type),
-                            inArray(feedItemsTable.dedupeIdentifier, urls),
-                        ),
-                    )
+                    .where(and(eq(feedItemsTable.type, incoming.type), inArray(feedItemsTable.id, ids)))
                     .orderBy(asc(feedItemsTable.ingestedAt), sql`rowid`)
                     .all()
                     .map(row => feedItemMasterSchema.parse(row))
                 const retained = existing[0]
                 if (!retained) {
                     tx.insert(feedItemsTable).values(incoming).run()
+                    rememberIdentity(incoming.id, incoming.type, incoming.dedupeIdentifier)
                     continue
+                }
+                for (const item of existing) {
+                    identities.get(identityKey(item.type, item.dedupeIdentifier))?.delete(item.id)
                 }
                 const mergedIds = existing.slice(1).map(item => item.id)
                 if (mergedIds.length) {
@@ -87,6 +109,7 @@ export class FeedBackendRepository {
                     })
                     .where(eq(feedItemsTable.id, retained.id))
                     .run()
+                rememberIdentity(retained.id, incoming.type, incoming.dedupeIdentifier)
             }
         })
         // Publish aliases only after the transaction commits.

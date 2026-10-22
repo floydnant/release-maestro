@@ -133,6 +133,35 @@ describe('feed hydration playable-track filter', () => {
         expect((await service.loadFeed(0, 5)).map(item => item.id)).toEqual(['preorder'])
     })
 
+    it('hydrates a playable parent album after retaining an unplayable track’s ID', async () => {
+        const trackUrl = 'https://test.bandcamp.com/track/unavailable'
+        const track = bandcampFeedItem('retained', new Date())
+        track.dedupeIdentifier = trackUrl
+        track.data = { tralbumUrl: trackUrl, tralbumType: 'track', purchases: [] }
+        await repository.ingestFeedItems([track])
+        await expect(service.loadFeed(0, 5)).resolves.toEqual([])
+
+        const albumUrl = 'https://test.bandcamp.com/album/playable'
+        await repository.ingestFeedItems([
+            {
+                ...track,
+                id: 'album',
+                dedupeIdentifier: albumUrl,
+                data: {
+                    tralbumUrl: albumUrl,
+                    tralbumType: 'album',
+                    purchases: [{ tralbumUrl: trackUrl, fans: [] }],
+                },
+            },
+        ])
+        scrape.mockResolvedValue(scrapedRelease(['https://audio.example/preview.mp3']))
+
+        const result = await service.loadFeed(0, 5)
+        expect(result.map(item => item.id)).toEqual(['retained'])
+        expect(result[0]?.data.releaseUrl).toBe(albumUrl)
+        expect(scrape).toHaveBeenLastCalledWith(albumUrl)
+    })
+
     it('bounds remembered unplayable releases and rechecks evicted entries', async () => {
         const items = Array.from({ length: 1001 }, (_, index) => bandcampFeedItem(String(index), new Date()))
         await expect(service.hydrateFeed(items)).resolves.toEqual([])
