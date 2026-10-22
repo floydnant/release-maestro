@@ -83,7 +83,19 @@ export class BandcampApiBackendService {
         }
         const bandData = parseBandData($)
 
-        let about = $('#trackInfoInner > div.tralbumData.tralbum-about').html() || ''
+        // Resolve links before extracting either section. Electron must receive Bandcamp URLs.
+        $('#trackInfoInner > div.tralbumData a[href]')
+            .toArray()
+            .forEach(link => {
+                const cheerioLink = $(link)
+                const href = cheerioLink.attr('href')
+                const resolved = href ? URL.parse(href, result.url || url) : null
+                if (resolved) cheerioLink.attr('href', resolved.href)
+                cheerioLink.attr('target', '_blank')
+                cheerioLink.attr('rel', 'noopener noreferrer')
+            })
+
+        const about = $('#trackInfoInner > div.tralbumData.tralbum-about').html() || ''
         const aboutLinks = $('#trackInfoInner > div.tralbumData.tralbum-about a')
             .toArray()
             .map(link => ({ url: $(link).attr('href') || '', text: $(link).text().trim() }))
@@ -91,21 +103,6 @@ export class BandcampApiBackendService {
         const creditsLinks = $('#trackInfoInner > div.tralbumData.tralbum-credits a')
             .toArray()
             .map(link => ({ url: $(link).attr('href') || '', text: $(link).text().trim() }))
-
-        // Ensure links open in a new tab
-        $('#trackInfoInner > div.tralbumData a')
-            .toArray()
-            .forEach(link => {
-                const cheerioLink = $(link)
-                const originalHtml = cheerioLink.prop('outerHTML')
-                cheerioLink.attr('target', '_blank')
-                cheerioLink.attr('rel', 'noopener noreferrer')
-                const fixedHtml = cheerioLink.prop('outerHTML')
-
-                if (!originalHtml || !fixedHtml) return
-
-                about = about.replace(originalHtml, fixedHtml)
-            })
 
         // @TODO: we could scrape the collectors info too (people supporting the release)
 
