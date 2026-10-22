@@ -195,7 +195,7 @@ fn cover_cache_write_failure_retains_metadata_and_can_retry() {
         .find(|message| message["event"] == "item")
         .expect("cache failures must retain readable audio metadata");
     assert_eq!(item["data"]["metadata"]["contentHash"], original["contentHash"]);
-    assert_eq!(item["data"]["metadata"]["coverPath"], original["coverPath"]);
+    assert!(item["data"]["metadata"]["coverPath"].is_null());
     assert_eq!(item["data"]["metadata"]["coverError"]["path"], original["coverPath"]);
     assert!(item["data"]["metadata"]["coverError"]["message"].is_string());
     assert!(!failed.iter().any(|message| message["event"] == "item_error"));
@@ -205,8 +205,8 @@ fn cover_cache_write_failure_retains_metadata_and_can_retry() {
     write_params["update"] = json!({"title": "Saved with blocked cache"});
     let written = engine.request("write_tags", write_params);
     assert_eq!(written["title"], "Saved with blocked cache");
-    assert_eq!(written["coverPath"], original["coverPath"]);
-    assert!(written["coverError"].is_object());
+    assert!(written["coverPath"].is_null());
+    assert_eq!(written["coverError"]["path"], original["coverPath"]);
 
     std::fs::remove_file(&cache).unwrap();
     let retried = engine.exchange("read_files", params);
@@ -218,6 +218,45 @@ fn cover_cache_write_failure_retains_metadata_and_can_retry() {
     assert!(item["data"]["metadata"]["coverError"].is_null());
     assert_eq!(
         std::fs::read(item["data"]["metadata"]["coverPath"].as_str().unwrap()).unwrap(),
+        std::fs::read(fixtures().join("cover.png")).unwrap()
+    );
+}
+
+#[test]
+fn cover_cache_write_failure_uses_folder_art_until_retry_succeeds() {
+    let library = Library::new();
+    let mut engine = Engine::new();
+    let case = cases().into_iter().find(|case| case.artwork).unwrap();
+    let path = library.copy(&case.file);
+    let original = engine.request("read_file", library.params(&path));
+    let cached_cover = original["coverPath"].as_str().unwrap();
+    let folder_cover = library.copy("cover.png");
+
+    // A directory at the embedded cover destination makes writes fail on every platform.
+    std::fs::remove_file(cached_cover).unwrap();
+    std::fs::create_dir(cached_cover).unwrap();
+    let params = json!({"paths": [path], "coverArtCacheDir": library.0.join("cache")});
+    let failed = engine.exchange("read_files", params);
+    let item = failed
+        .iter()
+        .find(|message| message["event"] == "item")
+        .expect("cache failures must retain readable audio metadata");
+    let metadata = &item["data"]["metadata"];
+    assert_eq!(metadata["contentHash"], original["contentHash"]);
+    assert_eq!(metadata["coverPath"], folder_cover.to_str().unwrap());
+    assert_eq!(metadata["coverError"]["path"], cached_cover);
+    assert!(metadata["coverError"]["message"].is_string());
+    assert_eq!(
+        std::fs::read(metadata["coverPath"].as_str().unwrap()).unwrap(),
+        std::fs::read(fixtures().join("cover.png")).unwrap()
+    );
+
+    std::fs::remove_dir(cached_cover).unwrap();
+    let retried = engine.request("read_file", library.params(&path));
+    assert_eq!(retried["coverPath"], cached_cover);
+    assert!(retried["coverError"].is_null());
+    assert_eq!(
+        std::fs::read(cached_cover).unwrap(),
         std::fs::read(fixtures().join("cover.png")).unwrap()
     );
 }

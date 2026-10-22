@@ -960,9 +960,10 @@ pub fn read_song_metadata_v2(
 
             if let Err(error) = fs::write(&cover_path, cover.data()) {
                 cover_error = Some(CoverError {
-                    path: cover_path.clone(),
+                    path: cover_path,
                     message: error.to_string(),
                 });
+                return None;
             }
             Some(cover_path)
         })
