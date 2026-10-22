@@ -71,14 +71,28 @@ describe('MetadataBackendService', () => {
                 type: 'response',
                 id: 'fake',
                 ok: true,
-                result: { protocolVersion: 1, engineVersion: '0.1.0' },
+                result: { protocolVersion: 1, engineVersion: '0.1.0', extractorVersion: '1111111111111111' },
             })
 
             await expect(service.ping()).resolves.toEqual({
                 protocolVersion: 1,
                 engineVersion: '0.1.0',
+                extractorVersion: '1111111111111111',
             })
             expect(sidecar.sendCalls[0]).toEqual({ method: 'ping', params: {} })
+        })
+
+        it('rejects a ping response without a usable extractor version', async () => {
+            sidecar.sendQueue.push({
+                type: 'response',
+                id: 'fake',
+                ok: true,
+                result: { protocolVersion: 1, engineVersion: '0.1.0', extractorVersion: 'invalid' },
+            })
+
+            await expect(service.ping()).rejects.toThrow(
+                'metadata-engine returned an invalid extractor version',
+            )
         })
     })
 
