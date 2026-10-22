@@ -22,11 +22,11 @@ test('Electron exits before a watched build starts its replacement', async () =>
         child.stdout = new EventEmitter()
         child.stderr = new EventEmitter()
         child.kill = signal => {
-            queueMicrotask(() => {
+            setTimeout(() => {
                 child.signalCode = signal
                 live.delete(child.pid)
                 child.emit('exit', null, signal)
-            })
+            }, 20)
             return true
         }
         live.add(child.pid)
