@@ -167,7 +167,7 @@ const defaultScenario = (): RendererScenario => ({
         'library:pick-folders': { kind: 'resolve', value: null },
         'library:query-songs': {
             kind: 'resolve',
-            value: { rows: [], offset: 0, total: 0 } satisfies SongWindowResult,
+            value: { rows: [], offset: 0, total: 0, metadata: { discGroups: [] } } satisfies SongWindowResult,
         },
         'library:describe-song-filter': {
             kind: 'resolve',
@@ -241,13 +241,17 @@ export const scenarioBuilder = (scenario: Partial<RendererScenario> = {}) => {
          * library far larger than the rows it hands over, and assert that scrolling
          * asks for a *different* window rather than that the fake windowed correctly.
          */
-        songs(rows: SongRow[], options: { total?: number; offset?: number } = {}) {
+        songs(
+            rows: SongRow[],
+            options: Partial<Pick<SongWindowResult, 'total' | 'offset' | 'metadata'>> = {},
+        ) {
             current.handlers['library:query-songs'] = {
                 kind: 'resolve',
                 value: {
                     rows,
                     offset: options.offset ?? 0,
                     total: options.total ?? rows.length,
+                    metadata: options.metadata ?? { discGroups: [] },
                 } satisfies SongWindowResult,
             }
             return this
@@ -379,6 +383,7 @@ export const createSongRow = (overrides: Partial<SongRow> = {}): SongRow => {
         albumId: 'album-1',
         albumTitle: 'Daybreak',
         trackNumber: 1,
+        discNumber: null,
         genreText: 'Ambient',
         genres: [{ id: 'genre-1', name: 'Ambient' }],
         recordLabelId: 'label-1',
@@ -494,6 +499,7 @@ export const createAlbumDetail = (overrides: Partial<AlbumDetail> = {}): AlbumDe
     recordLabelId: 'label-1',
     recordLabelText: 'Kosmische',
     songCount: 2,
+    trackTotal: null,
     totalDuration: 617,
     genres: [{ id: 'genre-1', name: 'Ambient' }],
     ...overrides,
@@ -734,6 +740,7 @@ export const songCatalogResponder =
             }),
             offset,
             total,
+            metadata: { discGroups: [] },
         }
     }
 

@@ -128,6 +128,9 @@ export const metadataHash = (metadata: SongMetadata): string =>
         energy: normalizeDisplayText(metadata.energy),
         title: normalizeDisplayText(metadata.title),
         track: metadata.track,
+        discNumber: metadata.discNumber,
+        discTotal: metadata.discTotal,
+        trackTotal: metadata.trackTotal,
         year: metadata.year,
         externalRefs: extractExternalRefs(metadata.extraMetadata, metadata.comment),
     })
