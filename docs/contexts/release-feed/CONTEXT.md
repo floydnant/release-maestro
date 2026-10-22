@@ -106,6 +106,8 @@ The Bandcamp album containing a track. Import reads the track page to resolve it
 before choosing the feed item's identity. A genuine standalone track keeps its own release URL.
 A missing or malformed track page keeps the original track URL because its album is unknown.
 Network failures leave the import checkpoint unchanged so the next pass can retry.
+Import runs at most four parent lookups at once and gives transient failures two retries. A
+processing failure stops the remaining export before the import reports its final error.
 
 **Feed source item**:
 A parsed notification, before it becomes a feed item. This is the boundary type: one source item can
