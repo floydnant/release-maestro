@@ -214,7 +214,9 @@
                                     class="underline decoration-content-muted hover:decoration-current"
                                     [routerLink]="settingsLink('library-folders')"
                                     >{{
-                                        status.coverFailureCount > 0 ? 'View scan failures' : 'View failed files'
+                                        status.coverFailureCount > 0
+                                            ? 'View scan failures'
+                                            : 'View failed files'
                                     }}</a
                                 >
                             </p>
@@ -251,7 +253,9 @@
                                     class="underline decoration-content-muted hover:decoration-current"
                                     [routerLink]="settingsLink('library-folders')"
                                     >{{
-                                        status.coverFailureCount > 0 ? 'View scan failures' : 'View failed files'
+                                        status.coverFailureCount > 0
+                                            ? 'View scan failures'
+                                            : 'View failed files'
                                     }}</a
                                 >
                             </p>

@@ -37,7 +37,15 @@ import {
     selector: 'app-song-table-row',
     templateUrl: './song-table-row.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RetryCoverAfterScanDirective, NgClass, HlmButton, HlmOverflowTooltip, HlmTooltip, IconComponent, RouterLink],
+    imports: [
+        RetryCoverAfterScanDirective,
+        NgClass,
+        HlmButton,
+        HlmOverflowTooltip,
+        HlmTooltip,
+        IconComponent,
+        RouterLink,
+    ],
     host: { class: 'contents' },
 })
 export class SongTableRowComponent {

@@ -21,7 +21,14 @@ import { formatTotalDuration, formatTrackCount } from '../../shared/utils/format
     selector: 'app-album-detail-header',
     templateUrl: './album-detail-header.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RetryCoverAfterScanDirective, HlmBadge, HlmOverflowTooltip, HlmButton, IconComponent, RouterLink],
+    imports: [
+        RetryCoverAfterScanDirective,
+        HlmBadge,
+        HlmOverflowTooltip,
+        HlmButton,
+        IconComponent,
+        RouterLink,
+    ],
     host: { class: 'flex shrink-0 gap-5 px-4 pb-4 pt-3' },
 })
 export class AlbumDetailHeaderComponent {
