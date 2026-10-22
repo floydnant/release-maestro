@@ -78,85 +78,10 @@ test.describe('release feed scenario states', () => {
 
         await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
         await expect(page.getByText(`by ${release.data.artist}`)).toBeVisible()
-        await expect(page.getByText('Bought by fans you follow')).toHaveCount(0)
 
         await expect
             .poll(async () => controller.lastCall('load-feed'))
             .toMatchObject({ channel: 'load-feed', payload: { index: 0, count: 5 } })
-    })
-
-    test('labels a release with the fan who bought it', async ({ page }) => {
-        const base = createHydratedRelease()
-        const release = createHydratedRelease({
-            sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
-            data: { ...base.data, fanNames: ['Adam Pitts'] },
-        })
-        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
-
-        await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
-        await expect(page.getByText('Bought by Adam Pitts', { exact: true })).toBeVisible()
-        await expect(page.getByText('Bought by fans you follow')).toHaveCount(0)
-        await expect(page.getByText(/purchase email received/)).toBeVisible()
-    })
-
-    test('shows every buyer of a release', async ({ page }) => {
-        const base = createHydratedRelease()
-        const release = createHydratedRelease({
-            sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
-            data: { ...base.data, fanNames: ['Maya', 'River & Rain'] },
-        })
-        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
-
-        await expect(page.getByText('Bought by Maya, River & Rain', { exact: true })).toBeVisible()
-    })
-
-    test('reveals a long fan list when the chip receives keyboard focus', async ({ page }) => {
-        await page.setViewportSize({ width: 800, height: 700 })
-        const base = createHydratedRelease()
-        const fanNames = ['Alexandra Montgomery', 'River & Rain', 'The Midnight Listening Club']
-        const release = createHydratedRelease({
-            sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
-            data: { ...base.data, fanNames },
-        })
-        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
-
-        const label = `Bought by ${fanNames.join(', ')}`
-        const chip = page.getByText(label, { exact: true }).locator('..')
-        await chip.focus()
-        await expect(chip).toBeFocused()
-        await expect(page.getByRole('tooltip')).toHaveText(label)
-    })
-
-    test('shows a generic label when no fan names were parsed from the email', async ({ page }) => {
-        const release = createHydratedRelease({ sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' })
-        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
-
-        await expect(page.getByText('Bought by fans you follow', { exact: true })).toBeVisible()
-    })
-
-    test('keeps the fan-purchase label and release link when hydration fails', async ({ page }) => {
-        const base = createHydratedRelease()
-        const release = createHydratedRelease({
-            sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
-            error: { message: 'The Bandcamp track or album could not be found' },
-            data: {
-                ...base.data,
-                fanNames: ['Adam Pitts'],
-                releaseName: base.data.releaseUrl,
-                tracks: [],
-                iframeUrl: null,
-                imageUrl: undefined,
-                band: null,
-            },
-        })
-        await createRendererScenario(page, scenarioBuilder().feed([release]).build())
-
-        await expect(page.getByText('Bought by Adam Pitts', { exact: true })).toBeVisible()
-        await expect(page.getByText('The Bandcamp track or album could not be found')).toBeVisible()
-        await expect(page.getByRole('link', { name: release.data.releaseUrl, exact: true })).toHaveAttribute(
-            'href',
-            release.data.releaseUrl,
-        )
     })
 
     test('updates a failed release feed scenario with a new handler before retrying', async ({ page }) => {

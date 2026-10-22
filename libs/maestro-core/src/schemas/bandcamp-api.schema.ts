@@ -31,6 +31,7 @@ export type ScrapedTralbumInfo = {
     artist: string | null
     releaseDate: CalendarDay | null
     type: 'album' | 'track'
+    parentAlbumUrl: string | null
     id: number | null
     artworkUrl: string | null
     about: string
@@ -47,6 +48,7 @@ export type ScrapedTralbumInfo = {
     }[]
 }
 export const tralbumDataAttrSchema = z.object({
+    album_url: z.string().nullish(),
     current: z.object({
         title: z.string(),
         artist: z.string().nullish(),

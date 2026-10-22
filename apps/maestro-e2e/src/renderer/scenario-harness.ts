@@ -5,6 +5,7 @@ import {
     AlbumRow,
     AlbumWindowResult,
     AppSettings,
+    BandcampFan,
     FeedLoadError,
     HydratedFeedItem,
     MainIpcContract,
@@ -329,7 +330,7 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
         emailReceivedAt: new Date('2026-06-20T10:00:00.000Z'),
         isEmailRead: false,
         emailId: 'email-1',
-        fanNames: [],
+        fans: [],
         releaseName: 'Gecko',
         band: {
             name: 'Shiva Chandra',
@@ -355,9 +356,21 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
                 titleLink: null,
                 albumPreorder: false,
                 streamUrl: audioFixtureUrl,
+                fans: [],
             },
         ],
     },
+    ...overrides,
+})
+
+/**
+ * A Bandcamp fan with a stand-in profile photo. Pass `imageUrl: null` for a fan without one, or a URL
+ * that fails to load to exercise the initials fallback.
+ */
+export const createBandcampFan = (name: string, overrides: Partial<BandcampFan> = {}): BandcampFan => ({
+    name,
+    profileUrl: `https://bandcamp.com/${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
+    imageUrl: coverArtDataUrl(`fan ${name}`),
     ...overrides,
 })
 
