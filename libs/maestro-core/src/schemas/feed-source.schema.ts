@@ -16,8 +16,7 @@ export const bandcampEmailFansBoughtMusicFeedSourceItemSchema = emailSchema
     .extend({
         type: z.literal('EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'),
         tralbumUrls: z.string().array(),
-        /** Older imported notifications have no buyer attribution. */
-        purchases: z.object({ tralbumUrl: z.string(), fanNames: z.string().array() }).array().optional(),
+        purchases: z.object({ tralbumUrl: z.string(), fanNames: z.string().array() }).array(),
     })
 export type BandcampEmailFansBoughtMusicFeedSourceItem = z.infer<
     typeof bandcampEmailFansBoughtMusicFeedSourceItemSchema

@@ -89,7 +89,7 @@ The Bandcamp notification about releases bought by fans the user follows
 item per distinct URL. Each keeps the notification's event date and read state. The notification
 associates each release with the names of the fans who bought it. These releases show a "Bought by
 Adam Pitts" chip using those names, including when the release page is missing or malformed. Multiple buyers appear together.
-Older imported notifications without buyer attribution show "Bought by fans you follow".
+Notifications with no recognizable fan names show "Bought by fans you follow".
 
 **Feed source item**:
 A parsed notification, before it becomes a feed item. This is the boundary type: one source item can
