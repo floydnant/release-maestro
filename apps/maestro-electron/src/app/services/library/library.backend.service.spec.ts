@@ -1,14 +1,11 @@
 import { firstValueFrom, from, Observable, Subject, toArray } from 'rxjs'
 import { fromPartial } from '@total-typescript/shoehorn'
-import { access, link, mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { MetadataPrescanUpdate, MetadataScanUpdate, PrescanFileFact } from '@release-maestro/core'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
 import {
     LibraryBackendRepository,
-    MovedSongCandidate,
     PrescanBatchComparison,
+    ScanReconciliationResult,
 } from './library.backend.repository'
 import { MetadataBackendService } from '../metadata/metadata.backend.service'
 import { LibraryBackendService } from './library.backend.service'
@@ -30,15 +27,11 @@ const newRepositoryMock = () => ({
         new: 1,
         changedPaths: [],
     })),
-    findAvailabilityProbes: jest.fn(() => []),
-    invalidateCoexistingMoves: jest.fn(),
-    recordPendingMove: jest.fn(),
-    findMovedSongCandidates: jest.fn((): MovedSongCandidate[] => []),
-    reconcileMovedSong: jest.fn(),
-    recordSongAvailable: jest.fn(),
-    countOpenIssuesForReadSongs: jest.fn(() => 0),
-    markNotSeenPresent: jest.fn(() => 2),
-    getReadIdentity: jest.fn(() => null),
+    reconcileScan: jest.fn(async (): Promise<ScanReconciliationResult> => ({
+        adjustments: { new: 0, changed: 0, unchanged: 0 },
+        missing: 2,
+        normalizationIssues: null,
+    })),
     countSongsNeedingMetadata: jest.fn(() => 1),
     countSongsNeedingVersionRefresh: jest.fn(() => 0),
     listSongsNeedingMetadata: jest.fn().mockReturnValueOnce([fact]).mockReturnValueOnce([]),
@@ -77,7 +70,14 @@ describe('LibraryBackendService', () => {
         const updates = await firstValueFrom(service.scan(['/music']).pipe(toArray()))
 
         expect(repository.processPrescanBatch).toHaveBeenCalledWith([fact], scanSeenAt, false)
-        expect(repository.markNotSeenPresent).toHaveBeenCalledWith(scanSeenAt)
+        expect(repository.reconcileScan).toHaveBeenCalledWith({
+            seenAt: scanSeenAt,
+            complete: true,
+            changedPaths: new Set(),
+            failedReadPaths: new Set(),
+            unavailableFolders: [],
+            abortSignal: undefined,
+        })
         expect(repository.countSongsNeedingMetadata).toHaveBeenCalledWith(scanSeenAt, EXTRACTOR_VERSION)
         expect(repository.countSongsNeedingVersionRefresh).toHaveBeenCalledWith(scanSeenAt, EXTRACTOR_VERSION)
         expect(repository.listSongsNeedingMetadata).toHaveBeenCalledWith(
@@ -136,12 +136,10 @@ describe('LibraryBackendService', () => {
 
         const updates = await firstValueFrom(service.scan(['/music']).pipe(toArray()))
 
-        // Discovery was incomplete — nothing may be flagged missing.
-        expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
+        expect(repository.reconcileScan).toHaveBeenCalledWith(expect.objectContaining({ complete: false }))
         expect(repository.removeUnusedCatalogEntities).toHaveBeenCalledTimes(1)
-        expect(repository.reconcileMovedSong).not.toHaveBeenCalled()
         const completed = updates.find(update => update.phase === 'completed')
-        expect(completed).toMatchObject({ missing: 0, errors: 1 })
+        expect(completed).toMatchObject({ errors: 1 })
     })
 
     it('skips absent-file reconciliation when cancelled during discovery', async () => {
@@ -171,8 +169,9 @@ describe('LibraryBackendService', () => {
 
         const updates = await updatesPromise
 
-        expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
-        expect(repository.reconcileMovedSong).not.toHaveBeenCalled()
+        expect(repository.reconcileScan).toHaveBeenCalledWith(
+            expect.objectContaining({ complete: false, abortSignal: abortController.signal }),
+        )
         expect(metadataService.readFiles).not.toHaveBeenCalled()
         // A cancelled scan produces no `completed` update — the caller derives
         // the cancelled outcome from the abort signal.
@@ -213,122 +212,50 @@ describe('LibraryBackendService', () => {
             )
             const result = firstValueFrom(service.scan(['/music'], abort.signal).pipe(toArray()))
             return reading.then(async () => {
-                expect(repository.reconcileMovedSong).not.toHaveBeenCalled()
-                expect(repository.markNotSeenPresent).not.toHaveBeenCalled()
+                expect(repository.reconcileScan).not.toHaveBeenCalled()
                 if (outcome === 'failed')
                     read$.next({ phase: 'itemError', path: fact.path, error: 'read failed' })
                 if (outcome === 'cancelled') abort.abort()
                 read$.complete()
                 await result
-                expect(repository.findMovedSongCandidates).toHaveBeenCalledTimes(1)
-                expect(repository.markNotSeenPresent).toHaveBeenCalledTimes(outcome === 'cancelled' ? 0 : 1)
+                expect(repository.reconcileScan).toHaveBeenCalledTimes(1)
+                expect(repository.reconcileScan).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        complete: true,
+                        failedReadPaths: new Set(outcome === 'failed' ? [fact.path] : []),
+                        abortSignal: abort.signal,
+                    }),
+                )
             })
         },
     )
 
-    it.each([true, false])(
-        'only merges when the original path no longer exists: original exists %s',
-        async exists => {
-            const directory = await mkdtemp(join(tmpdir(), 'maestro-move-'))
-            try {
-                const oldPath = join(directory, 'old.mp3')
-                if (exists) await writeFile(oldPath, 'original')
-                const foundPath = join(directory, 'found.mp3')
-                await writeFile(foundPath, 'original')
-                const repository = newRepositoryMock()
-                repository.countSongsNeedingMetadata.mockReturnValue(0)
-                repository.listSongsNeedingMetadata.mockReset().mockReturnValue([])
-                const candidate = fromPartial<MovedSongCandidate>({
-                    original: { id: 'original', path: oldPath },
-                    found: { path: foundPath, firstSeenAt: repository.nextScanSeenAt() },
-                })
-                repository.findMovedSongCandidates.mockReturnValue([candidate])
-                const metadataService = fromPartial<MetadataBackendService>({
-                    ping: async () => ({
-                        protocolVersion: 1,
-                        engineVersion: '0.1.0',
-                        extractorVersion: 'test-extractor',
-                    }),
-                    prescan: () =>
-                        from<MetadataPrescanUpdate[]>([
-                            { phase: 'batch', items: [fact] },
-                            { phase: 'completed', count: 1, errors: 0 },
-                        ]),
-                })
-                const service = new LibraryBackendService(
-                    fromPartial<LibraryBackendRepository>(repository),
-                    metadataService,
-                )
-                const updates = await firstValueFrom(service.scan([directory]).pipe(toArray()))
-                expect(repository.reconcileMovedSong).toHaveBeenCalledTimes(exists ? 0 : 1)
-                expect(updates.at(-1)).toMatchObject({ new: exists ? 1 : 0, changed: exists ? 0 : 1 })
-                expect(repository.recordSongAvailable).toHaveBeenCalledTimes(exists ? 1 : 0)
-            } finally {
-                await rm(directory, { recursive: true, force: true })
-            }
-        },
-    )
-    it.each(['file case', 'folder case', 'hardlink', 'symlink', 'case alias with copy'])(
-        'distinguishes a case rename from independent directory entries: %s',
-        async kind => {
-            const directory = await mkdtemp(join(tmpdir(), 'maestro-move-'))
-            try {
-                const oldFolder = join(directory, 'Album')
-                await mkdir(oldFolder)
-                let oldPath = join(oldFolder, 'Song.mp3')
-                await writeFile(oldPath, 'original')
-                let foundPath = join(oldFolder, 'song.mp3')
-                if (kind === 'file case') await rename(oldPath, foundPath)
-                else if (kind === 'folder case') {
-                    await rename(oldFolder, join(directory, 'album'))
-                    foundPath = join(directory, 'album', 'Song.mp3')
-                } else {
-                    foundPath = join(oldFolder, 'copy.mp3')
-                    if (kind === 'hardlink') await link(oldPath, foundPath)
-                    else await symlink(oldPath, foundPath)
-                    if (kind === 'case alias with copy') {
-                        const alias = join(directory, 'ALBUM')
-                        // A differently cased configured folder remains an alias on macOS/Windows.
-                        // On case-sensitive volumes, a directory symlink represents the alias instead.
-                        await access(alias).catch(() => symlink(oldFolder, alias, 'junction'))
-                        oldPath = join(alias, 'Song.mp3')
-                    }
-                }
-                const repository = newRepositoryMock()
-                repository.countSongsNeedingMetadata.mockReturnValue(0)
-                repository.listSongsNeedingMetadata.mockReset().mockReturnValue([])
-                repository.findMovedSongCandidates.mockReturnValue([
-                    fromPartial<MovedSongCandidate>({
-                        original: { id: 'original', path: oldPath },
-                        found: { path: foundPath, firstSeenAt: repository.nextScanSeenAt() },
-                    }),
-                ])
-                const metadataService = fromPartial<MetadataBackendService>({
-                    ping: async () => ({
-                        protocolVersion: 1,
-                        engineVersion: '0.1.0',
-                        extractorVersion: 'test-extractor',
-                    }),
-                    prescan: () =>
-                        from<MetadataPrescanUpdate[]>([
-                            { phase: 'batch', items: [fact] },
-                            { phase: 'completed', count: 1, errors: 0 },
-                        ]),
-                })
-                await firstValueFrom(
-                    new LibraryBackendService(
-                        fromPartial<LibraryBackendRepository>(repository),
-                        metadataService,
-                    )
-                        .scan([directory])
-                        .pipe(toArray()),
-                )
-                const isMove = kind === 'file case' || kind === 'folder case'
-                expect(repository.reconcileMovedSong).toHaveBeenCalledTimes(isMove ? 1 : 0)
-                expect(repository.recordSongAvailable).toHaveBeenCalledTimes(isMove ? 0 : 1)
-            } finally {
-                await rm(directory, { recursive: true, force: true })
-            }
-        },
-    )
+    it('reports the classification adjustments returned by reconciliation', async () => {
+        const repository = newRepositoryMock()
+        repository.reconcileScan.mockResolvedValue({
+            adjustments: { new: -1, changed: 1, unchanged: 0 },
+            missing: 0,
+            normalizationIssues: 1,
+        })
+        repository.listSongsNeedingMetadata.mockReset().mockReturnValue([])
+        const metadataService = fromPartial<MetadataBackendService>({
+            ping: async () => ({
+                protocolVersion: 1,
+                engineVersion: '0.1.0',
+                extractorVersion: EXTRACTOR_VERSION,
+            }),
+            prescan: () =>
+                from<MetadataPrescanUpdate[]>([
+                    { phase: 'batch', items: [fact] },
+                    { phase: 'completed', count: 1, errors: 0 },
+                ]),
+        })
+        const updates = await firstValueFrom(
+            new LibraryBackendService(fromPartial(repository), metadataService)
+                .scan(['/music'])
+                .pipe(toArray()),
+        )
+        expect(updates).toContainEqual({ phase: 'normalization', normalizationIssues: 1 })
+        expect(updates.at(-1)).toMatchObject({ new: 0, changed: 1, unchanged: 0, missing: 0 })
+    })
 })

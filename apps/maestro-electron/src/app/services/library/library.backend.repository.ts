@@ -21,6 +21,7 @@ import {
     sql,
 } from 'drizzle-orm'
 import { DatabaseClient } from '../../database/database.client'
+import { compareSongLocations } from './library-move-location'
 import {
     albumArtistsTable,
     albumsTable,
@@ -65,14 +66,36 @@ export interface PrescanBatchComparison {
     changedPaths: string[]
 }
 
-export interface MovedSongCandidate {
+interface MovedSongCandidate {
     original: DbSong
     found: DbSong
     intermediate?: DbSong[]
 }
 
+export interface ScanReconciliation {
+    seenAt: Date
+    /** Discovery and metadata reads finished, with no discovery errors. */
+    complete: boolean
+    changedPaths: ReadonlySet<string>
+    /** Null means the worker returned metadata without matching discovery facts. */
+    failedReadPaths: ReadonlySet<string | null>
+    unavailableFolders: readonly string[]
+    abortSignal?: AbortSignal
+}
+
+export interface ScanReconciliationResult {
+    adjustments: { new: number; changed: number; unchanged: number }
+    missing: number
+    normalizationIssues: number | null
+}
+
 const titleFromFileName = (fileName: string): string => fileName.replace(/\.[^.]+$/, '').trim() || fileName
 const NORMALIZATION_ISSUE_DETECTOR_VERSION = 1
+
+/** A rename chain can exceed SQLite's bind limit even when it has only one origin. */
+function* songIdBatches(ids: readonly string[]): Generator<string[]> {
+    for (let offset = 0; offset < ids.length; offset += 500) yield ids.slice(offset, offset + 500)
+}
 
 const issueFingerprint = (issue: NormalizationIssue): string =>
     stableHash({
@@ -82,7 +105,84 @@ const issueFingerprint = (issue: NormalizationIssue): string =>
     })
 
 export class LibraryBackendRepository {
-    constructor(private readonly database: Pick<DatabaseClient, 'db'>) {}
+    constructor(
+        private readonly database: Pick<DatabaseClient, 'db'>,
+        private readonly compareLocations: typeof compareSongLocations = compareSongLocations,
+    ) {}
+
+    /**
+     * Own the proof-to-merge sequence. Positive evidence survives an interrupted scan;
+     * identity merges and absence marking require a complete, uncancelled scan.
+     * ADR 0001 serializes scans, so no other scan writes while filesystem probes await.
+     */
+    async reconcileScan(scan: ScanReconciliation): Promise<ScanReconciliationResult> {
+        const result: ScanReconciliationResult = {
+            adjustments: { new: 0, changed: 0, unchanged: 0 },
+            missing: 0,
+            normalizationIssues: null,
+        }
+        this.invalidateCoexistingMoves(scan.seenAt)
+        for (const probe of this.findAvailabilityProbes(scan.seenAt)) {
+            if (
+                (await this.compareLocations(probe.originalPath, probe.foundPath, scan.unavailableFolders)) ==
+                'copy'
+            )
+                this.recordSongAvailable(probe.songId, scan.seenAt)
+        }
+        const provenMoves: MovedSongCandidate[] = []
+        for (const candidate of this.findMovedSongCandidates(scan.seenAt)) {
+            let proven = true
+            for (const previous of [candidate.original, ...(candidate.intermediate ?? [])]) {
+                if (previous.id == candidate.found.id) continue
+                const location = await this.compareLocations(
+                    previous.path,
+                    candidate.found.path,
+                    scan.unavailableFolders,
+                )
+                if (location == 'copy') this.recordSongAvailable(previous.id, scan.seenAt)
+                if (location != 'moved') proven = false
+            }
+            if (proven) {
+                this.recordPendingMove(candidate)
+                provenMoves.push(candidate)
+            }
+        }
+
+        // Check after every asynchronous probe has settled. Cancellation during proof
+        // collection must leave all identities intact, including earlier proven pairs.
+        if (!scan.complete || scan.abortSignal?.aborted) return result
+        const failedReads = [...scan.failedReadPaths].map(path =>
+            path == null ? null : this.getReadIdentity(path),
+        )
+        for (const candidate of provenMoves) {
+            // A failed read can hide another same-size match, unless its current hash
+            // proves different bytes. Legacy matches have no original byte evidence.
+            if (
+                failedReads.some(
+                    identity =>
+                        identity == null ||
+                        (identity.size == candidate.found.size &&
+                            (candidate.original.contentHash == null ||
+                                identity.contentHash == null ||
+                                identity.contentHash == candidate.found.contentHash)),
+                )
+            )
+                continue
+            this.reconcileMovedSong(candidate)
+            if (candidate.found.firstSeenAt?.getTime() == scan.seenAt.getTime()) {
+                result.adjustments.new -= 1
+                result.adjustments.changed += 1
+            } else if (!scan.changedPaths.has(candidate.found.path)) {
+                result.adjustments.unchanged -= 1
+                result.adjustments.changed += 1
+            }
+            result.normalizationIssues = 0
+        }
+        if (result.normalizationIssues != null)
+            result.normalizationIssues = this.countOpenIssuesForReadSongs(scan.seenAt)
+        result.missing = this.markNotSeenPresent(scan.seenAt)
+        return result
+    }
 
     private pendingMoveGroups(): DbSong[][] {
         const pending = this.database.db
@@ -90,51 +190,76 @@ export class LibraryBackendRepository {
             .from(songsTable)
             .where(isNotNull(songsTable.moveOriginId))
             .all()
-        const originIds = [
-            ...new Set(pending.flatMap(song => (song.moveOriginId ? [song.moveOriginId] : []))),
-        ]
-        if (originIds.length == 0) return []
+        if (pending.length == 0) return []
+        const pendingByOrigin = new Map<string, DbSong[]>()
+        for (const song of pending) {
+            if (song.moveOriginId == null) continue
+            const group = pendingByOrigin.get(song.moveOriginId) ?? []
+            group.push(song)
+            pendingByOrigin.set(song.moveOriginId, group)
+        }
         const origins = this.database.db
             .select()
             .from(songsTable)
-            .where(inArray(songsTable.id, originIds))
+            .where(
+                inArray(
+                    songsTable.id,
+                    this.database.db
+                        .select({ id: songsTable.moveOriginId })
+                        .from(songsTable)
+                        .where(isNotNull(songsTable.moveOriginId)),
+                ),
+            )
             .all()
-        return origins.map(origin => [origin, ...pending.filter(song => song.moveOriginId == origin.id)])
+        return origins.map(origin => [origin, ...(pendingByOrigin.get(origin.id) ?? [])])
     }
 
-    invalidateCoexistingMoves(seenAt: Date): void {
+    private invalidateCoexistingMoves(seenAt: Date): void {
         for (const group of this.pendingMoveGroups()) {
             if (group.filter(song => song.lastSeenAt.getTime() == seenAt.getTime()).length > 1) {
-                this.database.db
-                    .update(songsTable)
-                    .set({ moveOriginId: null })
-                    .where(
-                        inArray(
-                            songsTable.id,
-                            group.map(song => song.id),
-                        ),
-                    )
-                    .run()
+                this.database.db.transaction(tx => {
+                    for (const ids of songIdBatches(group.map(song => song.id))) {
+                        tx.update(songsTable)
+                            .set({ moveOriginId: null })
+                            .where(inArray(songsTable.id, ids))
+                            .run()
+                    }
+                })
             }
         }
     }
 
-    recordPendingMove({ original, found, intermediate = [] }: MovedSongCandidate): void {
+    private recordPendingMove({ original, found, intermediate = [] }: MovedSongCandidate): void {
         const ids = [found, ...intermediate].filter(song => song.id != original.id).map(song => song.id)
-        if (ids.length > 0)
-            this.database.db
-                .update(songsTable)
-                .set({ moveOriginId: original.id })
-                .where(inArray(songsTable.id, ids))
-                .run()
+        this.database.db.transaction(tx => {
+            for (const batch of songIdBatches(ids)) {
+                tx.update(songsTable)
+                    .set({ moveOriginId: original.id })
+                    .where(inArray(songsTable.id, batch))
+                    .run()
+            }
+        })
     }
 
     /** Positive availability evidence must not depend on a destination finishing its metadata read. */
-    findAvailabilityProbes(seenAt: Date): { songId: string; originalPath: string; foundPath: string }[] {
+    private findAvailabilityProbes(
+        seenAt: Date,
+    ): { songId: string; originalPath: string; foundPath: string }[] {
         const seenSizes = this.database.db
             .select({ size: songsTable.size })
             .from(songsTable)
             .where(and(eq(songsTable.lastSeenAt, seenAt), isNotNull(songsTable.firstSeenAt)))
+        const seenSongs = this.database.db
+            .select({ path: songsTable.path, size: songsTable.size, firstSeenAt: songsTable.firstSeenAt })
+            .from(songsTable)
+            .where(eq(songsTable.lastSeenAt, seenAt))
+            .all()
+        const seenBySize = new Map<number, typeof seenSongs>()
+        for (const song of seenSongs) {
+            const group = seenBySize.get(song.size) ?? []
+            group.push(song)
+            seenBySize.set(song.size, group)
+        }
         const originals = this.database.db
             .select({
                 id: songsTable.id,
@@ -146,17 +271,9 @@ export class LibraryBackendRepository {
             .where(and(lt(songsTable.lastSeenAt, seenAt), inArray(songsTable.size, seenSizes)))
             .all()
         const probes = originals.flatMap(original => {
-            const found = this.database.db
-                .select({ path: songsTable.path })
-                .from(songsTable)
-                .where(
-                    and(
-                        eq(songsTable.lastSeenAt, seenAt),
-                        eq(songsTable.size, original.size),
-                        gt(songsTable.firstSeenAt, original.lastAvailableAt),
-                    ),
-                )
-                .all()
+            const found = (seenBySize.get(original.size) ?? []).filter(
+                song => song.firstSeenAt != null && song.firstSeenAt > original.lastAvailableAt,
+            )
             // Prefer a possible case alias: its old spelling is not a separate original.
             const destination =
                 found.find(song => song.path.toLowerCase() == original.path.toLowerCase()) ?? found[0]
@@ -166,12 +283,14 @@ export class LibraryBackendRepository {
         })
         // Returning to an earlier path reverses the discovery chronology. Pending rename
         // evidence still needs a coexistence check, including when a metadata read fails.
+        const probedIds = new Set(probes.map(probe => probe.songId))
         for (const group of this.pendingMoveGroups()) {
             const found = group.find(song => song.lastSeenAt.getTime() == seenAt.getTime())
             if (!found) continue
             for (const original of group.filter(song => song.lastSeenAt < seenAt)) {
-                if (!probes.some(probe => probe.songId == original.id)) {
+                if (!probedIds.has(original.id)) {
                     probes.push({ songId: original.id, originalPath: original.path, foundPath: found.path })
+                    probedIds.add(original.id)
                 }
             }
         }
@@ -179,7 +298,7 @@ export class LibraryBackendRepository {
     }
 
     /** Match only complete, unambiguous pairs after every discovery/deep-read batch. */
-    findMovedSongCandidates(seenAt: Date): MovedSongCandidate[] {
+    private findMovedSongCandidates(seenAt: Date): MovedSongCandidate[] {
         const candidates = new Map<string, MovedSongCandidate>()
         const contentGroups = this.database.db
             .select({ hash: songsTable.contentHash, size: songsTable.size })
@@ -286,22 +405,24 @@ export class LibraryBackendRepository {
     }
 
     /** Keep the original identity and user state, replace its location and latest derived data atomically. */
-    reconcileMovedSong({ original, found, intermediate = [] }: MovedSongCandidate): void {
+    private reconcileMovedSong({ original, found, intermediate = [] }: MovedSongCandidate): void {
         this.database.db.transaction(tx => {
             const sources = [
                 ...new Map([original, ...intermediate, found].map(song => [song.id, song])).values(),
             ]
             const sourceIds = sources.map(song => song.id)
-            const issues = tx
-                .select()
-                .from(normalizationIssuesTable)
-                .where(
-                    and(
-                        eq(normalizationIssuesTable.entityType, 'SONG'),
-                        inArray(normalizationIssuesTable.entityId, sourceIds),
-                    ),
-                )
-                .all()
+            const issues = [...songIdBatches(sourceIds)].flatMap(ids =>
+                tx
+                    .select()
+                    .from(normalizationIssuesTable)
+                    .where(
+                        and(
+                            eq(normalizationIssuesTable.entityType, 'SONG'),
+                            inArray(normalizationIssuesTable.entityId, ids),
+                        ),
+                    )
+                    .all(),
+            )
             for (const fingerprint of new Set(issues.map(issue => issue.fingerprint))) {
                 const group = issues.filter(issue => issue.fingerprint == fingerprint)
                 const originalIssue = group.find(issue => issue.entityId == original.id)
@@ -344,14 +465,9 @@ export class LibraryBackendRepository {
                     .where(eq(songGenresTable.songId, found.id))
                     .run()
             }
-            tx.delete(songsTable)
-                .where(
-                    inArray(
-                        songsTable.id,
-                        sourceIds.filter(id => id != original.id),
-                    ),
-                )
-                .run()
+            for (const ids of songIdBatches(sourceIds.filter(id => id != original.id))) {
+                tx.delete(songsTable).where(inArray(songsTable.id, ids)).run()
+            }
             tx.update(songsTable)
                 .set({
                     ...found,
@@ -370,7 +486,7 @@ export class LibraryBackendRepository {
         })
     }
 
-    recordSongAvailable(id: string, availableAt: Date): void {
+    private recordSongAvailable(id: string, availableAt: Date): void {
         const song = this.database.db.select().from(songsTable).where(eq(songsTable.id, id)).get()
         if (song)
             this.database.db
@@ -386,7 +502,7 @@ export class LibraryBackendRepository {
             .run()
     }
 
-    countOpenIssuesForReadSongs(seenAt: Date): number {
+    private countOpenIssuesForReadSongs(seenAt: Date): number {
         return (
             this.database.db
                 .select({ value: countDistinct(songsTable.id) })
@@ -410,7 +526,7 @@ export class LibraryBackendRepository {
     }
 
     /** Current fingerprint proves whether a stored hash is still evidence about this file. */
-    getReadIdentity(path: string): { size: number; contentHash: string | null } | null {
+    private getReadIdentity(path: string): { size: number; contentHash: string | null } | null {
         const song = this.database.db
             .select({
                 size: songsTable.size,
@@ -1159,7 +1275,8 @@ const legacyMoveKey = (song: DbSong, includeDiscFields = true): string =>
         label: normalizeDisplayText(song.rawRecordLabel),
         catalogNumber: song.catalogNumber,
         year: song.year,
-        track: song.trackNumber,
+        // The extractor treats zero positions as unknown, including historical rows.
+        track: song.trackNumber === 0 ? null : song.trackNumber,
         ...(includeDiscFields
             ? { discNumber: song.discNumber, discTotal: song.discTotal, trackTotal: song.trackTotal }
             : {}),

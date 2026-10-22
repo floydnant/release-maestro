@@ -7,9 +7,20 @@ import {
 } from '@release-maestro/core'
 import { fromPartial } from '@total-typescript/shoehorn'
 import { eq } from 'drizzle-orm'
-import { copyFile, mkdtemp, rename, rm, writeFile, symlink, stat } from 'node:fs/promises'
+import {
+    access,
+    copyFile,
+    link,
+    mkdir,
+    mkdtemp,
+    rename,
+    rm,
+    writeFile,
+    symlink,
+    stat,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, parse } from 'node:path'
+import { basename, dirname, join, parse } from 'node:path'
 import { firstValueFrom, from, Observable, toArray } from 'rxjs'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { newSongFixture } from '../../../test/fixtures/song-metadata.fixture'
@@ -91,7 +102,7 @@ describe('move reconciliation across scan retries', () => {
                     }),
             }),
         )
-            .scan([directory], abort.signal, false, unavailableFolders)
+            .scan([dirname(found.path)], abort.signal, false, unavailableFolders)
             .pipe(toArray())
 
     beforeEach(async () => {
@@ -119,6 +130,74 @@ describe('move reconciliation across scan retries', () => {
         expect(rows()).toHaveLength(2)
         expect(rows().find(song => song.path == original.path)?.id).toBe(identity?.id)
     })
+
+    it('keeps a backup separate when an excluded nested symlink loses its renamed target directory', async () => {
+        const source = join(directory, 'source')
+        const target = join(directory, 'target')
+        const renamedTarget = join(directory, 'renamed-target')
+        const backup = join(directory, 'backup')
+        await mkdir(source)
+        await mkdir(join(target, 'Album'), { recursive: true })
+        await mkdir(backup)
+        await rename(original.path, join(target, 'Album', 'song.mp3'))
+        await symlink(target, join(source, 'artist'), 'junction')
+        original = { ...original, path: join(source, 'artist', 'Album', 'song.mp3'), fileName: 'song.mp3' }
+        database.db.delete(songsTable).run()
+        repository.processPrescanBatch([fact(original)], new Date(10_000), true)
+        repository.ingestMetadata(original, fact(original), new Date(10_000), 'test-extractor')
+        const identity = rows()[0]!
+        const backupPath = join(backup, 'song.mp3')
+        await rename(found.path, backupPath)
+        found = { ...found, path: backupPath, fileName: 'song.mp3' }
+
+        await rename(target, renamedTarget)
+        // Only the backup folder remains configured. The original bytes still exist.
+        await firstValueFrom(scanner('clean'))
+        await expect(access(join(renamedTarget, 'Album', 'song.mp3'))).resolves.toBeUndefined()
+        expect(rows()).toHaveLength(2)
+        expect(rows().find(song => song.id == identity.id)).toMatchObject({
+            path: original.path,
+            present: false,
+        })
+        expect(rows().find(song => song.path == found.path)?.id).not.toBe(identity.id)
+        expect(rows().every(song => song.moveOriginId == null)).toBe(true)
+    })
+
+    it.each(['folder rename', 'file case', 'folder case', 'hardlink', 'symlink', 'case alias with copy'])(
+        'preserves directory-entry evidence during reconciliation: %s',
+        async kind => {
+            const oldFolder = join(directory, 'Album')
+            await mkdir(oldFolder)
+            const oldPath = join(oldFolder, 'Song.mp3')
+            await rename(original.path, oldPath)
+            original = { ...original, path: oldPath }
+            database.db.update(songsTable).set({ path: oldPath }).run()
+            const identity = rows()[0]!
+            let foundPath = join(oldFolder, 'song.mp3')
+            if (kind == 'file case') await rename(oldPath, foundPath)
+            else if (kind == 'folder case' || kind == 'folder rename') {
+                const newFolder = join(directory, kind == 'folder case' ? 'album' : 'Renamed')
+                await rename(oldFolder, newFolder)
+                foundPath = join(newFolder, 'Song.mp3')
+            } else {
+                foundPath = join(oldFolder, 'copy.mp3')
+                if (kind == 'hardlink') await link(oldPath, foundPath)
+                else await symlink(oldPath, foundPath)
+                if (kind == 'case alias with copy') {
+                    const alias = join(directory, 'ALBUM')
+                    await access(alias).catch(() => symlink(oldFolder, alias, 'junction'))
+                    original = { ...original, path: join(alias, 'Song.mp3') }
+                    database.db.update(songsTable).set({ path: original.path }).run()
+                }
+            }
+            found = { ...found, path: foundPath, fileName: basename(foundPath) }
+            const updates = await firstValueFrom(scanner('clean'))
+            const moved = kind == 'folder rename' || kind == 'file case' || kind == 'folder case'
+            expect(rows()).toHaveLength(moved ? 1 : 2)
+            expect(rows().find(song => song.id == identity.id)?.path).toBe(moved ? found.path : original.path)
+            expect(updates.at(-1)).toMatchObject({ new: moved ? 0 : 1, changed: moved ? 1 : 0 })
+        },
+    )
 
     it('preserves a case-only rename of the same symlink entry', async () => {
         const identity = rows()[0]!
@@ -269,6 +348,27 @@ describe('move reconciliation across scan retries', () => {
             expect.objectContaining({ id: identity.id, addedAt: identity.addedAt, path: found.path }),
         ])
     })
+
+    it.each(['discovery error', 'cancelled', 'fatal'] as const)(
+        'retains pending move evidence without applying identities after %s',
+        async outcome => {
+            const identity = rows()[0]!
+            await rm(original.path)
+            const result = firstValueFrom(scanner(outcome))
+            if (outcome == 'fatal') await expect(result).rejects.toThrow('sidecar disconnected')
+            else await result
+            expect(rows()).toHaveLength(2)
+            expect(rows().find(song => song.id == identity.id)).toMatchObject({
+                path: original.path,
+                present: true,
+            })
+            expect(rows().find(song => song.path == found.path)?.moveOriginId).toBe(identity.id)
+            await firstValueFrom(scanner('clean'))
+            expect(rows()).toEqual([
+                expect.objectContaining({ id: identity.id, path: found.path, moveOriginId: null }),
+            ])
+        },
+    )
 
     it.each(['original', 'third'])(
         'preserves the original identity after a failed rename followed by a move to %s',

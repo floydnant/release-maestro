@@ -78,6 +78,8 @@ discovery did not see them. Runs after deep read. Move application and absence m
 reported errors, see ADR 0003. Read failures defer moves when they could hide another matching file.
 A different discovered size or a valid different content hash can prove a read failure unrelated. Successful
 probes still retain proof that excluded originals coexist with copies, even on failed or cancelled scans.
+An absent file beneath a dangling directory symlink does not prove a move, even when its library
+folder is no longer configured. Ancestor availability must be established before transferring identity.
 _Avoid_: pruning, cleanup, deletion
 
 **Moved song**:
