@@ -5,8 +5,8 @@ import {
     BandcampApiRateLimitedException,
 } from './bandcamp-api.exceptions'
 
-// Conservative app-wide pacing, not a published Bandcamp quota.
-const REQUEST_INTERVAL_MS = 1000
+// Conservative background pacing, not a published Bandcamp quota.
+const BACKGROUND_REQUEST_INTERVAL_MS = 1000
 const RATE_LIMIT_BACKOFF_MS = 30_000
 const MAX_RATE_LIMIT_BACKOFF_MS = 5 * 60_000
 const MAX_IMPORT_WAIT_MS = 60_000
@@ -71,24 +71,27 @@ const retryAfterDelay = (header: string | null): number | null => {
 }
 
 /**
- * Routes web pages and every redirect. Known Bandcamp requests share one gate.
+ * Routes web pages and every redirect. Known Bandcamp requests share one cooldown.
  * Feed and import callers identify known Bandcamp releases, including custom domains. Their
  * redirects retain that ownership. Preview callers use Bandcamp hostnames and learned custom domains.
  * Imports may wait through cooldowns; the interactive feed and previews fail fast. Bandcamp previews
- * enter the shared gate one at a time, so at most one can queue ahead of release metadata. Other websites retain
- * a five-second budget across redirects. Unknown custom domains remain outside sites until a
+ * enter the background queue one at a time, so at most one can queue ahead of import lookups.
+ * Other websites retain a five-second budget across redirects. Unknown custom domains remain outside sites until a
  * release lookup identifies them as Bandcamp.
  *
- * Bandcamp requests start one second apart, including body reads in a 15-second timeout.
+ * Feed requests use the caller's page concurrency and never wait behind background work.
+ * Imports and Bandcamp previews share a serial queue and start one second apart.
+ * Every Bandcamp response body stays inside its request's 15-second timeout.
  * Imports retry 429 twice and wait at most a minute per cooldown. Successful Bandcamp release HTML stays
  * cached for five minutes, bounded by 20 pages and 8 MiB measured as UTF-16 strings.
  */
 export class BandcampHttpClient {
-    private queue: Promise<void> = Promise.resolve()
+    private backgroundQueue: Promise<void> = Promise.resolve()
     private previewQueue: Promise<void> = Promise.resolve()
-    private nextRequestAt = 0
+    private nextBackgroundRequestAt = 0
     private cooldownUntil = 0
     private consecutiveRateLimits = 0
+    private rateLimitEpoch = 0
     private pages = new Map<string, { page: Page; expiresAt: number; bytes: number }>()
     private cachedHtmlBytes = 0
     private knownBandcampHosts = new Set<string>()
@@ -118,14 +121,17 @@ export class BandcampHttpClient {
                 const delay = this.cooldownUntil - Date.now()
                 if (purpose !== 'import' || delay > MAX_IMPORT_WAIT_MS)
                     throw new BandcampApiRateLimitedException(url, new Date(this.cooldownUntil))
-                // A background cooldown must not occupy the queue while the feed fails fast.
+                // Keep the background queue free while this import waits for Bandcamp's cooldown.
                 await wait(delay, requestSignal)
                 continue
             }
             let result: PageResult
             try {
                 if (bandcamp) {
-                    const request = this.queueBandcampPage(url, requestSignal, purpose)
+                    const request =
+                        purpose === 'feed'
+                            ? this.requestBandcampPage(url, requestSignal, purpose)
+                            : this.queueBackgroundPage(url, requestSignal, purpose)
                     result = await abortable(request, requestSignal)
                 } else {
                     result = await this.fetchPage(url, requestSignal, false)
@@ -144,17 +150,15 @@ export class BandcampHttpClient {
         }
     }
 
-    private queueBandcampPage(
+    private queueBackgroundPage(
         url: string,
         signal: AbortSignal,
-        purpose: BandcampRequestPurpose,
+        purpose: Exclude<BandcampRequestPurpose, 'feed'>,
     ): Promise<PageResult> {
         const enqueue = () => {
-            const request = this.queue.then(() =>
-                this.requestBandcampPage(url, signal, purpose !== 'preview'),
-            )
+            const request = this.backgroundQueue.then(() => this.requestBandcampPage(url, signal, purpose))
             // A failed or cancelled caller must not poison either queue.
-            this.queue = request.then(
+            this.backgroundQueue = request.then(
                 () => undefined,
                 () => undefined,
             )
@@ -200,18 +204,22 @@ export class BandcampHttpClient {
     private async requestBandcampPage(
         url: string,
         signal: AbortSignal,
-        retainPage: boolean,
+        purpose: BandcampRequestPurpose,
     ): Promise<PageResult> {
         signal.throwIfAborted()
         // A queued lookup can reuse a page that another caller just fetched.
         const cached = this.cachedPage(url)
         if (cached) return { kind: 'page', page: cached }
         if (this.cooldownUntil > Date.now()) return { kind: 'cooldown' }
-        const delay = this.nextRequestAt - Date.now()
-        if (delay > 0) await wait(delay, signal)
-        signal.throwIfAborted()
-        this.nextRequestAt = Date.now() + REQUEST_INTERVAL_MS
-        return this.fetchPage(url, signal, true, retainPage)
+        if (purpose !== 'feed') {
+            const delay = this.nextBackgroundRequestAt - Date.now()
+            if (delay > 0) await wait(delay, signal)
+            signal.throwIfAborted()
+            // A foreground request can receive a 429 while background pacing waits.
+            if (this.cooldownUntil > Date.now()) return { kind: 'cooldown' }
+            this.nextBackgroundRequestAt = Date.now() + BACKGROUND_REQUEST_INTERVAL_MS
+        }
+        return this.fetchPage(url, signal, true, purpose !== 'preview')
     }
 
     private async fetchPage(
@@ -225,15 +233,21 @@ export class BandcampHttpClient {
             AbortSignal.timeout(bandcamp ? REQUEST_TIMEOUT_MS : PREVIEW_TIMEOUT_MS),
         ])
         let response: Response | undefined
+        const rateLimitEpochAtStart = this.rateLimitEpoch
         try {
             response = await fetch(url, { signal: requestSignal, redirect: 'manual' })
             if (bandcamp && response.status === 429) {
+                const retryAfter = retryAfterDelay(response.headers.get('Retry-After'))
+                // Concurrent failures belong to one attempt; only a later attempt escalates backoff.
+                if (this.rateLimitEpoch === rateLimitEpochAtStart) {
+                    this.consecutiveRateLimits++
+                    this.rateLimitEpoch++
+                }
                 const backoff = Math.min(
-                    RATE_LIMIT_BACKOFF_MS * 2 ** this.consecutiveRateLimits++,
+                    RATE_LIMIT_BACKOFF_MS * 2 ** Math.max(0, this.consecutiveRateLimits - 1),
                     MAX_RATE_LIMIT_BACKOFF_MS,
                 )
-                const delay = retryAfterDelay(response.headers.get('Retry-After')) ?? backoff
-                this.cooldownUntil = Math.max(this.cooldownUntil, Date.now() + delay)
+                this.cooldownUntil = Math.max(this.cooldownUntil, Date.now() + (retryAfter ?? backoff))
                 throw new BandcampApiRateLimitedException(url, new Date(this.cooldownUntil))
             }
             if ([301, 302, 303, 307, 308].includes(response.status)) {
@@ -247,7 +261,8 @@ export class BandcampHttpClient {
             const page = { url: response.url || url, html: await response.text() }
             if (bandcamp) {
                 if (retainPage) this.cachePage(url, page)
-                this.consecutiveRateLimits = 0
+                // An older response must not reset backoff after a concurrent request receives a 429.
+                if (this.rateLimitEpoch === rateLimitEpochAtStart) this.consecutiveRateLimits = 0
             }
             return { kind: 'page', page }
         } catch (error) {
