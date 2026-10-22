@@ -110,14 +110,15 @@ before choosing the feed item's identity. A genuine standalone track keeps its o
 A missing or malformed track page keeps the original track URL because its album is unknown.
 Network failures leave the import checkpoint unchanged so the next pass can retry.
 Import runs at most four parent lookups at once and gives network and server failures two retries.
-Bandcamp page requests share the app-wide pacing and cooldown described below. A
+Bandcamp page requests share the app-wide cooldown described below. A
 processing failure stops the remaining export before the import reports its final error.
 
 **Bandcamp request cooldown**:
 A temporary pause after Bandcamp rejects excessive requests. Imports and feed hydration share the
 same pause across Bandcamp pages. Imports can wait and retry; the feed reports unavailable data
-while retaining the release link and purchase attribution. Link previews share the same pacing and
-cooldown, so loading them cannot bypass a pause.
+while retaining the release link and purchase attribution. Link previews share the same cooldown,
+so loading them cannot bypass a pause. Background imports and previews are paced; normal feed
+loading runs concurrently and does not wait behind background work.
 
 **Link preview**:
 The title and favicon shown for a link from a notification. Previews load after the release appears
