@@ -13,6 +13,40 @@ import { bandcampFeedItem } from '../../../test/fixtures/feed.fixture'
 import { FeedBackendRepository } from './feed.backend.repository'
 
 describe('FeedBackendRepository album purchases', () => {
+    it.each(['/', '#artwork'])(
+        'retains a viewed announcement when its stored URL ends in %s',
+        async suffix => {
+            const database = createMigratedTestDatabase()
+            try {
+                const repository = new FeedBackendRepository(database.client)
+                const url = 'https://test.bandcamp.com/album/release'
+                const legacy = bandcampFeedItem('legacy', new Date())
+                legacy.dedupeIdentifier = url + suffix
+                legacy.data.tralbumUrl = url + suffix
+                await repository.ingestFeedItems([legacy])
+                await repository.markFeedItemViewed('legacy', 'BANDCAMP.TRALBUM', false)
+                await repository.ingestFeedItems([
+                    {
+                        ...legacy,
+                        id: 'reimport',
+                        dedupeIdentifier: url,
+                        data: { ...legacy.data, tralbumUrl: url },
+                    },
+                ])
+
+                const stored = database.db.select().from(feedItemsTable).all()
+                expect(stored).toHaveLength(1)
+                expect(stored[0]).toMatchObject({ id: 'legacy', dedupeIdentifier: url })
+                expect(stored[0]?.lastViewedAt).not.toBeNull()
+                expect(database.db.select().from(feedItemHistoryEntriesTable).all()).toEqual([
+                    expect.objectContaining({ feedItemId: 'legacy' }),
+                ])
+            } finally {
+                database.sqlite.close()
+            }
+        },
+    )
+
     it('merges fans across notifications and reimports using their profile identity', async () => {
         const database = createMigratedTestDatabase()
         try {
