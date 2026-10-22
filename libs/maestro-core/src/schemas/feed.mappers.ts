@@ -3,6 +3,8 @@ import { BandcampFeedItem, HydratedBandcampReleaseFeedItem } from './feed.schema
 import { ScrapedLinkMetadata } from './web-scraping.schema'
 
 const BANDCAMP_FAN_UNSUBSCRIBE_PATH = 'fan_unsubscribe'
+// "First  ?  Second" becomes "First\nSecond". Start once per whitespace run to avoid repeated scans.
+const EMAIL_BODY_SEPARATOR = /(?<!\s)(?:\s{2,}\?\s*|\s*\?\s{2,})|\?\s{2,}/g
 const isBandcampArtworkUrl = (link: string): boolean => {
     try {
         const url = new URL(link)
@@ -51,8 +53,7 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
                     .replace(/^\s*(released|releases).+\n/m, '')
                     .replace(/(^((<br>)|\n|\s)+)|(((<br>)|\n|\s)+$)/g, '') ||
                 (newRelease?.plainBody ?? '')
-                    // Only start once per whitespace run. A following '?' can start another separator.
-                    .replace(/(?<!\s)(?:\s{2,}\?\s*|\s*\?\s{2,})|\?\s{2,}/g, '\n')
+                    .replace(EMAIL_BODY_SEPARATOR, '\n')
                     .replace(/�/g, '')
                     .replace(
                         /(Unfollow|Unsubscribe) [^\r\n]+/i,

@@ -62,6 +62,21 @@ describe('parseBandcampEmail', () => {
         })
     })
 
+    it('uses the same release URL for new-release and fan-purchase notifications with tracking fragments', () => {
+        const url = 'https://test.bandcamp.com/album/first#artwork'
+        const newRelease = parseBandcampEmail({
+            ...newReleaseEmail,
+            htmlBody: `<a href="${url}">check it out here</a>`,
+        })
+        const fanPurchase = parseBandcampEmail({
+            ...fansBoughtMusicEmail,
+            htmlBody: `<a href="${url}?from=fan">First release</a>`,
+        })
+
+        expect(newRelease).toMatchObject({ releaseUrl: 'https://test.bandcamp.com/album/first' })
+        expect(fanPurchase).toMatchObject({ tralbumUrls: ['https://test.bandcamp.com/album/first'] })
+    })
+
     it('ignores unrelated email', () => {
         expect(parseBandcampEmail({ ...fansBoughtMusicEmail, subject: 'Your receipt' })).toBeNull()
     })

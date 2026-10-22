@@ -2,6 +2,8 @@ import { Email } from '@release-maestro/core'
 import { BandcampEmailFeedSourceItem } from '@release-maestro/core'
 import { load as cheerioLoad } from 'cheerio'
 
+const removeUrlTracking = (href: string): string => href.replace(/[?#].*$/, '')
+
 const canonicalBandcampReleaseUrl = (href: string | undefined): string | null => {
     if (!href) return null
     try {
@@ -13,27 +15,24 @@ const canonicalBandcampReleaseUrl = (href: string | undefined): string | null =>
         ) {
             return null
         }
-        url.search = ''
-        url.hash = ''
-        return url.href
+        return removeUrlTracking(url.href)
     } catch {
         return null
     }
 }
 
 export const parseBandcampEmail = (email: Email): BandcampEmailFeedSourceItem | null => {
-    let musicLinks: string[] =
-        email.htmlBody.match(/https?:\/\/[\w-]+\.bandcamp\.com\/(album|track)[^" ]+/g) || []
-
     // @TODO: there are also "New releases" (plural) emails, which contain multiple releases.
     // Right now, the subsequent releases are simply shown as additional links,
     // but we could also parse them into separate feed items.
     if (email.subject.includes('New release')) {
+        let musicLinks: string[] =
+            email.htmlBody.match(/https?:\/\/[\w-]+\.bandcamp\.com\/(album|track)[^" ]+/g) || []
         const checkItOutLink = email.htmlBody
             .match(/<a[^>]+>check it out here<\/a>/)?.[0]
             ?.match(/href="([^"]+)"/)?.[1]
         if (checkItOutLink) musicLinks.unshift(checkItOutLink)
-        musicLinks = [...new Set(musicLinks.map(l => l.replace(/\?.+$/, '')))]
+        musicLinks = [...new Set(musicLinks.map(removeUrlTracking))]
 
         const releaseUrl = musicLinks.shift()
         if (!releaseUrl) return null
