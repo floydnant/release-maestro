@@ -98,25 +98,20 @@ test('first run gates into onboarding, imports a library, and shows the cover mo
     await expect(page.getByLabel('Latest scan result')).toContainText('6 imported')
     await expect(page.getByLabel('Latest scan result')).not.toContainText('6 failed')
     await page.getByRole('link', { name: 'Albums', exact: true }).click()
-    const covers = page.getByRole('grid', { name: 'Albums' }).locator('img')
-    await expect(covers).toHaveCount(4)
-    await expect
-        .poll(() =>
-            covers.evaluateAll(images =>
-                images.every(
-                    image => image instanceof HTMLImageElement && image.complete && image.naturalWidth == 0,
-                ),
-            ),
-        )
-        .toBe(true)
+    const albums = page.getByRole('grid', { name: 'Albums' })
+    const covers = albums.locator('img')
+    await expect(albums.getByRole('gridcell')).toHaveCount(4)
+    // No sibling artwork exists, so failed cache writes leave album placeholders.
+    await expect(covers).toHaveCount(0)
     await rm(cacheDir)
-    // Keep the failed image elements mounted while the normal scan pipeline repairs the cache.
+    // Keep the grid mounted while the normal scan pipeline repairs the cache.
     await page.evaluate(async () => {
         const { ipcRenderer }: typeof import('electron') = require('electron')
         await ipcRenderer.invoke('library:start-scan', { trigger: 'manual' })
     })
     await expect.poll(async () => (await readdir(cacheDir).catch(() => [])).sort()).toEqual(coverNames)
     expect(await Promise.all(coverNames.map(name => readFile(join(cacheDir, name))))).toEqual(originalCovers)
+    await expect(covers).toHaveCount(4)
     await expect
         .poll(() =>
             covers.evaluateAll(images =>
