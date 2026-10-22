@@ -632,6 +632,77 @@ describe('LibraryBackendRepository', () => {
         expect(db.select().from(songsTable).get()?.present).toBe(false)
     })
 
+    it('backfills all confirmed album credits without rereading missing member files', () => {
+        const scannedAt = new Date('2026-06-15T10:00:00Z')
+        for (const [index, albumArtist] of ['Artist', ' Artist '].entries()) {
+            const song = { ...fact, path: `/music/${index}.flac`, fileName: `${index}.flac` }
+            repository.ingestMetadata(
+                newSongFixture({ ...song, albumTitle: 'Album', albumArtist }),
+                song,
+                scannedAt,
+                EXTRACTOR_VERSION,
+            )
+        }
+        db.insert(artistsTable)
+            .values([
+                { id: 'alpha', name: 'Alpha' },
+                { id: 'beta', name: 'Beta' },
+                { id: 'zed', name: 'Zed' },
+            ])
+            .run()
+        for (const [rawText, artistId] of [
+            ['Artist', 'beta'],
+            [' Artist ', 'zed'],
+        ] as const) {
+            const raw = db
+                .select()
+                .from(artistRawNamesTable)
+                .where(eq(artistRawNamesTable.rawText, rawText))
+                .get()
+            if (!raw) throw new Error('expected member alias')
+            db.update(artistRawNamesTable)
+                .set({ confirmedByUser: true })
+                .where(eq(artistRawNamesTable.id, raw.id))
+                .run()
+            db.delete(artistRawNameArtistsTable)
+                .where(eq(artistRawNameArtistsTable.artistRawNameId, raw.id))
+                .run()
+            db.insert(artistRawNameArtistsTable)
+                .values([
+                    { artistRawNameId: raw.id, artistId, position: 0 },
+                    { artistRawNameId: raw.id, artistId: 'alpha', position: 1 },
+                ])
+                .run()
+        }
+        const album = db.select().from(albumsTable).get()
+        if (!album) throw new Error('expected shared album')
+        // The old ingest kept only the last member's credits. No file is reachable to repair it.
+        db.delete(albumArtistsTable).run()
+        db.insert(albumArtistsTable).values({ albumId: album.id, artistId: 'zed' }).run()
+        db.update(songsTable).set({ present: false }).run()
+        const songsBefore = db.select().from(songsTable).all()
+        const resolutionsBefore = db.select().from(artistRawNameArtistsTable).all()
+
+        const migration = readFileSync(join(migrationsFolder, '0012_reconcile-album-fields.sql'), 'utf8')
+        for (let attempt = 0; attempt < 2; attempt++) {
+            sqlite.exec(migration)
+            expect(
+                db.select().from(albumArtistsTable).orderBy(asc(albumArtistsTable.position)).all(),
+            ).toEqual([
+                { albumId: album.id, artistId: 'beta', role: 'primary', position: 0 },
+                { albumId: album.id, artistId: 'zed', role: 'primary', position: 1 },
+                { albumId: album.id, artistId: 'alpha', role: 'primary', position: 2 },
+            ])
+            expect(browse.getAlbumDetail(album.id)?.albumArtists.map(artist => artist.id)).toEqual([
+                'beta',
+                'zed',
+                'alpha',
+            ])
+            expect(db.select().from(songsTable).all()).toEqual(songsBefore)
+            expect(db.select().from(artistRawNameArtistsTable).all()).toEqual(resolutionsBefore)
+        }
+    })
+
     it('reapplies a user-confirmed raw-name resolution in order', () => {
         const scannedAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([fact], scannedAt)
