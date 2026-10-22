@@ -1,36 +1,32 @@
 <!-- Hides at once on the import route, without waiting out the phase's dwell -->
-@if (hidden() ? null : view(); as import) {
-    @if (import.phase === 'started' || import.phase === 'processing') {
-        <p class="email-import-indicator | flex items-center gap-1 px-2 type-body-sm text-content-secondary">
-            <app-progress-ring
-                [mode]="import.phase === 'processing' ? 'progress' : 'spinning'"
-                [diameter]="25"
-                [strokeWidth]="2.5"
-                [color]="import.phase === 'processing' ? 'content.success' : 'content.secondary'"
-                bgColor="background.canvas"
-                [progress]="percent()"
-            ></app-progress-ring>
-            @if (import.phase === 'processing') {
-                Importing emails
-                <span class="font-mono">{{ import.current }}/{{ import.total }}</span>
-            } @else {
-                Checking mail…
-            }
-        </p>
-        @if (isRunning()) {
-            <button
-                hlmBtn
-                variant="ghost"
-                size="icon-xs"
-                class="email-import-cancel | self-center [-webkit-app-region:no-drag]"
-                type="button"
-                aria-label="Cancel email import"
-                hlmTooltip="Cancel email import"
-                (click)="cancelImport.emit($event)"
-            >
-                <app-icon name="close" size="14" aria-hidden="true"></app-icon>
-            </button>
+@if (hidden() ? null : activity(); as activity) {
+    <p class="email-import-indicator | flex items-center gap-1 px-2 type-body-sm text-content-secondary">
+        <app-progress-ring
+            [mode]="activity.ring"
+            [diameter]="25"
+            [strokeWidth]="2.5"
+            [color]="activity.color"
+            bgColor="background.canvas"
+            [progress]="activity.percent"
+        ></app-progress-ring>
+        {{ activity.label }}
+        @if (activity.count) {
+            <span class="font-mono">{{ activity.count }}</span>
         }
+    </p>
+    @if (isRunning()) {
+        <button
+            hlmBtn
+            variant="ghost"
+            size="icon-xs"
+            class="email-import-cancel | self-center [-webkit-app-region:no-drag]"
+            type="button"
+            aria-label="Cancel email import"
+            hlmTooltip="Cancel email import"
+            (click)="cancelImport.emit($event)"
+        >
+            <app-icon name="close" size="14" aria-hidden="true"></app-icon>
+        </button>
     }
 }
 <p class="email-import-summary | type-body-sm" role="status" aria-label="Email import" aria-live="polite">

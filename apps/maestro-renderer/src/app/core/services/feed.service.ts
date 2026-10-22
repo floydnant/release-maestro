@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import {
+    assertUnreachable,
     EmailImportProgressUpdate,
     EmailImportTrigger,
     HydratedFeedItem,
@@ -9,6 +10,30 @@ import {
 import { EMPTY, fromEventPattern, map, share } from 'rxjs'
 import { UiSideException } from '../../shared/ui-facing.exceptions'
 import { ElectronService } from './electron/electron.service'
+
+export type RunningEmailImportUpdate = Extract<
+    EmailImportProgressUpdate,
+    { phase: 'started' | 'processing' | 'finishing' }
+>
+
+/** Whether the import can still be cancelled, and blocks starting another. */
+export function isEmailImportRunning(
+    update: EmailImportProgressUpdate | null,
+): update is RunningEmailImportUpdate {
+    if (update === null) return false
+    switch (update.phase) {
+        case 'started':
+        case 'processing':
+        case 'finishing':
+            return true
+        case 'completed':
+        case 'cancelled':
+        case 'error':
+            return false
+        default:
+            return assertUnreachable(update)
+    }
+}
 
 @Injectable({
     providedIn: 'root',

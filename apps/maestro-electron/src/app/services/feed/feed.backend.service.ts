@@ -8,6 +8,7 @@ import {
     from,
     ignoreElements,
     materialize,
+    map,
     lastValueFrom,
     merge,
     mergeMap,
@@ -137,6 +138,7 @@ export class FeedBackendService {
             : null
         let newestReceivedAt: Date | null = null
         let terminalUpdate: EmailImportProgress | null = null
+        let hasExportedEmails = false
         const parentAlbums = new Map<string, Promise<string>>()
         const resolveReleaseUrl = (releaseUrl: string): Promise<string> => {
             if (!releaseUrl.includes('/track/')) return Promise.resolve(releaseUrl)
@@ -153,12 +155,13 @@ export class FeedBackendService {
         return merge(
             emails$.pipe(
                 materialize(),
-                switchMap(async (notification): Promise<EmailImportProgress | null> => {
-                    if (notification.kind == 'C' || notification.kind == 'E') {
-                        // The complete and error values are handled by the buffered stream below
-                        return null
-                    }
+                map((notification): EmailImportProgress | null => {
+                    if (notification.kind == 'C')
+                        return hasExportedEmails && !workSignal.aborted ? { phase: 'finishing' } : null
+                    // The buffered stream reports the final error after export progress drains.
+                    if (notification.kind == 'E') return null
                     if (notification.kind == 'N') {
+                        hasExportedEmails = true
                         return {
                             phase: 'processing' as const,
                             current: notification.value.current,

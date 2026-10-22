@@ -140,6 +140,29 @@ describe('EmailImportService', () => {
         ])
     })
 
+    it('keeps post-export processing cancellable when a manual request joins an auto import', async () => {
+        const service = createService()
+
+        const auto = service.start('auto')
+        await Promise.resolve()
+        progress$.next({ phase: 'finishing' })
+        const manual = service.start('manual')
+
+        expect(triggerEmailImport).toHaveBeenCalledTimes(1)
+        expect(updates.slice(-2)).toEqual([
+            { phase: 'finishing', trigger: 'auto' },
+            { phase: 'finishing', trigger: 'manual' },
+        ])
+
+        service.cancel()
+        expect(triggerEmailImport.mock.calls[0]?.[0].aborted).toBe(true)
+        progress$.next({ phase: 'cancelled' })
+        progress$.complete()
+        await Promise.all([auto, manual])
+
+        expect(updates.at(-1)).toEqual({ phase: 'cancelled', trigger: 'manual' })
+    })
+
     it('reports a failure to save the import state as an error', async () => {
         stateStore.set = () => {
             throw new Error('disk full')
