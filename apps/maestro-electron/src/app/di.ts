@@ -65,7 +65,6 @@ export const diContainer = new DiContainer({
                 new FeedBackendService(
                     await di.get(EmailBackendRepository),
                     await di.get(BandcampApiBackendService),
-                    await di.get(WebScrapingService),
                     await di.get(FeedBackendRepository),
                     await di.get(SettingsBackendService),
                 ),

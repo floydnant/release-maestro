@@ -5,6 +5,7 @@ import {
     EmailImportProgressUpdate,
     EmailImportTrigger,
     HydratedFeedItem,
+    ScrapedLinkMetadata,
     USE_SAME_MESSAGE,
 } from '@release-maestro/core'
 import { EMPTY, fromEventPattern, map, share } from 'rxjs'
@@ -76,6 +77,11 @@ export class FeedService {
         }
 
         return result
+    }
+
+    /** Page previews for links on loaded releases, keyed by URL. URLs without a preview are absent. */
+    loadLinkPreviews(urls: string[]): Promise<Record<string, ScrapedLinkMetadata>> {
+        return this.electronService.ipcRenderer.invoke('load-link-previews', { urls })
     }
 
     async hasFeed(): Promise<boolean> {
