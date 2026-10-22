@@ -1,5 +1,4 @@
 import { HlmButton } from '@spartan-ng/helm/button'
-import type { BrowseResult } from '../../shared/browse/browse-query'
 import { formatTrackCount } from '../../shared/utils/formatting.utils'
 import {
     ChangeDetectionStrategy,
@@ -8,6 +7,7 @@ import {
     DestroyRef,
     inject,
     linkedSignal,
+    type Signal,
     untracked,
     viewChild,
 } from '@angular/core'
@@ -20,7 +20,6 @@ import {
     type BrowseWindow,
     type SongQuery,
     type SongSort,
-    type SongRow,
 } from '@release-maestro/core'
 import {
     auditTime,
@@ -63,7 +62,7 @@ import { AlbumDetailHeaderComponent } from './album-detail-header.component'
  * the one surface that ignores ADR 0004, and a 200-track compilation is exactly where
  * that stops being free.
  *
- * Disc sections use boundaries from the album detail aggregate, so a window can start
+ * Disc sections use boundaries returned with each song window, so a window can start
  * in the middle of a disc without creating a false section heading.
  */
 
@@ -215,28 +214,10 @@ export class AlbumDetailComponent {
      * The slice the table wants, seeded from that position so the first window fetched
      * is the right one — see `TracksComponent.viewport`.
      */
-    private orderedDiscGroups = computed(() => {
-        if (this.sort().field != SongSortField.trackNumber) return []
-        const album = this.album()
-        if (!album) return []
-        const ordered = this.sort().direction == 'desc' ? [...album.discGroups].reverse() : album.discGroups
-        let startIndex = 0
-        return ordered.map(group => {
-            const section = {
-                discNumber: group.discNumber,
-                startIndex: startIndex,
-                label: group.discNumber == null ? 'Disc unknown' : `Disc ${group.discNumber}`,
-                summary: formatTrackCount(group.songCount, group.trackTotal),
-            }
-            startIndex += group.songCount
-            return section
-        })
-    })
-
     private viewportSource = computed(
         () => ({
             query: this.query(),
-            groupStarts: this.orderedDiscGroups().map(group => group.startIndex),
+            groupStarts: this.discGroups().map(group => group.startIndex),
         }),
         {
             equal: (a, b) =>
@@ -274,40 +255,15 @@ export class AlbumDetailComponent {
         fetchWindow: (query, window) => this.browseService.querySongs(query, window),
     })
 
-    // Detail and song windows settle independently. Retain one consistent pair while
-    // a same-query refresh is in flight, so headings never collapse beneath retained rows.
-    private groupedWindow = linkedSignal({
-        source: () => ({
-            query: this.query(),
-            album: this.album(),
-            groups: this.orderedDiscGroups(),
-            result: this.browse.result(),
-        }),
-        computation: (
-            { query, album, groups, result },
-            previous,
-        ): { result: BrowseResult<SongRow>; groups: readonly SongTableGroup[] } => {
-            if (!album || result.rows.some(song => song.albumId != album.id)) return { result, groups: [] }
-            const matches = groups.every((group, position) =>
-                result.rows.every((song, rowIndex) => {
-                    const index = result.offset + rowIndex
-                    const nextStart = groups[position + 1]?.startIndex ?? Number.POSITIVE_INFINITY
-                    return (
-                        index < group.startIndex || index >= nextStart || song.discNumber == group.discNumber
-                    )
-                }),
-            )
-            if (matches) return { result, groups }
-            if (previous && sameQuery(previous.source.query, query)) {
-                return {
-                    ...previous.value,
-                    result: { ...previous.value.result, status: result.status, error: result.error },
-                }
-            }
-            return { result, groups: [] }
-        },
-    })
-    protected result = computed(() => this.groupedWindow().result)
+    protected result = this.browse.result
+
+    protected discGroups: Signal<readonly SongTableGroup[]> = computed(() =>
+        (this.result().metadata?.discGroups ?? []).map(group => ({
+            startIndex: group.startIndex,
+            label: group.discNumber == null ? 'Disc unknown' : `Disc ${group.discNumber}`,
+            summary: formatTrackCount(group.songCount, group.trackTotal),
+        })),
+    )
 
     /**
      * Whether the retained browse window can be shown beneath the current album header.
@@ -333,8 +289,6 @@ export class AlbumDetailComponent {
     protected headerSongCount = computed(() =>
         this.songWindowMatchesAlbum() ? this.result().total : (this.album()?.songCount ?? 0),
     )
-
-    protected discGroups = computed(() => this.groupedWindow().groups)
 
     /**
      * This page's columns, which differ from the default in both directions.

@@ -15,7 +15,8 @@ import { fromPartial } from '@total-typescript/shoehorn'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
-import { existsSync } from 'fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
 import { join } from 'path'
 import * as schema from '../../database/drizzle.schema'
 import {
@@ -1247,6 +1248,97 @@ describe('LibraryBrowseRepository', () => {
         })
     })
 
+    describe('disc boundaries in song windows', () => {
+        const discQuery = (): SongQuery =>
+            query({
+                filter: { albumIds: ['double'] },
+                sort: { field: SongSortField.trackNumber, direction: 'asc' },
+            })
+        beforeEach(() => {
+            seedAlbum({ id: 'double', title: 'Double' })
+            for (let index = 0; index < 6; index++) {
+                seedSong({
+                    id: `disc-song-${index}`,
+                    title: `Song ${index}`,
+                    albumId: 'double',
+                    discNumber: index < 3 ? 1 : 2,
+                    discTotal: 2,
+                    trackNumber: (index % 3) + 1,
+                    trackTotal: 3,
+                })
+            }
+        })
+
+        it('returns absolute boundaries for descending windows, and no groups for another sort', () => {
+            const query = discQuery()
+            query.sort.direction = 'desc'
+            const result = repository.querySongs({ query, window: { offset: 2, limit: 2 } })
+            expect(result.rows.map(row => row.id)).toEqual(['disc-song-3', 'disc-song-2'])
+            expect(result.metadata?.discGroups).toEqual([
+                { discNumber: 2, songCount: 3, trackTotal: 3, startIndex: 0 },
+                { discNumber: 1, songCount: 3, trackTotal: 3, startIndex: 3 },
+            ])
+            query.sort.field = SongSortField.title
+            expect(
+                repository.querySongs({ query, window: { offset: 0, limit: 2 } }).metadata?.discGroups,
+            ).toEqual([])
+        })
+
+        it('counts only matching songs for boundaries and keeps windows bounded', () => {
+            const query = discQuery()
+            db.update(songsTable).set({ present: false }).where(eq(songsTable.id, 'disc-song-0')).run()
+            query.filter.presence = SongPresence.present
+            const result = repository.querySongs({ query, window: { offset: 1, limit: 2 } })
+            expect(result.rows.map(row => row.id)).toEqual(['disc-song-2', 'disc-song-3'])
+            expect(result.total).toBe(5)
+            expect(result.metadata?.discGroups.map(group => group.startIndex)).toEqual([0, 2])
+            query.filter = {}
+            expect(
+                repository.querySongs({ query, window: { offset: 0, limit: 2 } }).metadata?.discGroups,
+            ).toEqual([])
+        })
+
+        it('reads rows and boundaries from one snapshot when another connection commits between reads', () => {
+            const folder = mkdtempSync(join(tmpdir(), 'maestro-browse-snapshot-'))
+            const path = join(folder, 'library.sqlite')
+            writeFileSync(path, sqlite.serialize())
+            const reader = new Database(path)
+            reader.pragma('journal_mode = WAL')
+            const writer = new Database(path)
+            let committed = false
+            const snapshotDb = drizzle(reader, {
+                schema,
+                logger: {
+                    logQuery(statement) {
+                        // Disc aggregation already established the read snapshot.
+                        if (committed || !statement.startsWith('select count(*)')) return
+                        committed = true
+                        drizzle(writer, { schema })
+                            .update(songsTable)
+                            .set({ discNumber: 1 })
+                            .where(eq(songsTable.id, 'disc-song-3'))
+                            .run()
+                    },
+                },
+            })
+            try {
+                const snapshots = new LibraryBrowseRepository({ db: snapshotDb })
+                const request = { query: discQuery(), window: { offset: 3, limit: 1 } }
+                const before = snapshots.querySongs(request)
+                expect(committed).toBe(true)
+                expect(before.metadata?.discGroups.map(group => group.startIndex)).toEqual([0, 3])
+                expect(before.rows).toMatchObject([{ id: 'disc-song-3', discNumber: 2 }])
+                const after = snapshots.querySongs(request)
+                expect(after.metadata?.discGroups.map(group => group.startIndex)).toEqual([0, 4])
+                expect(after.rows).toMatchObject([{ id: 'disc-song-2', discNumber: 1 }])
+            } finally {
+                writer.close()
+                reader.close()
+                rmSync(folder, { recursive: true, force: true })
+            }
+        })
+    })
+
     describe('getAlbumDetail', () => {
         beforeEach(() => {
             db.insert(artistsTable).values({ id: 'artist-burial', name: 'Burial' }).run()
@@ -1333,7 +1425,6 @@ describe('LibraryBrowseRepository', () => {
             expect(repository.getAlbumDetail('one-disc')).toMatchObject({
                 songCount: 8,
                 trackTotal: 8,
-                discGroups: [],
             })
         })
 
@@ -1356,6 +1447,59 @@ describe('LibraryBrowseRepository', () => {
                 trackTotal: 8,
             })
             expect(repository.getAlbumDetail('unknown-disc')?.trackTotal).toBeNull()
+        })
+
+        it('keeps the album total unknown until every declared disc has a known total', () => {
+            seedAlbum({ id: 'partial-discs', title: 'Partial discs' })
+            for (let index = 1; index <= 5; index++) {
+                seedSong({
+                    id: `disc-one-${index}`,
+                    title: `Track ${index}`,
+                    albumId: 'partial-discs',
+                    discNumber: 1,
+                    discTotal: 2,
+                    trackNumber: index,
+                    trackTotal: 10,
+                })
+            }
+            expect(repository.getAlbumDetail('partial-discs')).toMatchObject({
+                songCount: 5,
+                trackTotal: null,
+            })
+            const request = {
+                query: query({
+                    filter: { albumIds: ['partial-discs'] },
+                    sort: { field: SongSortField.trackNumber, direction: 'asc' },
+                }),
+                window: { offset: 0, limit: 2 },
+            }
+            expect(repository.querySongs(request).metadata?.discGroups).toEqual([
+                { discNumber: 1, songCount: 5, trackTotal: 10, startIndex: 0 },
+            ])
+            seedSong({
+                id: 'disc-two',
+                title: 'Disc two',
+                albumId: 'partial-discs',
+                discNumber: 2,
+                discTotal: 2,
+            })
+            expect(repository.getAlbumDetail('partial-discs')?.trackTotal).toBeNull()
+            db.update(songsTable).set({ trackTotal: 8 }).where(eq(songsTable.id, 'disc-two')).run()
+            expect(repository.getAlbumDetail('partial-discs')?.trackTotal).toBe(18)
+        })
+
+        it('keeps the album total unknown when a numbered disc implies a missing earlier disc', () => {
+            seedAlbum({ id: 'disc-gap', title: 'Disc gap' })
+            for (const discNumber of [1, 3]) {
+                seedSong({
+                    id: `gap-${discNumber}`,
+                    title: 'Track',
+                    albumId: 'disc-gap',
+                    discNumber,
+                    trackTotal: 10,
+                })
+            }
+            expect(repository.getAlbumDetail('disc-gap')?.trackTotal).toBeNull()
         })
 
         it('orders tracks by disc and reports tagged totals per disc and album', () => {
@@ -1399,10 +1543,17 @@ describe('LibraryBrowseRepository', () => {
             expect(repository.getAlbumDetail('album-multi')).toMatchObject({
                 songCount: 3,
                 trackTotal: 5,
-                discGroups: [
-                    { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 0 },
-                    { discNumber: 2, songCount: 1, trackTotal: 3, startIndex: 2 },
-                ],
+            })
+            expect(repository.querySongs({ query, window: { offset: 1, limit: 1 } })).toMatchObject({
+                offset: 1,
+                total: 3,
+                rows: [{ id: 'disc-1-second' }],
+                metadata: {
+                    discGroups: [
+                        { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 0 },
+                        { discNumber: 2, songCount: 1, trackTotal: 3, startIndex: 2 },
+                    ],
+                },
             })
         })
     })

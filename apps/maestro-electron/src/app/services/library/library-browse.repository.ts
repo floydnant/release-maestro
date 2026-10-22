@@ -31,6 +31,7 @@ import {
     type CatalogEntityRef,
     type QueryAlbumsRequest,
     type QuerySongsRequest,
+    type SongDiscGroup,
     type SongFilter,
     type SongFilterDescription,
     type SongQuery,
@@ -656,49 +657,90 @@ export class LibraryBrowseRepository {
     }
 
     querySongs({ query, window }: QuerySongsRequest): SongWindowResult {
-        const where = this.songConditions(query)
-        const { offset, limit } = normalizeWindow(window)
+        // One read transaction keeps boundaries, count and rows on the same snapshot,
+        // including when another SQLite connection commits during this request.
+        return this.database.db.transaction(() => {
+            const where = this.songConditions(query)
+            const { offset } = normalizeWindow(window)
 
-        const total =
-            this.database.db.select({ value: count() }).from(songsTable).where(where).get()?.value ?? 0
+            const metadata = { discGroups: this.songDiscGroups(query) }
+            const total =
+                this.database.db.select({ value: count() }).from(songsTable).where(where).get()?.value ?? 0
 
-        // Skip the row query entirely when the window starts past the end — a stale
-        // viewport request after a filter narrows the result set is routine, not an error.
-        if (offset >= total) return { rows: [], offset, total }
+            // Skip the row query entirely when the window starts past the end — a stale
+            // viewport request after a filter narrows the result set is routine, not an error.
+            if (offset >= total) return { rows: [], offset, total, metadata }
 
-        const rows = this.songWindowQuery({ query, window }).all()
+            const rows = this.songWindowQuery({ query, window }).all()
 
-        const songIds = rows.map(row => row.id)
-        const creditsBySong = this.artistCredits(songIds)
-        const genresBySong = this.genres(songIds)
+            const songIds = rows.map(row => row.id)
+            const creditsBySong = this.artistCredits(songIds)
+            const genresBySong = this.genres(songIds)
 
-        return {
-            rows: rows.map(row => ({
-                id: row.id,
-                path: row.path,
-                present: row.present,
-                title: row.title,
-                // A track without embedded art still belongs to an album that has some.
-                coverPath: row.coverPath ?? row.albumCoverPath,
-                artistText: row.artistText,
-                artistCredit: creditsBySong.get(row.id) ?? [],
-                albumId: row.albumId,
-                albumTitle: row.albumTitle,
-                trackNumber: row.trackNumber,
+            return {
+                rows: rows.map(row => ({
+                    id: row.id,
+                    path: row.path,
+                    present: row.present,
+                    title: row.title,
+                    // A track without embedded art still belongs to an album that has some.
+                    coverPath: row.coverPath ?? row.albumCoverPath,
+                    artistText: row.artistText,
+                    artistCredit: creditsBySong.get(row.id) ?? [],
+                    albumId: row.albumId,
+                    albumTitle: row.albumTitle,
+                    trackNumber: row.trackNumber,
+                    discNumber: row.discNumber,
+                    genreText: row.genreText,
+                    genres: genresBySong.get(row.id) ?? [],
+                    recordLabelId: row.recordLabelId,
+                    recordLabelText: row.recordLabelText,
+                    year: row.year,
+                    bpm: row.bpm,
+                    musicalKey: row.musicalKey,
+                    duration: row.duration,
+                    dateAdded: row.addedAt?.getTime() ?? null,
+                })),
+                offset,
+                total,
+                metadata,
+            }
+        })
+    }
+
+    private discStats(where: SQL | undefined) {
+        return this.database.db
+            .select({
+                discNumber: songsTable.discNumber,
+                songCount: count(),
+                trackTotal: max(songsTable.trackTotal),
+                discTotal: max(songsTable.discTotal),
+            })
+            .from(songsTable)
+            .where(where)
+            .groupBy(songsTable.discNumber)
+            .orderBy(asc(songsTable.discNumber))
+            .all()
+    }
+
+    private songDiscGroups(query: SongQuery): SongDiscGroup[] {
+        if (query.sort.field != SongSortField.trackNumber || query.filter.albumIds?.length != 1) return []
+        const discs = this.discStats(this.songConditions(query))
+        const multiDisc = discs.some(row => (row.discTotal ?? 0) > 1 || (row.discNumber ?? 0) > 1)
+        if (!multiDisc) return []
+        if (query.sort.direction == 'desc') discs.reverse()
+        let startIndex = 0
+        return discs.map(row => {
+            const group = {
                 discNumber: row.discNumber,
-                genreText: row.genreText,
-                genres: genresBySong.get(row.id) ?? [],
-                recordLabelId: row.recordLabelId,
-                recordLabelText: row.recordLabelText,
-                year: row.year,
-                bpm: row.bpm,
-                musicalKey: row.musicalKey,
-                duration: row.duration,
-                dateAdded: row.addedAt?.getTime() ?? null,
-            })),
-            offset,
-            total,
-        }
+                songCount: row.songCount,
+                // Unassigned songs may belong to any numbered disc.
+                trackTotal: row.discNumber == null ? null : row.trackTotal,
+                startIndex,
+            }
+            startIndex += row.songCount
+            return group
+        })
     }
 
     /**
@@ -1166,39 +1208,21 @@ export class LibraryBrowseRepository {
             .where(eq(songsTable.albumId, albumId))
             .get()
 
-        const discRows = this.database.db
-            .select({
-                discNumber: songsTable.discNumber,
-                songCount: count(),
-                trackTotal: max(songsTable.trackTotal),
-                discTotal: max(songsTable.discTotal),
-            })
-            .from(songsTable)
-            .where(eq(songsTable.albumId, albumId))
-            .groupBy(songsTable.discNumber)
-            .orderBy(asc(songsTable.discNumber))
-            .all()
-        const multiDisc = discRows.some(row => (row.discTotal ?? 0) > 1 || (row.discNumber ?? 0) > 1)
-        let startIndex = 0
-        const discGroups = discRows.map(row => {
-            const group = {
-                discNumber: row.discNumber,
-                songCount: row.songCount,
-                // An unknown bucket may contain tracks from any numbered disc.
-                trackTotal: multiDisc && row.discNumber == null ? null : row.trackTotal,
-                startIndex,
-            }
-            startIndex += row.songCount
-            return group
-        })
-        const trackTotal = !multiDisc
-            ? discRows.reduce<number | null>(
-                  (total, row) => (row.trackTotal == null ? total : Math.max(total ?? 0, row.trackTotal)),
-                  null,
-              )
-            : discGroups.length > 0 && discGroups.every(group => group.trackTotal != null)
-              ? discGroups.reduce((total, group) => total + (group.trackTotal ?? 0), 0)
-              : null
+        const discRows = this.discStats(eq(songsTable.albumId, albumId))
+        const discCount = discRows.reduce(
+            (total, row) => Math.max(total, row.discTotal ?? 1, row.discNumber ?? 1),
+            1,
+        )
+        const trackTotal =
+            discCount == 1
+                ? discRows.reduce<number | null>(
+                      (total, row) => (row.trackTotal == null ? total : Math.max(total ?? 0, row.trackTotal)),
+                      null,
+                  )
+                : discRows.length == discCount &&
+                    discRows.every((row, index) => row.discNumber == index + 1 && row.trackTotal != null)
+                  ? discRows.reduce((total, row) => total + (row.trackTotal ?? 0), 0)
+                  : null
 
         const genres = this.database.db
             .selectDistinct({ id: genresTable.id, name: genresTable.name })
@@ -1222,7 +1246,6 @@ export class LibraryBrowseRepository {
             recordLabelText: album.recordLabelText,
             songCount: totals?.songCount ?? 0,
             trackTotal,
-            discGroups: multiDisc ? discGroups : [],
             // `sum` returns a string from SQLite's numeric affinity, and null when no
             // song on the album carries a duration at all.
             totalDuration: totals?.totalDuration == null ? null : Number(totals.totalDuration),

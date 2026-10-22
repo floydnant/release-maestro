@@ -139,8 +139,9 @@ track number. A missing disc number stays `null`; the app does not infer one fro
 **Disc total** / **track total**:
 A file's tagged disc count and track count on one disc. Zero values mean unknown. An album's track
 total is derived from these tags. A single disc uses the largest tagged total; multiple discs sum
-known per-disc totals only when every represented disc has one. Unassigned songs make that sum
-unknown, since they may belong to a numbered disc. Tags do not invent totals for absent discs.
+known per-disc totals only when every declared disc has one, including any gaps below the highest
+numbered disc. Unassigned songs make that sum unknown, since they may belong to a numbered disc.
+A declared disc with no imported songs keeps the album total unknown.
 
 **Disc section**:
 A contiguous group of tracks from one tagged disc in an album track list. Multidisc evidence is a

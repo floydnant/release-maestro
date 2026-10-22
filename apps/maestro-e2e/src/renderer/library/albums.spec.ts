@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import type { QueryAlbumsRequest, QuerySongsRequest } from '@release-maestro/core'
+import type { QueryAlbumsRequest, QuerySongsRequest, SongWindowResult } from '@release-maestro/core'
 import {
     createAlbumDetail,
     createAlbumRow,
@@ -7,6 +7,7 @@ import {
     createRendererScenario,
     createSongRow,
     rendererScenarios,
+    respond,
     scenarioBuilder,
     type RendererScenarioController,
 } from '../scenario-harness'
@@ -810,17 +811,28 @@ test.describe('the album detail page', () => {
                     createAlbumDetail({
                         songCount: 3,
                         trackTotal: 5,
-                        discGroups: [
-                            { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 0 },
-                            { discNumber: 2, songCount: 1, trackTotal: 3, startIndex: 2 },
-                        ],
                     }),
                 )
-                .songs([
-                    createSongRow({ id: 'disc-1-first', title: 'First', trackNumber: 1, discNumber: 1 }),
-                    createSongRow({ id: 'disc-1-second', title: 'Second', trackNumber: 2, discNumber: 1 }),
-                    createSongRow({ id: 'disc-2-first', title: 'Third', trackNumber: 1, discNumber: 2 }),
-                ])
+                .songs(
+                    [
+                        createSongRow({ id: 'disc-1-first', title: 'First', trackNumber: 1, discNumber: 1 }),
+                        createSongRow({
+                            id: 'disc-1-second',
+                            title: 'Second',
+                            trackNumber: 2,
+                            discNumber: 1,
+                        }),
+                        createSongRow({ id: 'disc-2-first', title: 'Third', trackNumber: 1, discNumber: 2 }),
+                    ],
+                    {
+                        metadata: {
+                            discGroups: [
+                                { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 0 },
+                                { discNumber: 2, songCount: 1, trackTotal: 3, startIndex: 2 },
+                            ],
+                        },
+                    },
+                )
                 .build(),
         )
 
@@ -847,13 +859,12 @@ test.describe('the album detail page', () => {
     })
 
     for (const firstResponse of ['detail', 'window']) {
+        const newRowCount = firstResponse == 'window' ? 1 : 0
+        const discSummary = firstResponse == 'window' ? '3 tracks' : '2/3 tracks'
+
         test(`retains disc geometry when ${firstResponse} refresh responds first`, async ({ page }) => {
             const initial = createAlbumDetail({
                 songCount: 3,
-                discGroups: [
-                    { discNumber: 1, songCount: 2, trackTotal: 3, startIndex: 0 },
-                    { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 2 },
-                ],
             })
             const rows = [
                 createSongRow({ id: 'first', title: 'First', discNumber: 1 }),
@@ -862,7 +873,17 @@ test.describe('the album detail page', () => {
             ]
             const controller = await openDetail(
                 page,
-                scenarioBuilder().albumDetail(initial).songs(rows).build(),
+                scenarioBuilder()
+                    .albumDetail(initial)
+                    .songs(rows, {
+                        metadata: {
+                            discGroups: [
+                                { discNumber: 1, songCount: 2, trackTotal: 3, startIndex: 0 },
+                                { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 2 },
+                            ],
+                        },
+                    })
+                    .build(),
             )
             await expect(page.getByText('Disc 2', { exact: true })).toBeVisible()
             await controller.setHandler('library:get-album-detail', { kind: 'pending' })
@@ -898,18 +919,20 @@ test.describe('the album detail page', () => {
             const nextDetail = {
                 ...initial,
                 songCount: 4,
-                discGroups: [
-                    { discNumber: 1, songCount: 3, trackTotal: 3, startIndex: 0 },
-                    { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 3 },
-                ],
             }
-            const nextWindow = {
+            const nextWindow: SongWindowResult = {
                 offset: 0,
                 total: 4,
+                metadata: {
+                    discGroups: [
+                        { discNumber: 1, songCount: 3, trackTotal: 3, startIndex: 0 },
+                        { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 3 },
+                    ],
+                },
                 rows: [
                     ...rows.slice(0, 2),
                     createSongRow({ id: 'new', title: 'New track', discNumber: 1 }),
-                    rows[2],
+                    ...rows.slice(2),
                 ],
             }
             await controller.resolvePending(
@@ -917,6 +940,9 @@ test.describe('the album detail page', () => {
                 firstResponse == 'detail' ? nextDetail : nextWindow,
             )
             await expect(page.getByText('Disc 2', { exact: true })).toBeVisible()
+            // The window owns its boundaries even while the header request is pending.
+            await expect(page.getByRole('row', { name: /New track/ })).toHaveCount(newRowCount)
+            await expect(page.getByText(discSummary, { exact: true })).toBeVisible()
             await controller.resolvePending(
                 firstResponse == 'detail' ? 'library:query-songs' : 'library:get-album-detail',
                 firstResponse == 'detail' ? nextWindow : nextDetail,
@@ -933,17 +959,28 @@ test.describe('the album detail page', () => {
                 .albumDetail(
                     createAlbumDetail({
                         songCount: 3,
-                        discGroups: [
-                            { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 0 },
-                            { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 2 },
-                        ],
                     }),
                 )
-                .songs([
-                    createSongRow({ id: 'disc-2-first', title: 'Third', trackNumber: 1, discNumber: 2 }),
-                    createSongRow({ id: 'disc-1-second', title: 'Second', trackNumber: 2, discNumber: 1 }),
-                    createSongRow({ id: 'disc-1-first', title: 'First', trackNumber: 1, discNumber: 1 }),
-                ])
+                .songs(
+                    [
+                        createSongRow({ id: 'disc-2-first', title: 'Third', trackNumber: 1, discNumber: 2 }),
+                        createSongRow({
+                            id: 'disc-1-second',
+                            title: 'Second',
+                            trackNumber: 2,
+                            discNumber: 1,
+                        }),
+                        createSongRow({ id: 'disc-1-first', title: 'First', trackNumber: 1, discNumber: 1 }),
+                    ],
+                    {
+                        metadata: {
+                            discGroups: [
+                                { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 0 },
+                                { discNumber: 1, songCount: 2, trackTotal: 2, startIndex: 1 },
+                            ],
+                        },
+                    },
+                )
                 .build(),
             '/albums/album-1?sort=trackNumber&dir=desc',
         )
@@ -952,6 +989,103 @@ test.describe('the album detail page', () => {
         await expect(page.getByText('Disc 2')).toBeVisible()
         await expect(page.getByText('Disc 1')).toBeVisible()
         await expect(page.getByRole('row', { name: 'Disc 1, First' })).toBeVisible()
+    })
+
+    test('retains headings with their rows during a sort, then removes them for title order', async ({
+        page,
+    }) => {
+        const rows = [
+            createSongRow({ id: 'a', title: 'Zulu', discNumber: 1 }),
+            createSongRow({ id: 'b', title: 'Alpha', discNumber: 2 }),
+        ]
+        const controller = await openDetail(
+            page,
+            scenarioBuilder()
+                .albumDetail(createAlbumDetail({ songCount: 2 }))
+                .songs(rows, {
+                    metadata: {
+                        discGroups: [
+                            { discNumber: 1, songCount: 1, trackTotal: 1, startIndex: 0 },
+                            { discNumber: 2, songCount: 1, trackTotal: 1, startIndex: 1 },
+                        ],
+                    },
+                })
+                .build(),
+        )
+        await expect(page.getByText('Disc 2', { exact: true })).toBeVisible()
+        await controller.setHandler('library:query-songs', { kind: 'pending' })
+        await page.getByRole('button', { name: 'Sort by Title', exact: true }).click()
+        await expect.poll(async () => (await lastSongQuery(controller))?.query.sort.field).toBe('title')
+        await expect(page.getByText('Disc 2', { exact: true })).toBeVisible()
+        await controller.resolvePending('library:query-songs', {
+            rows: [...rows].reverse(),
+            offset: 0,
+            total: 2,
+            metadata: { discGroups: [] },
+        })
+        await expect(page.getByText('Disc 2', { exact: true })).toHaveCount(0)
+        await expect(page.getByRole('row', { name: /Alpha by/ })).toBeVisible()
+    })
+
+    test('restores a bounded window inside a disc without adding a heading at the window start', async ({
+        page,
+    }) => {
+        const controller = await openDetail(
+            page,
+            scenarioBuilder()
+                .albumDetail(createAlbumDetail({ songCount: 600 }))
+                .handler(
+                    'library:query-songs',
+                    respond(page, 'grouped-album-window', (request: QuerySongsRequest): SongWindowResult => ({
+                        offset: request.window.offset,
+                        total: 600,
+                        rows: Array.from(
+                            { length: Math.min(request.window.limit, 600 - request.window.offset) },
+                            (_, index) => {
+                                const songIndex = request.window.offset + index
+                                return createSongRow({
+                                    id: `song-${songIndex}`,
+                                    title: `Song ${songIndex}`,
+                                    discNumber: songIndex < 300 ? 1 : 2,
+                                })
+                            },
+                        ),
+                        metadata: {
+                            discGroups: [
+                                { discNumber: 1, songCount: 300, trackTotal: 300, startIndex: 0 },
+                                { discNumber: 2, songCount: 300, trackTotal: 300, startIndex: 300 },
+                            ],
+                        },
+                    })),
+                )
+                .build(),
+        )
+        const table = page.getByRole('grid', { name: 'Tracks' })
+        await expect(table).toBeVisible()
+        // Two 24px disc headings precede song 350.
+        const scrollTop = 350 * 40 + 48
+        await table.evaluate((element, top) => element.scrollTo({ top }), scrollTop)
+        await expect(page.getByRole('row', { name: /Disc 2, Song 351/ })).toBeVisible()
+        await expect(page.getByText('Disc 2', { exact: true })).toHaveCount(0)
+        await expect.poll(async () => (await lastSongQuery(controller))?.window.offset).toBeGreaterThan(300)
+        await page.getByRole('link', { name: 'Tracks', exact: true }).click()
+        await expect(page).toHaveURL(/\/tracks/)
+        const baseline = (await controller.calls('library:query-songs')).length
+        await page.getByRole('button', { name: 'Back', exact: true }).click()
+        await expect(page).toHaveURL(/\/albums\/album-1/)
+        await expect.poll(() => table.evaluate(element => element.scrollTop)).toBe(scrollTop)
+        await expect(page.getByRole('row', { name: /Disc 2, Song 351/ })).toBeVisible()
+        await expect(page.getByText('Disc 2', { exact: true })).toHaveCount(0)
+        const calls = (await controller.calls('library:query-songs')).slice(baseline)
+        const windows = calls.flatMap(call => {
+            const request = call.payload as QuerySongsRequest
+            return request.query.filter.albumIds?.includes('album-1') ? [request.window] : []
+        })
+        expect(windows.length).toBeGreaterThan(0)
+        for (const window of windows) {
+            expect(window.offset).toBeGreaterThan(300)
+            expect(window.limit).toBeLessThanOrEqual(60)
+        }
     })
 
     test('does not show the previous album’s tracks during same-route navigation', async ({ page }) => {
@@ -989,6 +1123,7 @@ test.describe('the album detail page', () => {
         await expect(page.getByText('Loading tracks…')).toBeVisible()
 
         await controller.resolveAllPending('library:query-songs', {
+            metadata: { discGroups: [] },
             rows: [
                 createSongRow({
                     id: 'song-second',
