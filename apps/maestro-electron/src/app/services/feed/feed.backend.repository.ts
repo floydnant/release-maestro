@@ -1,5 +1,10 @@
-import { and, count, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm'
-import { EmailVendor, FeedItemMaster } from '@release-maestro/core'
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import {
+    EmailVendor,
+    FeedItemMaster,
+    feedItemMasterSchema,
+    mergeBandcampPurchases,
+} from '@release-maestro/core'
 import { DatabaseClient } from '../../database/database.client'
 import {
     feedEmailImportCheckpointsTable,
@@ -14,12 +19,78 @@ import {
 const FEED_VIEW_HISTORY_THROTTLE_TIME_MS = 1000 * 60 * 3
 
 export class FeedBackendRepository {
+    // Open renderer windows can still write to track IDs collapsed during this app session.
+    private readonly mergedItemIds = new Map<string, string>()
+
     constructor(private db: DatabaseClient) {}
+
+    private resolveItemId(id: string): string {
+        let current = id
+        while (this.mergedItemIds.has(current)) current = this.mergedItemIds.get(current) ?? current
+        return current
+    }
 
     async ingestFeedItems(feedItemsToIngest: FeedItemMaster[]) {
         if (feedItemsToIngest.length == 0) return
 
-        await this.db.db.insert(feedItemsTable).values(feedItemsToIngest).onConflictDoNothing()
+        const mergedItems = new Map<string, string>()
+        this.db.db.transaction(tx => {
+            for (const incoming of feedItemsToIngest) {
+                const urls = [
+                    ...new Set(
+                        [
+                            incoming.dedupeIdentifier,
+                            ...incoming.data.purchases.map(purchase => purchase.tralbumUrl),
+                            ...(incoming.source.type === 'EMAIL.BANDCAMP_NEW_RELEASE'
+                                ? [incoming.source.releaseUrl]
+                                : []),
+                        ].flatMap(url => [url, url.replace(/^https:/, 'http:')]),
+                    ),
+                ]
+                const existing = tx
+                    .select()
+                    .from(feedItemsTable)
+                    .where(
+                        and(
+                            eq(feedItemsTable.type, incoming.type),
+                            inArray(feedItemsTable.dedupeIdentifier, urls),
+                        ),
+                    )
+                    .orderBy(asc(feedItemsTable.ingestedAt), sql`rowid`)
+                    .all()
+                    .map(row => feedItemMasterSchema.parse(row))
+                const retained = existing[0]
+                if (!retained) {
+                    tx.insert(feedItemsTable).values(incoming).run()
+                    continue
+                }
+                const mergedIds = existing.slice(1).map(item => item.id)
+                if (mergedIds.length) {
+                    tx.update(feedItemHistoryEntriesTable)
+                        .set({ feedItemId: retained.id })
+                        .where(inArray(feedItemHistoryEntriesTable.feedItemId, mergedIds))
+                        .run()
+                    tx.delete(feedItemsTable).where(inArray(feedItemsTable.id, mergedIds)).run()
+                    for (const id of mergedIds) mergedItems.set(id, retained.id)
+                }
+                tx.update(feedItemsTable)
+                    .set({
+                        dedupeIdentifier: incoming.dedupeIdentifier,
+                        source: retained.source,
+                        data: {
+                            ...incoming.data,
+                            purchases: mergeBandcampPurchases(
+                                existing.flatMap(item => item.data.purchases),
+                                incoming.data.purchases,
+                            ),
+                        },
+                    })
+                    .where(eq(feedItemsTable.id, retained.id))
+                    .run()
+            }
+        })
+        // Publish aliases only after the transaction commits.
+        for (const [id, retainedId] of mergedItems) this.mergedItemIds.set(id, retainedId)
     }
 
     async listFeedItems({
@@ -40,7 +111,7 @@ export class FeedBackendRepository {
             .where(
                 and(
                     excludedIds.length > 0
-                        ? sql`${feedItemsTable.id} not in (select value from json_each(${JSON.stringify(excludedIds)}))`
+                        ? sql`${feedItemsTable.id} not in (select value from json_each(${JSON.stringify(excludedIds.map(id => this.resolveItemId(id)))}))`
                         : undefined,
                     or(
                         isNull(feedItemsTable.lastViewedAt),
@@ -55,7 +126,7 @@ export class FeedBackendRepository {
             .limit(count)
             .offset(index)
 
-        return items as FeedItemMaster[] // TODO: Add proper schema validation
+        return items.map(item => feedItemMasterSchema.parse(item))
     }
 
     async hasFeedItems(): Promise<boolean> {
@@ -105,6 +176,7 @@ export class FeedBackendRepository {
     }
 
     async markFeedItemViewed(id: string, type: FeedItemMaster['type'], isSnoozed: boolean): Promise<void> {
+        id = this.resolveItemId(id)
         const [feedItem] = await this.db.db.select().from(feedItemsTable).where(eq(feedItemsTable.id, id))
         if (!feedItem) {
             // @TODO: custom exception

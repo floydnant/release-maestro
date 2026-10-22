@@ -85,11 +85,27 @@ mail body.
 
 **Fans-bought-music notification**:
 The Bandcamp notification about releases bought by fans the user follows
-(`EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC`). It carries a list of release URLs, so import creates one feed
-item per distinct URL. Each keeps the notification's event date and read state. The notification
-associates each release with the names of the fans who bought it. These releases show a "Bought by
-Adam Pitts" chip using those names, including when the release page is missing or malformed. Multiple buyers appear together.
-Notifications with no recognizable fan names show "Bought by fans you follow".
+(`EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC`). It associates bought release URLs with fan profiles and photos.
+Import groups purchases under the parent album. The album shows every involved fan, and each track
+shows only its buyers. A fan who bought the whole album appears on every track. Later notifications
+merge attribution into the existing album item. Missing or malformed release pages keep the purchase
+and its fan attribution available.
+
+**Fan**:
+A Bandcamp listener named in a purchase notification. The profile URL identifies the fan; display
+names are not unique. A fan has a display name and may have a profile photo. Overlapping portraits
+show involved fans, and a tooltip lists their names.
+
+**Purchase attribution**:
+The association between a bought album or track and its fans. Buying an album attributes every
+track to that fan. Buying individual tracks attributes only those tracks, while the album's fan
+list includes everyone involved. Reimporting the same purchase adds no duplicate fans.
+
+**Parent album**:
+The Bandcamp album containing a track. Import reads the track page to resolve its parent album
+before choosing the feed item's identity. A genuine standalone track keeps its own release URL.
+A missing or malformed track page keeps the original track URL because its album is unknown.
+Network failures leave the import checkpoint unchanged so the next pass can retry.
 
 **Feed source item**:
 A parsed notification, before it becomes a feed item. This is the boundary type: one source item can
@@ -142,8 +158,13 @@ _Avoid_: released track, owned track, downloaded track
 **Dedupe identifier**:
 What makes two notifications about the same release one feed item. It is the release URL, and it is
 unique per feed item type in the database. Bandcamp notifications about the same release collapse
-across both notification types. The first imported notification supplies the retained source. The
-same URL with a different feed item type would not collapse.
+across both notification types. Album tracks use the parent album URL. Purchases merge into that
+item even when a release announcement supplied its source. When track entries collapse into an
+album, the first imported entry keeps its identity, source, viewed state and snooze state. The view
+history from every merged entry follows that identity. The same URL with a different feed item
+type would not collapse.
+Bandcamp release URLs use HTTPS and omit tracking queries, fragments and trailing slashes. Open
+windows can still mark a merged track as viewed or snoozed through its original ID until they close.
 
 **Event date**:
 When the thing the feed item describes actually happened — for a notification, when the email was

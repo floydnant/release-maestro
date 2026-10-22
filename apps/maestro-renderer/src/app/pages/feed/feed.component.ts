@@ -13,7 +13,6 @@ import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-i
 import { RouterModule } from '@angular/router'
 import { assertUnreachable, HydratedFeedItem, resolveFeedSettings } from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
-import { HlmBadgeImports } from '@spartan-ng/helm/badge'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
 import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
@@ -31,6 +30,7 @@ import {
     formatReleaseDateRelative,
 } from '../../shared/utils/formatting.utils'
 import { settingsLink } from '../settings/settings-link'
+import { FanAvatarStackComponent } from './fan-avatar-stack.component'
 
 const NUM_PREFETCH_ITEMS = 5
 const SEEK_BY_SECONDS = 30
@@ -63,7 +63,7 @@ type FeedState =
         IconComponent,
         RouterModule,
         HlmButtonImports,
-        HlmBadgeImports,
+        FanAvatarStackComponent,
         HlmTooltipImports,
         HlmProgressImports,
     ],

@@ -1,6 +1,19 @@
 import z from 'zod'
 import { emailSchema } from './email.schema'
 
+export const bandcampFanSchema = z.object({
+    name: z.string(),
+    profileUrl: z.string(),
+    imageUrl: z.string().nullable(),
+})
+export type BandcampFan = z.infer<typeof bandcampFanSchema>
+
+export const bandcampPurchaseSchema = z.object({
+    tralbumUrl: z.string(),
+    fans: bandcampFanSchema.array(),
+})
+export type BandcampPurchase = z.infer<typeof bandcampPurchaseSchema>
+
 export const bandcampEmailNewReleaseFeedSourceItemSchema = emailSchema.extend({
     type: z.literal('EMAIL.BANDCAMP_NEW_RELEASE'),
     releaseUrl: z.string(),
@@ -15,8 +28,7 @@ export const bandcampEmailFansBoughtMusicFeedSourceItemSchema = emailSchema
     .pick({ messageId: true, dateReceived: true, isRead: true })
     .extend({
         type: z.literal('EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'),
-        tralbumUrls: z.string().array(),
-        purchases: z.object({ tralbumUrl: z.string(), fanNames: z.string().array() }).array(),
+        purchases: bandcampPurchaseSchema.array(),
     })
 export type BandcampEmailFansBoughtMusicFeedSourceItem = z.infer<
     typeof bandcampEmailFansBoughtMusicFeedSourceItemSchema

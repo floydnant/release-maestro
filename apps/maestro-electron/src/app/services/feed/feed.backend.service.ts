@@ -1,7 +1,20 @@
-import { bufferCount, concatMap, filter, materialize, merge, Observable, switchMap } from 'rxjs'
+import {
+    bufferCount,
+    concatMap,
+    concatWith,
+    defer,
+    filter,
+    ignoreElements,
+    materialize,
+    merge,
+    Observable,
+    switchMap,
+    tap,
+} from 'rxjs'
 import {
     BandcampEmailFeedSourceItem,
     BandcampFeedItem,
+    BandcampPurchase,
     EmailImportProgress,
     HydratedBandcampReleaseFeedItem,
     HydratedFeedItem,
@@ -10,6 +23,7 @@ import {
     isUsefulUrlFromBandcampEmail,
     mapBandcampReleaseFeedItemToHydratedFeedItem,
     resolveFeedSettings,
+    mergeBandcampPurchases,
 } from '@release-maestro/core'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import {
@@ -32,34 +46,33 @@ const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
 const UNPLAYABLE_RELEASE_RECHECK_MS = 1000 * 60 * 5
 const MAX_UNPLAYABLE_RELEASE_CHECKS = 1000
 
-const mapBandcampEmailToFeedItems = (email: BandcampEmailFeedSourceItem): BandcampFeedItem[] => {
-    let tralbumUrls: string[]
-    switch (email.type) {
-        case 'EMAIL.BANDCAMP_NEW_RELEASE':
-            tralbumUrls = email.releaseUrl ? [email.releaseUrl] : []
-            break
-        case 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC':
-            tralbumUrls = email.tralbumUrls
-            break
-        default:
-            return assertUnreachable(email, 'Unhandled Bandcamp email type:')
-    }
-
-    return tralbumUrls.map(releaseUrl => ({
-        id: crypto.randomUUID(),
-        type: 'BANDCAMP.TRALBUM',
-        dedupeIdentifier: releaseUrl,
-        ingestedAt: new Date(),
-        eventDate: new Date(email.dateReceived),
-        isSnoozed: false,
-        lastViewedAt: null,
-        data: {
-            tralbumUrl: releaseUrl,
-            tralbumType: releaseUrl.includes('/album/') ? 'album' : 'track',
-        },
-        source: email,
-    }))
-}
+const createBandcampFeedItem = (
+    email: BandcampEmailFeedSourceItem,
+    releaseUrl: string,
+    purchases: BandcampPurchase[],
+): BandcampFeedItem => ({
+    id: crypto.randomUUID(),
+    type: 'BANDCAMP.TRALBUM',
+    dedupeIdentifier: releaseUrl,
+    ingestedAt: new Date(),
+    eventDate: new Date(email.dateReceived),
+    isSnoozed: false,
+    lastViewedAt: null,
+    data: {
+        tralbumUrl: releaseUrl,
+        tralbumType: releaseUrl.includes('/album/') ? 'album' : 'track',
+        purchases,
+    },
+    source:
+        email.type === 'EMAIL.BANDCAMP_NEW_RELEASE'
+            ? email
+            : {
+                  type: email.type,
+                  messageId: email.messageId,
+                  dateReceived: email.dateReceived,
+                  isRead: email.isRead,
+              },
+})
 
 export class FeedBackendService {
     private readonly unplayableReleaseChecks = new Map<string, number>()
@@ -88,6 +101,29 @@ export class FeedBackendService {
             ? new Date(checkpoint.getTime() - EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS)
             : null
         let newestReceivedAt: Date | null = null
+        let terminalUpdate: EmailImportProgress | null = null
+        const parentAlbums = new Map<string, Promise<string>>()
+        const resolveReleaseUrl = (releaseUrl: string): Promise<string> => {
+            if (!releaseUrl.includes('/track/')) return Promise.resolve(releaseUrl)
+            let resolved = parentAlbums.get(releaseUrl)
+            if (!resolved) {
+                resolved = this.bandcampApiService
+                    .scrapeTralbumInfo(releaseUrl, abortSignal)
+                    .then(track => track.parentAlbumUrl ?? releaseUrl)
+                    .catch(error => {
+                        if (
+                            error instanceof BandcampApiMalformedTralbumDataException ||
+                            (error instanceof BandcampApiFailedToFetchTralbumException &&
+                                [404, 410].includes(error.status))
+                        ) {
+                            return releaseUrl
+                        }
+                        throw error
+                    })
+                parentAlbums.set(releaseUrl, resolved)
+            }
+            return resolved
+        }
 
         const emails$ = await this.emailRepo.loadEmails(vendor, abortSignal, mailboxName, receivedSince)
 
@@ -136,7 +172,37 @@ export class FeedBackendService {
                         .map(email => parseBandcampEmail(email))
                         .filter(isTruthy)
 
-                    const feedItems = emailFeedSourceItems.flatMap(mapBandcampEmailToFeedItems)
+                    const feedItems: BandcampFeedItem[] = []
+                    for (const email of emailFeedSourceItems) {
+                        const releases = new Map<string, BandcampFeedItem>()
+                        const purchases =
+                            email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'
+                                ? email.purchases
+                                : [{ tralbumUrl: email.releaseUrl, fans: [] }]
+                        const resolved = await Promise.all(
+                            purchases.map(async purchase => ({
+                                purchase,
+                                releaseUrl: await resolveReleaseUrl(purchase.tralbumUrl),
+                            })),
+                        )
+                        for (const { purchase, releaseUrl } of resolved) {
+                            const attribution =
+                                email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' ? [purchase] : []
+                            const previous = releases.get(releaseUrl)
+                            if (previous) {
+                                previous.data.purchases = mergeBandcampPurchases(
+                                    previous.data.purchases,
+                                    attribution,
+                                )
+                            } else {
+                                releases.set(
+                                    releaseUrl,
+                                    createBandcampFeedItem(email, releaseUrl, attribution),
+                                )
+                            }
+                        }
+                        feedItems.push(...releases.values())
+                    }
                     totalImported += feedItems.length
 
                     await this.feedBackendRepository.ingestFeedItems(feedItems)
@@ -172,6 +238,7 @@ export class FeedBackendService {
                         }
                     }
                     if (notification.kind == 'E') {
+                        if (abortSignal.aborted) return { phase: 'cancelled' as const }
                         console.error('Error during email import:', notification.error)
 
                         return {
@@ -189,8 +256,16 @@ export class FeedBackendService {
 
                     return assertUnreachable(notification, 'Unhandled notification kind:')
                 }),
+                tap(update => {
+                    if (update) terminalUpdate = update
+                }),
+                ignoreElements(),
             ),
-        ).pipe(filter((update): update is EmailImportProgress => update !== null))
+        ).pipe(
+            // A failed lookup can precede the export's final emails. Drain their progress first.
+            concatWith(defer(() => Promise.resolve(terminalUpdate))),
+            filter((update): update is EmailImportProgress => update !== null),
+        )
     }
 
     // @TODO: error handling

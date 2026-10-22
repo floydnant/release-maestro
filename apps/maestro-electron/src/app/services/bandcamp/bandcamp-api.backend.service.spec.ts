@@ -6,6 +6,7 @@ describe('BandcampApiBackendService release links', () => {
 
     beforeEach(() => {
         const tralbum = {
+            album_url: '/album/occultation',
             current: { title: 'Elemento', type: 'track', id: 123 },
             trackinfo: [],
         }
@@ -33,6 +34,7 @@ describe('BandcampApiBackendService release links', () => {
         const parentAlbum = $('a').filter((_, link) => $(link).text() === 'OCCULTATION')
 
         expect(parentAlbum.attr('href')).toBe('https://label.bandcamp.com/album/occultation')
+        expect(result.parentAlbumUrl).toBe('https://label.bandcamp.com/album/occultation')
         expect(parentAlbum.attr('target')).toBe('_blank')
         expect(parentAlbum.attr('rel')).toBe('noopener noreferrer')
         expect(parentAlbum.find('em').text()).toBe('OCCULTATION')
