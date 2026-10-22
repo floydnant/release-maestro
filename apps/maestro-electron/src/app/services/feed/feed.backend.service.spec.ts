@@ -1,9 +1,10 @@
-import { lastValueFrom, Subject, toArray } from 'rxjs'
+import { lastValueFrom, Subject, tap, toArray } from 'rxjs'
 import { fromPartial } from '@total-typescript/shoehorn'
 import {
     DEFAULT_FEED_SNOOZE_HOURS,
     Email,
     EmailImportStreamPacket,
+    EmailImportProgress,
     FetchFailedException,
 } from '@release-maestro/core'
 // eslint-disable-next-line @nx/enforce-module-boundaries -- Shared synthetic fixtures live in fixtures/, per docs/testing.md.
@@ -106,11 +107,78 @@ describe('FeedBackendService email import', () => {
     })
 
     const runImport = async (abortController = new AbortController()) => {
+        const reported: EmailImportProgress[] = []
         const updates = lastValueFrom(
-            (await service.triggerEmailImport(abortController.signal)).pipe(toArray()),
+            (await service.triggerEmailImport(abortController.signal)).pipe(
+                tap(update => reported.push(update)),
+                toArray(),
+            ),
         )
-        return { updates, abortController }
+        return { updates, abortController, reported }
     }
+
+    it('completes an empty export without reporting queued processing', async () => {
+        const { updates } = await runImport()
+        emails$.complete()
+
+        expect((await updates).map(update => update.phase)).toEqual(['completed'])
+    })
+
+    it('reports processing after export while queued batches are still resolving releases', async () => {
+        let finishLookup = () => {}
+        scrapeTralbumInfo.mockImplementationOnce(
+            () =>
+                new Promise(resolve => {
+                    finishLookup = () => resolve(scrapedBandcampAlbum)
+                }),
+        )
+        const { updates, reported } = await runImport()
+        emails$.next({ current: 1, total: 51, email: fansBoughtMusicEmail })
+        for (let current = 2; current <= 51; current++)
+            emails$.next(packet('2026-10-01T21:40:12', current, 51))
+        emails$.complete()
+        try {
+            await new Promise<void>(resolve => setImmediate(resolve))
+            expect(reported.at(-1)).toEqual({ phase: 'finishing' })
+            await expect(
+                feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp'),
+            ).resolves.toBeNull()
+        } finally {
+            finishLookup()
+            await updates
+        }
+        expect(reported.at(-1)).toMatchObject({ phase: 'completed', totalProcessed: 51 })
+        const afterExport = reported.slice(reported.findIndex(update => update.phase === 'finishing'))
+        expect(afterExport.map(update => update.phase)).toEqual(['finishing', 'completed'])
+    })
+
+    it('cancels queued processing after export without advancing the checkpoint', async () => {
+        let lookupStarted = () => {}
+        const started = new Promise<void>(resolve => (lookupStarted = resolve))
+        scrapeTralbumInfo.mockImplementationOnce(
+            (_url, signal) =>
+                new Promise((_resolve, reject) => {
+                    signal?.addEventListener('abort', () => reject(new Error('Aborted')), { once: true })
+                    lookupStarted()
+                }),
+        )
+        const { updates, reported, abortController } = await runImport()
+        emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
+        emails$.complete()
+        await started
+        try {
+            expect(reported.at(-1)).toEqual({ phase: 'finishing' })
+        } finally {
+            abortController.abort()
+            await updates
+        }
+        expect(reported.at(-1)).toEqual({ phase: 'cancelled' })
+        expect(
+            reported.filter(update => ['completed', 'cancelled', 'error'].includes(update.phase)),
+        ).toHaveLength(1)
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
+        expect(await service.hasFeed()).toBe(false)
+    })
 
     it('limits parent lookups while importing an email with many purchased tracks', async () => {
         let active = 0
@@ -245,7 +313,9 @@ describe('FeedBackendService email import', () => {
         emails$.next({ current: 1, total: 1, email: groupedFansBoughtMusicEmail })
         emails$.complete()
 
-        await expect(updates).resolves.toContainEqual({ phase: 'error', errorMessage: 'Offline' })
+        const reported = await updates
+        expect(reported.map(update => update.phase)).toEqual(['processing', 'finishing', 'error'])
+        expect(reported.at(-1)).toEqual({ phase: 'error', errorMessage: 'Offline' })
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
         expect(await service.hasFeed()).toBe(false)
     })
@@ -564,6 +634,7 @@ describe('FeedBackendService email import', () => {
         const reported = await updates
         expect(reported.at(-1)).toEqual({ phase: 'cancelled' })
         expect(reported).not.toContainEqual(expect.objectContaining({ phase: 'completed' }))
+        expect(reported).not.toContainEqual({ phase: 'finishing' })
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
     })
 
