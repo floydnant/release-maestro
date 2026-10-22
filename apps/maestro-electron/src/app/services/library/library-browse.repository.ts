@@ -687,7 +687,8 @@ export class LibraryBrowseRepository {
                     title: row.title,
                     // A track without embedded art still belongs to an album that has some.
                     coverPath:
-                        row.coverPath ?? (row.albumId == null ? null : (coversByAlbum.get(row.albumId) ?? null)),
+                        row.coverPath ??
+                        (row.albumId == null ? null : (coversByAlbum.get(row.albumId) ?? null)),
                     artistText: row.artistText,
                     artistCredit: creditsBySong.get(row.id) ?? [],
                     albumId: row.albumId,
