@@ -1,4 +1,5 @@
 import { Observable } from 'rxjs'
+import { stat } from 'node:fs/promises'
 import {
     LibraryScanUpdate,
     MetadataPrescanUpdate,
@@ -7,6 +8,7 @@ import {
 } from '@release-maestro/core'
 import { MetadataBackendService } from '../metadata/metadata.backend.service'
 import { LibraryBackendRepository } from './library.backend.repository'
+import { isAbsentPathError } from './library-filesystem'
 
 const DEEP_READ_BATCH_SIZE = 100
 
@@ -235,7 +237,7 @@ export class LibraryBackendService {
                         needsRefresh.set(coverPath, !(await stat(coverPath)).isFile())
                     } catch (error) {
                         needsRefresh.set(coverPath, true)
-                        if (!isAbsent(error)) onError(coverPath, error)
+                        if (!isAbsentPathError(error)) onError(coverPath, error)
                     }
                 }),
             )

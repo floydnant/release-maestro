@@ -1,5 +1,6 @@
 import { readdir, stat, lstat } from 'node:fs/promises'
 import { basename, dirname, relative, isAbsolute, parse, join } from 'node:path'
+import { isAbsentPathError } from './library-filesystem'
 
 /** Distinguish an independent original from case aliases on case-insensitive filesystems. */
 export const compareSongLocations = async (
@@ -30,12 +31,14 @@ export const compareSongLocations = async (
             return 'unknown'
         }
     }
-    const entry = await lstat(original).catch(error => (isAbsent(error) ? 'absent' : 'unknown'))
+    const entry = await lstat(original).catch(error => (isAbsentPathError(error) ? 'absent' : 'unknown'))
     if (entry == 'absent') {
         // ENOENT at the leaf can mean an ancestor symlink lost its target. Check
         // every ancestor, even above missing directories, before inferring absence.
         for (let path = dirname(original); ; path = dirname(path)) {
-            const ancestor = await lstat(path).catch(error => (isAbsent(error) ? 'absent' : 'unknown'))
+            const ancestor = await lstat(path).catch(error =>
+                isAbsentPathError(error) ? 'absent' : 'unknown',
+            )
             if (ancestor == 'unknown') return 'unknown'
             if (ancestor != 'absent') {
                 if (ancestor.isSymbolicLink()) {
@@ -88,9 +91,3 @@ const sourceVolumeRoot = async (path: string): Promise<string | null> => {
     }
     return null
 }
-
-const isAbsent = (error: unknown): boolean =>
-    typeof error == 'object' &&
-    error != null &&
-    'code' in error &&
-    (error.code == 'ENOENT' || error.code == 'ENOTDIR')
