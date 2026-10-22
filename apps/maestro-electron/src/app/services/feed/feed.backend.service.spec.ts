@@ -15,13 +15,16 @@ import {
     mayaFan,
     riverFan,
     groupedFansBoughtMusicEmail,
+    fansBoughtMusicFeedItem,
     scrapedGroupedAlbum,
 } from '../../../../../../fixtures/feed.fixture'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
+import { BandcampHttpClient } from '../bandcamp/bandcamp-http.client'
 import {
     BandcampApiFailedToFetchTralbumException,
     BandcampApiMalformedTralbumDataException,
+    BandcampApiRateLimitedException,
 } from '../bandcamp/bandcamp-api.exceptions'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
@@ -175,6 +178,25 @@ describe('FeedBackendService email import', () => {
 
         await expect(updates).resolves.toContainEqual({ phase: 'error', errorMessage: 'Lookup failed' })
         expect(loadEmails.mock.calls[0]?.[1].aborted).toBe(true)
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
+    })
+
+    it('keeps the checkpoint and reports a rate limit without retrying beyond the HTTP client budget', async () => {
+        scrapeTralbumInfo.mockRejectedValue(
+            new BandcampApiRateLimitedException(
+                'https://other.bandcamp.com/track/second',
+                new Date(Date.now() + 120_000),
+            ),
+        )
+        const { updates } = await runImport()
+        emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
+        emails$.complete()
+
+        await expect(updates).resolves.toContainEqual({
+            phase: 'error',
+            errorMessage: 'Bandcamp is limiting requests. Please try again later.',
+        })
+        expect(scrapeTralbumInfo).toHaveBeenCalledTimes(1)
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
     })
 
@@ -377,14 +399,24 @@ describe('FeedBackendService email import', () => {
         }
     })
 
-    it('retains a failed fan purchase without preventing the other release from hydrating', async () => {
+    it.each([
+        [
+            new BandcampApiFailedToFetchTralbumException('https://test.bandcamp.com/album/first', 404),
+            'The Bandcamp track or album could not be found',
+        ],
+        [
+            new BandcampApiRateLimitedException(
+                'https://test.bandcamp.com/album/first',
+                new Date(Date.now() + 120_000),
+            ),
+            'Bandcamp is limiting requests. Please try again later.',
+        ],
+    ])('retains a failed fan purchase while other releases hydrate: %s', async (error, message) => {
         const { updates } = await runImport()
         emails$.next({ current: 1, total: 1, email: fansBoughtMusicEmail })
         emails$.complete()
         await updates
-        scrapeTralbumInfo.mockRejectedValueOnce(
-            new BandcampApiFailedToFetchTralbumException('https://test.bandcamp.com/album/first', 404),
-        )
+        scrapeTralbumInfo.mockRejectedValueOnce(error)
 
         const hydrated = await service.loadFeed(0, 10)
         expect(hydrated).toHaveLength(2)
@@ -392,7 +424,7 @@ describe('FeedBackendService email import', () => {
         const failed = hydrated.find(item => item.error)
         expect(failed).toMatchObject({
             sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
-            error: { message: 'The Bandcamp track or album could not be found' },
+            error: { message },
         })
         expect(failed?.data.releaseName).toBe(failed?.data.releaseUrl)
         expect(failed?.data.fans.length).toBeGreaterThan(0)
@@ -416,6 +448,51 @@ describe('FeedBackendService email import', () => {
                 snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
             }),
         ).toEqual([])
+    })
+
+    it('hydrates a page with many Bandcamp links without waiting for every optional preview', async () => {
+        jest.useFakeTimers()
+        const html = `<title>Preview</title><div data-tralbum='${JSON.stringify({
+            current: { title: 'Album', type: 'album', id: 1 },
+            trackinfo: [],
+        })}'></div>`
+        const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(html))
+        try {
+            const http = new BandcampHttpClient()
+            const realService = new FeedBackendService(
+                fromPartial<EmailBackendRepository>({}),
+                new BandcampApiBackendService(http),
+                new WebScrapingService(http),
+                feedRepository,
+                fromPartial<SettingsBackendService>({ getSettings: () => ({}) }),
+            )
+            const items = Array.from({ length: 5 }, (_, index) => {
+                const url = `https://artist-${index}.bandcamp.com/album/release`
+                return {
+                    ...fansBoughtMusicFeedItem,
+                    id: `release-${index}`,
+                    data: { ...fansBoughtMusicFeedItem.data, tralbumUrl: url },
+                    source: {
+                        ...newReleaseEmail,
+                        type: 'EMAIL.BANDCAMP_NEW_RELEASE' as const,
+                        releaseUrl: url,
+                        releaseType: 'album' as const,
+                        links: Array.from(
+                            { length: 6 },
+                            (_, link) => `https://artist-${index}.bandcamp.com/link-${link}`,
+                        ),
+                    },
+                }
+            })
+            const hydrated = realService.hydrateFeed(items, false)
+            await jest.advanceTimersByTimeAsync(4000)
+            await expect(hydrated).resolves.toHaveLength(5)
+            expect(fetchMock).toHaveBeenCalledTimes(5)
+            expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/album/'))).toHaveLength(5)
+        } finally {
+            jest.useRealTimers()
+            jest.restoreAllMocks()
+        }
     })
 
     it('reads the whole mailbox on the first import and checkpoints the newest email', async () => {

@@ -1,13 +1,14 @@
 import { load as cheerioLoad } from 'cheerio'
 import { ScrapedLinkMetadata } from '@release-maestro/core'
+import { BandcampHttpClient } from '../bandcamp/bandcamp-http.client'
 
 export class WebScrapingService {
+    constructor(private readonly bandcampHttp: BandcampHttpClient) {}
+
     async getLinkMetaData(url: string): Promise<ScrapedLinkMetadata> {
         try {
-            // @TODO: cache this
-            const res = await fetch(url, { signal: AbortSignal.timeout(5000) })
-            const html = await res.text()
-            const $ = cheerioLoad(html)
+            const page = await this.bandcampHttp.get(url, { purpose: 'preview' })
+            const $ = cheerioLoad(page.html)
 
             // @TODO: make this more resilient/add more fallbacks
             const title = $('title').text() || null
@@ -39,7 +40,7 @@ export class WebScrapingService {
             }
 
             // @TODO: we could test if the favicon url returns a 200, but we can also fallback to a default in the UI
-            const fullFavicon = favicon.startsWith('http') ? favicon : new URL(favicon, url).href
+            const fullFavicon = favicon.startsWith('http') ? favicon : new URL(favicon, page.url).href
 
             return { url, title, description, image, favicon: fullFavicon }
         } catch {
