@@ -1,8 +1,22 @@
 import { Email } from '@release-maestro/core'
-import { BandcampEmailFeedSourceItem } from '@release-maestro/core'
+import {
+    BandcampEmailFeedSourceItem,
+    BandcampFan,
+    BandcampPurchase,
+    mergeBandcampPurchases,
+    normalizeBandcampReleaseUrl,
+} from '@release-maestro/core'
 import { load as cheerioLoad } from 'cheerio'
 
 const removeUrlTracking = (href: string): string => href.replace(/[?#].*$/, '')
+
+const fanProfileUrl = (href: string | undefined): string | null => {
+    if (!href) return null
+    const url = URL.parse(href, 'https://bandcamp.com')
+    if (!url || !['http:', 'https:'].includes(url.protocol) || url.hostname !== 'bandcamp.com') return null
+    url.protocol = 'https:'
+    return removeUrlTracking(url.href).replace(/\/$/, '')
+}
 
 const canonicalBandcampReleaseUrl = (href: string | undefined): string | null => {
     if (!href) return null
@@ -15,7 +29,7 @@ const canonicalBandcampReleaseUrl = (href: string | undefined): string | null =>
         ) {
             return null
         }
-        return removeUrlTracking(url.href)
+        return normalizeBandcampReleaseUrl(url.href)
     } catch {
         return null
     }
@@ -32,7 +46,13 @@ export const parseBandcampEmail = (email: Email): BandcampEmailFeedSourceItem | 
             .match(/<a[^>]+>check it out here<\/a>/)?.[0]
             ?.match(/href="([^"]+)"/)?.[1]
         if (checkItOutLink) musicLinks.unshift(checkItOutLink)
-        musicLinks = [...new Set(musicLinks.map(removeUrlTracking))]
+        musicLinks = [
+            ...new Set(
+                musicLinks
+                    .map(link => normalizeBandcampReleaseUrl(link))
+                    .filter((link): link is string => link !== null),
+            ),
+        ]
 
         const releaseUrl = musicLinks.shift()
         if (!releaseUrl) return null
@@ -59,28 +79,37 @@ export const parseBandcampEmail = (email: Email): BandcampEmailFeedSourceItem | 
                     .filter((url): url is string => url !== null),
             ),
         ]
-        const purchases = new Map<string, Set<string>>()
+        const purchases: BandcampPurchase[] = []
         $('.item-tralbum-text').each((_, element) => {
             const item = $(element)
             const tralbumUrl = canonicalBandcampReleaseUrl(item.children('a[href]').first().attr('href'))
             if (!tralbumUrl) return
 
-            const fanNames = purchases.get(tralbumUrl) ?? new Set<string>()
-            item.find('.bought-by a').each((_, fan) => {
-                const name = $(fan).text().replace(/\s+/g, ' ').trim()
-                if (name) fanNames.add(name)
+            const fans = new Map<string, BandcampFan>()
+            item.find('.bought-by a[href]').each((_, link) => {
+                const profileUrl = fanProfileUrl($(link).attr('href'))
+                const name = $(link).text().replace(/\s+/g, ' ').trim()
+                if (profileUrl && name) fans.set(profileUrl, { name, profileUrl, imageUrl: null })
             })
-            purchases.set(tralbumUrl, fanNames)
+            item.find('.purchaser-photos a[href]').each((_, link) => {
+                const profileUrl = fanProfileUrl($(link).attr('href'))
+                const fan = profileUrl ? fans.get(profileUrl) : undefined
+                const image = $(link).find('img').attr('src')
+                const imageUrl = image ? URL.parse(image, 'https://bandcamp.com') : null
+                if (fan && imageUrl && ['http:', 'https:'].includes(imageUrl.protocol)) {
+                    fan.imageUrl = imageUrl.href
+                }
+            })
+            purchases.push({ tralbumUrl, fans: [...fans.values()] })
         })
 
         return {
             ...email,
             type: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
-            tralbumUrls,
-            purchases: [...purchases].map(([tralbumUrl, fanNames]) => ({
-                tralbumUrl,
-                fanNames: [...fanNames],
-            })),
+            purchases: mergeBandcampPurchases(
+                tralbumUrls.map(tralbumUrl => ({ tralbumUrl, fans: [] })),
+                purchases,
+            ),
         }
     }
 

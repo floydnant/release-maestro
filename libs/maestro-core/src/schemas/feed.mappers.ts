@@ -1,6 +1,8 @@
 import { ScrapedTralbumInfo } from './bandcamp-api.schema'
 import { BandcampFeedItem, HydratedBandcampReleaseFeedItem } from './feed.schema'
 import { ScrapedLinkMetadata } from './web-scraping.schema'
+import { mergeBandcampFans } from './feed.purchases'
+import { normalizeBandcampReleaseUrl } from '../utils/bandcamp-release-url'
 
 // Email content is untrusted. Classify links by their parsed host and path, never by substring, and
 // scan text in linear time: nested or adjacent quantifiers backtrack polynomially on long input.
@@ -140,6 +142,11 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
     const newRelease = source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' ? source : null
     const sourceLinks = newRelease?.links ?? []
     const releaseType = tralbum?.type ?? data.tralbumType
+    const releaseFans = mergeBandcampFans(
+        ...data.purchases
+            .filter(purchase => purchase.tralbumUrl === data.tralbumUrl)
+            .map(purchase => purchase.fans),
+    )
 
     const unsubscribeUrl = sourceLinks.find(isUnsubscribeLink) ?? null
 
@@ -153,11 +160,7 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
             emailReceivedAt: new Date(source.dateReceived),
             isEmailRead: source.isRead,
             emailId: source.messageId,
-            fanNames:
-                source.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'
-                    ? (source.purchases.find(purchase => purchase.tralbumUrl === data.tralbumUrl)?.fanNames ??
-                      [])
-                    : [],
+            fans: mergeBandcampFans(...data.purchases.map(purchase => purchase.fans)),
             releaseName: tralbum?.title || newRelease?.subject || data.tralbumUrl,
             band: tralbum?.band || null,
             artist: tralbum?.artist || null,
@@ -181,7 +184,20 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
             iframeUrl: tralbum?.id
                 ? `https://bandcamp.com/EmbeddedPlayer/${releaseType}=${tralbum.id}/size=large/bgcol=999999/linkcol=0687f5`
                 : null,
-            tracks: tralbum?.tracks || [],
+            tracks: (tralbum?.tracks ?? []).map(track => {
+                const trackUrl = track.titleLink
+                    ? normalizeBandcampReleaseUrl(track.titleLink, data.tralbumUrl)
+                    : null
+                return {
+                    ...track,
+                    fans: mergeBandcampFans(
+                        releaseFans,
+                        ...data.purchases
+                            .filter(purchase => purchase.tralbumUrl === trackUrl)
+                            .map(purchase => purchase.fans),
+                    ),
+                }
+            }),
         },
     }
 }

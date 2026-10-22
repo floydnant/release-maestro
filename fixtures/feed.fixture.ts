@@ -1,4 +1,20 @@
-import type { BandcampFeedItem, Email, ScrapedTralbumInfo } from '@release-maestro/core'
+import type { BandcampFan, BandcampFeedItem, Email, ScrapedTralbumInfo } from '@release-maestro/core'
+
+export const adamFan: BandcampFan = {
+    name: 'Adam Pitts',
+    profileUrl: 'https://bandcamp.com/adam',
+    imageUrl: 'https://f4.bcbits.com/img/fan-adam.jpg',
+}
+export const mayaFan: BandcampFan = {
+    name: 'Maya',
+    profileUrl: 'https://bandcamp.com/maya',
+    imageUrl: 'https://f4.bcbits.com/img/fan-maya.jpg',
+}
+export const riverFan: BandcampFan = {
+    name: 'River & Rain',
+    profileUrl: 'https://bandcamp.com/river',
+    imageUrl: null,
+}
 
 export const fansBoughtMusicEmail: Email = {
     messageId: '<fan-purchases@bandcamp.com>',
@@ -15,7 +31,7 @@ export const fansBoughtMusicEmail: Email = {
                 <a href="https://test.bandcamp.com/album/first?t=1&amp;from=fanactv-adam">First Release</a>
                 <div class="bought-by">
                     Bought by <a href="http://bandcamp.com/adam">Adam Pitts</a>
-                    <div class="purchaser-photos"><a href="http://bandcamp.com/adam"><img></a></div>
+                    <div class="purchaser-photos"><a href="http://bandcamp.com/adam"><img src="https://f4.bcbits.com/img/fan-adam.jpg"></a></div>
                 </div>
             </div>
         </div>
@@ -25,7 +41,7 @@ export const fansBoughtMusicEmail: Email = {
                 Bought by <a href="http://bandcamp.com/maya">Maya</a> and
                 <a href="http://bandcamp.com/river">River &amp; Rain</a>
                 <div class="purchaser-photos">
-                    <a href="http://bandcamp.com/maya"><img></a>
+                    <a href="http://bandcamp.com/maya"><img src="https://f4.bcbits.com/img/fan-maya.jpg"></a>
                     <a href="http://bandcamp.com/river"><img></a>
                 </div>
             </div>
@@ -44,6 +60,31 @@ export const newReleaseEmail: Email = {
     isRead: false,
 }
 
+export const groupedFansBoughtMusicEmail: Email = {
+    ...fansBoughtMusicEmail,
+    messageId: '<album-and-tracks@bandcamp.com>',
+    htmlBody: `
+        <div class="item-tralbum-text">
+            <a href="https://test.bandcamp.com/album/first">First release</a>
+            <div class="bought-by"><a href="http://bandcamp.com/adam">Adam Pitts</a>
+                <div class="purchaser-photos"><a href="http://bandcamp.com/adam"><img src="https://f4.bcbits.com/img/fan-adam.jpg"></a></div>
+            </div>
+        </div>
+        <div class="item-tralbum-text">
+            <a href="https://test.bandcamp.com/track/first-track">First track</a>
+            <div class="bought-by"><a href="http://bandcamp.com/maya">Maya</a> and <a href="http://bandcamp.com/river">River &amp; Rain</a>
+                <div class="purchaser-photos"><a href="http://bandcamp.com/maya"><img src="https://f4.bcbits.com/img/fan-maya.jpg"></a></div>
+            </div>
+        </div>
+        <div class="item-tralbum-text">
+            <a href="https://test.bandcamp.com/track/second-track">Second track</a>
+            <div class="bought-by"><a href="https://bandcamp.com/maya">Maya</a>
+                <div class="purchaser-photos"><a href="https://bandcamp.com/maya"><img src="https://f4.bcbits.com/img/fan-maya.jpg"></a></div>
+            </div>
+        </div>
+    `,
+}
+
 export const fansBoughtMusicFeedItem: BandcampFeedItem = {
     id: 'fan-purchase-album',
     type: 'BANDCAMP.TRALBUM',
@@ -55,20 +96,13 @@ export const fansBoughtMusicFeedItem: BandcampFeedItem = {
     data: {
         tralbumUrl: 'https://test.bandcamp.com/album/first',
         tralbumType: 'album',
+        purchases: [{ tralbumUrl: 'https://test.bandcamp.com/album/first', fans: [adamFan] }],
     },
     source: {
         type: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
         messageId: fansBoughtMusicEmail.messageId,
         dateReceived: fansBoughtMusicEmail.dateReceived,
         isRead: fansBoughtMusicEmail.isRead,
-        tralbumUrls: ['https://test.bandcamp.com/album/first', 'https://other.bandcamp.com/track/second'],
-        purchases: [
-            { tralbumUrl: 'https://test.bandcamp.com/album/first', fanNames: ['Adam Pitts'] },
-            {
-                tralbumUrl: 'https://other.bandcamp.com/track/second',
-                fanNames: ['Maya', 'River & Rain'],
-            },
-        ],
     },
 }
 
@@ -77,6 +111,7 @@ export const scrapedBandcampAlbum: ScrapedTralbumInfo = {
     artist: 'Test Artist',
     releaseDate: null,
     type: 'album',
+    parentAlbumUrl: null,
     id: 123,
     artworkUrl: 'https://f4.bcbits.com/img/a123_16.jpg',
     about: 'An album bought by a fan.\nreleased October 1, 2026\n',
@@ -91,6 +126,22 @@ export const scrapedBandcampAlbum: ScrapedTralbumInfo = {
             titleLink: '/track/first-track',
             albumPreorder: false,
             streamUrl: 'https://audio.example.com/first-track.mp3',
+        },
+    ],
+}
+
+export const scrapedGroupedAlbum: ScrapedTralbumInfo = {
+    ...scrapedBandcampAlbum,
+    tracks: [
+        ...scrapedBandcampAlbum.tracks,
+        {
+            title: 'Second Track',
+            id: 457,
+            artist: 'Test Artist',
+            duration: 180,
+            titleLink: '/track/second-track',
+            albumPreorder: false,
+            streamUrl: 'https://audio.example.com/second-track.mp3',
         },
     ],
 }

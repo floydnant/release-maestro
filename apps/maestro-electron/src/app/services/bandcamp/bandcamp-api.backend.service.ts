@@ -5,6 +5,7 @@ import {
     BandData,
     ScrapedTralbumInfo,
     tralbumDataAttrSchema,
+    normalizeBandcampReleaseUrl,
 } from '@release-maestro/core'
 import {
     BandcampApiFailedToFetchTralbumException,
@@ -47,8 +48,8 @@ const parseBandData = ($: CheerioAPI): BandData | null => {
 }
 
 export class BandcampApiBackendService {
-    async scrapeTralbumInfo(url: string): Promise<ScrapedTralbumInfo> {
-        const result = await fetch(url).catch(err => {
+    async scrapeTralbumInfo(url: string, signal?: AbortSignal): Promise<ScrapedTralbumInfo> {
+        const result = await fetch(url, { signal }).catch(err => {
             if (err instanceof Error) {
                 throw new FetchFailedException(
                     'Failed to fetch tralbum',
@@ -107,6 +108,10 @@ export class BandcampApiBackendService {
             artist: tralbumData?.current.artist || null,
             releaseDate: tralbumData?.album_release_date || tralbumData?.current.release_date || null,
             type: tralbumData?.current.type || 'album',
+            parentAlbumUrl:
+                tralbumData?.current.type === 'track' && tralbumData.album_url
+                    ? normalizeBandcampReleaseUrl(tralbumData.album_url, result.url || url)
+                    : null,
             id: tralbumData?.current.id || null,
             about: about + credits,
             aboutLinks: [...aboutLinks, ...creditsLinks],

@@ -3,6 +3,8 @@ import { CalendarDay } from './calendar-day.schema'
 import {
     bandcampEmailFansBoughtMusicFeedSourceItemSchema,
     bandcampEmailNewReleaseFeedSourceItemSchema,
+    bandcampPurchaseSchema,
+    BandcampFan,
 } from './feed-source.schema'
 import { BandData, ScrapedTralbumInfo } from './bandcamp-api.schema'
 
@@ -30,10 +32,16 @@ export const bandcampTralbumFeedItem = feedItemBaseSchema.extend({
     data: z.object({
         tralbumUrl: z.string(),
         tralbumType: z.enum(['album', 'track']),
+        purchases: bandcampPurchaseSchema.array().default([]),
     }),
     source: z.discriminatedUnion('type', [
         bandcampEmailNewReleaseFeedSourceItemSchema,
-        bandcampEmailFansBoughtMusicFeedSourceItemSchema,
+        bandcampEmailFansBoughtMusicFeedSourceItemSchema.pick({
+            type: true,
+            messageId: true,
+            dateReceived: true,
+            isRead: true,
+        }),
     ]),
 })
 export type BandcampFeedItem = z.infer<typeof bandcampTralbumFeedItem>
@@ -52,7 +60,7 @@ export type HydratedBandcampReleaseFeedItem = {
         emailReceivedAt: Date
         isEmailRead: boolean
         emailId: string
-        fanNames: string[]
+        fans: BandcampFan[]
         releaseName: string
         band: BandData | null
         artist: string | null
@@ -63,7 +71,7 @@ export type HydratedBandcampReleaseFeedItem = {
         unsubscribeText: string
         imageUrl: string | undefined
         iframeUrl: string | null
-        tracks: ScrapedTralbumInfo['tracks']
+        tracks: (ScrapedTralbumInfo['tracks'][number] & { fans: BandcampFan[] })[]
     }
     error: { message: string } | null
     id: string
