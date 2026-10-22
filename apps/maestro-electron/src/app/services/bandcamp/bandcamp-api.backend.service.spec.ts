@@ -1,3 +1,4 @@
+import { load } from 'cheerio'
 import { createServer } from 'node:http'
 import { BandcampApiBackendService } from './bandcamp-api.backend.service'
 import {
@@ -89,7 +90,7 @@ describe('BandcampApiBackendService HTTP hydration', () => {
             ],
         })
         expect(release.about).toContain('target="_blank" rel="noopener noreferrer"')
-        expect(release.aboutLinks).toEqual([{ url: 'https://label.example', text: 'the label' }])
+        expect(release.aboutLinks).toEqual([{ url: 'https://label.example/', text: 'the label' }])
     })
 
     it('reports malformed Bandcamp data as a hydration error', async () => {
@@ -103,5 +104,66 @@ describe('BandcampApiBackendService HTTP hydration', () => {
         await expect(service.scrapeTralbumInfo(url)).rejects.toEqual(
             new BandcampApiFailedToFetchTralbumException(url, 429),
         )
+    })
+})
+
+describe('BandcampApiBackendService release links', () => {
+    const releaseUrl = 'https://label.bandcamp.com/track/elemento'
+
+    beforeEach(() => {
+        const tralbum = {
+            current: { title: 'Elemento', type: 'track', id: 123 },
+            trackinfo: [],
+        }
+        jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+            new Response(`
+                <div data-tralbum='${JSON.stringify(tralbum)}'></div>
+                <div id="trackInfoInner">
+                    <div class="tralbumData tralbum-about">
+                        <a href="https://artist.example.com">Artist website</a>
+                    </div>
+                    <div class="tralbumData tralbum-credits">
+                        from <a href="/album/occultation"><em>OCCULTATION</em></a>,
+                        <a href="../album/another-release">Another release</a>
+                    </div>
+                </div>
+            `),
+        )
+    })
+
+    afterEach(() => jest.restoreAllMocks())
+
+    it('opens the parent album from the track credits on Bandcamp', async () => {
+        const result = await new BandcampApiBackendService().scrapeTralbumInfo(releaseUrl)
+        const $ = load(result.about)
+        const parentAlbum = $('a').filter((_, link) => $(link).text() === 'OCCULTATION')
+
+        expect(parentAlbum.attr('href')).toBe('https://label.bandcamp.com/album/occultation')
+        expect(parentAlbum.attr('target')).toBe('_blank')
+        expect(parentAlbum.attr('rel')).toBe('noopener noreferrer')
+        expect(parentAlbum.find('em').text()).toBe('OCCULTATION')
+        expect(result.aboutLinks).toContainEqual({
+            url: 'https://label.bandcamp.com/album/occultation',
+            text: 'OCCULTATION',
+        })
+    })
+
+    it('keeps absolute links and resolves other relative credits links against the release page', async () => {
+        const result = await new BandcampApiBackendService().scrapeTralbumInfo(releaseUrl)
+        const $ = load(result.about)
+
+        expect(
+            $('a')
+                .map((_, link) => $(link).attr('href'))
+                .get(),
+        ).toEqual([
+            'https://artist.example.com/',
+            'https://label.bandcamp.com/album/occultation',
+            'https://label.bandcamp.com/album/another-release',
+        ])
+        for (const link of $('a').toArray()) {
+            expect($(link).attr('target')).toBe('_blank')
+            expect($(link).attr('rel')).toBe('noopener noreferrer')
+        }
     })
 })
