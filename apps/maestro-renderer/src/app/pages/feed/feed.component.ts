@@ -6,16 +6,38 @@ import {
     ElementRef,
     HostListener,
     inject,
+    Signal,
     signal,
     viewChildren,
 } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
-import { assertUnreachable, HydratedFeedItem, resolveFeedSettings } from '@release-maestro/core'
+import {
+    assertUnreachable,
+    HydratedFeedItem,
+    resolveFeedSettings,
+    ScrapedLinkMetadata,
+} from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
-import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
+import {
+    catchError,
+    combineLatestWith,
+    concatMap,
+    distinct,
+    filter,
+    from,
+    fromEvent,
+    map,
+    mergeMap,
+    mergeScan,
+    mergeWith,
+    of,
+    scan,
+    startWith,
+    Subject,
+} from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { SettingsService } from '../../core/settings/settings.service'
@@ -164,6 +186,48 @@ export class FeedComponent {
             ),
         ),
         { initialValue: null },
+    )
+
+    /**
+     * Link previews for loaded releases, keyed by URL. They load after the releases render, one
+     * release at a time in feed order, so the first release fills in before later ones are fetched.
+     * Each URL is requested once per visit; the backend caches previews across visits.
+     */
+    readonly linkPreviews: Signal<Record<string, ScrapedLinkMetadata>> = toSignal(
+        toObservable(this.feedState).pipe(
+            mergeMap(state => from(state?.items ?? [])),
+            distinct(item => item.id),
+            scan(
+                (
+                    { requested }: { requested: ReadonlySet<string>; urls: string[] },
+                    item: HydratedFeedItem,
+                ) => {
+                    const urls = [...new Set(item.data.links.map(link => link.url))].filter(
+                        url => !requested.has(url),
+                    )
+                    return { requested: new Set([...requested, ...urls]), urls }
+                },
+                { requested: new Set<string>(), urls: [] },
+            ),
+            map(({ urls }) => urls),
+            filter(urls => urls.length > 0),
+            concatMap(urls =>
+                from(this.feedService.loadLinkPreviews(urls)).pipe(
+                    catchError((error: unknown) => {
+                        console.warn('Failed to load link previews', urls, error)
+                        return of({})
+                    }),
+                ),
+            ),
+            scan(
+                (
+                    previews: Record<string, ScrapedLinkMetadata>,
+                    batch: Record<string, ScrapedLinkMetadata>,
+                ) => ({ ...previews, ...batch }),
+                {},
+            ),
+        ),
+        { initialValue: {} },
     )
 
     @HostListener('document:keydown.Shift.ArrowUp', ['$event'])

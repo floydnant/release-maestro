@@ -7,7 +7,6 @@ import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.serv
 import { BandcampApiFailedToFetchTralbumException } from '../bandcamp/bandcamp-api.exceptions'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { SettingsBackendService } from '../settings.backend.service'
-import { WebScrapingService } from '../web-scraping/web-scraping.service'
 import { FeedBackendRepository } from './feed.backend.repository'
 import { FeedBackendService } from './feed.backend.service'
 
@@ -29,7 +28,6 @@ describe('feed hydration playable-track filter', () => {
         service = new FeedBackendService(
             fromPartial<EmailBackendRepository>({}),
             fromPartial<BandcampApiBackendService>({ scrapeTralbumInfo: scrape }),
-            fromPartial<WebScrapingService>({ getLinkMetaDataBatch: jest.fn().mockResolvedValue({}) }),
             repository,
             settings,
         )

@@ -74,17 +74,18 @@ const retryAfterDelay = (header: string | null): number | null => {
  * Routes web pages and every redirect. Known Bandcamp requests share one gate.
  * Feed and import callers identify known Bandcamp releases, including custom domains. Their
  * redirects retain that ownership. Preview callers use Bandcamp hostnames and learned custom domains.
- * Imports may wait through cooldowns; the interactive feed fails fast. Optional Bandcamp previews
- * use cached pages only, preserving request capacity for release metadata. Other websites retain
+ * Imports may wait through cooldowns; the interactive feed and previews fail fast. Bandcamp previews
+ * enter the shared gate one at a time, so at most one can queue ahead of release metadata. Other websites retain
  * a five-second budget across redirects. Unknown custom domains remain outside sites until a
  * release lookup identifies them as Bandcamp.
  *
  * Bandcamp requests start one second apart, including body reads in a 15-second timeout.
- * Imports retry 429 twice and wait at most a minute per cooldown. Successful Bandcamp HTML stays
+ * Imports retry 429 twice and wait at most a minute per cooldown. Successful Bandcamp release HTML stays
  * cached for five minutes, bounded by 20 pages and 8 MiB measured as UTF-16 strings.
  */
 export class BandcampHttpClient {
     private queue: Promise<void> = Promise.resolve()
+    private previewQueue: Promise<void> = Promise.resolve()
     private nextRequestAt = 0
     private cooldownUntil = 0
     private consecutiveRateLimits = 0
@@ -98,20 +99,21 @@ export class BandcampHttpClient {
     ): Promise<Page> {
         signal?.throwIfAborted()
         const originalUrl = url
-        const signals = signal ? [signal] : []
-        if (purpose === 'preview') signals.push(AbortSignal.timeout(PREVIEW_TIMEOUT_MS))
-        const requestSignal = AbortSignal.any(signals)
+        const callerSignal = signal ?? AbortSignal.any([])
+        const previewDeadline = purpose === 'preview' ? AbortSignal.timeout(PREVIEW_TIMEOUT_MS) : null
         let retries = purpose === 'import' ? MAX_RATE_LIMIT_RETRIES : 0
         let redirects = 0
         let bandcamp = purpose !== 'preview'
         for (;;) {
-            requestSignal.throwIfAborted()
+            callerSignal.throwIfAborted()
             const cached = this.cachedPage(url)
             if (cached) return cached
             const hostname = new URL(url).hostname
             bandcamp ||= isBandcampHostname(hostname) || this.knownBandcampHosts.has(hostname)
             if (bandcamp && !isBandcampHostname(hostname)) this.knownBandcampHosts.add(hostname)
-            if (bandcamp && purpose === 'preview') throw new Error('No cached Bandcamp link preview')
+            const requestSignal =
+                !bandcamp && previewDeadline ? AbortSignal.any([callerSignal, previewDeadline]) : callerSignal
+            requestSignal.throwIfAborted()
             if (bandcamp && this.cooldownUntil > Date.now()) {
                 const delay = this.cooldownUntil - Date.now()
                 if (purpose !== 'import' || delay > MAX_IMPORT_WAIT_MS)
@@ -123,13 +125,7 @@ export class BandcampHttpClient {
             let result: PageResult
             try {
                 if (bandcamp) {
-                    const requestUrl = url
-                    const request = this.queue.then(() => this.requestBandcampPage(requestUrl, requestSignal))
-                    // A failed or cancelled caller must not poison the queue.
-                    this.queue = request.then(
-                        () => undefined,
-                        () => undefined,
-                    )
+                    const request = this.queueBandcampPage(url, requestSignal, purpose)
                     result = await abortable(request, requestSignal)
                 } else {
                     result = await this.fetchPage(url, requestSignal, false)
@@ -146,6 +142,31 @@ export class BandcampHttpClient {
                 )
             url = result.url
         }
+    }
+
+    private queueBandcampPage(
+        url: string,
+        signal: AbortSignal,
+        purpose: BandcampRequestPurpose,
+    ): Promise<PageResult> {
+        const enqueue = () => {
+            const request = this.queue.then(() =>
+                this.requestBandcampPage(url, signal, purpose !== 'preview'),
+            )
+            // A failed or cancelled caller must not poison either queue.
+            this.queue = request.then(
+                () => undefined,
+                () => undefined,
+            )
+            return request
+        }
+        if (purpose !== 'preview') return enqueue()
+        const request = this.previewQueue.then(enqueue)
+        this.previewQueue = request.then(
+            () => undefined,
+            () => undefined,
+        )
+        return request
     }
 
     private cachedPage(url: string): Page | null {
@@ -176,7 +197,11 @@ export class BandcampHttpClient {
         this.cachedHtmlBytes += bytes
     }
 
-    private async requestBandcampPage(url: string, signal: AbortSignal): Promise<PageResult> {
+    private async requestBandcampPage(
+        url: string,
+        signal: AbortSignal,
+        retainPage: boolean,
+    ): Promise<PageResult> {
         signal.throwIfAborted()
         // A queued lookup can reuse a page that another caller just fetched.
         const cached = this.cachedPage(url)
@@ -186,10 +211,15 @@ export class BandcampHttpClient {
         if (delay > 0) await wait(delay, signal)
         signal.throwIfAborted()
         this.nextRequestAt = Date.now() + REQUEST_INTERVAL_MS
-        return this.fetchPage(url, signal, true)
+        return this.fetchPage(url, signal, true, retainPage)
     }
 
-    private async fetchPage(url: string, signal: AbortSignal, bandcamp: boolean): Promise<PageResult> {
+    private async fetchPage(
+        url: string,
+        signal: AbortSignal,
+        bandcamp: boolean,
+        retainPage = false,
+    ): Promise<PageResult> {
         const requestSignal = AbortSignal.any([
             signal,
             AbortSignal.timeout(bandcamp ? REQUEST_TIMEOUT_MS : PREVIEW_TIMEOUT_MS),
@@ -216,7 +246,7 @@ export class BandcampHttpClient {
             if (!response.ok) throw new BandcampApiFailedToFetchTralbumException(url, response.status)
             const page = { url: response.url || url, html: await response.text() }
             if (bandcamp) {
-                this.cachePage(url, page)
+                if (retainPage) this.cachePage(url, page)
                 this.consecutiveRateLimits = 0
             }
             return { kind: 'page', page }

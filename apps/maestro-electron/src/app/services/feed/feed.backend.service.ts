@@ -27,7 +27,6 @@ import {
     HydratedFeedItem,
     isTruthy,
     assertUnreachable,
-    isUsefulUrlFromBandcampEmail,
     mapBandcampReleaseFeedItemToHydratedFeedItem,
     resolveFeedSettings,
     mergeBandcampPurchases,
@@ -40,7 +39,6 @@ import {
 } from '../bandcamp/bandcamp-api.exceptions'
 import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { EmailBackendRepository } from '../email/email.backend.repository'
-import { WebScrapingService } from '../web-scraping/web-scraping.service'
 import { SettingsBackendService } from '../settings.backend.service'
 import { FeedBackendRepository } from './feed.backend.repository'
 
@@ -89,7 +87,6 @@ export class FeedBackendService {
     constructor(
         private emailRepo: EmailBackendRepository,
         private bandcampApiService: BandcampApiBackendService,
-        private webScrapingService: WebScrapingService,
         private feedBackendRepository: FeedBackendRepository,
         private settingsService: SettingsBackendService,
     ) {}
@@ -304,27 +301,13 @@ export class FeedBackendService {
 
     // @TODO: error handling
     async hydrateBandcampFeedItem(item: BandcampFeedItem): Promise<HydratedBandcampReleaseFeedItem> {
-        const sourceLinks =
-            item.source.type == 'EMAIL.BANDCAMP_NEW_RELEASE'
-                ? [...new Set(item.source.links.filter(isUsefulUrlFromBandcampEmail))]
-                : null
-
         if (!item.data.tralbumUrl) {
             console.warn('No tralbum link found:', item)
-
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(
-                item,
-                null,
-                sourceLinks &&
-                    (await this.webScrapingService.getLinkMetaDataBatch(sourceLinks).catch(err => {
-                        console.error('Failed to scrape links', err)
-                        return null
-                    })),
-                null,
-            )
+            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null)
         } else {
-            const [scrapedData, linkMetadataMap] = await Promise.all([
-                this.bandcampApiService.scrapeTralbumInfo(item.data.tralbumUrl).catch(error => {
+            const scrapedData = await this.bandcampApiService
+                .scrapeTralbumInfo(item.data.tralbumUrl)
+                .catch(error => {
                     if (
                         error instanceof BandcampApiFailedToFetchTralbumException ||
                         error instanceof BandcampApiRateLimitedException ||
@@ -335,23 +318,12 @@ export class FeedBackendService {
                     }
                     console.error('Failed to load tralbum:', item.data.tralbumUrl, error)
                     throw error
-                }),
-                sourceLinks &&
-                    (await this.webScrapingService.getLinkMetaDataBatch(sourceLinks).catch(err => {
-                        console.error('Failed to scrape links', err)
-                        return null
-                    })),
-            ])
+                })
 
             if ('isError' in scrapedData)
-                return mapBandcampReleaseFeedItemToHydratedFeedItem(
-                    item,
-                    null,
-                    linkMetadataMap,
-                    scrapedData.error,
-                )
+                return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, scrapedData.error)
 
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedData, linkMetadataMap, null)
+            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedData, null, null)
         }
     }
 
