@@ -33,19 +33,19 @@ const UNPLAYABLE_RELEASE_RECHECK_MS = 1000 * 60 * 5
 const MAX_UNPLAYABLE_RELEASE_CHECKS = 1000
 
 const mapBandcampEmailToFeedItems = (email: BandcampEmailFeedSourceItem): BandcampFeedItem[] => {
-    let releaseUrls: string[]
+    let tralbumUrls: string[]
     switch (email.type) {
         case 'EMAIL.BANDCAMP_NEW_RELEASE':
-            releaseUrls = email.releaseUrl ? [email.releaseUrl] : []
+            tralbumUrls = email.releaseUrl ? [email.releaseUrl] : []
             break
         case 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC':
-            releaseUrls = email.tralbumUrls
+            tralbumUrls = email.tralbumUrls
             break
         default:
             return assertUnreachable(email, 'Unhandled Bandcamp email type:')
     }
 
-    return releaseUrls.map(releaseUrl => ({
+    return tralbumUrls.map(releaseUrl => ({
         id: crypto.randomUUID(),
         type: 'BANDCAMP.TRALBUM',
         dedupeIdentifier: releaseUrl,

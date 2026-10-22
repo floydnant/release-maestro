@@ -14,7 +14,7 @@ const validateEmail = (data: unknown): Email | null => {
 }
 
 /** Mail exports the raw MIME source, including transfer-encoded HTML. */
-const parseAppleMailHtml = (source: string): string => {
+const decodeAppleMailHtml = (source: string): string => {
     const lines = source.replace(/\r\n/g, '\n').split('\n')
     const logicalLines: { text: string; start: number }[] = []
     lines.forEach((line, start) => {
@@ -33,10 +33,10 @@ const parseAppleMailHtml = (source: string): string => {
     while (headersStart > 0 && lines[headersStart - 1] !== '') headersStart--
     const headersEnd = lines.findIndex((line, index) => index > htmlHeaderIndex && line === '')
     if (headersEnd === -1) throw new Error('Incomplete HTML MIME headers')
-    const headers = lines
-        .slice(headersStart, headersEnd)
+    const headers = logicalLines
+        .filter(line => line.start >= headersStart && line.start < headersEnd)
+        .map(line => line.text)
         .join('\n')
-        .replace(/\n[ \t]+/g, ' ')
     const boundary = lines
         .slice(0, htmlHeaderIndex)
         .reverse()
@@ -54,6 +54,7 @@ const parseAppleMailHtml = (source: string): string => {
         return new TextDecoder(charset).decode(Buffer.from(body, 'base64')).trim()
     }
     if (encoding === 'quoted-printable') {
+        // Latin-1 preserves each decoded =XX byte until TextDecoder applies the MIME charset.
         const bytes = Buffer.from(
             body
                 .replace(/=\n/g, '')
@@ -73,7 +74,7 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
         '==========================================\n==========================================',
     )
     data.plainBody = plainTextBody?.trim() || ''
-    data.htmlBody = parseAppleMailHtml(htmlFileContents)
+    data.htmlBody = decodeAppleMailHtml(htmlFileContents)
 
     for (const line of frontMatter?.trim().split('\n') || []) {
         const key = line.match(/^(\w+)+: /)?.[1]
