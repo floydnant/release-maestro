@@ -8,6 +8,13 @@ describe('BandcampHttpClient', () => {
     let client: BandcampHttpClient
     let fetchMock: jest.SpiedFunction<typeof fetch>
 
+    const mockSignalTimeouts = () =>
+        jest.spyOn(AbortSignal, 'timeout').mockImplementation(delay => {
+            const controller = new AbortController()
+            setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), delay)
+            return controller.signal
+        })
+
     beforeEach(() => {
         jest.useFakeTimers({ now: new Date('2026-10-22T10:00:00Z') })
         client = new BandcampHttpClient()
@@ -181,18 +188,61 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
-    it('answers uncached Bandcamp previews immediately without retaining a queued request', async () => {
+    it('keeps a backlog of Bandcamp previews behind at most one shared queue slot', async () => {
+        mockSignalTimeouts()
         let finish: (response: Response) => void = () => {}
         fetchMock.mockImplementationOnce(() => new Promise(resolve => (finish = resolve)))
         const release = client.get(firstUrl)
-        await expect(client.get(secondUrl, { purpose: 'preview' })).rejects.toThrow(
-            'No cached Bandcamp link preview',
+        const previews = Array.from({ length: 4 }, (_, index) =>
+            client.get(`https://preview.bandcamp.com/album/${index}`, { purpose: 'preview' }),
         )
         await jest.advanceTimersByTimeAsync(0)
+        const feed = client.get(secondUrl)
+        const imported = client.get(firstUrl + '-import', { purpose: 'import' })
         finish(new Response('OK'))
-        await release
-        await jest.advanceTimersByTimeAsync(5000)
-        expect(fetchMock).toHaveBeenCalledTimes(1)
+        await jest.advanceTimersByTimeAsync(6000)
+        await Promise.all([release, feed, imported, ...previews])
+        expect(fetchMock.mock.calls.slice(0, 4).map(([url]) => url)).toEqual([
+            firstUrl,
+            'https://preview.bandcamp.com/album/0',
+            secondUrl,
+            firstUrl + '-import',
+        ])
+        expect(fetchMock).toHaveBeenCalledTimes(7)
+    })
+
+    it('does not let preview HTML evict cached release pages', async () => {
+        await client.get(firstUrl)
+        const preview = client.get(secondUrl, { purpose: 'preview' })
+        await jest.advanceTimersByTimeAsync(1000)
+        await preview
+        const again = client.get(secondUrl, { purpose: 'preview' })
+        await jest.advanceTimersByTimeAsync(1000)
+        await again
+        await client.get(firstUrl)
+        expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([firstUrl, secondUrl, secondUrl])
+    })
+
+    it('does not make outside previews wait for a Bandcamp preview', async () => {
+        let finish: (response: Response) => void = () => {}
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => (finish = resolve)))
+        const bandcamp = client.get(firstUrl, { purpose: 'preview' })
+        await jest.advanceTimersByTimeAsync(0)
+        await expect(client.get('https://artist.example/', { purpose: 'preview' })).resolves.toMatchObject({
+            html: 'OK',
+        })
+        finish(new Response('OK'))
+        await bandcamp
+    })
+
+    it('lets later previews run after a failed Bandcamp preview', async () => {
+        fetchMock.mockRejectedValueOnce(new TypeError('Offline'))
+        const failed = client.get(firstUrl, { purpose: 'preview' }).catch(error => error)
+        const next = client.get(secondUrl, { purpose: 'preview' })
+        await jest.advanceTimersByTimeAsync(1000)
+        await expect(failed).resolves.toBeInstanceOf(FetchFailedException)
+        await expect(next).resolves.toMatchObject({ html: 'OK' })
+        expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
     it('caches Bandcamp HTML but does not retain outside pages', async () => {
@@ -251,11 +301,7 @@ describe('BandcampHttpClient', () => {
     })
 
     it('wraps a body timeout as a retryable network failure and releases the queue', async () => {
-        jest.spyOn(AbortSignal, 'timeout').mockImplementation(delay => {
-            const controller = new AbortController()
-            setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), delay)
-            return controller.signal
-        })
+        mockSignalTimeouts()
         fetchMock.mockImplementationOnce(
             async (_url, init) =>
                 new Response(
@@ -289,9 +335,9 @@ describe('BandcampHttpClient', () => {
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 429 }))
         await expect(client.get(firstUrl)).rejects.toBeInstanceOf(BandcampApiRateLimitedException)
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: secondUrl } }))
-        await expect(client.get('https://artist.example/music', { purpose: 'preview' })).rejects.toThrow(
-            'No cached Bandcamp link preview',
-        )
+        await expect(
+            client.get('https://artist.example/music', { purpose: 'preview' }),
+        ).rejects.toBeInstanceOf(BandcampApiRateLimitedException)
         expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([firstUrl, 'https://artist.example/music'])
         expect(fetchMock.mock.calls.every(([_url, init]) => init?.redirect === 'manual')).toBe(true)
     })
@@ -351,18 +397,16 @@ describe('BandcampHttpClient', () => {
         await jest.advanceTimersByTimeAsync(2000)
         await expect(result).resolves.toMatchObject({ url: customUrl, html: 'OK' })
         await jest.advanceTimersByTimeAsync(5 * 60_000)
-        await expect(client.get(customUrl, { purpose: 'preview' })).rejects.toThrow(
-            'No cached Bandcamp link preview',
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 429 }))
+        await expect(client.get(secondUrl)).rejects.toBeInstanceOf(BandcampApiRateLimitedException)
+        await expect(client.get(customUrl, { purpose: 'preview' })).rejects.toBeInstanceOf(
+            BandcampApiRateLimitedException,
         )
-        expect(fetchMock).toHaveBeenCalledTimes(2)
+        expect(fetchMock).toHaveBeenCalledTimes(3)
     })
 
     it('uses one five-second budget across external preview redirects', async () => {
-        jest.spyOn(AbortSignal, 'timeout').mockImplementation(delay => {
-            const controller = new AbortController()
-            setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), delay)
-            return controller.signal
-        })
+        mockSignalTimeouts()
         fetchMock.mockImplementation(async (_url, init) => {
             const signal = init?.signal
             return new Promise((resolve, reject) => {
@@ -384,6 +428,41 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2)
         await jest.advanceTimersByTimeAsync(1)
         await expect(preview).resolves.toMatchObject({ name: 'TimeoutError' })
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('uses the Bandcamp budget after an outside preview redirects to Bandcamp', async () => {
+        mockSignalTimeouts()
+        fetchMock.mockImplementation(async (url, init) => {
+            const bandcamp = url === firstUrl
+            return new Promise((resolve, reject) => {
+                const signal = init?.signal
+                const onAbort = () => {
+                    clearTimeout(timeout)
+                    reject(signal?.reason)
+                }
+                const timeout = setTimeout(
+                    () => {
+                        signal?.removeEventListener('abort', onAbort)
+                        resolve(
+                            bandcamp
+                                ? new Response('Bandcamp page')
+                                : new Response(null, {
+                                      status: 302,
+                                      headers: { Location: firstUrl },
+                                  }),
+                        )
+                    },
+                    bandcamp ? 6000 : 4000,
+                )
+                signal?.addEventListener('abort', onAbort, { once: true })
+            })
+        })
+        const preview = client
+            .get('https://artist.example/music', { purpose: 'preview' })
+            .catch(error => error)
+        await jest.advanceTimersByTimeAsync(10_000)
+        await expect(preview).resolves.toMatchObject({ html: 'Bandcamp page' })
         expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 })
