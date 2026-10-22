@@ -296,6 +296,24 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock.mock.calls.every(([_url, init]) => init?.redirect === 'manual')).toBe(true)
     })
 
+    it('identifies the requested release and last redirect when the redirect limit is reached', async () => {
+        let redirect = 0
+        fetchMock.mockImplementation(
+            async () =>
+                new Response(null, { status: 302, headers: { Location: `/track/redirect-${++redirect}` } }),
+        )
+        const result = client.get(firstUrl, { purpose: 'import' }).catch(error => error)
+
+        await jest.advanceTimersByTimeAsync(10_000)
+
+        await expect(result).resolves.toEqual(
+            new Error(
+                `Too many page redirects for ${firstUrl} (last redirect: https://one.bandcamp.com/track/redirect-10 -> https://one.bandcamp.com/track/redirect-11)`,
+            ),
+        )
+        expect(fetchMock).toHaveBeenCalledTimes(11)
+    })
+
     it('updates the cooldown when a custom-domain release redirects to a rate-limited Bandcamp page', async () => {
         fetchMock
             .mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: firstUrl } }))
