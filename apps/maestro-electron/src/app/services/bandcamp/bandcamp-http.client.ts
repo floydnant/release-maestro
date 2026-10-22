@@ -97,6 +97,7 @@ export class BandcampHttpClient {
         { signal, purpose = 'feed' }: { signal?: AbortSignal; purpose?: BandcampRequestPurpose } = {},
     ): Promise<Page> {
         signal?.throwIfAborted()
+        const originalUrl = url
         const signals = signal ? [signal] : []
         if (purpose === 'preview') signals.push(AbortSignal.timeout(PREVIEW_TIMEOUT_MS))
         const requestSignal = AbortSignal.any(signals)
@@ -139,7 +140,10 @@ export class BandcampHttpClient {
             }
             if (result.kind === 'cooldown') continue
             if (result.kind === 'page') return result.page
-            if (++redirects > MAX_REDIRECTS) throw new Error('Too many page redirects')
+            if (++redirects > MAX_REDIRECTS)
+                throw new Error(
+                    `Too many page redirects for ${originalUrl} (last redirect: ${url} -> ${result.url})`,
+                )
             url = result.url
         }
     }
