@@ -1,17 +1,13 @@
-import bandcampFetch, { Artist, Label } from 'bandcamp-fetch'
 import { CheerioAPI, load as cheerioLoad } from 'cheerio'
 import {
-    FetchFailedException,
     AttributeTralbumData,
     BandData,
     ScrapedTralbumInfo,
     tralbumDataAttrSchema,
     normalizeBandcampReleaseUrl,
 } from '@release-maestro/core'
-import {
-    BandcampApiFailedToFetchTralbumException,
-    BandcampApiMalformedTralbumDataException,
-} from './bandcamp-api.exceptions'
+import { BandcampApiMalformedTralbumDataException } from './bandcamp-api.exceptions'
+import { BandcampHttpClient, BandcampRequestPurpose } from './bandcamp-http.client'
 
 const parseTralbumData = ($: CheerioAPI): AttributeTralbumData => {
     const tralbumJson = $('[data-tralbum]').attr('data-tralbum')
@@ -49,28 +45,15 @@ const parseBandData = ($: CheerioAPI): BandData | null => {
 }
 
 export class BandcampApiBackendService {
-    async getBand(url: string): Promise<Label | Artist> {
-        return await bandcampFetch.band.getInfo({ bandUrl: url })
-    }
+    constructor(private readonly http: BandcampHttpClient) {}
 
-    async scrapeTralbumInfo(url: string, signal?: AbortSignal): Promise<ScrapedTralbumInfo> {
-        const result = await fetch(url, { signal }).catch(err => {
-            if (err instanceof Error) {
-                throw new FetchFailedException(
-                    'Failed to fetch tralbum',
-                    url,
-                    err,
-                    'Check your internet connection and retry.',
-                )
-            }
-            throw err
-        })
-        if (!result.ok) {
-            throw new BandcampApiFailedToFetchTralbumException(url, result.status)
-        }
-
-        const html = await result.text()
-        const $ = cheerioLoad(html)
+    async scrapeTralbumInfo(
+        url: string,
+        signal?: AbortSignal,
+        purpose: Exclude<BandcampRequestPurpose, 'preview'> = 'feed',
+    ): Promise<ScrapedTralbumInfo> {
+        const result = await this.http.get(url, { signal, purpose })
+        const $ = cheerioLoad(result.html)
 
         const artworkUrl = $('#tralbumArt img').attr('src') || null
         let tralbumData: AttributeTralbumData | null = null
