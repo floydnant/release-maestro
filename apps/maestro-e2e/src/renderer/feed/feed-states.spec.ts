@@ -127,7 +127,7 @@ test.describe('release feed scenario states', () => {
         await expect(page.getByRole('tooltip')).toHaveText(label)
     })
 
-    test('keeps a generic label for older fan purchases without buyer names', async ({ page }) => {
+    test('shows a generic label when no fan names were parsed from the email', async ({ page }) => {
         const release = createHydratedRelease({ sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' })
         await createRendererScenario(page, scenarioBuilder().feed([release]).build())
 

@@ -78,19 +78,20 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
         })
     })
 
-    it('hydrates older fan purchases that were stored without buyer attribution', () => {
-        const oldItem: BandcampFeedItem = {
+    it('hydrates a fan purchase when no fan names were parsed from the email', () => {
+        const unattributedItem: BandcampFeedItem = {
             ...fansBoughtMusicFeedItem,
             source: {
                 type: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
-                messageId: 'older-fan-email',
+                messageId: 'unattributed-fan-email',
                 dateReceived: '2026-10-01T21:40:12Z',
                 isRead: false,
                 tralbumUrls: [fansBoughtMusicFeedItem.data.tralbumUrl],
+                purchases: [],
             },
         }
 
-        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(oldItem, null, null, null)
+        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(unattributedItem, null, null, null)
 
         expect(result.sourceType).toBe('EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC')
         expect(result.data.fanNames).toEqual([])
