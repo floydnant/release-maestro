@@ -36,7 +36,7 @@ type ScanIndicatorView =
           discovered: number
           readDone: number
           readTotal: number
-          refreshingMetadata: boolean
+          refreshTotal: number
           failedFiles: number
       }
     | {
@@ -301,7 +301,7 @@ export class AppComponent {
             discovered: status.discovered,
             readDone: status.readDone,
             readTotal: status.readTotal,
-            refreshingMetadata: status.refreshTotal > 0,
+            refreshTotal: status.refreshTotal,
             failedFiles: status.failedFiles,
         }
         return {

@@ -56,7 +56,8 @@
                             Discovering files… {{ scanStatus.discovered }} found
                         } @else {
                             @if (scanStatus.refreshTotal > 0) {
-                                Refreshing metadata after app update.
+                                Refreshing metadata for {{ scanStatus.refreshTotal }}
+                                {{ scanStatus.refreshTotal === 1 ? 'track' : 'tracks' }} after app update.
                             }
                             Reading tracks… {{ scanStatus.readDone }}/{{ scanStatus.readTotal }}
                         }

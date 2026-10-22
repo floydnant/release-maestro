@@ -157,7 +157,7 @@ test.describe('startup scan summary', () => {
             })
             .build()
         const controller = await createRendererScenario(page, scenario, '/home')
-        await expect(page.locator('.scan-indicator')).toContainText('Refreshing metadata')
+        await expect(page.getByText('Refreshing metadata for 3 tracks after app update.')).toBeVisible()
         await controller.emit('library:scan-status', { status: completed, newAlbums: [] })
         const summary = page.getByRole('status', { name: 'Library scan' })
         await expect(summary).toHaveText('Metadata refreshed')

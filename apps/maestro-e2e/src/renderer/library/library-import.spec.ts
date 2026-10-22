@@ -88,7 +88,15 @@ test('a reachable folder with no supported files still shows the empty-folder re
 
 test('the import dropzone and counters keep their original emphasis', async ({ page }) => {
     const status: LibraryScanStatus = {
-        ...completedStatus({ discovered: 12, imported: 3, readTotal: 12, readsAttempted: 3 }),
+        ...completedStatus({
+            discovered: 12,
+            new: 11,
+            unchanged: 1,
+            imported: 3,
+            readTotal: 12,
+            readsAttempted: 3,
+        }),
+        refreshTotal: 1,
         phase: 'reading',
         finishedAt: null,
         terminal: null,
@@ -108,6 +116,7 @@ test('the import dropzone and counters keep their original emphasis', async ({ p
     await expect(page.getByText('/music', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByRole('heading', { name: 'Importing your library' })).toBeVisible()
+    await expect(page.getByText('Refreshing metadata for 1 track after app update.').last()).toBeVisible()
     await expect(page.getByLabel('Imported tracks')).toHaveText('3')
     // Counters are monospaced so their width holds steady while they count up.
     await expect(page.getByLabel('Imported tracks')).toHaveCSS('font-family', /monospace/)

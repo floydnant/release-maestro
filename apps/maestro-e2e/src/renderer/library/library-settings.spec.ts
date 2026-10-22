@@ -91,7 +91,8 @@ test.describe('library settings scenarios', () => {
             trigger: 'manual',
             phase: 'reading',
             finishedAt: null,
-            refreshTotal: 0,
+            refreshTotal: 8,
+            readTotal: 10,
             readDone: 1,
             terminal: null,
         }
@@ -104,7 +105,10 @@ test.describe('library settings scenarios', () => {
             .build()
         const controller = await createRendererScenario(page, scenario, '/settings/library-folders')
 
-        await expect(page.getByText('Reading tracks… 1/2')).toBeVisible()
+        await expect(page.getByText('Reading tracks… 1/10')).toBeVisible()
+        await expect(
+            page.getByText('Refreshing metadata for 8 tracks after app update.').last(),
+        ).toBeVisible()
         await expect(page.getByRole('button', { name: 'Rescan now' })).toBeDisabled()
         const cancel = page.getByRole('button', { name: 'Cancel scan' }).last()
         await cancel.focus()

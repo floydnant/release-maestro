@@ -120,7 +120,8 @@
                                 Discovering files… {{ status.discovered }} found so far
                             } @else if (status.phase === 'reading') {
                                 @if (status.refreshTotal > 0) {
-                                    Refreshing metadata after app update.
+                                    Refreshing metadata for {{ status.refreshTotal }}
+                                    {{ status.refreshTotal === 1 ? 'track' : 'tracks' }} after app update.
                                 }
                                 Reading tracks…
                                 <span class="font-mono">{{ status.readDone }} / {{ status.readTotal }}</span>
