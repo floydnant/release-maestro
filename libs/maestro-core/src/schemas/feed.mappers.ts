@@ -137,7 +137,7 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
     { data, source, ...item }: Extract<BandcampFeedItem, { type: 'BANDCAMP.TRALBUM' }>,
     tralbum: ScrapedTralbumInfo | null,
     linkMetadataMap: Record<string, ScrapedLinkMetadata | null> | null,
-    error: { userFacingMessage: string } | null,
+    error: { userFacingMessage: string; retryAt?: Date } | null,
 ): HydratedBandcampReleaseFeedItem {
     const newRelease = source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' ? source : null
     const sourceLinks = newRelease?.links ?? []
@@ -153,7 +153,12 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
     return {
         ...item,
         sourceType: source.type,
-        error: error?.userFacingMessage ? { message: error.userFacingMessage } : null,
+        error: error?.userFacingMessage
+            ? {
+                  message: error.userFacingMessage,
+                  ...(error.retryAt ? { retryAt: error.retryAt.getTime() } : {}),
+              }
+            : null,
         data: {
             releaseUrl: data.tralbumUrl,
             releaseDate: tralbum?.releaseDate ?? null,

@@ -1,10 +1,13 @@
-import { AppSettings, DEFAULT_FEED_SNOOZE_HOURS } from '@release-maestro/core'
+import { AppSettings, DEFAULT_FEED_SNOOZE_HOURS, FetchFailedException } from '@release-maestro/core'
 import { fromPartial } from '@total-typescript/shoehorn'
 import { createMigratedTestDatabase } from '../../../test/fixtures/database.fixture'
 import { bandcampFeedItem, scrapedRelease } from '../../../test/fixtures/feed.fixture'
 import { InMemoryStore } from '../../utils/persistent-store.util'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
-import { BandcampApiFailedToFetchTralbumException } from '../bandcamp/bandcamp-api.exceptions'
+import {
+    BandcampApiFailedToFetchTralbumException,
+    BandcampApiRedirectException,
+} from '../bandcamp/bandcamp-api.exceptions'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { SettingsBackendService } from '../settings.backend.service'
 import { FeedBackendRepository } from './feed.backend.repository'
@@ -27,7 +30,10 @@ describe('feed hydration playable-track filter', () => {
         scrape.mockReset().mockResolvedValue(scrapedRelease([]))
         service = new FeedBackendService(
             fromPartial<EmailBackendRepository>({}),
-            fromPartial<BandcampApiBackendService>({ scrapeTralbumInfo: scrape }),
+            fromPartial<BandcampApiBackendService>({
+                scrapeTralbumInfo: scrape,
+                holdFeedPriority: () => () => {},
+            }),
             repository,
             settings,
         )
@@ -172,6 +178,39 @@ describe('feed hydration playable-track filter', () => {
         await expect(service.loadFeed(0, 5)).resolves.toEqual([])
         settings.patchSettings({ feed: { hideUnplayableReleases: false } })
         expect((await service.loadFeed(0, 5)).map(item => item.id)).toEqual(['preorder'])
+    })
+
+    it.each([
+        new Error('Unexpected scraper failure'),
+        new BandcampApiRedirectException('https://test.bandcamp.com/album/broken', 'Too many page redirects'),
+        new FetchFailedException(
+            'Failed to fetch page',
+            'https://test.bandcamp.com/album/broken',
+            new TypeError('Offline'),
+            'Check your internet connection and retry.',
+        ),
+    ])('keeps other releases usable when one page fails: %s', async error => {
+        await seed('broken', 'playable')
+        scrape.mockImplementation(async url => {
+            if (url.endsWith('/broken')) throw error
+            return scrapedRelease(['https://audio.example/preview.mp3'])
+        })
+        const result = service.loadFeed(0, 2)
+        await expect(result).resolves.toHaveLength(2)
+        expect((await result).find(item => item.id === 'playable')?.data.tracks[0]?.streamUrl).toBe(
+            'https://audio.example/preview.mp3',
+        )
+        expect((await result).find(item => item.id === 'broken')?.error).not.toBeNull()
+    })
+
+    it('reloads requested items in place even after a view, without loading unrelated releases', async () => {
+        await seed('first', 'second')
+        await service.markFeedItemAsViewed('first', 'BANDCAMP.TRALBUM', false)
+        scrape.mockResolvedValue(scrapedRelease(['https://audio.example/preview.mp3']))
+        const result = await service.reloadFeedItems(['first'])
+        expect(result.map(item => item.id)).toEqual(['first'])
+        expect(scrape).toHaveBeenCalledTimes(1)
+        expect(scrape).toHaveBeenCalledWith('https://test.bandcamp.com/album/first')
     })
 
     it('keeps hydration errors visible when release playability is unknown', async () => {

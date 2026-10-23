@@ -116,9 +116,11 @@ processing failure stops the remaining export before the import reports its fina
 **Bandcamp request cooldown**:
 A temporary pause after Bandcamp rejects excessive requests. Imports and feed hydration share the
 same pause across Bandcamp pages. Imports can wait and retry; the feed reports unavailable data
-while retaining the release link and purchase attribution. Link previews share the same cooldown,
-so loading them cannot bypass a pause. Background imports and previews are paced; normal feed
-loading runs concurrently and does not wait behind background work.
+while retaining the release link and purchase attribution. Visible releases retry after the pause
+and keep their position in the feed. Link previews share the same cooldown, so loading them cannot
+bypass a pause. Background imports and previews yield while the feed hydrates and slow down after
+rate limiting. An import can remain paused until Bandcamp allows requests again; cancellation
+remains available. Feed loading runs concurrently and does not wait behind background work.
 
 **Link preview**:
 The title and favicon shown for a link from a notification. Previews load after the release appears
@@ -166,6 +168,10 @@ candidates until the visible page is filled or the eligible releases run out.
 The app remembers up to 1,000 releases confirmed unplayable for five minutes to avoid fetching them
 again on every scroll. Later hydration rechecks them after that interval. Disabling the filter
 bypasses the interval. Hydration errors stay visible because their track availability is unknown.
+One release's page failure does not prevent other releases from loading. Repeated redirect URLs end
+the page lookup immediately. A failed next page preserves the releases already loaded and their
+playback. Retrying hydration replaces only the failed release's details, without reopening the feed.
+Automatic retries cover the current release and the nearby releases being prefetched.
 _Avoid_: scraping — that names the implementation, not the behavior
 
 **Playable track**:
@@ -191,7 +197,8 @@ is ordered by event date, so a late import still lands in the right chronologica
 _Avoid_: date, timestamp, created at
 
 **Viewed**:
-A feed item the user has seen (`lastViewedAt`). Viewing is throttled — re-viewing within a few
+A successfully hydrated feed item the user has seen (`lastViewedAt`). Passing an error card does not
+mark it viewed. Viewing is throttled — re-viewing within a few
 minutes does not re-stamp it. An unviewed item is eligible for the feed, subject to the playable-track
 filter; a viewed one has left it unless
 it is snoozed.

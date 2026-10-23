@@ -2,6 +2,15 @@ import { Exception, USE_SAME_MESSAGE } from '@release-maestro/core'
 
 export class BandcampApiException extends Exception {}
 
+export class BandcampApiRedirectException extends BandcampApiException {
+    constructor(
+        public url: string,
+        message: string,
+    ) {
+        super(message, 'This page could not be opened because of a redirect problem.')
+    }
+}
+
 export class BandcampApiRateLimitedException extends BandcampApiException {
     constructor(
         public url: string,
