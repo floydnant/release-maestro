@@ -158,6 +158,25 @@ export class FeedBackendRepository {
         return items.length > 0
     }
 
+    /** Open windows may still address IDs merged into an album during the current app session. */
+    async getFeedItems(ids: string[]): Promise<FeedItemMaster[]> {
+        const requested = [...new Set(ids)].map(id => ({ id, resolvedId: this.resolveItemId(id) }))
+        const rows = await this.db.db
+            .select()
+            .from(feedItemsTable)
+            .where(
+                inArray(
+                    feedItemsTable.id,
+                    requested.map(item => item.resolvedId),
+                ),
+            )
+        const byId = new Map(rows.map(row => [row.id, feedItemMasterSchema.parse(row)]))
+        return requested.flatMap(({ id, resolvedId }) => {
+            const item = byId.get(resolvedId)
+            return item ? [{ ...item, id }] : []
+        })
+    }
+
     async countItemsIngestedAfterDate(date: Date): Promise<number> {
         const count_ = await this.db.db
             .select({ count: count(feedItemsTable.id) })
