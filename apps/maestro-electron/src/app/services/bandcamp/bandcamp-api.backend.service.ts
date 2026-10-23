@@ -47,6 +47,11 @@ const parseBandData = ($: CheerioAPI): BandData | null => {
 export class BandcampApiBackendService {
     constructor(private readonly http: BandcampHttpClient) {}
 
+    /** Covers a complete feed load, including database reads and parsing between HTTP requests. */
+    holdFeedPriority(): () => void {
+        return this.http.holdFeedPriority()
+    }
+
     async scrapeTralbumInfo(
         url: string,
         signal?: AbortSignal,

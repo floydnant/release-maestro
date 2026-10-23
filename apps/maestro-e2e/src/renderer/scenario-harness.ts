@@ -159,6 +159,7 @@ const defaultScenario = (): RendererScenario => ({
         'load-link-previews': { kind: 'resolve', value: {} },
         'has-feed': { kind: 'resolve', value: false },
         'mark-feed-item-viewed': { kind: 'resolve' },
+        'reload-feed-items': { kind: 'resolve', value: [] },
         'metadata:ping': { kind: 'resolve', value: { ok: true } },
         'metadata:read': { kind: 'resolve', value: null },
         'metadata:write': { kind: 'resolve' },

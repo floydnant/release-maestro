@@ -136,6 +136,9 @@ describe('FeedBackendRepository album purchases', () => {
             expect(history.every(entry => entry.feedItemId === 'track-0')).toBe(true)
 
             // An open window still holds track-1. Its exclusion and snooze follow the retained ID.
+            expect(await repository.getFeedItems(['track-1'])).toMatchObject([
+                { id: 'track-1', data: { tralbumUrl: albumUrl } },
+            ])
             expect(
                 await repository.listFeedItems({
                     index: 0,
