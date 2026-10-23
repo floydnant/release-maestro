@@ -26,30 +26,43 @@ describe('BandcampHttpClient', () => {
         jest.useRealTimers()
     })
 
-    it('spaces background requests across artist subdomains by one second', async () => {
+    it('spaces background requests across artist subdomains by three seconds', async () => {
         const requests = [firstUrl, secondUrl, firstUrl + '-third'].map(url =>
             client.get(url, { purpose: 'import' }),
         )
         await jest.advanceTimersByTimeAsync(0)
         expect(fetchMock).toHaveBeenCalledTimes(1)
-        await jest.advanceTimersByTimeAsync(999)
+        await jest.advanceTimersByTimeAsync(2999)
         expect(fetchMock).toHaveBeenCalledTimes(1)
         await jest.advanceTimersByTimeAsync(1)
         expect(fetchMock).toHaveBeenCalledTimes(2)
-        await jest.advanceTimersByTimeAsync(1000)
+        await jest.advanceTimersByTimeAsync(3000)
         await Promise.all(requests)
         expect(fetchMock).toHaveBeenCalledTimes(3)
     })
 
+    it('stops a repeated custom-domain redirect before requesting the same page again', async () => {
+        const customUrl = 'https://music.artist.example/album/first'
+        fetchMock.mockImplementation(
+            async url =>
+                new Response(null, {
+                    status: 302,
+                    headers: { Location: url === firstUrl ? customUrl : firstUrl },
+                }),
+        )
+        await expect(client.get(firstUrl)).rejects.toThrow()
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
     it.each([
-        ['seconds', '4', 4000],
-        ['HTTP date', 'Thu, 22 Oct 2026 10:00:04 GMT', 4000],
-        ['absent header', null, 30_000],
-        ['malformed header', 'later', 30_000],
-        ['negative seconds', '-1', 30_000],
-        ['fractional seconds', '1.5', 30_000],
-        ['zero seconds', '0', 1000],
-        ['past HTTP date', 'Thu, 22 Oct 2026 09:59:00 GMT', 1000],
+        ['seconds', '4', 6000],
+        ['HTTP date', 'Thu, 22 Oct 2026 10:00:04 GMT', 6000],
+        ['absent header', null, 32_000],
+        ['malformed header', 'later', 32_000],
+        ['negative seconds', '-1', 32_000],
+        ['fractional seconds', '1.5', 32_000],
+        ['zero seconds', '0', 3000],
+        ['past HTTP date', 'Thu, 22 Oct 2026 09:59:00 GMT', 3000],
     ])('retries using %s', async (_label, header, delay) => {
         fetchMock.mockResolvedValueOnce(
             new Response(null, { status: 429, headers: header === null ? {} : { 'Retry-After': header } }),
@@ -62,20 +75,23 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
-    it('bounds retries and preserves the increasing cooldown for subsequent callers', async () => {
+    it('keeps imports waiting through increasing cooldowns until cancellation', async () => {
         fetchMock.mockImplementation(async () => new Response(null, { status: 429 }))
-        const result = client.get(firstUrl, { purpose: 'import' }).catch(error => error)
-        await jest.advanceTimersByTimeAsync(30_000)
+        const controller = new AbortController()
+        const result = client
+            .get(firstUrl, { purpose: 'import', signal: controller.signal })
+            .catch(error => error)
+        await jest.advanceTimersByTimeAsync(32_000)
         expect(fetchMock).toHaveBeenCalledTimes(2)
-        await jest.advanceTimersByTimeAsync(60_000)
-        await expect(result).resolves.toBeInstanceOf(BandcampApiRateLimitedException)
+        await jest.advanceTimersByTimeAsync(62_000)
         expect(fetchMock).toHaveBeenCalledTimes(3)
-        // The last rejection asks callers to wait two minutes. Do not hold a UI request that long.
         await expect(client.get(secondUrl)).rejects.toBeInstanceOf(BandcampApiRateLimitedException)
         expect(fetchMock).toHaveBeenCalledTimes(3)
+        controller.abort()
+        await expect(result).resolves.toBe(controller.signal.reason)
         fetchMock.mockImplementation(async () => new Response('Recovered'))
         await jest.advanceTimersByTimeAsync(120_000)
-        await expect(client.get(secondUrl)).resolves.toMatchObject({ html: expect.any(String) })
+        await expect(client.get(secondUrl)).resolves.toMatchObject({ html: 'Recovered' })
     })
 
     it('honors a long Retry-After without waiting indefinitely or retrying early', async () => {
@@ -106,7 +122,7 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(1)
         const third = client.get(firstUrl + '-third', { purpose: 'import' })
         releaseFirst(new Response('OK'))
-        await jest.advanceTimersByTimeAsync(1000)
+        await jest.advanceTimersByTimeAsync(3000)
         await Promise.all([first, third])
         expect(fetchMock).toHaveBeenCalledTimes(2)
         expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([firstUrl, firstUrl + '-third'])
@@ -122,7 +138,7 @@ describe('BandcampHttpClient', () => {
         controller.abort()
         await expect(cancelled).resolves.toBe(controller.signal.reason)
         const next = client.get(secondUrl, { purpose: 'import' })
-        await jest.advanceTimersByTimeAsync(29_999)
+        await jest.advanceTimersByTimeAsync(31_999)
         expect(fetchMock).toHaveBeenCalledTimes(1)
         await jest.advanceTimersByTimeAsync(1)
         await expect(next).resolves.toMatchObject({ html: expect.any(String) })
@@ -164,6 +180,28 @@ describe('BandcampHttpClient', () => {
         await expect(client.get(firstUrl)).rejects.toBeInstanceOf(BandcampApiRateLimitedException)
         await expect(client.get(secondUrl)).rejects.toBeInstanceOf(BandcampApiRateLimitedException)
         expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('holds background work while foreground release hydration is active', async () => {
+        let finishBody: () => void = () => {}
+        fetchMock.mockResolvedValueOnce(
+            new Response(
+                new ReadableStream({
+                    start(controller) {
+                        finishBody = () => controller.close()
+                    },
+                }),
+            ),
+        )
+        const feed = client.get(firstUrl)
+        await jest.advanceTimersByTimeAsync(0)
+        const imported = client.get(secondUrl, { purpose: 'import' })
+        await jest.advanceTimersByTimeAsync(1000)
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        finishBody()
+        await jest.advanceTimersByTimeAsync(30_000)
+        await Promise.all([feed, imported])
+        expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
     it('loads the feed while an import is still reading a response body', async () => {
@@ -291,7 +329,7 @@ describe('BandcampHttpClient', () => {
         await expect(nextAttempt).resolves.toMatchObject({ retryAt: new Date(Date.now() + 60_000) })
     })
 
-    it('keeps an import retry paced when an older feed request receives a late 429', async () => {
+    it('reserves cooldown recovery for the feed before allowing an import retry', async () => {
         let releaseFirst: (response: Response) => void = () => {}
         fetchMock
             .mockImplementationOnce(() => new Promise(resolve => (releaseFirst = resolve)))
@@ -311,10 +349,13 @@ describe('BandcampHttpClient', () => {
         await jest.advanceTimersByTimeAsync(0)
         const feed = client.get(secondUrl).catch(error => error)
         releaseFirst(new Response(null, { status: 429, headers: { 'Retry-After': '1' } }))
-        await jest.advanceTimersByTimeAsync(3000)
+        await jest.advanceTimersByTimeAsync(33_999)
         await expect(feed).resolves.toBeInstanceOf(BandcampApiRateLimitedException)
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+        await jest.advanceTimersByTimeAsync(1)
         expect(fetchMock).toHaveBeenCalledTimes(3)
-        await jest.advanceTimersByTimeAsync(59_999)
+        await jest.advanceTimersByTimeAsync(2000)
+        await jest.advanceTimersByTimeAsync(61_999)
         expect(fetchMock).toHaveBeenCalledTimes(3)
         await jest.advanceTimersByTimeAsync(1)
         await expect(imported).resolves.toMatchObject({ html: 'OK' })
@@ -348,7 +389,7 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
-    it('keeps previews behind one background queue slot while the feed runs immediately', async () => {
+    it('prioritizes previews over imports while the feed runs immediately', async () => {
         mockSignalTimeouts()
         let finish: (response: Response) => void = () => {}
         fetchMock.mockImplementationOnce(() => new Promise(resolve => (finish = resolve)))
@@ -360,13 +401,13 @@ describe('BandcampHttpClient', () => {
         const feed = client.get(secondUrl)
         const imported = client.get(firstUrl + '-import', { purpose: 'import' })
         finish(new Response('OK'))
-        await jest.advanceTimersByTimeAsync(6000)
+        await jest.advanceTimersByTimeAsync(20_000)
         await Promise.all([release, feed, imported, ...previews])
         expect(fetchMock.mock.calls.slice(0, 4).map(([url]) => url)).toEqual([
             firstUrl,
             secondUrl,
             'https://preview.bandcamp.com/album/0',
-            firstUrl + '-import',
+            'https://preview.bandcamp.com/album/1',
         ])
         expect(fetchMock).toHaveBeenCalledTimes(7)
     })
@@ -374,13 +415,41 @@ describe('BandcampHttpClient', () => {
     it('does not let preview HTML evict cached release pages', async () => {
         await client.get(firstUrl)
         const preview = client.get(secondUrl, { purpose: 'preview' })
-        await jest.advanceTimersByTimeAsync(1000)
+        await jest.advanceTimersByTimeAsync(3000)
         await preview
         const again = client.get(secondUrl, { purpose: 'preview' })
-        await jest.advanceTimersByTimeAsync(1000)
+        await jest.advanceTimersByTimeAsync(3000)
         await again
         await client.get(firstUrl)
         expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([firstUrl, secondUrl, secondUrl])
+    })
+
+    it('protects cached feed pages from a background import scan', async () => {
+        const urls = Array.from({ length: 20 }, (_, index) => `${firstUrl}-${index}`)
+        await Promise.all(urls.map(url => client.get(url)))
+        const imported = client.get(secondUrl, { purpose: 'import' })
+        await jest.advanceTimersByTimeAsync(3000)
+        await imported
+        await client.get(urls[0] ?? firstUrl)
+        expect(fetchMock).toHaveBeenCalledTimes(21)
+    })
+
+    it('retains feed cache priority when an older import response finishes later', async () => {
+        let finishImport: (response: Response) => void = () => {}
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => (finishImport = resolve)))
+        const imported = client.get(firstUrl, { purpose: 'import' })
+        await jest.advanceTimersByTimeAsync(0)
+
+        await client.get(firstUrl)
+        await Promise.all(Array.from({ length: 19 }, (_, index) => client.get(`${firstUrl}-feed-${index}`)))
+        finishImport(new Response('OK'))
+        await imported
+
+        const nextImport = client.get(secondUrl, { purpose: 'import' })
+        await jest.advanceTimersByTimeAsync(3000)
+        await nextImport
+        await client.get(firstUrl)
+        expect(fetchMock).toHaveBeenCalledTimes(22)
     })
 
     it('does not make outside previews wait for a Bandcamp preview', async () => {
@@ -399,7 +468,7 @@ describe('BandcampHttpClient', () => {
         fetchMock.mockRejectedValueOnce(new TypeError('Offline'))
         const failed = client.get(firstUrl, { purpose: 'preview' }).catch(error => error)
         const next = client.get(secondUrl, { purpose: 'preview' })
-        await jest.advanceTimersByTimeAsync(1000)
+        await jest.advanceTimersByTimeAsync(3000)
         await expect(failed).resolves.toBeInstanceOf(FetchFailedException)
         await expect(next).resolves.toMatchObject({ html: 'OK' })
         expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -456,11 +525,12 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(1)
         await jest.advanceTimersByTimeAsync(1)
         await expect(first).resolves.toMatchObject({ html: 'Slow body' })
+        await jest.advanceTimersByTimeAsync(500)
         await second
         expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
-    it('wraps a body timeout as a retryable network failure and releases the queue', async () => {
+    it('wraps body timeouts as retryable failures without blocking other feed requests', async () => {
         mockSignalTimeouts()
         fetchMock.mockImplementationOnce(
             async (_url, init) =>
@@ -510,7 +580,7 @@ describe('BandcampHttpClient', () => {
         )
         const result = client.get(firstUrl, { purpose: 'import' }).catch(error => error)
 
-        await jest.advanceTimersByTimeAsync(10_000)
+        await jest.advanceTimersByTimeAsync(30_000)
 
         await expect(result).resolves.toEqual(
             new Error(
@@ -537,12 +607,12 @@ describe('BandcampHttpClient', () => {
             .mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: customUrl } }))
             .mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '4' } }))
         const result = client.get(firstUrl, { purpose: 'import' })
-        await jest.advanceTimersByTimeAsync(999)
+        await jest.advanceTimersByTimeAsync(2999)
         expect(fetchMock).toHaveBeenCalledTimes(1)
         await jest.advanceTimersByTimeAsync(1)
         expect(fetchMock).toHaveBeenCalledTimes(2)
         await expect(client.get(secondUrl)).rejects.toBeInstanceOf(BandcampApiRateLimitedException)
-        await jest.advanceTimersByTimeAsync(3999)
+        await jest.advanceTimersByTimeAsync(5999)
         expect(fetchMock).toHaveBeenCalledTimes(2)
         await jest.advanceTimersByTimeAsync(1)
         await expect(result).resolves.toMatchObject({ url: customUrl, html: 'OK' })
@@ -554,7 +624,7 @@ describe('BandcampHttpClient', () => {
         const customUrl = 'https://music.artist.example/album/first'
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '2' } }))
         const result = client.get(customUrl, { purpose: 'import' })
-        await jest.advanceTimersByTimeAsync(2000)
+        await jest.advanceTimersByTimeAsync(4000)
         await expect(result).resolves.toMatchObject({ url: customUrl, html: 'OK' })
         await jest.advanceTimersByTimeAsync(5 * 60_000)
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 429 }))

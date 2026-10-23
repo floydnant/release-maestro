@@ -33,9 +33,10 @@ import {
 } from '@release-maestro/core'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import {
+    BandcampApiException,
     BandcampApiFailedToFetchTralbumException,
     BandcampApiMalformedTralbumDataException,
-    BandcampApiRateLimitedException,
+    BandcampApiRedirectException,
 } from '../bandcamp/bandcamp-api.exceptions'
 import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { EmailBackendRepository } from '../email/email.backend.repository'
@@ -98,6 +99,7 @@ export class FeedBackendService {
                 return track.parentAlbumUrl ?? releaseUrl
             } catch (error) {
                 if (
+                    error instanceof BandcampApiRedirectException ||
                     error instanceof BandcampApiMalformedTralbumDataException ||
                     (error instanceof BandcampApiFailedToFetchTralbumException &&
                         [404, 410].includes(error.status))
@@ -308,15 +310,16 @@ export class FeedBackendService {
             const scrapedData = await this.bandcampApiService
                 .scrapeTralbumInfo(item.data.tralbumUrl)
                 .catch(error => {
-                    if (
-                        error instanceof BandcampApiFailedToFetchTralbumException ||
-                        error instanceof BandcampApiRateLimitedException ||
-                        error instanceof BandcampApiMalformedTralbumDataException
-                    ) {
+                    if (error instanceof BandcampApiException || error instanceof FetchFailedException) {
                         console.log(error)
                         return { isError: true as const, error }
                     }
                     console.error('Failed to load tralbum:', item.data.tralbumUrl, error)
+                    if (error instanceof Error && error.name !== 'AbortError')
+                        return {
+                            isError: true as const,
+                            error: new BandcampApiMalformedTralbumDataException(item.data.tralbumUrl, error),
+                        }
                     throw error
                 })
 
@@ -370,30 +373,46 @@ export class FeedBackendService {
     }
 
     async loadFeed(index: number, count: number, excludedIds: string[] = []): Promise<HydratedFeedItem[]> {
-        const { hideUnplayableReleases, snoozeHours } = resolveFeedSettings(
-            this.settingsService.getSettings().feed,
-        )
-        const items: HydratedFeedItem[] = []
-        const scannedIds = [...excludedIds]
-        // Hidden releases remain unviewed. Continue past them to fill the visible page.
-        while (items.length < count) {
-            const remaining = count - items.length
-            const candidates = await this.feedBackendRepository.listFeedItems({
-                index,
-                count: remaining,
-                excludedIds: scannedIds,
-                snoozeHours,
-            })
-            if (candidates.length === 0) break
-            items.push(...(await this.hydrateFeed(candidates, hideUnplayableReleases)))
-            scannedIds.push(...candidates.map(item => item.id))
-            if (candidates.length < remaining) break
+        const release = this.bandcampApiService.holdFeedPriority()
+        try {
+            const { hideUnplayableReleases, snoozeHours } = resolveFeedSettings(
+                this.settingsService.getSettings().feed,
+            )
+            const items: HydratedFeedItem[] = []
+            const scannedIds = [...excludedIds]
+            // Hidden releases remain unviewed. Continue past them to fill the visible page.
+            while (items.length < count) {
+                const remaining = count - items.length
+                const candidates = await this.feedBackendRepository.listFeedItems({
+                    index,
+                    count: remaining,
+                    excludedIds: scannedIds,
+                    snoozeHours,
+                })
+                if (candidates.length === 0) break
+                items.push(...(await this.hydrateFeed(candidates, hideUnplayableReleases)))
+                scannedIds.push(...candidates.map(item => item.id))
+                if (candidates.length < remaining) break
+            }
+            return items
+        } finally {
+            release()
         }
-        return items
     }
 
     async hasFeed(): Promise<boolean> {
         return await this.feedBackendRepository.hasFeedItems()
+    }
+
+    async reloadFeedItems(ids: string[]): Promise<HydratedFeedItem[]> {
+        const release = this.bandcampApiService.holdFeedPriority()
+        try {
+            const items = await this.feedBackendRepository.getFeedItems(ids)
+            // Retry the requested entries even if they are now viewed or previously looked unplayable.
+            return await this.hydrateFeed(items, false)
+        } finally {
+            release()
+        }
     }
 
     async markFeedItemAsViewed(id: string, feedItemType: HydratedFeedItem['type'], isSnoozed: boolean) {

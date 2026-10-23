@@ -26,6 +26,7 @@ import {
     BandcampApiFailedToFetchTralbumException,
     BandcampApiMalformedTralbumDataException,
     BandcampApiRateLimitedException,
+    BandcampApiRedirectException,
 } from '../bandcamp/bandcamp-api.exceptions'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { SettingsBackendService } from '../settings.backend.service'
@@ -93,7 +94,7 @@ describe('FeedBackendService email import', () => {
         }))
         service = new FeedBackendService(
             emailRepository,
-            fromPartial<BandcampApiBackendService>({ scrapeTralbumInfo }),
+            fromPartial<BandcampApiBackendService>({ scrapeTralbumInfo, holdFeedPriority: () => () => {} }),
             feedRepository,
             fromPartial<SettingsBackendService>({}),
         )
@@ -333,6 +334,7 @@ describe('FeedBackendService email import', () => {
 
     it.each([
         new BandcampApiFailedToFetchTralbumException('https://other.bandcamp.com/track/second', 404),
+        new BandcampApiRedirectException('https://other.bandcamp.com/track/second', 'Redirect loop'),
         new BandcampApiMalformedTralbumDataException(
             'https://other.bandcamp.com/track/second',
             new Error('No tralbum data'),
@@ -490,6 +492,38 @@ describe('FeedBackendService email import', () => {
             newlyImported: 0,
         })
         expect(await feedRepository.listFeedItems(0, 10)).toEqual([])
+    })
+
+    it('reserves foreground capacity before the database read and releases it after an empty page', async () => {
+        jest.useFakeTimers()
+        const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('OK'))
+        let finishRead: (items: []) => void = () => {}
+        jest.spyOn(feedRepository, 'listFeedItems').mockImplementationOnce(
+            () => new Promise(resolve => (finishRead = resolve)),
+        )
+        const http = new BandcampHttpClient()
+        const realService = new FeedBackendService(
+            fromPartial<EmailBackendRepository>({}),
+            new BandcampApiBackendService(http),
+            feedRepository,
+            fromPartial<SettingsBackendService>({ getSettings: () => ({}) }),
+        )
+        try {
+            const loaded = realService.loadFeed(0, 5)
+            const imported = http.get('https://artist.bandcamp.com/track/imported', { purpose: 'import' })
+            await jest.advanceTimersByTimeAsync(1000)
+            expect(fetchMock).not.toHaveBeenCalled()
+            finishRead([])
+            await loaded
+            await jest.advanceTimersByTimeAsync(1999)
+            expect(fetchMock).not.toHaveBeenCalled()
+            await jest.advanceTimersByTimeAsync(1)
+            await imported
+            expect(fetchMock).toHaveBeenCalledTimes(1)
+        } finally {
+            jest.useRealTimers()
+            jest.restoreAllMocks()
+        }
     })
 
     it('hydrates a cold feed page concurrently without waiting for link previews', async () => {

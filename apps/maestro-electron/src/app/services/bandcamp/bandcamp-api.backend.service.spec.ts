@@ -116,7 +116,7 @@ describe('Bandcamp request pacing', () => {
         const second = previews.getLinkMetaData('https://two.bandcamp.com/album/second')
         await jest.advanceTimersByTimeAsync(1999)
         expect(fetchMock).toHaveBeenCalledTimes(1)
-        await jest.advanceTimersByTimeAsync(1001)
+        await jest.advanceTimersByTimeAsync(2001)
         await expect(first).resolves.toMatchObject({ title: 'Album' })
         await expect(second).resolves.toMatchObject({ url: 'https://two.bandcamp.com/album/second' })
         expect(fetchMock).toHaveBeenCalledTimes(2)

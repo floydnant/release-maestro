@@ -30,7 +30,7 @@ import type {
 import type { WebContents } from 'electron'
 import type { AppSettings } from '../schemas/app-settings.schema'
 import type { EmailImportProgressUpdate, EmailImportTrigger } from '../schemas/email.schema'
-import type { HydratedFeedItem } from '../schemas/feed.schema'
+import type { HydratedFeedItem, ReloadFeedItemsRequest } from '../schemas/feed.schema'
 import type { LoadLinkPreviewsRequest, ScrapedLinkMetadata } from '../schemas/web-scraping.schema'
 import {
     LibraryBrowseIpcChannel,
@@ -107,6 +107,7 @@ export const MainIpcContract = defineIpcContract({
     >(),
     /** Optional page previews load after release metadata, without holding up the feed. */
     'load-link-previews': defineIpcRequest<LoadLinkPreviewsRequest, Record<string, ScrapedLinkMetadata>>(),
+    'reload-feed-items': defineIpcRequest<ReloadFeedItemsRequest, HydratedFeedItem[] | FeedLoadError>(),
     'has-feed': defineIpcRequest<void, boolean>(),
     'mark-feed-item-viewed': defineIpcRequest<{
         id: string

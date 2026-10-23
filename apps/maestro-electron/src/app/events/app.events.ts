@@ -10,6 +10,8 @@ import {
     asAppIpcMain,
     emailImportTriggerSchema,
     FeedLoadError,
+    Exception,
+    reloadFeedItemsRequestSchema,
     loadLinkPreviewsRequestSchema,
     LibraryBrowseIpcChannel,
     LibraryIpcChannel,
@@ -24,6 +26,20 @@ import { SettingsBackendService } from '../services/settings.backend.service'
 import { WebScrapingService } from '../services/web-scraping/web-scraping.service'
 
 const ipc = asAppIpcMain(ipcMain)
+
+const feedLoadFailure = (error: unknown): FeedLoadError => {
+    console.error('Error loading feed:', error)
+    if (!(error instanceof Error)) throw error
+    return {
+        isError: true,
+        message: error.message,
+        name: error.name,
+        userFacingMessage:
+            error instanceof Exception
+                ? error.userFacingMessage
+                : 'Failed to load feed. Please try again later.',
+    }
+}
 
 export default class AppEvents {
     static bootstrapAppEvents(): Electron.IpcMain {
@@ -77,22 +93,14 @@ ipc.handle('load-feed', async (_event, { index, count, excludedIds }) => {
     const { FeedBackendService } = await import('../services/feed/feed.backend.service')
     const feedService = await diContainer.get(FeedBackendService)
 
-    return await feedService.loadFeed(index, count, excludedIds).catch(err => {
-        console.error('Error loading feed:', err)
+    return await feedService.loadFeed(index, count, excludedIds).catch(feedLoadFailure)
+})
 
-        if (err instanceof Error) {
-            return {
-                isError: true,
-                message: err.message,
-                name: err.name,
-                userFacingMessage:
-                    (err as FeedLoadError).userFacingMessage ??
-                    'Failed to load feed. Please try again later.',
-            } satisfies FeedLoadError
-        }
-
-        throw err
-    })
+ipc.handle('reload-feed-items', async (_event, request) => {
+    const { ids } = reloadFeedItemsRequestSchema.parse(request)
+    const { FeedBackendService } = await import('../services/feed/feed.backend.service')
+    const feedService = await diContainer.get(FeedBackendService)
+    return feedService.reloadFeedItems(ids).catch(feedLoadFailure)
 })
 
 // Link previews load independently so optional pages cannot delay release playback.

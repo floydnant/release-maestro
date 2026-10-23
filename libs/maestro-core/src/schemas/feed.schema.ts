@@ -8,6 +8,11 @@ import {
 } from './feed-source.schema'
 import { BandData, ScrapedTralbumInfo } from './bandcamp-api.schema'
 
+export const reloadFeedItemsRequestSchema = z.object({
+    ids: z.array(z.string().min(1).max(200)).min(1).max(20),
+})
+export type ReloadFeedItemsRequest = z.infer<typeof reloadFeedItemsRequestSchema>
+
 const feedItemBaseSchema = z.object({
     id: z.string(),
     /**
@@ -73,7 +78,7 @@ export type HydratedBandcampReleaseFeedItem = {
         iframeUrl: string | null
         tracks: (ScrapedTralbumInfo['tracks'][number] & { fans: BandcampFan[] })[]
     }
-    error: { message: string } | null
+    error: { message: string; retryAt?: number } | null
     id: string
     type: 'BANDCAMP.TRALBUM'
     sourceType: BandcampFeedItem['source']['type']

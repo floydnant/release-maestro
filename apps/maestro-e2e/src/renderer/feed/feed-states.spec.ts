@@ -72,6 +72,54 @@ test.describe('release feed scenario states', () => {
         await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
     })
 
+    test('keeps a failed release unviewed and reloads it in place from its Retry button', async ({
+        page,
+    }) => {
+        const base = createHydratedRelease()
+        const release = (id: string, releaseName: string) =>
+            createHydratedRelease({ id, data: { ...base.data, releaseName } })
+        const failed = createHydratedRelease({
+            id: 'failed-release',
+            error: { message: 'Could not reach Bandcamp' },
+            data: { ...base.data, releaseName: 'Failed release', tracks: [] },
+        })
+        const controller = await createRendererScenario(
+            page,
+            scenarioBuilder()
+                .feed([
+                    failed,
+                    release('second-release', 'Second release'),
+                    release('third-release', 'Third release'),
+                    release('fourth-release', 'Fourth release'),
+                ])
+                .handler('reload-feed-items', { kind: 'pending' })
+                .build(),
+        )
+        await expect(page.getByText('Could not reach Bandcamp')).toBeVisible()
+
+        // Moving well past both, the healthy release is marked viewed and the failed one is not.
+        for (let step = 0; step < 3; step++) await page.keyboard.press('Shift+J')
+        await expect
+            .poll(async () => (await controller.calls('mark-feed-item-viewed')).map(({ payload }) => payload))
+            .toContainEqual(expect.objectContaining({ id: 'second-release' }))
+        expect(await controller.calls('mark-feed-item-viewed')).not.toContainEqual(
+            expect.objectContaining({ payload: expect.objectContaining({ id: 'failed-release' }) }),
+        )
+
+        await page.getByRole('button', { name: 'Retry loading Failed release' }).click()
+        await expect(page.getByText('Retrying', { exact: true })).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Retry loading Failed release' })).toHaveCount(0)
+        expect(await controller.lastCall('reload-feed-items')).toMatchObject({
+            payload: { ids: ['failed-release'] },
+        })
+
+        await controller.resolvePending('reload-feed-items', [release('failed-release', 'Failed release')])
+
+        await expect(page.getByText('Could not reach Bandcamp')).toBeHidden()
+        await expect(page.getByRole('link', { name: 'Failed release' })).toBeVisible()
+        expect(await controller.calls('reload-feed-items')).toHaveLength(1)
+    })
+
     test('renders a populated release feed from mocked IPC state', async ({ page }) => {
         const release = createHydratedRelease()
         const controller = await createRendererScenario(page, scenarioBuilder().feed([release]).build())

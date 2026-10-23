@@ -10,7 +10,32 @@
             </div>
         }
         @if (feedState(); as feedState) {
-            @if (feedState.status === 'error') {
+            <ng-template #pageRetryButton>
+                <button
+                    hlmBtn
+                    variant="ghost"
+                    class="page-retry | mt-3 gap-2"
+                    type="button"
+                    [disabled]="feedState.isRetryingPage"
+                    [attr.aria-busy]="feedState.isRetryingPage"
+                    (click)="pageRetry$.next()"
+                >
+                    @if (feedState.isRetryingPage) {
+                        <app-progress-ring
+                            mode="spinning"
+                            [diameter]="16"
+                            [strokeWidth]="2"
+                            color="content.secondary"
+                            bgColor="transparent"
+                        ></app-progress-ring>
+                        Retrying
+                    } @else {
+                        Retry
+                    }
+                </button>
+            </ng-template>
+
+            @if (feedState.items.length === 0 && feedState.pageFailure; as failure) {
                 <div
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
@@ -18,14 +43,12 @@
                         <app-icon name="error" color="content.danger" size="3rem"></app-icon>
                     </p>
                     <p class="mt-2 text-center type-label-md text-content-danger">
-                        {{ feedState.error }}
+                        {{ failure.message }}
                     </p>
 
-                    <button hlmBtn variant="ghost" class="mt-3" type="button" (click)="retryNotifier$.next()">
-                        Retry
-                    </button>
+                    <ng-container [ngTemplateOutlet]="pageRetryButton"></ng-container>
                 </div>
-            } @else if (feedState.status === 'caught-up') {
+            } @else if (feedState.emptyReason === 'caught-up') {
                 <div
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
@@ -34,7 +57,7 @@
                         You're all caught up! Check back later for new releases.
                     </p>
                 </div>
-            } @else if (feedState.status === 'empty') {
+            } @else if (feedState.emptyReason === 'not-set-up') {
                 <div
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
@@ -52,7 +75,7 @@
                     </p>
                 </div>
             }
-            @for (feedItem of feedState.status === 'feed' ? feedState.items : []; track feedItem.id) {
+            @for (feedItem of feedState.items; track feedItem.id) {
                 <div
                     class="feed-entry | my-32 flex max-h-(--max-feed-item-height) min-h-[45vh] snap-center items-center py-[calc(var(--feed-item-padding-y)/2)] transition-all duration-slow ease-standard"
                     [ngClass]="{ 'opacity-30 blur-xs': currentFeedIndex() != $index }"
@@ -206,19 +229,12 @@
                         >
                             <div class="wrap-nicely overflow-x-hidden overflow-y-scroll">
                                 @if (feedItem.error; as error) {
-                                    <div class="error | mb-1.5 flex items-center gap-2">
-                                        <p class="text-content-danger">
-                                            <app-icon
-                                                name="error"
-                                                color="content.danger"
-                                                size="1.3rem"
-                                                class="translate-y-[3px]"
-                                            ></app-icon>
-                                        </p>
-                                        <p class="type-label-md text-content-danger">
-                                            {{ error.message || 'Error loading feed item' }}
-                                        </p>
-                                    </div>
+                                    <app-release-load-status
+                                        [error]="error"
+                                        [recovery]="releaseRecovery(feedState, feedItem, $index)"
+                                        [releaseName]="feedItem.data.releaseName"
+                                        (retry)="itemRetry$.next(feedItem)"
+                                    />
                                 }
 
                                 @if (feedItem.data.fans.length) {
@@ -439,6 +455,17 @@
                             </div>
                         }
                     </div>
+                </div>
+            }
+
+            @if (feedState.items.length > 0 && feedState.pageFailure; as failure) {
+                <div class="page-error | my-16 flex snap-center flex-col items-center px-3 text-center">
+                    <p class="flex items-center gap-2 type-label-md text-content-danger">
+                        <app-icon name="error" color="content.danger" size="1.3rem"></app-icon>
+                        {{ failure.message }}
+                    </p>
+
+                    <ng-container [ngTemplateOutlet]="pageRetryButton"></ng-container>
                 </div>
             }
         }
