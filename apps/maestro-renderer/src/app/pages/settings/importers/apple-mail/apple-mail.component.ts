@@ -8,9 +8,10 @@ import {
     viewChild,
 } from '@angular/core'
 import { FormsModule } from '@angular/forms'
+import { assertUnreachable } from '@release-maestro/core'
 import { HlmButton } from '@spartan-ng/helm/button'
 import { HlmInput } from '@spartan-ng/helm/input'
-import { FeedService } from '../../../../core/services/feed.service'
+import { FeedService, isEmailImportRunning } from '../../../../core/services/feed.service'
 import { SettingsService } from '../../../../core/settings/settings.service'
 import { ProgressRingComponent } from '../../../../shared/components/progress-ring/progress-ring.component'
 
@@ -41,9 +42,25 @@ export class AppleMailImporterComponent {
 
     /** The running or last import of this session, whichever started it. */
     readonly importUpdate = this.feedService.emailImportUpdate
-    readonly isImporting = computed(() => {
-        const phase = this.importUpdate()?.phase
-        return phase === 'started' || phase === 'processing'
+    /** The running import, or null once it has ended. */
+    readonly runningImport = computed(() => {
+        const update = this.importUpdate()
+        return isEmailImportRunning(update) ? update : null
+    })
+    readonly isImporting = computed(() => this.runningImport() !== null)
+    readonly runningImportText = computed(() => {
+        const update = this.runningImport()
+        if (update === null) return null
+        switch (update.phase) {
+            case 'started':
+                return 'Checking mail…'
+            case 'processing':
+                return `Importing emails ${update.current}/${update.total}`
+            case 'finishing':
+                return 'Adding releases…'
+            default:
+                return assertUnreachable(update)
+        }
     })
 
     /** Why "Import now" is disabled, or null when it is not, or settings have not loaded yet. */

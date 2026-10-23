@@ -8,7 +8,7 @@ export const bandcampFeedItem = (id: string, eventDate: Date): BandcampFeedItem 
     eventDate,
     isSnoozed: false,
     lastViewedAt: null,
-    data: { tralbumUrl: `https://test.bandcamp.com/album/${id}`, tralbumType: 'album' },
+    data: { tralbumUrl: `https://test.bandcamp.com/album/${id}`, tralbumType: 'album', purchases: [] },
     source: {
         type: 'EMAIL.BANDCAMP_NEW_RELEASE',
         messageId: `<${id}@example.com>`,
@@ -30,6 +30,7 @@ export const scrapedRelease = (streamUrls: (string | null)[]): ScrapedTralbumInf
     artist: 'Test artist',
     releaseDate: null,
     type: 'album',
+    parentAlbumUrl: null,
     id: 1,
     artworkUrl: null,
     about: '',

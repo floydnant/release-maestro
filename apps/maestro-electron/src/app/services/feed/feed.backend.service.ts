@@ -1,24 +1,45 @@
-import { bufferCount, concatMap, filter, materialize, merge, Observable, switchMap } from 'rxjs'
+import { setTimeout as waitForRetry } from 'node:timers/promises'
+import {
+    bufferCount,
+    concatMap,
+    concatWith,
+    defer,
+    filter,
+    from,
+    ignoreElements,
+    materialize,
+    map,
+    lastValueFrom,
+    merge,
+    mergeMap,
+    Observable,
+    switchMap,
+    tap,
+    toArray,
+} from 'rxjs'
 import {
     BandcampEmailFeedSourceItem,
     BandcampFeedItem,
+    BandcampPurchase,
     EmailImportProgress,
+    FetchFailedException,
     HydratedBandcampReleaseFeedItem,
     HydratedFeedItem,
     isTruthy,
     assertUnreachable,
-    isUsefulUrlFromBandcampEmail,
     mapBandcampReleaseFeedItemToHydratedFeedItem,
     resolveFeedSettings,
+    mergeBandcampPurchases,
 } from '@release-maestro/core'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import {
+    BandcampApiException,
     BandcampApiFailedToFetchTralbumException,
     BandcampApiMalformedTralbumDataException,
+    BandcampApiRedirectException,
 } from '../bandcamp/bandcamp-api.exceptions'
 import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { EmailBackendRepository } from '../email/email.backend.repository'
-import { WebScrapingService } from '../web-scraping/web-scraping.service'
 import { SettingsBackendService } from '../settings.backend.service'
 import { FeedBackendRepository } from './feed.backend.repository'
 
@@ -31,43 +52,70 @@ import { FeedBackendRepository } from './feed.backend.repository'
 const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
 const UNPLAYABLE_RELEASE_RECHECK_MS = 1000 * 60 * 5
 const MAX_UNPLAYABLE_RELEASE_CHECKS = 1000
+const MAX_PARENT_ALBUM_LOOKUPS = 4
+const PARENT_ALBUM_LOOKUP_RETRY_MS = [250, 1000]
 
-const mapBandcampEmailToFeedItem = (email: BandcampEmailFeedSourceItem): BandcampFeedItem | null => {
-    if (email.type == 'EMAIL.BANDCAMP_NEW_RELEASE') {
-        if (!email.releaseUrl) return null
-
-        return {
-            id: crypto.randomUUID(),
-            type: 'BANDCAMP.TRALBUM',
-            dedupeIdentifier: email.releaseUrl,
-            ingestedAt: new Date(),
-            eventDate: new Date(email.dateReceived),
-            isSnoozed: false,
-            lastViewedAt: null,
-            data: {
-                tralbumUrl: email.releaseUrl,
-                tralbumType: email.releaseUrl.includes('/album/') ? 'album' : 'track',
-            },
-            source: email,
-        }
-    }
-    // @TODO: Implement this type
-    if (email.type == 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC') {
-        return null
-    }
-
-    return assertUnreachable(email as never, 'Unhandled Bandcamp email type:')
-}
+const createBandcampFeedItem = (
+    email: BandcampEmailFeedSourceItem,
+    releaseUrl: string,
+    purchases: BandcampPurchase[],
+): BandcampFeedItem => ({
+    id: crypto.randomUUID(),
+    type: 'BANDCAMP.TRALBUM',
+    dedupeIdentifier: releaseUrl,
+    ingestedAt: new Date(),
+    eventDate: new Date(email.dateReceived),
+    isSnoozed: false,
+    lastViewedAt: null,
+    data: {
+        tralbumUrl: releaseUrl,
+        tralbumType: releaseUrl.includes('/album/') ? 'album' : 'track',
+        purchases,
+    },
+    source:
+        email.type === 'EMAIL.BANDCAMP_NEW_RELEASE'
+            ? email
+            : {
+                  type: email.type,
+                  messageId: email.messageId,
+                  dateReceived: email.dateReceived,
+                  isRead: email.isRead,
+              },
+})
 
 export class FeedBackendService {
     private readonly unplayableReleaseChecks = new Map<string, number>()
     constructor(
         private emailRepo: EmailBackendRepository,
         private bandcampApiService: BandcampApiBackendService,
-        private webScrapingService: WebScrapingService,
         private feedBackendRepository: FeedBackendRepository,
         private settingsService: SettingsBackendService,
     ) {}
+
+    private async resolveParentAlbumUrl(releaseUrl: string, signal: AbortSignal): Promise<string> {
+        for (let attempt = 0; ; attempt++) {
+            try {
+                const track = await this.bandcampApiService.scrapeTralbumInfo(releaseUrl, signal, 'import')
+                return track.parentAlbumUrl ?? releaseUrl
+            } catch (error) {
+                if (
+                    error instanceof BandcampApiRedirectException ||
+                    error instanceof BandcampApiMalformedTralbumDataException ||
+                    (error instanceof BandcampApiFailedToFetchTralbumException &&
+                        [404, 410].includes(error.status))
+                )
+                    return releaseUrl
+
+                const retryDelay = PARENT_ALBUM_LOOKUP_RETRY_MS[attempt]
+                const retryable =
+                    error instanceof FetchFailedException ||
+                    (error instanceof BandcampApiFailedToFetchTralbumException &&
+                        [500, 502, 503, 504].includes(error.status))
+                if (signal.aborted || retryDelay === undefined || !retryable) throw error
+                await waitForRetry(retryDelay, undefined, { signal })
+            }
+        }
+    }
 
     async triggerEmailImport(abortSignal: AbortSignal): Promise<Observable<EmailImportProgress>> {
         console.log('Running email import...')
@@ -76,6 +124,8 @@ export class FeedBackendService {
         let totalProcessed = 0
         let totalImported = 0
         let skippedEmails = 0
+        const processingFailure = new AbortController()
+        const workSignal = AbortSignal.any([abortSignal, processingFailure.signal])
 
         const vendor = 'APPLE_MAIL'
         const mailboxName = this.emailRepo.getMailboxName(vendor)
@@ -86,18 +136,31 @@ export class FeedBackendService {
             ? new Date(checkpoint.getTime() - EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS)
             : null
         let newestReceivedAt: Date | null = null
+        let terminalUpdate: EmailImportProgress | null = null
+        let hasExportedEmails = false
+        const parentAlbums = new Map<string, Promise<string>>()
+        const resolveReleaseUrl = (releaseUrl: string): Promise<string> => {
+            if (!releaseUrl.includes('/track/')) return Promise.resolve(releaseUrl)
+            let resolved = parentAlbums.get(releaseUrl)
+            if (!resolved) {
+                resolved = this.resolveParentAlbumUrl(releaseUrl, workSignal)
+                parentAlbums.set(releaseUrl, resolved)
+            }
+            return resolved
+        }
 
-        const emails$ = await this.emailRepo.loadEmails(vendor, abortSignal, mailboxName, receivedSince)
+        const emails$ = await this.emailRepo.loadEmails(vendor, workSignal, mailboxName, receivedSince)
 
         return merge(
             emails$.pipe(
                 materialize(),
-                switchMap(async (notification): Promise<EmailImportProgress | null> => {
-                    if (notification.kind == 'C' || notification.kind == 'E') {
-                        // The complete and error values are handled by the buffered stream below
-                        return null
-                    }
+                map((notification): EmailImportProgress | null => {
+                    if (notification.kind == 'C')
+                        return hasExportedEmails && !workSignal.aborted ? { phase: 'finishing' } : null
+                    // The buffered stream reports the final error after export progress drains.
+                    if (notification.kind == 'E') return null
                     if (notification.kind == 'N') {
+                        hasExportedEmails = true
                         return {
                             phase: 'processing' as const,
                             current: notification.value.current,
@@ -134,7 +197,44 @@ export class FeedBackendService {
                         .map(email => parseBandcampEmail(email))
                         .filter(isTruthy)
 
-                    const feedItems = emailFeedSourceItems.map(mapBandcampEmailToFeedItem).filter(isTruthy)
+                    const feedItems: BandcampFeedItem[] = []
+                    for (const email of emailFeedSourceItems) {
+                        const releases = new Map<string, BandcampFeedItem>()
+                        const purchases =
+                            email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'
+                                ? email.purchases
+                                : [{ tralbumUrl: email.releaseUrl, fans: [] }]
+                        const resolved = await lastValueFrom(
+                            from(purchases).pipe(
+                                mergeMap(
+                                    async (purchase, index) => ({
+                                        purchase,
+                                        index,
+                                        releaseUrl: await resolveReleaseUrl(purchase.tralbumUrl),
+                                    }),
+                                    MAX_PARENT_ALBUM_LOOKUPS,
+                                ),
+                                toArray(),
+                            ),
+                        )
+                        for (const { purchase, releaseUrl } of resolved.sort((a, b) => a.index - b.index)) {
+                            const attribution =
+                                email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' ? [purchase] : []
+                            const previous = releases.get(releaseUrl)
+                            if (previous) {
+                                previous.data.purchases = mergeBandcampPurchases(
+                                    previous.data.purchases,
+                                    attribution,
+                                )
+                            } else {
+                                releases.set(
+                                    releaseUrl,
+                                    createBandcampFeedItem(email, releaseUrl, attribution),
+                                )
+                            }
+                        }
+                        feedItems.push(...releases.values())
+                    }
                     totalImported += feedItems.length
 
                     await this.feedBackendRepository.ingestFeedItems(feedItems)
@@ -170,6 +270,8 @@ export class FeedBackendService {
                         }
                     }
                     if (notification.kind == 'E') {
+                        if (abortSignal.aborted) return { phase: 'cancelled' as const }
+                        processingFailure.abort()
                         console.error('Error during email import:', notification.error)
 
                         return {
@@ -187,59 +289,44 @@ export class FeedBackendService {
 
                     return assertUnreachable(notification, 'Unhandled notification kind:')
                 }),
+                tap(update => {
+                    if (update) terminalUpdate = update
+                }),
+                ignoreElements(),
             ),
-        ).pipe(filter((update): update is EmailImportProgress => update !== null))
+        ).pipe(
+            // A failed lookup can precede the export's final emails. Drain their progress first.
+            concatWith(defer(() => Promise.resolve(terminalUpdate))),
+            filter((update): update is EmailImportProgress => update !== null),
+        )
     }
 
     // @TODO: error handling
     async hydrateBandcampFeedItem(item: BandcampFeedItem): Promise<HydratedBandcampReleaseFeedItem> {
-        const sourceLinks =
-            item.source.type == 'EMAIL.BANDCAMP_NEW_RELEASE'
-                ? [...new Set(item.source.links.filter(isUsefulUrlFromBandcampEmail))]
-                : null
-
         if (!item.data.tralbumUrl) {
             console.warn('No tralbum link found:', item)
-
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(
-                item,
-                null,
-                sourceLinks &&
-                    (await this.webScrapingService.getLinkMetaDataBatch(sourceLinks).catch(err => {
-                        console.error('Failed to scrape links', err)
-                        return null
-                    })),
-                null,
-            )
+            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null)
         } else {
-            const [scrapedData, linkMetadataMap] = await Promise.all([
-                this.bandcampApiService.scrapeTralbumInfo(item.data.tralbumUrl).catch(error => {
-                    if (
-                        error instanceof BandcampApiFailedToFetchTralbumException ||
-                        error instanceof BandcampApiMalformedTralbumDataException
-                    ) {
+            const scrapedData = await this.bandcampApiService
+                .scrapeTralbumInfo(item.data.tralbumUrl)
+                .catch(error => {
+                    if (error instanceof BandcampApiException || error instanceof FetchFailedException) {
                         console.log(error)
                         return { isError: true as const, error }
                     }
                     console.error('Failed to load tralbum:', item.data.tralbumUrl, error)
+                    if (error instanceof Error && error.name !== 'AbortError')
+                        return {
+                            isError: true as const,
+                            error: new BandcampApiMalformedTralbumDataException(item.data.tralbumUrl, error),
+                        }
                     throw error
-                }),
-                sourceLinks &&
-                    (await this.webScrapingService.getLinkMetaDataBatch(sourceLinks).catch(err => {
-                        console.error('Failed to scrape links', err)
-                        return null
-                    })),
-            ])
+                })
 
             if ('isError' in scrapedData)
-                return mapBandcampReleaseFeedItemToHydratedFeedItem(
-                    item,
-                    null,
-                    linkMetadataMap,
-                    scrapedData.error,
-                )
+                return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, scrapedData.error)
 
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedData, linkMetadataMap, null)
+            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedData, null, null)
         }
     }
 
@@ -250,7 +337,7 @@ export class FeedBackendService {
     ): Promise<HydratedFeedItem[]> {
         console.log('Hydrating feed items')
         const promises = items.map(async item => {
-            const checkedAt = this.unplayableReleaseChecks.get(item.id)
+            const checkedAt = this.unplayableReleaseChecks.get(item.data.tralbumUrl)
             if (
                 hideUnplayableReleases &&
                 checkedAt !== undefined &&
@@ -260,12 +347,12 @@ export class FeedBackendService {
 
             if (item.type == 'BANDCAMP.TRALBUM') {
                 const hydrated = await this.hydrateBandcampFeedItem(item)
-                this.unplayableReleaseChecks.delete(item.id)
+                this.unplayableReleaseChecks.delete(item.data.tralbumUrl)
                 if (!hydrated.error && !hydrated.data.tracks.some(track => !!track.streamUrl)) {
-                    this.unplayableReleaseChecks.set(item.id, Date.now())
+                    this.unplayableReleaseChecks.set(item.data.tralbumUrl, Date.now())
                     if (this.unplayableReleaseChecks.size > MAX_UNPLAYABLE_RELEASE_CHECKS) {
-                        const oldestId = this.unplayableReleaseChecks.keys().next().value
-                        if (oldestId !== undefined) this.unplayableReleaseChecks.delete(oldestId)
+                        const oldestUrl = this.unplayableReleaseChecks.keys().next().value
+                        if (oldestUrl !== undefined) this.unplayableReleaseChecks.delete(oldestUrl)
                     }
                 }
                 return hydrated
@@ -286,30 +373,46 @@ export class FeedBackendService {
     }
 
     async loadFeed(index: number, count: number, excludedIds: string[] = []): Promise<HydratedFeedItem[]> {
-        const { hideUnplayableReleases, snoozeHours } = resolveFeedSettings(
-            this.settingsService.getSettings().feed,
-        )
-        const items: HydratedFeedItem[] = []
-        const scannedIds = [...excludedIds]
-        // Hidden releases remain unviewed. Continue past them to fill the visible page.
-        while (items.length < count) {
-            const remaining = count - items.length
-            const candidates = await this.feedBackendRepository.listFeedItems({
-                index,
-                count: remaining,
-                excludedIds: scannedIds,
-                snoozeHours,
-            })
-            if (candidates.length === 0) break
-            items.push(...(await this.hydrateFeed(candidates, hideUnplayableReleases)))
-            scannedIds.push(...candidates.map(item => item.id))
-            if (candidates.length < remaining) break
+        const release = this.bandcampApiService.holdFeedPriority()
+        try {
+            const { hideUnplayableReleases, snoozeHours } = resolveFeedSettings(
+                this.settingsService.getSettings().feed,
+            )
+            const items: HydratedFeedItem[] = []
+            const scannedIds = [...excludedIds]
+            // Hidden releases remain unviewed. Continue past them to fill the visible page.
+            while (items.length < count) {
+                const remaining = count - items.length
+                const candidates = await this.feedBackendRepository.listFeedItems({
+                    index,
+                    count: remaining,
+                    excludedIds: scannedIds,
+                    snoozeHours,
+                })
+                if (candidates.length === 0) break
+                items.push(...(await this.hydrateFeed(candidates, hideUnplayableReleases)))
+                scannedIds.push(...candidates.map(item => item.id))
+                if (candidates.length < remaining) break
+            }
+            return items
+        } finally {
+            release()
         }
-        return items
     }
 
     async hasFeed(): Promise<boolean> {
         return await this.feedBackendRepository.hasFeedItems()
+    }
+
+    async reloadFeedItems(ids: string[]): Promise<HydratedFeedItem[]> {
+        const release = this.bandcampApiService.holdFeedPriority()
+        try {
+            const items = await this.feedBackendRepository.getFeedItems(ids)
+            // Retry the requested entries even if they are now viewed or previously looked unplayable.
+            return await this.hydrateFeed(items, false)
+        } finally {
+            release()
+        }
     }
 
     async markFeedItemAsViewed(id: string, feedItemType: HydratedFeedItem['type'], isSnoozed: boolean) {

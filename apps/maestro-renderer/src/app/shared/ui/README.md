@@ -80,6 +80,13 @@ Inputs and textareas accept `aria-describedby`; Brain combines those caller IDs
 with descriptions registered by the enclosing Field. The dialog service accepts component classes and `TemplateRef`; a template's `let-dialog`
 receives the supplied context and `close(result)` action.
 
+`hlm-avatar` shows its `hlmAvatarImage` once the image has loaded, and its `hlmAvatarFallback`
+while it loads, when the image has no URL, or when it fails, so callers render both and leave the
+choice to the avatar. The `xs` size fits a single-line row; `sm`, `default` and `lg` follow upstream.
+`hlmAvatarGroup` overlaps its avatars and rings each in the canvas color, and `hlmAvatarGroupCount`
+is the `+N` disc for the rest. A group on another surface overrides the ring color. Avatars carry no
+names of their own; the caller names the person or group.
+
 `hlm-switch` renders Brain's `button[role=switch]`. Name it with a `<label for>` that matches its
 `inputId`, and pass its description through `aria-describedby`: the switch does not read Field
 descriptions. Its `focus()` method moves focus to that button.

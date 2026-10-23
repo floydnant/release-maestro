@@ -37,8 +37,11 @@ _Avoid_: sync, fetch, download
 
 **Import**:
 One pass that turns exported emails into feed items. Only one runs at a time (`EmailImportService`).
-It streams progress to every window as `started`, then `processing` for each email (none when nothing
-was exported), then exactly one `completed`, `cancelled`, or `error`, and reports both `totalImported` (how many the pass covered) and
+It streams progress to every window as `started`, then `processing` for each exported email (none
+when nothing was exported). After export ends, `finishing` keeps the import visibly active while
+queued release processing and saving settle. It remains cancellable in this phase. Exactly one
+`completed`, `cancelled`, or `error` ends the import. A completed import reports both
+`totalImported` (how many the pass covered) and
 `newlyImported` (how many were not already in the feed) — a user re-running an import may
 legitimately see a nonzero total and a zero new count, because it re-reads the overlap before its
 _import checkpoint_. Each update carries its trigger. The title bar shows every import, but paces and
@@ -84,9 +87,45 @@ The notification announcing one release from an artist the user follows
 mail body.
 
 **Fans-bought-music notification**:
-The other Bandcamp notification shape (`EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC`). It announces several
-releases at once and carries a list of URLs rather than one release, so it fans out into multiple
-feed items.
+The Bandcamp notification about releases bought by fans the user follows
+(`EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC`). It associates bought release URLs with fan profiles and photos.
+Import groups purchases under the parent album. The album shows every involved fan, and each track
+shows only its buyers. A fan who bought the whole album appears on every track. Later notifications
+merge attribution into the existing album item. Missing or malformed release pages keep the purchase
+and its fan attribution available.
+
+**Fan**:
+A Bandcamp listener named in a purchase notification. The profile URL identifies the fan; display
+names are not unique. A fan has a display name and may have a profile photo. Overlapping portraits
+show involved fans, and a tooltip lists their names.
+
+**Purchase attribution**:
+The association between a bought album or track and its fans. Buying an album attributes every
+track to that fan. Buying individual tracks attributes only those tracks, while the album's fan
+list includes everyone involved. Reimporting the same purchase adds no duplicate fans.
+
+**Parent album**:
+The Bandcamp album containing a track. Import reads the track page to resolve its parent album
+before choosing the feed item's identity. A genuine standalone track keeps its own release URL.
+A missing or malformed track page keeps the original track URL because its album is unknown.
+Network failures leave the import checkpoint unchanged so the next pass can retry.
+Import runs at most four parent lookups at once and gives network and server failures two retries.
+Bandcamp page requests share the app-wide cooldown described below. A
+processing failure stops the remaining export before the import reports its final error.
+
+**Bandcamp request cooldown**:
+A temporary pause after Bandcamp rejects excessive requests. Imports and feed hydration share the
+same pause across Bandcamp pages. Imports can wait and retry; the feed reports unavailable data
+while retaining the release link and purchase attribution. Visible releases retry after the pause
+and keep their position in the feed. Link previews share the same cooldown, so loading them cannot
+bypass a pause. Background imports and previews yield while the feed hydrates and slow down after
+rate limiting. An import can remain paused until Bandcamp allows requests again; cancellation
+remains available. Feed loading runs concurrently and does not wait behind background work.
+
+**Link preview**:
+The title and favicon shown for a link from a notification. Previews load after the release appears
+and update its links without delaying playback. Repeated links reuse parsed metadata or a release
+page already fetched by the app. An unavailable page keeps its original URL as the label.
 
 **Feed source item**:
 A parsed notification, before it becomes a feed item. This is the boundary type: one source item can
@@ -129,6 +168,10 @@ candidates until the visible page is filled or the eligible releases run out.
 The app remembers up to 1,000 releases confirmed unplayable for five minutes to avoid fetching them
 again on every scroll. Later hydration rechecks them after that interval. Disabling the filter
 bypasses the interval. Hydration errors stay visible because their track availability is unknown.
+One release's page failure does not prevent other releases from loading. Repeated redirect URLs end
+the page lookup immediately. A failed next page preserves the releases already loaded and their
+playback. Retrying hydration replaces only the failed release's details, without reopening the feed.
+Automatic retries cover the current release and the nearby releases being prefetched.
 _Avoid_: scraping — that names the implementation, not the behavior
 
 **Playable track**:
@@ -138,8 +181,14 @@ _Avoid_: released track, owned track, downloaded track
 
 **Dedupe identifier**:
 What makes two notifications about the same release one feed item. It is the release URL, and it is
-unique per feed item type in the database. Two Bandcamp emails about the same album collapse; the
-same URL arriving from a different source type would not.
+unique per feed item type in the database. Bandcamp notifications about the same release collapse
+across both notification types. Album tracks use the parent album URL. Purchases merge into that
+item even when a release announcement supplied its source. When track entries collapse into an
+album, the first imported entry keeps its identity, source, viewed state and snooze state. The view
+history from every merged entry follows that identity. The same URL with a different feed item
+type would not collapse.
+Bandcamp release URLs use HTTPS and omit tracking queries, fragments and trailing slashes. Open
+windows can still mark a merged track as viewed or snoozed through its original ID until they close.
 
 **Event date**:
 When the thing the feed item describes actually happened — for a notification, when the email was
@@ -148,7 +197,8 @@ is ordered by event date, so a late import still lands in the right chronologica
 _Avoid_: date, timestamp, created at
 
 **Viewed**:
-A feed item the user has seen (`lastViewedAt`). Viewing is throttled — re-viewing within a few
+A successfully hydrated feed item the user has seen (`lastViewedAt`). Passing an error card does not
+mark it viewed. Viewing is throttled — re-viewing within a few
 minutes does not re-stamp it. An unviewed item is eligible for the feed, subject to the playable-track
 filter; a viewed one has left it unless
 it is snoozed.
