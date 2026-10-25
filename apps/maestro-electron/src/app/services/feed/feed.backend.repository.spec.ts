@@ -13,6 +13,44 @@ import { bandcampFeedItem } from '../../../test/fixtures/feed.fixture'
 import { FeedBackendRepository } from './feed.backend.repository'
 
 describe('FeedBackendRepository album purchases', () => {
+    it.each(['announcement first', 'purchase first'])(
+        'keeps one album with its fans across release and purchase notifications: %s',
+        async order => {
+            const database = createMigratedTestDatabase()
+            try {
+                const repository = new FeedBackendRepository(database.client)
+                const purchase = fansBoughtMusicFeedItem
+                const announcement: BandcampFeedItem = {
+                    ...purchase,
+                    id: 'album-announcement',
+                    source: {
+                        ...newReleaseEmail,
+                        type: 'EMAIL.BANDCAMP_NEW_RELEASE',
+                        releaseUrl: purchase.data.tralbumUrl,
+                        releaseType: 'album',
+                        links: [],
+                    },
+                    data: { ...purchase.data, purchases: [] },
+                }
+                const items =
+                    order === 'announcement first' ? [announcement, purchase] : [purchase, announcement]
+                for (const item of items) await repository.ingestFeedItems([item])
+                const stored = await repository.listFeedItems({
+                    index: 0,
+                    count: 5,
+                    snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+                })
+                expect(stored).toHaveLength(1)
+                expect(stored[0]).toMatchObject({
+                    id: items[0]?.id,
+                    data: { purchases: purchase.data.purchases },
+                })
+            } finally {
+                database.sqlite.close()
+            }
+        },
+    )
+
     it.each(['/', '#artwork'])(
         'retains a viewed announcement when its stored URL ends in %s',
         async suffix => {

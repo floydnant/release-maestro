@@ -1,4 +1,5 @@
-// Covers the fans-who-bought avatar stacks on a release and beside each of its tracks.
+// Covers the fans who bought a release, named with links to their profiles above the release, and
+// the avatar stacks beside each of its tracks.
 import { expect, type Page, test } from '@playwright/test'
 import { BandcampFan, HydratedFeedItem } from '@release-maestro/core'
 import { installAudioFixtureRoute } from '../../fixtures/audio.fixture'
@@ -40,32 +41,35 @@ const openFeed = async (page: Page, release: HydratedFeedItem) => {
 
 const trackRow = (page: Page, index: number) => page.locator(`.track[data-track-index="${index}"]`)
 const releaseStack = (page: Page) => page.locator('.text-column .fan-avatar-stack')
+const fanLink = (page: Page, fan: BandcampFan) =>
+    releaseStack(page).getByRole('link', { name: fan.name, exact: true })
 
 test.describe('release feed fan purchases', () => {
     test('credits a fan who bought the whole album on the release and every track', async ({ page }) => {
         await openFeed(page, createPurchasedAlbum([[adam], [adam], [adam]]))
 
         await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pitts')
-        await expect(page.getByRole('img', { name: 'Bought by Adam Pitts', exact: true })).toHaveCount(4)
+        await expect(fanLink(page, adam)).toHaveAttribute('href', adam.profileUrl)
+        await expect(page.getByRole('img', { name: 'Bought by Adam Pitts', exact: true })).toHaveCount(3)
         for (const index of [0, 1, 2]) {
             await expect(
                 trackRow(page, index).getByRole('img', { name: 'Bought by Adam Pitts' }),
             ).toBeVisible()
+            // Names appear only in the release sentence, never inline on a track.
+            await expect(trackRow(page, index).getByText('Adam Pitts', { exact: true })).toHaveCount(0)
+            await expect(trackRow(page, index).getByRole('link', { name: 'Adam Pitts' })).toHaveCount(0)
         }
-        // Names appear only in the release summary, never inline on a track.
-        await expect(page.getByText('Adam Pitts', { exact: true })).toHaveCount(0)
-        await expect(page.getByText('Bought by fans you follow')).toHaveCount(0)
+        await expect(releaseStack(page).getByRole('img')).toHaveCount(0)
     })
 
     test('shows each track’s own buyers and keeps durations aligned', async ({ page }) => {
         await openFeed(page, createPurchasedAlbum([[adam, maya], [], [adam, river]]))
 
-        await expect(page.locator('.fan-summary')).toHaveText('Bought by 3 fans you follow')
-        await expect(
-            page.getByRole('img', {
-                name: 'Bought by 3 fans you follow: Adam Pitts, Maya, and River & Rain',
-            }),
-        ).toBeVisible()
+        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pitts, Maya, and River & Rain')
+        for (const fan of [adam, maya, river]) {
+            await expect(fanLink(page, fan)).toHaveAttribute('href', fan.profileUrl)
+            await expect(fanLink(page, fan)).toHaveAttribute('target', '_blank')
+        }
         await expect(trackRow(page, 0).getByRole('img')).toHaveAccessibleName('Bought by Adam Pitts and Maya')
         await expect(trackRow(page, 1).getByRole('img')).toHaveCount(0)
         await expect(trackRow(page, 2).getByRole('img')).toHaveAccessibleName(
@@ -93,7 +97,7 @@ test.describe('release feed fan purchases', () => {
         await expect(page.getByRole('button', { name: 'Pause Karasu' })).toBeVisible()
     })
 
-    test('reveals buyers on keyboard focus, after the track controls', async ({ page }) => {
+    test('reveals track buyers on keyboard focus, after the track controls', async ({ page }) => {
         await openFeed(page, createPurchasedAlbum([[adam, maya], [maya], [river]]))
         const row = trackRow(page, 0)
 
@@ -102,9 +106,31 @@ test.describe('release feed fan purchases', () => {
         const trackStack = row.getByRole('img', { name: 'Bought by Adam Pitts and Maya' })
         await expect(trackStack).toBeFocused()
         await expect(page.getByRole('tooltip')).toHaveText('Bought by Adam Pitts and Maya')
+    })
 
-        await releaseStack(page).focus()
-        await expect(page.getByRole('tooltip')).toHaveText('Adam Pitts, Maya, and River & Rain')
+    test('reaches each release buyer’s profile link by keyboard, before the release title', async ({
+        page,
+    }) => {
+        await page.context().route('https://bandcamp.com/**', route => route.fulfill({ body: 'Fan profile' }))
+        const release = createPurchasedAlbum([[adam, maya], [maya], [river]])
+        await openFeed(page, release)
+
+        await fanLink(page, adam).focus()
+        await page.keyboard.press('Tab')
+        await expect(fanLink(page, maya)).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(fanLink(page, river)).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(page.getByRole('link', { name: release.data.releaseName })).toBeFocused()
+
+        await fanLink(page, river).focus()
+        // `rel="noopener"` severs the opener, so the profile is watched for on the context.
+        const [profile] = await Promise.all([
+            page.context().waitForEvent('page'),
+            page.keyboard.press('Enter'),
+        ])
+        await expect(profile).toHaveURL(river.profileUrl)
+        await expect(page.getByRole('link', { name: release.data.releaseName })).toBeVisible()
     })
 
     test('shows an initial when a fan has no photo or the photo fails to load', async ({ page }) => {
@@ -132,6 +158,10 @@ test.describe('release feed fan purchases', () => {
         await expect(trackRow(page, 1).locator('[data-slot="avatar-group-count"]')).toHaveText('+2')
         await expect(trackRow(page, 2).locator('[data-slot="avatar"]')).toHaveCount(3)
         await expect(trackRow(page, 2).locator('[data-slot="avatar-group-count"]')).toHaveCount(0)
+        await expect(page.locator('.fan-summary')).toHaveText(
+            'Bought by Ada, Ben, Cyrus, Dee, Eve, Fay, Gus, and Hal',
+        )
+        await expect(releaseStack(page).getByRole('link')).toHaveCount(names.length)
 
         await trackRow(page, 0).getByRole('img').focus()
         await expect(page.getByRole('tooltip')).toHaveText(
@@ -139,21 +169,38 @@ test.describe('release feed fan purchases', () => {
         )
     })
 
-    test('truncates a long buyer name inside a narrow release column', async ({ page }) => {
-        await page.setViewportSize({ width: 800, height: 700 })
-        const longName = 'The Midnight Listening Club of Greater Manchester'
-        await openFeed(page, createPurchasedAlbum([[createBandcampFan(longName)], [], []]))
+    for (const longName of [
+        'The Midnight Listening Club of Greater Manchester',
+        'TheMidnightListeningClubOfGreaterManchesterAndSalford',
+    ]) {
+        test(`wraps the long buyer name “${longName}” inside a narrow release column`, async ({ page }) => {
+            await page.setViewportSize({ width: 800, height: 700 })
+            const longFan = createBandcampFan(longName)
+            await openFeed(page, createPurchasedAlbum([[longFan], [], []]))
 
-        const summary = page.locator('.fan-summary')
-        await expect(summary).toHaveText(`Bought by ${longName}`)
-        const overflow = await summary.evaluate(element => {
-            const column = element.closest('.text-column')
-            if (!column) throw new Error('Text column is missing')
-            return element.getBoundingClientRect().right - column.getBoundingClientRect().right
+            const summary = page.locator('.fan-summary')
+            await expect(summary).toHaveText(`Bought by ${longName}`)
+            await expect(fanLink(page, longFan)).toBeVisible()
+            const fit = await summary.evaluate(element => {
+                const column = element.closest('.text-column')
+                if (!column) throw new Error('Text column is missing')
+                const link = element.querySelector('a')
+                if (!link) throw new Error('Fan link is missing')
+                const columnRight = column.getBoundingClientRect().right
+                return {
+                    summaryOverflow: element.getBoundingClientRect().right - columnRight,
+                    linkOverflow:
+                        Math.max(...[...link.getClientRects()].map(rect => rect.right)) - columnRight,
+                    clipped: element.scrollWidth > element.clientWidth,
+                }
+            })
+            expect(fit.summaryOverflow).toBeLessThanOrEqual(0)
+            expect(fit.linkOverflow).toBeLessThanOrEqual(0)
+            expect(fit.clipped).toBe(false)
+            await fanLink(page, longFan).focus()
+            await expect(fanLink(page, longFan)).toBeFocused()
         })
-        expect(overflow).toBeLessThanOrEqual(0)
-        expect(await summary.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
-    })
+    }
 
     test('credits buyers on a release that first arrived as a new-release notification', async ({ page }) => {
         await openFeed(

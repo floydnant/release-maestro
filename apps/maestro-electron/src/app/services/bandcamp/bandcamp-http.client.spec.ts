@@ -55,14 +55,15 @@ describe('BandcampHttpClient', () => {
     })
 
     it.each([
-        ['seconds', '4', 6000],
-        ['HTTP date', 'Thu, 22 Oct 2026 10:00:04 GMT', 6000],
+        ['seconds', '4', 32_000],
+        ['HTTP date', 'Thu, 22 Oct 2026 10:00:04 GMT', 32_000],
+        ['longer server pause', '90', 92_000],
         ['absent header', null, 32_000],
         ['malformed header', 'later', 32_000],
         ['negative seconds', '-1', 32_000],
         ['fractional seconds', '1.5', 32_000],
-        ['zero seconds', '0', 3000],
-        ['past HTTP date', 'Thu, 22 Oct 2026 09:59:00 GMT', 3000],
+        ['zero seconds', '0', 32_000],
+        ['past HTTP date', 'Thu, 22 Oct 2026 09:59:00 GMT', 32_000],
     ])('retries using %s', async (_label, header, delay) => {
         fetchMock.mockResolvedValueOnce(
             new Response(null, { status: 429, headers: header === null ? {} : { 'Retry-After': header } }),
@@ -299,7 +300,7 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
-    it('pauses on a late 429 after a short cooldown and still escalates the next attempt', async () => {
+    it('keeps the same cooldown on a late 429 and still escalates the next attempt', async () => {
         fetchMock
             .mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '2' } }))
             .mockImplementationOnce(
@@ -316,16 +317,17 @@ describe('BandcampHttpClient', () => {
             )
         const first = client.get(firstUrl).catch(error => error)
         const late = client.get(secondUrl).catch(error => error)
-        await jest.advanceTimersByTimeAsync(2000)
+        await jest.advanceTimersByTimeAsync(3000)
         await first
-        const nextAttempt = client.get(firstUrl + '-next').catch(error => error)
-        await jest.advanceTimersByTimeAsync(1000)
-        await expect(late).resolves.toMatchObject({ retryAt: new Date(Date.now() + 30_000) })
+        await expect(late).resolves.toMatchObject({ retryAt: new Date(Date.now() + 27_000) })
         await expect(client.get(firstUrl + '-blocked')).rejects.toBeInstanceOf(
             BandcampApiRateLimitedException,
         )
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+        await jest.advanceTimersByTimeAsync(27_000)
+        const nextAttempt = client.get(firstUrl + '-next').catch(error => error)
+        await jest.advanceTimersByTimeAsync(2000)
         expect(fetchMock).toHaveBeenCalledTimes(3)
-        await jest.advanceTimersByTimeAsync(1000)
         await expect(nextAttempt).resolves.toMatchObject({ retryAt: new Date(Date.now() + 60_000) })
     })
 
@@ -349,7 +351,7 @@ describe('BandcampHttpClient', () => {
         await jest.advanceTimersByTimeAsync(0)
         const feed = client.get(secondUrl).catch(error => error)
         releaseFirst(new Response(null, { status: 429, headers: { 'Retry-After': '1' } }))
-        await jest.advanceTimersByTimeAsync(33_999)
+        await jest.advanceTimersByTimeAsync(31_999)
         await expect(feed).resolves.toBeInstanceOf(BandcampApiRateLimitedException)
         expect(fetchMock).toHaveBeenCalledTimes(2)
         await jest.advanceTimersByTimeAsync(1)
@@ -621,7 +623,7 @@ describe('BandcampHttpClient', () => {
         await jest.advanceTimersByTimeAsync(1)
         expect(fetchMock).toHaveBeenCalledTimes(2)
         await expect(client.get(secondUrl)).rejects.toBeInstanceOf(BandcampApiRateLimitedException)
-        await jest.advanceTimersByTimeAsync(5999)
+        await jest.advanceTimersByTimeAsync(31_999)
         expect(fetchMock).toHaveBeenCalledTimes(2)
         await jest.advanceTimersByTimeAsync(1)
         await expect(result).resolves.toMatchObject({ url: customUrl, html: 'OK' })
@@ -633,7 +635,7 @@ describe('BandcampHttpClient', () => {
         const customUrl = 'https://music.artist.example/album/first'
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '2' } }))
         const result = client.get(customUrl, { purpose: 'import' })
-        await jest.advanceTimersByTimeAsync(4000)
+        await jest.advanceTimersByTimeAsync(32_000)
         await expect(result).resolves.toMatchObject({ url: customUrl, html: 'OK' })
         await jest.advanceTimersByTimeAsync(5 * 60_000)
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 429 }))
