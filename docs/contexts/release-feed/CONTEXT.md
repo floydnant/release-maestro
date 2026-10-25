@@ -109,7 +109,8 @@ The Bandcamp album containing a track. Import reads the track page to resolve it
 before choosing the feed item's identity. A genuine standalone track keeps its own release URL.
 A missing or malformed track page keeps the original track URL because its album is unknown.
 Network failures leave the import checkpoint unchanged so the next pass can retry.
-Import runs at most four parent lookups at once and gives network and server failures two retries.
+Import schedules parent lookups across each email batch. The shared request gate limits active
+Bandcamp requests. Network and server failures get two retries.
 Bandcamp page requests share the app-wide cooldown described below. A
 processing failure stops the remaining export before the import reports its final error.
 

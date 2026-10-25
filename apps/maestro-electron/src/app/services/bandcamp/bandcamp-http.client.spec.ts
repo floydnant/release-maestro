@@ -26,17 +26,17 @@ describe('BandcampHttpClient', () => {
         jest.useRealTimers()
     })
 
-    it('spaces background requests across artist subdomains by three seconds', async () => {
+    it('spaces background starts across artist subdomains by 200ms', async () => {
         const requests = [firstUrl, secondUrl, firstUrl + '-third'].map(url =>
             client.get(url, { purpose: 'import' }),
         )
         await jest.advanceTimersByTimeAsync(0)
         expect(fetchMock).toHaveBeenCalledTimes(1)
-        await jest.advanceTimersByTimeAsync(2999)
+        await jest.advanceTimersByTimeAsync(199)
         expect(fetchMock).toHaveBeenCalledTimes(1)
         await jest.advanceTimersByTimeAsync(1)
         expect(fetchMock).toHaveBeenCalledTimes(2)
-        await jest.advanceTimersByTimeAsync(3000)
+        await jest.advanceTimersByTimeAsync(200)
         await Promise.all(requests)
         expect(fetchMock).toHaveBeenCalledTimes(3)
     })
@@ -506,28 +506,37 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
-    it('does not release the background queue until the response body finishes', async () => {
-        fetchMock.mockResolvedValueOnce(
-            new Response(
-                new ReadableStream({
-                    start(controller) {
-                        setTimeout(() => {
-                            controller.enqueue(new TextEncoder().encode('Slow body'))
-                            controller.close()
-                        }, 2500)
-                    },
-                }),
-            ),
+    it('holds background slots until bodies finish while letting the feed load immediately', async () => {
+        fetchMock.mockImplementation(async url =>
+            url === secondUrl
+                ? new Response('Feed page')
+                : new Response(
+                      new ReadableStream({
+                          start(controller) {
+                              setTimeout(() => {
+                                  controller.enqueue(new TextEncoder().encode('Slow body'))
+                                  controller.close()
+                              }, 2500)
+                          },
+                      }),
+                  ),
         )
-        const first = client.get(firstUrl, { purpose: 'import' })
-        const second = client.get(secondUrl, { purpose: 'import' })
-        await jest.advanceTimersByTimeAsync(2499)
-        expect(fetchMock).toHaveBeenCalledTimes(1)
+        const background = Array.from({ length: 5 }, (_, index) =>
+            client.get(`${firstUrl}-${index}`, { purpose: 'import' }),
+        )
+        await jest.advanceTimersByTimeAsync(800)
+        expect(fetchMock).toHaveBeenCalledTimes(4)
+        await expect(client.get(secondUrl)).resolves.toMatchObject({ html: 'Feed page' })
+        await jest.advanceTimersByTimeAsync(1699)
+        expect(fetchMock).toHaveBeenCalledTimes(5)
         await jest.advanceTimersByTimeAsync(1)
-        await expect(first).resolves.toMatchObject({ html: 'Slow body' })
-        await jest.advanceTimersByTimeAsync(500)
-        await second
-        expect(fetchMock).toHaveBeenCalledTimes(2)
+        // The first body is done, but foreground priority still keeps the two-second quiet tail.
+        await jest.advanceTimersByTimeAsync(299)
+        expect(fetchMock).toHaveBeenCalledTimes(5)
+        await jest.advanceTimersByTimeAsync(1)
+        expect(fetchMock).toHaveBeenCalledTimes(6)
+        await jest.advanceTimersByTimeAsync(2500)
+        await expect(Promise.all(background)).resolves.toHaveLength(5)
     })
 
     it('wraps body timeouts as retryable failures without blocking other feed requests', async () => {
@@ -607,7 +616,7 @@ describe('BandcampHttpClient', () => {
             .mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: customUrl } }))
             .mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '4' } }))
         const result = client.get(firstUrl, { purpose: 'import' })
-        await jest.advanceTimersByTimeAsync(2999)
+        await jest.advanceTimersByTimeAsync(199)
         expect(fetchMock).toHaveBeenCalledTimes(1)
         await jest.advanceTimersByTimeAsync(1)
         expect(fetchMock).toHaveBeenCalledTimes(2)
