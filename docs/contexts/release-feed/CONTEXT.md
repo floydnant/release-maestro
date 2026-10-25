@@ -156,6 +156,10 @@ which of the two is meant. A release is _announced_ and not necessarily owned; a
 from a file on disk. Neither converts to the other. See
 [CONTEXT-MAP](../../../CONTEXT-MAP.md).
 
+**Release day**:
+The calendar day Bandcamp assigns to a release (`releaseDate`). It can be in the future and has no
+time or timezone. It differs from the _event date_, which records when the notification email arrived.
+
 **Release feed**:
 The browsable collection of imported and hydrated releases shown to the user.
 
