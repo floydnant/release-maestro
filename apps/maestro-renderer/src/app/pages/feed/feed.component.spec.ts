@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing'
 import { provideRouter } from '@angular/router'
 import { provideTranslateService } from '@ngx-translate/core'
-import { HydratedFeedItem, ScrapedLinkMetadata } from '@release-maestro/core'
+import { calendarDaySchema, HydratedFeedItem, ScrapedLinkMetadata } from '@release-maestro/core'
 import { fromPartial } from '@total-typescript/shoehorn'
 import { EMPTY } from 'rxjs'
 import { FeedService } from '../../core/services/feed.service'
@@ -477,6 +477,118 @@ describe(FeedComponent.name, () => {
                 await advance(0)
                 expect(feedService.reloadFeedItems.mock.calls).toEqual([[['cooling']]])
             })
+        })
+    })
+
+    describe('timestamp line', () => {
+        // Local wall-clock times, so the calendar days match in any timezone.
+        const now = new Date('2026-10-23T12:00:00').getTime()
+
+        beforeEach(() => {
+            stubIntersectionObserver()
+            jest.useFakeTimers({ now, doNotFake: ['queueMicrotask', 'nextTick'] })
+        })
+        afterEach(() => {
+            jest.useRealTimers()
+        })
+
+        const dated = (
+            release: HydratedFeedItem,
+            releaseDate: string | null,
+            emailReceivedAt: string,
+            artist: string | null = 'Shiva Chandra',
+        ): HydratedFeedItem => ({
+            ...release,
+            data: {
+                ...release.data,
+                artist,
+                releaseDate: releaseDate === null ? null : calendarDaySchema.parse(releaseDate),
+                emailReceivedAt: new Date(emailReceivedAt),
+            },
+        })
+
+        /** What the line shows, without the spoken-only full dates, and what each timestamp says aloud. */
+        const timestampLine = (entry: HTMLElement | undefined) => {
+            const line = entry?.querySelector<HTMLElement>('.tralbum-title + p')
+            if (!line) throw new Error('The release has no timestamp line')
+            const normalize = (text: string | null) => (text ?? '').replace(/\s+/g, ' ').trim()
+            const visible = line.cloneNode(true) as HTMLElement
+            visible.querySelectorAll('.sr-only').forEach(spoken => spoken.remove())
+            return {
+                text: normalize(visible.textContent),
+                emailIcon: line.querySelector('time.email-received app-icon[aria-hidden="true"]'),
+                times: [...line.querySelectorAll('time')].map(time => ({
+                    datetime: time.getAttribute('datetime'),
+                    label: time.getAttribute('aria-label'),
+                    shown: normalize(time.querySelector('span[aria-hidden="true"]')?.textContent ?? null),
+                    spoken: normalize(time.querySelector('.sr-only')?.textContent ?? null),
+                })),
+            }
+        }
+
+        it('shows the release day, then when its email arrived, the same for every email kind', async () => {
+            const purchase: HydratedFeedItem = {
+                ...createRelease('purchased', []),
+                sourceType: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
+            }
+            feedService.loadFeed.mockResolvedValue([
+                dated(createRelease('past', []), '2026-10-07', '2026-10-03T10:00:00'),
+                dated(createRelease('upcoming', []), '2026-10-30', '2026-10-21T10:00:00'),
+                dated(createRelease('last-year', []), '2025-03-05', '2026-10-03T10:00:00'),
+                dated(purchase, '2026-10-07', '2026-10-03T10:00:00'),
+            ])
+            const { entryFor } = await renderFeed()
+
+            expect(timestampLine(entryFor('past')).text).toBe(
+                'by Shiva Chandra • released Oct 7 (16d ago) • 20d ago',
+            )
+            expect(timestampLine(entryFor('upcoming')).text).toBe(
+                'by Shiva Chandra • releases Oct 30 (in 7d) • 2d ago',
+            )
+            expect(timestampLine(entryFor('last-year')).text).toBe(
+                'by Shiva Chandra • released Mar 5 2025 (1y ago) • 20d ago',
+            )
+            expect(timestampLine(entryFor('purchased')).text).toBe(
+                'by Shiva Chandra • released Oct 7 (16d ago) • 20d ago',
+            )
+
+            // Each time speaks its full date, with the year and the time the email arrived, as its own
+            // text rather than a name, which the time role prohibits.
+            const past = timestampLine(entryFor('past'))
+            expect(past.emailIcon).not.toBeNull()
+            expect(past.times).toEqual([
+                {
+                    datetime: '2026-10-07',
+                    label: null,
+                    shown: 'released Oct 7 (16d ago)',
+                    spoken: 'Release date: October 7, 2026',
+                },
+                {
+                    datetime: new Date('2026-10-03T10:00:00').toISOString(),
+                    label: null,
+                    shown: '20d ago',
+                    spoken: 'Email received: October 3, 2026, 10:00 AM',
+                },
+            ])
+        })
+
+        it('shows only when the email arrived for a release without a date or artist', async () => {
+            feedService.loadFeed.mockResolvedValue([
+                dated(createRelease('undated', []), null, '2026-10-23T08:00:00', null),
+                dated(createRelease('undated-by-artist', []), null, '2026-10-22T08:00:00'),
+            ])
+            const { entryFor } = await renderFeed()
+
+            expect(timestampLine(entryFor('undated')).text).toBe('today')
+            expect(timestampLine(entryFor('undated-by-artist')).text).toBe('by Shiva Chandra • 1d ago')
+            expect(timestampLine(entryFor('undated')).times).toEqual([
+                {
+                    datetime: new Date('2026-10-23T08:00:00').toISOString(),
+                    label: null,
+                    shown: 'today',
+                    spoken: 'Email received: October 23, 2026, 8:00 AM',
+                },
+            ])
         })
     })
 

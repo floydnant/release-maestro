@@ -53,7 +53,7 @@ import { SafePipe } from '../../shared/pipes/safe.pipe'
 import {
     formatCalendarDateRelative,
     formatDuration,
-    formatReleaseDateRelative,
+    formatReleaseDate,
 } from '../../shared/utils/formatting.utils'
 import { settingsLink } from '../settings/settings-link'
 import { FanAvatarStackComponent } from './fan-avatar-stack.component'
@@ -725,7 +725,7 @@ export class FeedComponent {
 
     formatDuration = formatDuration
     formatCalendarDateRelative = formatCalendarDateRelative
-    formatReleaseDateRelative = formatReleaseDateRelative
+    formatReleaseDate = formatReleaseDate
     isAfter = (date: Date, otherDate: Date) => {
         return new Date(date).getTime() > new Date(otherDate).getTime()
     }
