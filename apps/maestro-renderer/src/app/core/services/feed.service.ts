@@ -36,6 +36,35 @@ export function isEmailImportRunning(
     }
 }
 
+/** What a running import shows: a spinner until the export reports a count, then that count. */
+export function emailImportActivity(update: RunningEmailImportUpdate) {
+    switch (update.phase) {
+        case 'started':
+            return {
+                phase: update.phase,
+                ring: 'spinning',
+                percent: 0,
+                label: 'Checking mail…',
+                count: null,
+            } as const
+        case 'processing':
+        case 'finishing': {
+            const { current, total } = update
+            return {
+                phase: update.phase,
+                ring: 'progress',
+                // Multiplied first, so a count that divides evenly gives a whole percent
+                percent: total === 0 ? 0 : (current * 100) / total,
+                // After the export, counts emails whose batch is done; it can wait on Bandcamp for a long time
+                label: update.phase === 'processing' ? 'Importing emails' : 'Processing emails',
+                count: `${current}/${total}`,
+            } as const
+        }
+        default:
+            return assertUnreachable(update)
+    }
+}
+
 @Injectable({
     providedIn: 'root',
 })

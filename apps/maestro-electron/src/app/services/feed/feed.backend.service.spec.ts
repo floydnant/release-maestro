@@ -133,7 +133,7 @@ describe('FeedBackendService email import', () => {
         emails$.complete()
         try {
             await new Promise<void>(resolve => setImmediate(resolve))
-            expect(reported.at(-1)).toEqual({ phase: 'finishing' })
+            expect(reported.at(-1)).toEqual({ phase: 'finishing', current: 0, total: 51 })
             await expect(
                 feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp'),
             ).resolves.toBeNull()
@@ -143,7 +143,47 @@ describe('FeedBackendService email import', () => {
         }
         expect(reported.at(-1)).toMatchObject({ phase: 'completed', totalProcessed: 51 })
         const afterExport = reported.slice(reported.findIndex(update => update.phase === 'finishing'))
-        expect(afterExport.map(update => update.phase)).toEqual(['finishing', 'completed'])
+        expect(afterExport).toEqual([
+            { phase: 'finishing', current: 0, total: 51 },
+            { phase: 'finishing', current: 50, total: 51 },
+            { phase: 'finishing', current: 51, total: 51 },
+            expect.objectContaining({ phase: 'completed', totalProcessed: 51 }),
+        ])
+    })
+
+    it('carries completed emails into finishing and advances only after the next batch is saved', async () => {
+        let finishSaving = () => {}
+        const saving = new Promise<void>(resolve => (finishSaving = resolve))
+        const ingest = feedRepository.ingestFeedItems.bind(feedRepository)
+        let batches = 0
+        jest.spyOn(feedRepository, 'ingestFeedItems').mockImplementation(async items => {
+            if (++batches === 2) await saving
+            return ingest(items)
+        })
+        const { updates, reported } = await runImport()
+        // Skipped and unrelated emails still count as handled, even when they produce no releases.
+        emails$.next({ current: 1, total: 100, email: null })
+        for (let current = 2; current <= 50; current++)
+            emails$.next(packet('2026-10-01T21:40:12', current, 100))
+        await new Promise<void>(resolve => setImmediate(resolve))
+        expect(reported.every(update => update.phase === 'processing')).toBe(true)
+        for (let current = 51; current <= 100; current++)
+            emails$.next(packet('2026-10-01T21:40:12', current, 100))
+        emails$.complete()
+        try {
+            await new Promise<void>(resolve => setImmediate(resolve))
+            expect(batches).toBe(2)
+            expect(reported.at(-1)).toEqual({ phase: 'finishing', current: 50, total: 100 })
+        } finally {
+            finishSaving()
+            await updates
+        }
+        expect(reported.filter(update => update.phase === 'finishing')).toEqual([
+            { phase: 'finishing', current: 50, total: 100 },
+            { phase: 'finishing', current: 100, total: 100 },
+        ])
+        expect(reported.at(-1)).toMatchObject({ phase: 'completed', totalProcessed: 100, skippedEmails: 1 })
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
     })
 
     it('cancels queued processing after export without advancing the checkpoint', async () => {
@@ -161,7 +201,7 @@ describe('FeedBackendService email import', () => {
         emails$.complete()
         await started
         try {
-            expect(reported.at(-1)).toEqual({ phase: 'finishing' })
+            expect(reported.at(-1)).toEqual({ phase: 'finishing', current: 0, total: 1 })
         } finally {
             abortController.abort()
             await updates
@@ -673,7 +713,7 @@ describe('FeedBackendService email import', () => {
         const reported = await updates
         expect(reported.at(-1)).toEqual({ phase: 'cancelled' })
         expect(reported).not.toContainEqual(expect.objectContaining({ phase: 'completed' }))
-        expect(reported).not.toContainEqual({ phase: 'finishing' })
+        expect(reported).not.toContainEqual(expect.objectContaining({ phase: 'finishing' }))
         await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
     })
 

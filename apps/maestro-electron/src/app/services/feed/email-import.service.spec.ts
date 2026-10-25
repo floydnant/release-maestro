@@ -145,13 +145,13 @@ describe('EmailImportService', () => {
 
         const auto = service.start('auto')
         await Promise.resolve()
-        progress$.next({ phase: 'finishing' })
+        progress$.next({ phase: 'finishing', current: 50, total: 100 })
         const manual = service.start('manual')
 
         expect(triggerEmailImport).toHaveBeenCalledTimes(1)
         expect(updates.slice(-2)).toEqual([
-            { phase: 'finishing', trigger: 'auto' },
-            { phase: 'finishing', trigger: 'manual' },
+            { phase: 'finishing', current: 50, total: 100, trigger: 'auto' },
+            { phase: 'finishing', current: 50, total: 100, trigger: 'manual' },
         ])
 
         service.cancel()
