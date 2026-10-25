@@ -1,29 +1,29 @@
 import { setTimeout as waitForRetry } from 'node:timers/promises'
 import {
-    bufferCount,
+    connect,
     concatMap,
     concatWith,
     defer,
+    endWith,
     filter,
     from,
+    ignoreElements,
     materialize,
     map,
-    lastValueFrom,
     merge,
     mergeMap,
     Observable,
     tap,
-    toArray,
 } from 'rxjs'
 import {
     BandcampEmailFeedSourceItem,
     BandcampFeedItem,
     BandcampPurchase,
     EmailImportProgress,
+    EmailImportStreamPacket,
     FetchFailedException,
     HydratedBandcampReleaseFeedItem,
     HydratedFeedItem,
-    isTruthy,
     assertUnreachable,
     mapBandcampReleaseFeedItemToHydratedFeedItem,
     resolveFeedSettings,
@@ -52,6 +52,7 @@ const UNPLAYABLE_RELEASE_RECHECK_MS = 1000 * 60 * 5
 const MAX_UNPLAYABLE_RELEASE_CHECKS = 1000
 // Keeps the request gate's background slots filled; the gate owns the network limit.
 const MAX_PARENT_ALBUM_LOOKUPS = 8
+const EMAIL_IMPORT_SAVE_BATCH_SIZE = 50
 const PARENT_ALBUM_LOOKUP_RETRY_MS = [250, 1000]
 
 const createBandcampFeedItem = (
@@ -143,15 +144,56 @@ export class FeedBackendService {
             current: totalProcessed,
             total: totalExported,
         })
-        const parentAlbums = new Map<string, Promise<string>>()
-        const resolveReleaseUrl = (releaseUrl: string): Promise<string> => {
-            if (!releaseUrl.includes('/track/')) return Promise.resolve(releaseUrl)
-            let resolved = parentAlbums.get(releaseUrl)
-            if (!resolved) {
-                resolved = this.resolveParentAlbumUrl(releaseUrl, workSignal)
-                parentAlbums.set(releaseUrl, resolved)
+        type PendingEmail = {
+            email: BandcampEmailFeedSourceItem | null
+            purchases: BandcampPurchase[]
+        }
+        const pendingEmails: PendingEmail[] = []
+        // A null value reserves a lookup before it reaches the concurrency limit.
+        const parentAlbums = new Map<string, string | null>()
+        const resolveReleaseUrl = (url: string): string | null =>
+            url.includes('/track/') ? (parentAlbums.get(url) ?? null) : url
+        const enqueue = ({ email: rawEmail }: EmailImportStreamPacket): string[] => {
+            if (!rawEmail) {
+                skippedEmails++
+            } else {
+                const receivedAt = new Date(rawEmail.dateReceived)
+                if (receivedAt.getTime() > (newestReceivedAt?.getTime() ?? -Infinity)) {
+                    newestReceivedAt = receivedAt
+                }
             }
-            return resolved
+            const email = rawEmail ? parseBandcampEmail(rawEmail) : null
+            const purchases: BandcampPurchase[] =
+                email?.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'
+                    ? email.purchases
+                    : email
+                      ? [{ tralbumUrl: email.releaseUrl, fans: [] }]
+                      : []
+            // Skipped and unrelated emails still count, in the same order as the export.
+            pendingEmails.push({ email, purchases })
+            const lookups: string[] = []
+            for (const { tralbumUrl } of purchases) {
+                if (tralbumUrl.includes('/track/') && !parentAlbums.has(tralbumUrl)) {
+                    parentAlbums.set(tralbumUrl, null)
+                    lookups.push(tralbumUrl)
+                }
+            }
+            return lookups
+        }
+        const takeReadyChunks = (): PendingEmail[][] => {
+            if (workSignal.aborted) return []
+            const firstPending = pendingEmails.findIndex(({ purchases }) =>
+                purchases.some(purchase => resolveReleaseUrl(purchase.tralbumUrl) === null),
+            )
+            const readyCount = firstPending === -1 ? pendingEmails.length : firstPending
+            // Batch fast export traffic; after export, show real progress as lookups finish.
+            const count = exportFinished
+                ? readyCount
+                : readyCount - (readyCount % EMAIL_IMPORT_SAVE_BATCH_SIZE)
+            const ready = pendingEmails.splice(0, count)
+            return Array.from({ length: Math.ceil(count / EMAIL_IMPORT_SAVE_BATCH_SIZE) }, (_, index) =>
+                ready.slice(index * EMAIL_IMPORT_SAVE_BATCH_SIZE, (index + 1) * EMAIL_IMPORT_SAVE_BATCH_SIZE),
+            )
         }
 
         const emails$ = await this.emailRepo.loadEmails(vendor, workSignal, mailboxName, receivedSince)
@@ -161,7 +203,6 @@ export class FeedBackendService {
                 materialize(),
                 map((notification): EmailImportProgress | null => {
                     if (notification.kind == 'C') {
-                        exportFinished = true
                         return totalExported > 0 && !workSignal.aborted ? finishingProgress() : null
                     }
                     // The buffered stream reports the final error after export progress drains.
@@ -181,63 +222,49 @@ export class FeedBackendService {
                 }),
             ),
             emails$.pipe(
-                bufferCount(50),
-                concatMap(async emailPackets => {
-                    console.log('Processing batch of emails:', emailPackets.length)
-
-                    for (const { email } of emailPackets) {
-                        if (!email) {
-                            skippedEmails++
-                            continue
-                        }
-                        const receivedAt = new Date(email.dateReceived)
-                        if (receivedAt.getTime() > (newestReceivedAt?.getTime() ?? -Infinity)) {
-                            newestReceivedAt = receivedAt
-                        }
-                    }
-
-                    const emailFeedSourceItems = emailPackets
-                        .map(packet => packet.email)
-                        .filter(isTruthy)
-                        // @TODO: figure out strategised email parsing (i.e. plugins for different email types)
-                        .map(email => parseBandcampEmail(email))
-                        .filter(isTruthy)
-
-                    const emailPurchases = emailFeedSourceItems.map(email => ({
-                        email,
-                        purchases:
-                            email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'
-                                ? email.purchases
-                                : [{ tralbumUrl: email.releaseUrl, fans: [] }],
-                    }))
-                    // Look up the whole batch at once so single-purchase emails share the lookup slots
-                    const releaseUrls = new Map(
-                        await lastValueFrom(
-                            from(
-                                new Set(
-                                    emailPurchases.flatMap(({ purchases }) =>
-                                        purchases.map(purchase => purchase.tralbumUrl),
-                                    ),
+                map(enqueue),
+                // Subscribe all three branches before consuming even a synchronous export source.
+                connect(enqueued$ => {
+                    const exportComplete = Symbol('Email export complete')
+                    const resolved$ = enqueued$.pipe(
+                        mergeMap(urls => from(urls)),
+                        mergeMap(
+                            url =>
+                                defer(() => this.resolveParentAlbumUrl(url, workSignal)).pipe(
+                                    tap(albumUrl => parentAlbums.set(url, albumUrl)),
                                 ),
-                            ).pipe(
-                                mergeMap(
-                                    async (url): Promise<[string, string]> => [
-                                        url,
-                                        await resolveReleaseUrl(url),
-                                    ],
-                                    MAX_PARENT_ALBUM_LOOKUPS,
-                                ),
-                                toArray(),
-                            ),
+                            MAX_PARENT_ALBUM_LOOKUPS,
                         ),
                     )
-
+                    return merge(
+                        enqueued$,
+                        resolved$,
+                        enqueued$.pipe(ignoreElements(), endWith(exportComplete)),
+                    ).pipe(
+                        tap(event => {
+                            if (event === exportComplete) exportFinished = true
+                        }),
+                        mergeMap(() => from(takeReadyChunks())),
+                    )
+                }),
+                // A lookup failure waits for any earlier save to settle before it ends the import.
+                materialize(),
+                concatMap(async (notification): Promise<EmailImportProgress | null> => {
+                    if (notification.kind === 'E') throw notification.error
+                    if (notification.kind === 'C') {
+                        if (!workSignal.aborted && pendingEmails.length > 0)
+                            throw new Error('Email import ended with unresolved emails')
+                        return null
+                    }
+                    workSignal.throwIfAborted()
+                    const readyEmails = notification.value
                     const feedItems: BandcampFeedItem[] = []
-                    for (const { email, purchases } of emailPurchases) {
+                    for (const { email, purchases } of readyEmails) {
+                        if (!email) continue
                         const releases = new Map<string, BandcampFeedItem>()
                         for (const purchase of purchases) {
-                            const releaseUrl = releaseUrls.get(purchase.tralbumUrl)
-                            if (releaseUrl === undefined)
+                            const releaseUrl = resolveReleaseUrl(purchase.tralbumUrl)
+                            if (releaseUrl === null)
                                 throw new Error(`No release URL was resolved for ${purchase.tralbumUrl}`)
                             const attribution =
                                 email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' ? [purchase] : []
@@ -256,10 +283,9 @@ export class FeedBackendService {
                         }
                         feedItems.push(...releases.values())
                     }
-                    totalImported += feedItems.length
-
                     await this.feedBackendRepository.ingestFeedItems(feedItems)
-                    totalProcessed += emailPackets.length
+                    totalImported += feedItems.length
+                    totalProcessed += readyEmails.length
                     return exportFinished && !workSignal.aborted ? finishingProgress() : null
                 }),
                 materialize(),
