@@ -9,10 +9,14 @@ import {
     output,
     signal,
 } from '@angular/core'
-import { assertUnreachable, EmailImportProgressUpdate } from '@release-maestro/core'
+import { EmailImportProgressUpdate } from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
-import { isEmailImportRunning, RunningEmailImportUpdate } from './core/services/feed.service'
+import {
+    emailImportActivity,
+    isEmailImportRunning,
+    RunningEmailImportUpdate,
+} from './core/services/feed.service'
 import { IconComponent } from './shared/components/icon/icon.component'
 import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
 import { MinDwellPacer } from './shared/utils/min-dwell-pacer'
@@ -48,36 +52,10 @@ export class EmailImportIndicatorComponent {
     protected readonly activity = computed(() => {
         const view = this.view()
         if (!isEmailImportRunning(view)) return null
-        switch (view.phase) {
-            case 'started':
-                return {
-                    ring: 'spinning',
-                    color: 'content.secondary',
-                    percent: 0,
-                    label: 'Checking mail…',
-                    count: null,
-                } as const
-            case 'processing':
-                return {
-                    ring: 'progress',
-                    color: 'content.success',
-                    percent: view.total === 0 ? 0 : (view.current / view.total) * 100,
-                    label: 'Importing emails',
-                    count: `${view.current}/${view.total}`,
-                } as const
-            case 'finishing':
-                // The full ring keeps its colour and starts spinning: the same import, still at work.
-                // No count or estimate, since lookups can wait on Bandcamp for a long time.
-                return {
-                    ring: 'spinning',
-                    color: 'content.success',
-                    percent: 0,
-                    label: 'Adding releases…',
-                    count: null,
-                } as const
-            default:
-                return assertUnreachable(view)
-        }
+        const activity = emailImportActivity(view)
+        // A counted ring keeps the success colour from the export through processing: the same import
+        const color = activity.ring === 'spinning' ? 'content.secondary' : 'content.success'
+        return { ...activity, color } as const
     })
     /** The paced view can trail the import by a second; the cancel button must not. */
     protected readonly isRunning = computed(() => isEmailImportRunning(this.update()))

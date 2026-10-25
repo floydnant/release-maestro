@@ -285,7 +285,13 @@
                                         [attr.datetime]="feedItem.data.emailReceivedAt.toISOString()"
                                         [hlmTooltip]="emailReceivedLabel"
                                     >
-                                        <app-icon name="email" size="0.875rem" aria-hidden="true" />
+                                        <!-- Centred on the date's line: on its baseline, the icon would sit above the text -->
+                                        <app-icon
+                                            class="self-center"
+                                            name="email"
+                                            size="0.875rem"
+                                            aria-hidden="true"
+                                        />
                                         <span aria-hidden="true">
                                             {{ formatCalendarDateRelative(feedItem.data.emailReceivedAt) }}
                                         </span>
