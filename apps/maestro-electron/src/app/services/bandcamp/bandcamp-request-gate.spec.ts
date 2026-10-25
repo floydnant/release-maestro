@@ -217,7 +217,92 @@ describe(BandcampRequestGate.name, () => {
         expect(gate.state.activeBackground).toBe(0)
     })
 
-    it('gives expired Retry-After values a positive delay for automatic foreground retries', () => {
-        expect(gate.rateLimited(0, gate.state.epoch)).toBe(Date.now() + 1000)
+    it('keeps the recovery backoff when Retry-After is already expired', () => {
+        expect(gate.rateLimited(0, gate.state.epoch)).toBe(Date.now() + 30_000)
+    })
+
+    it('bounds sustained background traffic while allowing a short initial burst', async () => {
+        const starts: number[] = []
+        const requests = Array.from({ length: 150 }, () =>
+            gate.acquire('import', signal()).then(permit => {
+                starts.push(Date.now() - 1_000_000)
+                permit?.()
+            }),
+        )
+
+        await jest.advanceTimersByTimeAsync(9599)
+        expect(starts).toHaveLength(48)
+        await jest.advanceTimersByTimeAsync(1)
+        expect(starts.at(-1)).toBe(9600)
+        await jest.advanceTimersByTimeAsync(399)
+        expect(starts).toHaveLength(49)
+        await jest.advanceTimersByTimeAsync(1)
+        expect(starts.at(-1)).toBe(10_000)
+        await jest.advanceTimersByTimeAsync(49_999)
+        expect(starts).toHaveLength(149)
+        await jest.advanceTimersByTimeAsync(1)
+        await Promise.all(requests)
+        expect(starts.at(-1)).toBe(60_000)
+    })
+
+    it.each([
+        [5, 3000],
+        [100, 15_000],
+    ])('admits %i feed requests without waiting and delays background by %ims', async (count, delay) => {
+        const initial = Array.from({ length: 50 }, () =>
+            gate.acquire('import', signal()).then(permit => permit?.()),
+        )
+        await jest.advanceTimersByTimeAsync(10_000)
+        await Promise.all(initial)
+        const releaseLease = gate.holdForeground()
+        for (let index = 0; index < count; index++) {
+            const permit = await gate.acquire('feed', signal())
+            expect(permit).not.toBeNull()
+            permit?.()
+        }
+        const admitted = jest.fn()
+        const waiting = gate.acquire('import', signal()).then(admitted)
+        releaseLease()
+        await jest.advanceTimersByTimeAsync(delay - 1)
+        expect(admitted).not.toHaveBeenCalled()
+        await jest.advanceTimersByTimeAsync(1)
+        await waiting
+        expect(admitted).toHaveBeenCalledTimes(1)
+        admitted.mock.calls[0][0]?.()
+    })
+
+    it('does not charge a cancelled caller waiting for the sustained budget', async () => {
+        const initial = Array.from({ length: 50 }, () =>
+            gate.acquire('import', signal()).then(permit => permit?.()),
+        )
+        await jest.advanceTimersByTimeAsync(10_000)
+        await Promise.all(initial)
+        const controller = new AbortController()
+        const cancelled = gate.acquire('import', controller.signal).catch(error => error)
+        controller.abort()
+        await expect(cancelled).resolves.toBe(controller.signal.reason)
+        const admitted = jest.fn()
+        const next = gate.acquire('import', signal()).then(admitted)
+        await jest.advanceTimersByTimeAsync(499)
+        expect(admitted).not.toHaveBeenCalled()
+        await jest.advanceTimersByTimeAsync(1)
+        await next
+        expect(admitted).toHaveBeenCalledTimes(1)
+        admitted.mock.calls[0][0]?.()
+    })
+
+    it('keeps one deadline for late responses from a rejected burst unless the server asks for longer', async () => {
+        const epoch = gate.state.epoch
+        expect(gate.rateLimited(3000, epoch)).toBe(1_030_000)
+        await jest.advanceTimersByTimeAsync(5000)
+        expect(gate.rateLimited(3000, epoch)).toBe(1_030_000)
+        expect(gate.rateLimited(600_000, epoch)).toBe(1_605_000)
+        expect(gate.state.epoch).toBe(1)
+    })
+
+    it('does not let repeated short Retry-After headers suppress the recovery backoff', () => {
+        expect(gate.rateLimited(3000, gate.state.epoch)).toBe(Date.now() + 30_000)
+        expect(gate.rateLimited(3000, gate.state.epoch)).toBe(Date.now() + 60_000)
+        expect(gate.rateLimited(3000, gate.state.epoch)).toBe(Date.now() + 120_000)
     })
 })
