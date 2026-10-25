@@ -52,7 +52,8 @@ import { FeedBackendRepository } from './feed.backend.repository'
 const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
 const UNPLAYABLE_RELEASE_RECHECK_MS = 1000 * 60 * 5
 const MAX_UNPLAYABLE_RELEASE_CHECKS = 1000
-const MAX_PARENT_ALBUM_LOOKUPS = 4
+// Keeps the request gate's background slots filled; the gate owns the network limit.
+const MAX_PARENT_ALBUM_LOOKUPS = 8
 const PARENT_ALBUM_LOOKUP_RETRY_MS = [250, 1000]
 
 const createBandcampFeedItem = (
@@ -197,27 +198,42 @@ export class FeedBackendService {
                         .map(email => parseBandcampEmail(email))
                         .filter(isTruthy)
 
-                    const feedItems: BandcampFeedItem[] = []
-                    for (const email of emailFeedSourceItems) {
-                        const releases = new Map<string, BandcampFeedItem>()
-                        const purchases =
+                    const emailPurchases = emailFeedSourceItems.map(email => ({
+                        email,
+                        purchases:
                             email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'
                                 ? email.purchases
-                                : [{ tralbumUrl: email.releaseUrl, fans: [] }]
-                        const resolved = await lastValueFrom(
-                            from(purchases).pipe(
+                                : [{ tralbumUrl: email.releaseUrl, fans: [] }],
+                    }))
+                    // Look up the whole batch at once so single-purchase emails share the lookup slots
+                    const releaseUrls = new Map(
+                        await lastValueFrom(
+                            from(
+                                new Set(
+                                    emailPurchases.flatMap(({ purchases }) =>
+                                        purchases.map(purchase => purchase.tralbumUrl),
+                                    ),
+                                ),
+                            ).pipe(
                                 mergeMap(
-                                    async (purchase, index) => ({
-                                        purchase,
-                                        index,
-                                        releaseUrl: await resolveReleaseUrl(purchase.tralbumUrl),
-                                    }),
+                                    async (url): Promise<[string, string]> => [
+                                        url,
+                                        await resolveReleaseUrl(url),
+                                    ],
                                     MAX_PARENT_ALBUM_LOOKUPS,
                                 ),
                                 toArray(),
                             ),
-                        )
-                        for (const { purchase, releaseUrl } of resolved.sort((a, b) => a.index - b.index)) {
+                        ),
+                    )
+
+                    const feedItems: BandcampFeedItem[] = []
+                    for (const { email, purchases } of emailPurchases) {
+                        const releases = new Map<string, BandcampFeedItem>()
+                        for (const purchase of purchases) {
+                            const releaseUrl = releaseUrls.get(purchase.tralbumUrl)
+                            if (releaseUrl === undefined)
+                                throw new Error(`No release URL was resolved for ${purchase.tralbumUrl}`)
                             const attribution =
                                 email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' ? [purchase] : []
                             const previous = releases.get(releaseUrl)

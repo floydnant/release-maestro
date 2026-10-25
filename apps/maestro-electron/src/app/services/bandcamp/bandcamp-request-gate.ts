@@ -1,7 +1,11 @@
 export type BandcampRequestPurpose = 'import' | 'feed' | 'preview'
 
-// Starting policies, not a published Bandcamp quota. The request journal supplies tuning evidence.
-const MIN_BACKGROUND_INTERVAL_MS = 3000
+// bandcamp-fetch 3.2.1 uses 200ms between operation starts and five concurrent operations.
+// Keep one fewer background slot; feed requests retain separate capacity instead of waiting on bodies.
+// These are starting policies, not a published Bandcamp quota.
+const MIN_BACKGROUND_INTERVAL_MS = 200
+const MAX_BACKGROUND_REQUESTS = 4
+const RATE_LIMIT_BACKGROUND_INTERVAL_MS = 3000
 const MAX_BACKGROUND_INTERVAL_MS = 30_000
 const FOREGROUND_QUIET_MS = 2000
 const MAX_FOREGROUND_REQUESTS = 5
@@ -23,7 +27,8 @@ export class BandcampRequestGate {
     private wakeup: ReturnType<typeof setTimeout> | undefined
     private foregroundLeases = 0
     private activeForeground = 0
-    private activeBackground = false
+    private activeBackground = 0
+    private backgroundLimit = MAX_BACKGROUND_REQUESTS
     private quietUntil = 0
     private nextBackgroundAt = 0
     private backgroundInterval = MIN_BACKGROUND_INTERVAL_MS
@@ -37,6 +42,7 @@ export class BandcampRequestGate {
             cooldownUntil: this.cooldown,
             epoch: this.rateLimitEpoch,
             backgroundIntervalMs: this.backgroundInterval,
+            backgroundLimit: this.backgroundLimit,
             foregroundLeases: this.foregroundLeases,
             activeForeground: this.activeForeground,
             activeBackground: this.activeBackground,
@@ -80,7 +86,11 @@ export class BandcampRequestGate {
         if (this.rateLimitEpoch === requestEpoch) {
             this.consecutiveRateLimits++
             this.rateLimitEpoch++
-            this.backgroundInterval = Math.min(this.backgroundInterval * 2, MAX_BACKGROUND_INTERVAL_MS)
+            this.backgroundLimit = 1
+            this.backgroundInterval = Math.min(
+                Math.max(RATE_LIMIT_BACKGROUND_INTERVAL_MS, this.backgroundInterval * 2),
+                MAX_BACKGROUND_INTERVAL_MS,
+            )
         }
         const backoff = Math.min(
             RATE_LIMIT_BACKOFF_MS * 2 ** Math.max(0, this.consecutiveRateLimits - 1),
@@ -97,7 +107,9 @@ export class BandcampRequestGate {
         if (this.rateLimitEpoch !== requestEpoch) return
         this.consecutiveRateLimits = 0
         if (purpose !== 'feed' && ++this.cleanBackgroundResponses >= 20) {
-            this.backgroundInterval = Math.max(MIN_BACKGROUND_INTERVAL_MS, this.backgroundInterval / 2)
+            if (this.backgroundInterval > MIN_BACKGROUND_INTERVAL_MS)
+                this.backgroundInterval = Math.max(MIN_BACKGROUND_INTERVAL_MS, this.backgroundInterval / 2)
+            else this.backgroundLimit = Math.min(MAX_BACKGROUND_REQUESTS, this.backgroundLimit + 1)
             this.cleanBackgroundResponses = 0
         }
     }
@@ -138,7 +150,8 @@ export class BandcampRequestGate {
                 )
             }
         }
-        if (this.foregroundLeases || this.activeForeground || this.activeBackground) return
+        if (this.foregroundLeases || this.activeForeground || this.activeBackground >= this.backgroundLimit)
+            return
         const next =
             this.waiting.find(request => request.purpose === 'preview') ??
             this.waiting.find(request => request.purpose === 'import')
@@ -153,14 +166,16 @@ export class BandcampRequestGate {
             this.wakeup = setTimeout(() => this.pump(), readyAt - now)
             return
         }
-        this.activeBackground = true
+        this.activeBackground++
         this.nextBackgroundAt = now + this.backgroundInterval
         this.admit(
             next,
             this.once(() => {
-                this.activeBackground = false
+                this.activeBackground--
                 this.pump()
             }),
         )
+        // Fill remaining slots at the next paced start, without waiting for an earlier body.
+        this.pump()
     }
 }
