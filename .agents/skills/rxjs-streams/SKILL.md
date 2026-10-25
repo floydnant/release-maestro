@@ -58,10 +58,11 @@ bookkeeping.
 `library.service.ts` adapt `ipcRenderer.on` into a stream. Prefer it over a hand-rolled `Subject` when
 the source is already an add/remove listener pair.
 
-**Batching a fast producer.** `feed.backend.service.ts` uses `bufferCount(50)` followed by
-`concatMap` — collect 50, then process batches strictly in order. That pairing is the idiom for a
-producer faster than its consumer where order still matters; `bufferCount` with `mergeMap` would
-silently interleave.
+**Parallel preparation, ordered persistence.** `feed.backend.service.ts` uses `connect` to share
+exported emails between lookup and readiness branches. A bounded `mergeMap` resolves track URLs;
+a queue of pending emails releases them in source order, and `concatMap` serializes their saves. Saves are
+batched during export and become incremental afterwards, so progress follows saved emails while
+lookups remain concurrent.
 
 **Carrying errors across a boundary.** The same file uses `materialize()` so completion and error
 become ordinary values that survive the IPC hop, then reconstitutes them on the far side. A raw error
