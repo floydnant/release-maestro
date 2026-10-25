@@ -55,7 +55,7 @@ export function emailImportActivity(update: RunningEmailImportUpdate) {
                 ring: 'progress',
                 // Multiplied first, so a count that divides evenly gives a whole percent
                 percent: total === 0 ? 0 : (current * 100) / total,
-                // After the export, counts emails whose batch is done; it can wait on Bandcamp for a long time
+                // After export, counts emails saved so far; it can wait on Bandcamp for a long time
                 label: update.phase === 'processing' ? 'Importing emails' : 'Processing emails',
                 count: `${current}/${total}`,
             } as const

@@ -118,6 +118,55 @@ describe('FeedBackendService email import', () => {
         expect((await updates).map(update => update.phase)).toEqual(['completed'])
     })
 
+    it('advances processing for each email in a five-email import while later lookups are pending', async () => {
+        const finishLookups: (() => void)[] = []
+        scrapeTralbumInfo.mockImplementation(
+            () =>
+                new Promise(resolve => {
+                    finishLookups.push(() => resolve({ ...scrapedBandcampAlbum, type: 'track' }))
+                }),
+        )
+        const { updates, reported } = await runImport()
+        for (let current = 1; current <= 5; current++) {
+            emails$.next({
+                ...releasePacket(
+                    '2026-10-01T21:40:12',
+                    `https://test.bandcamp.com/track/progress-${current}`,
+                ),
+                current,
+                total: 5,
+            })
+        }
+        emails$.complete()
+
+        try {
+            await new Promise<void>(resolve => setImmediate(resolve))
+            expect(finishLookups).toHaveLength(5)
+            expect(reported.at(-1)).toEqual({ phase: 'finishing', current: 0, total: 5 })
+            for (let index = 0; index < 4; index++) {
+                finishLookups[index]?.()
+                await new Promise<void>(resolve => setImmediate(resolve))
+                expect(reported.at(-1)).toEqual({ phase: 'finishing', current: index + 1, total: 5 })
+                expect(
+                    await feedRepository.listFeedItems({
+                        index: 0,
+                        count: 5,
+                        snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+                    }),
+                ).toHaveLength(index + 1)
+                expect(reported.some(update => update.phase === 'completed')).toBe(false)
+            }
+        } finally {
+            for (const finish of finishLookups) finish()
+            await updates
+        }
+
+        expect(reported.filter(update => update.phase === 'finishing')).toEqual(
+            Array.from({ length: 6 }, (_, current) => ({ phase: 'finishing', current, total: 5 })),
+        )
+        expect(reported.at(-1)).toMatchObject({ phase: 'completed', totalProcessed: 5 })
+    })
+
     it('reports processing after export while queued batches are still resolving releases', async () => {
         let finishLookup = () => {}
         scrapeTralbumInfo.mockImplementationOnce(
@@ -149,6 +198,100 @@ describe('FeedBackendService email import', () => {
             { phase: 'finishing', current: 51, total: 51 },
             expect.objectContaining({ phase: 'completed', totalProcessed: 51 }),
         ])
+    })
+
+    it('combines ready emails behind a slow lookup into bounded saves', async () => {
+        let finishLookup = () => {}
+        scrapeTralbumInfo.mockImplementationOnce(
+            () =>
+                new Promise(resolve => {
+                    finishLookup = () => resolve({ ...scrapedBandcampAlbum, type: 'track' })
+                }),
+        )
+        const ingest = jest.spyOn(feedRepository, 'ingestFeedItems')
+        const { updates, reported } = await runImport()
+        for (let current = 1; current <= 121; current++) {
+            emails$.next({
+                ...releasePacket(
+                    '2026-10-01T21:40:12',
+                    current === 1
+                        ? 'https://test.bandcamp.com/track/slow-head'
+                        : `https://test.bandcamp.com/album/ready-${current}`,
+                ),
+                current,
+                total: 121,
+            })
+        }
+        emails$.complete()
+        try {
+            await new Promise<void>(resolve => setImmediate(resolve))
+            expect(ingest).not.toHaveBeenCalled()
+        } finally {
+            finishLookup()
+            await updates
+        }
+        expect(ingest.mock.calls.map(([items]) => items.length)).toEqual([50, 50, 21])
+        expect(reported.filter(update => update.phase === 'finishing').map(update => update.current)).toEqual(
+            [0, 50, 100, 121],
+        )
+        expect(reported.at(-1)).toMatchObject({ phase: 'completed', totalProcessed: 121 })
+    })
+
+    it('settles an earlier save before reporting a later lookup failure', async () => {
+        let finishLookup = () => {}
+        let failLookup = () => {}
+        let finishSaving = () => {}
+        const saving = new Promise<void>(resolve => (finishSaving = resolve))
+        scrapeTralbumInfo
+            .mockImplementationOnce(
+                () =>
+                    new Promise(resolve => {
+                        finishLookup = () => resolve({ ...scrapedBandcampAlbum, type: 'track' })
+                    }),
+            )
+            .mockImplementationOnce(
+                () =>
+                    new Promise((_resolve, reject) => {
+                        failLookup = () => reject(new Error('Late lookup failure'))
+                    }),
+            )
+        const ingest = feedRepository.ingestFeedItems.bind(feedRepository)
+        const writing = jest.spyOn(feedRepository, 'ingestFeedItems').mockImplementationOnce(async items => {
+            await saving
+            return ingest(items)
+        })
+        const { updates, reported } = await runImport()
+        emails$.next(releasePacket('2026-10-01T21:40:12', 'https://test.bandcamp.com/track/saved-first'))
+        emails$.next(releasePacket('2026-10-01T21:40:12', 'https://test.bandcamp.com/track/fails-second'))
+        emails$.complete()
+        try {
+            await new Promise<void>(resolve => setImmediate(resolve))
+            finishLookup()
+            await new Promise<void>(resolve => setImmediate(resolve))
+            expect(writing).toHaveBeenCalledTimes(1)
+            failLookup()
+            await new Promise<void>(resolve => setImmediate(resolve))
+            expect(reported.at(-1)).toEqual({ phase: 'finishing', current: 0, total: 2 })
+            expect(reported.some(update => update.phase === 'error')).toBe(false)
+        } finally {
+            finishLookup()
+            failLookup()
+            finishSaving()
+            await updates
+        }
+        expect(reported.at(-1)).toEqual({ phase: 'error', errorMessage: 'Late lookup failure' })
+        expect(reported.filter(update => update.phase === 'finishing')).toEqual([
+            { phase: 'finishing', current: 0, total: 2 },
+            { phase: 'finishing', current: 1, total: 2 },
+        ])
+        expect(
+            await feedRepository.listFeedItems({
+                index: 0,
+                count: 5,
+                snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+            }),
+        ).toHaveLength(1)
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
     })
 
     it('carries completed emails into finishing and advances only after the next batch is saved', async () => {
@@ -247,6 +390,65 @@ describe('FeedBackendService email import', () => {
         expect(scrapeTralbumInfo).toHaveBeenCalledTimes(12)
     })
 
+    it('does not save ready emails held during export after cancellation', async () => {
+        const ingest = jest.spyOn(feedRepository, 'ingestFeedItems')
+        const { updates, abortController } = await runImport()
+        for (let current = 1; current <= 5; current++)
+            emails$.next(
+                releasePacket('2026-10-01T21:40:12', `https://test.bandcamp.com/album/cancel-${current}`),
+            )
+        await new Promise<void>(resolve => setImmediate(resolve))
+        expect(ingest).not.toHaveBeenCalled()
+        abortController.abort()
+        emails$.complete()
+        await expect(updates).resolves.toContainEqual({ phase: 'cancelled' })
+        expect(ingest).not.toHaveBeenCalled()
+        expect(await service.hasFeed()).toBe(false)
+        await expect(feedRepository.getEmailImportCheckpoint('APPLE_MAIL', 'Bandcamp')).resolves.toBeNull()
+    })
+
+    it('keeps lookup slots filled across the former fifty-email boundary', async () => {
+        const trackUrl = (index: number) => `https://test.bandcamp.com/track/boundary-${index}`
+        const finishLookups = new Map<string, () => void>()
+        let active = 0
+        let peak = 0
+        scrapeTralbumInfo.mockImplementation(
+            url =>
+                new Promise(resolve => {
+                    active++
+                    peak = Math.max(peak, active)
+                    finishLookups.set(url, () => {
+                        active--
+                        finishLookups.delete(url)
+                        resolve({ ...scrapedBandcampAlbum, type: 'track' })
+                    })
+                }),
+        )
+        const { updates, reported } = await runImport()
+        for (let current = 1; current <= 60; current++)
+            emails$.next({ ...releasePacket('2026-10-01T21:40:12', trackUrl(current)), current, total: 60 })
+        emails$.complete()
+        try {
+            await new Promise<void>(resolve => setImmediate(resolve))
+            for (let current = 1; current < 50; current++) {
+                const finish = finishLookups.get(trackUrl(current))
+                if (!finish) throw new Error(`Lookup ${current} did not start`)
+                finish()
+                await new Promise<void>(resolve => setImmediate(resolve))
+            }
+            expect(scrapeTralbumInfo).toHaveBeenCalledWith(trackUrl(51), expect.any(AbortSignal), 'import')
+            expect(peak).toBe(8)
+            expect(reported.at(-1)).toEqual({ phase: 'finishing', current: 49, total: 60 })
+        } finally {
+            while (finishLookups.size > 0) {
+                for (const finish of [...finishLookups.values()]) finish()
+                await new Promise<void>(resolve => setImmediate(resolve))
+            }
+            await updates
+        }
+        expect(reported.at(-1)).toMatchObject({ phase: 'completed', totalProcessed: 60 })
+    })
+
     it('overlaps parent lookups across single-track emails and ingests them in email order', async () => {
         const trackUrls = Array.from(
             { length: 4 },
@@ -260,15 +462,57 @@ describe('FeedBackendService email import', () => {
                 }),
         )
         const ingestFeedItems = jest.spyOn(feedRepository, 'ingestFeedItems')
-        const { updates } = await runImport()
+        const { updates, reported } = await runImport()
         for (const url of trackUrls) emails$.next(releasePacket('2026-10-01T21:40:12', url))
         emails$.complete()
         await new Promise<void>(resolve => setImmediate(resolve))
 
         expect(finishLookups).toHaveLength(4)
-        for (const finish of finishLookups.reverse()) finish()
+        finishLookups[3]?.()
+        await new Promise<void>(resolve => setImmediate(resolve))
+        expect(reported.at(-1)).toEqual({ phase: 'finishing', current: 0, total: 4 })
+        for (const finish of finishLookups.slice(0, 3).reverse()) finish()
         await expect(updates).resolves.toContainEqual(expect.objectContaining({ phase: 'completed' }))
         expect(ingestFeedItems.mock.calls[0]?.[0].map(item => item.dedupeIdentifier)).toEqual(trackUrls)
+    })
+
+    it('deduplicates a pending track lookup across different emails', async () => {
+        const trackUrl = 'https://test.bandcamp.com/track/repeated-purchase'
+        let finishLookup = () => {}
+        scrapeTralbumInfo.mockImplementationOnce(
+            () =>
+                new Promise(resolve => {
+                    finishLookup = () => resolve({ ...scrapedBandcampAlbum, type: 'track' })
+                }),
+        )
+        const { updates } = await runImport()
+        for (let current = 1; current <= 2; current++) {
+            emails$.next({
+                current,
+                total: 2,
+                email: {
+                    ...newReleaseEmail,
+                    messageId: `<repeated-${current}@example.com>`,
+                    htmlBody: `<a href="${trackUrl}">check it out here</a>`,
+                },
+            })
+        }
+        emails$.complete()
+        try {
+            await new Promise<void>(resolve => setImmediate(resolve))
+            expect(scrapeTralbumInfo).toHaveBeenCalledTimes(1)
+        } finally {
+            finishLookup()
+            await updates
+        }
+        expect(scrapeTralbumInfo).toHaveBeenCalledTimes(1)
+        expect(await updates).toContainEqual(
+            expect.objectContaining({
+                phase: 'completed',
+                totalProcessed: 2,
+                newlyImported: 1,
+            }),
+        )
     })
 
     it('retries a temporary network lookup failure before completing the import', async () => {
