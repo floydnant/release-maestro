@@ -41,6 +41,29 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock).toHaveBeenCalledTimes(3)
     })
 
+    it('keeps real feed fetches immediate when a long import fills the five-minute window', async () => {
+        const imports = Array.from({ length: 150 }, (_, index) =>
+            client.get(`${firstUrl}-${index}`, { purpose: 'import' }),
+        )
+        await jest.advanceTimersByTimeAsync(60_000)
+        await Promise.all(imports)
+        expect(fetchMock).toHaveBeenCalledTimes(150)
+        const nextImport = client.get(`${firstUrl}-next`, { purpose: 'import' })
+        const page = Promise.all(
+            Array.from({ length: 5 }, (_, index) => client.get(`${secondUrl}-${index}`, { purpose: 'feed' })),
+        )
+        await jest.advanceTimersByTimeAsync(0)
+        await expect(page).resolves.toHaveLength(5)
+        expect(fetchMock).toHaveBeenCalledTimes(155)
+
+        // Six old starts must expire after the extra feed traffic, not just the first start.
+        await jest.advanceTimersByTimeAsync(240_999)
+        expect(fetchMock).toHaveBeenCalledTimes(155)
+        await jest.advanceTimersByTimeAsync(1)
+        await expect(nextImport).resolves.toMatchObject({ html: 'OK' })
+        expect(fetchMock).toHaveBeenCalledTimes(156)
+    })
+
     it('stops a repeated custom-domain redirect before requesting the same page again', async () => {
         const customUrl = 'https://music.artist.example/album/first'
         fetchMock.mockImplementation(
