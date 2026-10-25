@@ -11,11 +11,14 @@ const FOREGROUND_QUIET_MS = 2000
 const MAX_FOREGROUND_REQUESTS = 5
 const RATE_LIMIT_BACKOFF_MS = 30_000
 const MAX_RATE_LIMIT_BACKOFF_MS = 5 * 60_000
-// The measured 180-start minute was rejected. Smooth sustained traffic to 120/minute,
-// with a 30-start allowance for short bursts. This remains a client policy, not a known quota.
+// Observed 429s around 180 starts despite different one-minute rates. Smooth short bursts,
+// then bound longer traffic to reserve feed headroom. These limits are policy, not a known quota.
 const REQUEST_BUDGET_COST_MS = 500
 const REQUEST_BURST_TOLERANCE_MS = 29 * REQUEST_BUDGET_COST_MS
 const MAX_FEED_BUDGET_DELAY_MS = 15_000
+const REQUEST_WINDOW_MS = 5 * 60_000
+const INITIAL_WINDOW_LIMIT = 150
+const MIN_WINDOW_LIMIT = 30
 
 type Permit = (() => void) | null
 type WaitingRequest = {
@@ -43,8 +46,11 @@ export class BandcampRequestGate {
     private rateLimitEpoch = 0
     // Virtual finish time: background starts wait until the burst allowance catches up.
     private budgetFinishAt = 0
+    private requestStarts: number[] = []
+    private windowLimit = INITIAL_WINDOW_LIMIT
 
     get state() {
+        const now = Date.now()
         return {
             cooldownUntil: this.cooldown,
             epoch: this.rateLimitEpoch,
@@ -55,6 +61,8 @@ export class BandcampRequestGate {
             activeBackground: this.activeBackground,
             queued: this.waiting.length,
             budgetReadyAt: Math.max(0, this.budgetFinishAt - REQUEST_BURST_TOLERANCE_MS),
+            windowStarts: this.startsInWindow(now).length,
+            windowLimit: this.windowLimit,
         }
     }
 
@@ -93,6 +101,10 @@ export class BandcampRequestGate {
         const now = Date.now()
         // A burst counts as one attempt. Late responses cannot suppress the next attempt's backoff.
         if (this.rateLimitEpoch === requestEpoch) {
+            // Reduce the ceiling once per rejection streak. Further rejections may be the same
+            // server penalty, and a small retry count cannot establish a smaller traffic quota.
+            if (this.consecutiveRateLimits === 0)
+                this.windowLimit = Math.max(MIN_WINDOW_LIMIT, Math.floor(0.75 * this.windowLimit))
             this.consecutiveRateLimits++
             this.rateLimitEpoch++
             this.backgroundLimit = 1
@@ -141,10 +153,15 @@ export class BandcampRequestGate {
         request.resolve(release)
     }
 
+    private startsInWindow(now: number): number[] {
+        return this.requestStarts.filter(start => start > now - REQUEST_WINDOW_MS)
+    }
+
     private pump(): void {
         clearTimeout(this.wakeup)
         this.wakeup = undefined
         const now = Date.now()
+        this.requestStarts = this.startsInWindow(now)
         if (this.cooldown > now) {
             for (const request of [...this.waiting]) {
                 if (request.purpose !== 'import') this.admit(request, null)
@@ -153,6 +170,7 @@ export class BandcampRequestGate {
             for (const request of [...this.waiting]) {
                 if (request.purpose !== 'feed' || this.activeForeground >= MAX_FOREGROUND_REQUESTS) continue
                 this.activeForeground++
+                this.requestStarts.push(now)
                 // Feed never waits for this budget. Its traffic holds background work back instead.
                 this.budgetFinishAt = Math.min(
                     Math.max(this.budgetFinishAt, now) + REQUEST_BUDGET_COST_MS,
@@ -173,18 +191,22 @@ export class BandcampRequestGate {
             this.waiting.find(request => request.purpose === 'preview') ??
             this.waiting.find(request => request.purpose === 'import')
         if (!next) return
+        // Feed may exceed the window limit. Wait for enough starts, not just the oldest, to expire.
+        const windowStart = this.requestStarts.at(-this.windowLimit)
         // Leave the first post-cooldown window for the renderer's automatic foreground retry.
         const readyAt = Math.max(
             this.nextBackgroundAt,
             this.quietUntil,
             this.cooldown ? this.cooldown + FOREGROUND_QUIET_MS : 0,
             this.budgetFinishAt - REQUEST_BURST_TOLERANCE_MS,
+            windowStart === undefined ? 0 : windowStart + REQUEST_WINDOW_MS,
         )
         if (readyAt > now) {
             this.wakeup = setTimeout(() => this.pump(), readyAt - now)
             return
         }
         this.activeBackground++
+        this.requestStarts.push(now)
         this.budgetFinishAt = Math.max(this.budgetFinishAt, now) + REQUEST_BUDGET_COST_MS
         this.nextBackgroundAt = now + this.backgroundInterval
         this.admit(
