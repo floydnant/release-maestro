@@ -45,6 +45,10 @@ export type EmailImportProgress =
     | {
           /** The export has ended; queued email processing and persistence are still running. */
           phase: 'finishing'
+          /** Exported emails whose processing and persistence have completed. */
+          current: number
+          /** All emails delivered by the completed export, including skipped messages. */
+          total: number
       }
     | {
           phase: 'completed'

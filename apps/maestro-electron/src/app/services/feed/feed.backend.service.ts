@@ -6,14 +6,12 @@ import {
     defer,
     filter,
     from,
-    ignoreElements,
     materialize,
     map,
     lastValueFrom,
     merge,
     mergeMap,
     Observable,
-    switchMap,
     tap,
     toArray,
 } from 'rxjs'
@@ -138,7 +136,13 @@ export class FeedBackendService {
             : null
         let newestReceivedAt: Date | null = null
         let terminalUpdate: EmailImportProgress | null = null
-        let hasExportedEmails = false
+        let totalExported = 0
+        let exportFinished = false
+        const finishingProgress = (): Extract<EmailImportProgress, { phase: 'finishing' }> => ({
+            phase: 'finishing',
+            current: totalProcessed,
+            total: totalExported,
+        })
         const parentAlbums = new Map<string, Promise<string>>()
         const resolveReleaseUrl = (releaseUrl: string): Promise<string> => {
             if (!releaseUrl.includes('/track/')) return Promise.resolve(releaseUrl)
@@ -156,12 +160,14 @@ export class FeedBackendService {
             emails$.pipe(
                 materialize(),
                 map((notification): EmailImportProgress | null => {
-                    if (notification.kind == 'C')
-                        return hasExportedEmails && !workSignal.aborted ? { phase: 'finishing' } : null
+                    if (notification.kind == 'C') {
+                        exportFinished = true
+                        return totalExported > 0 && !workSignal.aborted ? finishingProgress() : null
+                    }
                     // The buffered stream reports the final error after export progress drains.
                     if (notification.kind == 'E') return null
                     if (notification.kind == 'N') {
-                        hasExportedEmails = true
+                        totalExported++
                         return {
                             phase: 'processing' as const,
                             current: notification.value.current,
@@ -177,7 +183,6 @@ export class FeedBackendService {
             emails$.pipe(
                 bufferCount(50),
                 concatMap(async emailPackets => {
-                    totalProcessed += emailPackets.length
                     console.log('Processing batch of emails:', emailPackets.length)
 
                     for (const { email } of emailPackets) {
@@ -254,9 +259,11 @@ export class FeedBackendService {
                     totalImported += feedItems.length
 
                     await this.feedBackendRepository.ingestFeedItems(feedItems)
+                    totalProcessed += emailPackets.length
+                    return exportFinished && !workSignal.aborted ? finishingProgress() : null
                 }),
                 materialize(),
-                switchMap(async (notification): Promise<EmailImportProgress | null> => {
+                concatMap(async (notification): Promise<EmailImportProgress | null> => {
                     if (notification.kind == 'C') {
                         // A cancelled export completes too, but only a full pass covers the mailbox
                         if (abortSignal.aborted) return { phase: 'cancelled' as const }
@@ -299,16 +306,15 @@ export class FeedBackendService {
                         }
                     }
                     if (notification.kind == 'N') {
-                        // The next values are already handled by the non-buffered observable in the first part of the merge
-                        return null
+                        return notification.value
                     }
 
                     return assertUnreachable(notification, 'Unhandled notification kind:')
                 }),
                 tap(update => {
-                    if (update) terminalUpdate = update
+                    if (update && update.phase !== 'finishing') terminalUpdate = update
                 }),
-                ignoreElements(),
+                filter(update => update?.phase === 'finishing'),
             ),
         ).pipe(
             // A failed lookup can precede the export's final emails. Drain their progress first.

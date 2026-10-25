@@ -91,6 +91,30 @@ test.describe('release feed timestamps', () => {
         })
     }
 
+    test('centres the mail icon on the text of the time the email arrived', async ({ page }) => {
+        await openFeed(page, releaseWith('2026-10-21', new Date('2026-10-23T06:00:00Z')))
+
+        const emailReceived = timestamp(page, 'Email received: October 23, 2026, 8:00 AM')
+
+        // How far apart the centres of the icon and the date text are, or null until both have rendered
+        await expect
+            .poll(() =>
+                emailReceived.evaluate(element => {
+                    const glyph = element.querySelector('app-icon svg')
+                    const shown = element.querySelector('span[aria-hidden="true"]')
+                    if (!glyph || !shown) return null
+                    // The text's own box, not its line: a range spans the rendered glyphs' font box
+                    const range = document.createRange()
+                    range.selectNodeContents(shown)
+                    const iconBox = glyph.getBoundingClientRect()
+                    const textBox = range.getBoundingClientRect()
+                    if (iconBox.height === 0 || textBox.height === 0) return null
+                    return Math.abs(iconBox.top + iconBox.height / 2 - (textBox.top + textBox.height / 2))
+                }),
+            )
+            .toBeLessThanOrEqual(1)
+    })
+
     test('labels a fan purchase email exactly like a new release email', async ({ page }) => {
         await openFeed(
             page,
