@@ -97,8 +97,24 @@ test.describe('release feed scenario states', () => {
         )
         await expect(page.getByText('Could not reach Bandcamp')).toBeVisible()
 
-        // Moving well past both, the healthy release is marked viewed and the failed one is not.
-        for (let step = 0; step < 3; step++) await page.keyboard.press('Shift+J')
+        // Visit both cards, then leave them: only the healthy release should be marked viewed.
+        // The observer watches the whole card, so seeing its title alone is not enough.
+        const retry = page.getByRole('button', { name: 'Retry loading Failed release' })
+        const failedCard = page.locator('.feed-entry').filter({ has: retry })
+        await failedCard.scrollIntoViewIfNeeded()
+        await expect(failedCard).toBeInViewport({ ratio: 1 })
+        const second = page.locator('.feed-entry').filter({
+            has: page.getByRole('link', { name: 'Second release', exact: true }),
+        })
+        await second.scrollIntoViewIfNeeded()
+        await expect(second).toBeInViewport({ ratio: 1 })
+        const fourth = page.locator('.feed-entry').filter({
+            has: page.getByRole('link', { name: 'Fourth release', exact: true }),
+        })
+        await fourth.scrollIntoViewIfNeeded()
+        await expect(fourth).toBeInViewport({ ratio: 1 })
+        await expect(second).not.toBeInViewport()
+        await expect(failedCard).not.toBeInViewport()
         await expect
             .poll(async () => (await controller.calls('mark-feed-item-viewed')).map(({ payload }) => payload))
             .toContainEqual(expect.objectContaining({ id: 'second-release' }))
@@ -106,9 +122,9 @@ test.describe('release feed scenario states', () => {
             expect.objectContaining({ payload: expect.objectContaining({ id: 'failed-release' }) }),
         )
 
-        await page.getByRole('button', { name: 'Retry loading Failed release' }).click()
+        await retry.click()
         await expect(page.getByText('Retrying', { exact: true })).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Retry loading Failed release' })).toHaveCount(0)
+        await expect(retry).toHaveCount(0)
         expect(await controller.lastCall('reload-feed-items')).toMatchObject({
             payload: { ids: ['failed-release'] },
         })
