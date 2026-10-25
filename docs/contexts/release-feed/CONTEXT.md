@@ -122,9 +122,10 @@ and keep their position in the feed. Link previews share the same cooldown, so l
 bypass a pause. Background imports and previews yield while the feed hydrates and slow down after
 rate limiting. An import can remain paused until Bandcamp allows requests again; cancellation
 remains available. Feed loading runs concurrently and does not wait behind background work.
-Background work follows a sustained request budget. Feed requests count against it but never wait
-for it. Repeated rejections extend the recovery pause. A longer pause requested by the server always
-takes precedence.
+Background work follows short and sustained request budgets. Feed requests count against them but
+never wait for them. Rate limiting lowers the sustained background allowance for the rest of the
+app session. Consecutive rejected retries extend the recovery pause without lowering that allowance
+again. A longer pause requested by the server always takes precedence.
 
 **Link preview**:
 The title and favicon shown for a link from a notification. Previews load after the release appears

@@ -245,9 +245,123 @@ describe(BandcampRequestGate.name, () => {
         expect(starts.at(-1)).toBe(60_000)
     })
 
+    it('keeps a long import within 150 page starts in five minutes, including feed traffic', async () => {
+        // Both captures first rejected traffic around 180 total starts. This is a conservative
+        // client policy, not a simulation of Bandcamp's unknown quota.
+        for (let index = 0; index < 8; index++) (await gate.acquire('feed', signal()))?.()
+        const starts: number[] = []
+        const controller = new AbortController()
+        const requests = Array.from({ length: 200 }, () =>
+            gate.acquire('import', controller.signal).then(
+                permit => {
+                    starts.push(Date.now())
+                    permit?.()
+                },
+                () => undefined,
+            ),
+        )
+        await jest.advanceTimersByTimeAsync(299_999)
+        const observed = starts.length + 8
+        await jest.advanceTimersByTimeAsync(1)
+        const nextStart = starts.at(-1)
+        controller.abort()
+        await Promise.all(requests)
+        expect(observed).toBe(150)
+        expect(starts).toHaveLength(143)
+        expect(nextStart).toBe(1_300_000)
+    })
+
+    it('lets feed exceed a full window and waits for enough old starts to expire before importing', async () => {
+        const first = await gate.acquire('feed', signal())
+        first?.()
+        await jest.advanceTimersByTimeAsync(1000)
+        for (let index = 0; index < 149; index++) (await gate.acquire('feed', signal()))?.()
+        const admitted = jest.fn()
+        const waiting = gate.acquire('import', signal()).then(admitted)
+        await jest.advanceTimersByTimeAsync(1000)
+        const foreground = gate.holdForeground()
+        const permits = await Promise.all(Array.from({ length: 5 }, () => gate.acquire('feed', signal())))
+        expect(permits.every(permit => permit !== null)).toBe(true)
+        expect(gate.state).toMatchObject({ windowStarts: 155, windowLimit: 150, activeForeground: 5 })
+        for (const permit of permits) permit?.()
+        foreground()
+
+        await jest.advanceTimersByTimeAsync(298_000)
+        expect(gate.state.windowStarts).toBe(154)
+        expect(admitted).not.toHaveBeenCalled()
+        await jest.advanceTimersByTimeAsync(999)
+        expect(admitted).not.toHaveBeenCalled()
+        await jest.advanceTimersByTimeAsync(1)
+        await waiting
+        expect(admitted).toHaveBeenCalledTimes(1)
+        admitted.mock.calls[0][0]?.()
+    })
+
+    it('lowers the window limit once per rejection streak and retains it after clean responses', async () => {
+        for (let index = 0; index < 120; index++) (await gate.acquire('feed', signal()))?.()
+        const epoch = gate.state.epoch
+        gate.rateLimited(3000, epoch)
+        expect(gate.state.windowLimit).toBe(112)
+        gate.rateLimited(3000, epoch)
+        expect(gate.state.windowLimit).toBe(112)
+        gate.rateLimited(3000, gate.state.epoch)
+        expect(gate.state.windowLimit).toBe(112)
+        for (let index = 0; index < 200; index++) gate.succeeded('import', gate.state.epoch)
+        expect(gate.state).toMatchObject({ windowLimit: 112, backgroundIntervalMs: 200, backgroundLimit: 4 })
+        gate.rateLimited(3000, gate.state.epoch)
+        expect(gate.state.windowLimit).toBe(84)
+        for (let index = 0; index < 10; index++) {
+            gate.succeeded('import', gate.state.epoch)
+            gate.rateLimited(null, gate.state.epoch)
+        }
+        expect(gate.state.windowLimit).toBe(30)
+    })
+
+    it('reduces the configured allowance once when the first request and its retry are both rejected', async () => {
+        const first = await gate.acquire('import', signal())
+        gate.rateLimited(3000, gate.state.epoch)
+        first?.()
+        expect(gate.state.windowLimit).toBe(112)
+        await jest.advanceTimersByTimeAsync(32_000)
+        const retry = await gate.acquire('import', signal())
+        gate.rateLimited(3000, gate.state.epoch)
+        retry?.()
+        expect(gate.state.windowLimit).toBe(112)
+    })
+
+    it('waits for the lowered window limit even after a rate-limit cooldown expires', async () => {
+        for (let index = 0; index < 150; index++) (await gate.acquire('feed', signal()))?.()
+        gate.rateLimited(3000, gate.state.epoch)
+        expect(gate.state).toMatchObject({ windowLimit: 112, cooldownUntil: 1_030_000 })
+        const admitted = jest.fn()
+        const waiting = gate.acquire('import', signal()).then(admitted)
+        await jest.advanceTimersByTimeAsync(32_000)
+        expect(admitted).not.toHaveBeenCalled()
+        await jest.advanceTimersByTimeAsync(267_999)
+        expect(admitted).not.toHaveBeenCalled()
+        await jest.advanceTimersByTimeAsync(1)
+        await waiting
+        expect(admitted).toHaveBeenCalledTimes(1)
+        admitted.mock.calls[0][0]?.()
+    })
+
+    it('cancels a caller waiting on the five-minute window without charging a start', async () => {
+        for (let index = 0; index < 150; index++) (await gate.acquire('feed', signal()))?.()
+        const controller = new AbortController()
+        const cancelled = gate.acquire('import', controller.signal).catch(error => error)
+        controller.abort()
+        await expect(cancelled).resolves.toBe(controller.signal.reason)
+        expect(gate.state).toMatchObject({ queued: 0, activeBackground: 0, windowStarts: 150 })
+        await jest.advanceTimersByTimeAsync(300_000)
+        expect(gate.state.windowStarts).toBe(0)
+        const permit = await gate.acquire('import', signal())
+        expect(gate.state.windowStarts).toBe(1)
+        permit?.()
+    })
+
     it.each([
         [5, 3000],
-        [100, 15_000],
+        [50, 15_000],
     ])('admits %i feed requests without waiting and delays background by %ims', async (count, delay) => {
         const initial = Array.from({ length: 50 }, () =>
             gate.acquire('import', signal()).then(permit => permit?.()),
