@@ -62,8 +62,9 @@ const retryAfterDelay = (header: string | null): number | null => {
 /**
  * Routes every page and redirect through one admission gate. Feed requests reserve foreground
  * capacity for their whole chain; imports and previews yield, including between scroll loads.
- * Background work starts at most once per three seconds, slows after a 429, and waits cancellably
- * through cooldowns. These starting policies are measured by the bounded local request journal.
+ * Background admission and recovery belong to BandcampRequestGate. Background work waits cancellably
+ * through cooldowns. Foreground requests never queue behind background bodies; existing background
+ * bodies may overlap foreground loads. The bounded local request journal measures the gate's policies.
  * Each Bandcamp body has a 15-second timeout. Other sites share a five-second redirect budget.
  * Successful release HTML stays for five minutes, bounded by 20 pages and 8 MiB of UTF-16 strings.
  * Imports cannot evict feed pages. Tracking queries, cookie values and email data never enter the journal.

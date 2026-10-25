@@ -203,8 +203,32 @@ describe('FeedBackendService email import', () => {
         emails$.complete()
 
         await expect(updates).resolves.toContainEqual(expect.objectContaining({ phase: 'completed' }))
-        expect(peak).toBe(4)
+        expect(peak).toBe(8)
         expect(scrapeTralbumInfo).toHaveBeenCalledTimes(12)
+    })
+
+    it('overlaps parent lookups across single-track emails and ingests them in email order', async () => {
+        const trackUrls = Array.from(
+            { length: 4 },
+            (_, index) => `https://test.bandcamp.com/track/single-${index}`,
+        )
+        const finishLookups: (() => void)[] = []
+        scrapeTralbumInfo.mockImplementation(
+            () =>
+                new Promise(resolve => {
+                    finishLookups.push(() => resolve({ ...scrapedBandcampAlbum, type: 'track' }))
+                }),
+        )
+        const ingestFeedItems = jest.spyOn(feedRepository, 'ingestFeedItems')
+        const { updates } = await runImport()
+        for (const url of trackUrls) emails$.next(releasePacket('2026-10-01T21:40:12', url))
+        emails$.complete()
+        await new Promise<void>(resolve => setImmediate(resolve))
+
+        expect(finishLookups).toHaveLength(4)
+        for (const finish of finishLookups.reverse()) finish()
+        await expect(updates).resolves.toContainEqual(expect.objectContaining({ phase: 'completed' }))
+        expect(ingestFeedItems.mock.calls[0]?.[0].map(item => item.dedupeIdentifier)).toEqual(trackUrls)
     })
 
     it('retries a temporary network lookup failure before completing the import', async () => {
