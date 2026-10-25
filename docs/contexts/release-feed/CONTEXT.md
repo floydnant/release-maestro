@@ -96,8 +96,8 @@ and its fan attribution available.
 
 **Fan**:
 A Bandcamp listener named in a purchase notification. The profile URL identifies the fan; display
-names are not unique. A fan has a display name and may have a profile photo. Overlapping portraits
-show involved fans, and a tooltip lists their names.
+names are not unique. A fan has a display name and may have a profile photo. Track portraits name
+their fans in a tooltip. Above a release, each fan's name links to their Bandcamp profile.
 
 **Purchase attribution**:
 The association between a bought album or track and its fans. Buying an album attributes every
@@ -122,6 +122,9 @@ and keep their position in the feed. Link previews share the same cooldown, so l
 bypass a pause. Background imports and previews yield while the feed hydrates and slow down after
 rate limiting. An import can remain paused until Bandcamp allows requests again; cancellation
 remains available. Feed loading runs concurrently and does not wait behind background work.
+Background work follows a sustained request budget. Feed requests count against it but never wait
+for it. Repeated rejections extend the recovery pause. A longer pause requested by the server always
+takes precedence.
 
 **Link preview**:
 The title and favicon shown for a link from a notification. Previews load after the release appears
