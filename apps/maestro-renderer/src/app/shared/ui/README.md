@@ -65,8 +65,8 @@ explains a control; when the control's accessible name already contains the tool
 also announced as a description. `hlmOverflowTooltip` reveals truncated text and shows only while
 its host, or something inside it, is clipping — measured on hover and focus — so fully visible text
 never repeats in a tooltip. Do not put a tooltip on text whose full value is visible elsewhere, or
-on roving-focus grid items where every arrow key would open one. Brain 1.8.0 has a pinned
-patch in `patches/@spartan-ng__brain@1.8.0.patch`: capture document scroll and dismiss the tooltip,
+on roving-focus grid items where every arrow key would open one. Brain 1.8.2 has a pinned
+patch in `patches/@spartan-ng__brain@1.8.2.patch`: capture document scroll and dismiss the tooltip,
 including pending displays and retained content hover. Its original window listener misses nested
 scroll panels. Review and remove this patch when an upstream upgrade fixes that behavior; rerun the
 tooltip lifecycle checks before replacing it.
@@ -96,7 +96,7 @@ When a screen needs a standard control this directory lacks, check whether a Hel
 pinned tag covers the use case before building product markup. Upstream ships many families not yet
 copied here, and adding one is the default.
 
-The Brain runtime uses Spartan 1.8.0; the copied Helm source starts at Spartan 1.5.0. Check the root `package.json` and
+The Brain runtime uses Spartan 1.8.2; the copied Helm source starts at Spartan 1.5.0. Check the root `package.json` and
 [upstream.json](upstream.json) for the versions currently in use.
 
 1. Find the component in the matching
