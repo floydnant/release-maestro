@@ -1,4 +1,5 @@
 import { HlmButton } from '@spartan-ng/helm/button'
+import { formatTrackCount } from '../../shared/utils/formatting.utils'
 import {
     ChangeDetectionStrategy,
     Component,
@@ -6,6 +7,7 @@ import {
     DestroyRef,
     inject,
     linkedSignal,
+    type Signal,
     untracked,
     viewChild,
 } from '@angular/core'
@@ -47,6 +49,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component'
 import {
     SongTableComponent,
     type SongTableColumn,
+    type SongTableGroup,
 } from '../../shared/components/song-table/song-table.component'
 import { AlbumDetailHeaderComponent } from './album-detail-header.component'
 
@@ -54,17 +57,13 @@ import { AlbumDetailHeaderComponent } from './album-detail-header.component'
  * One album: its own attributes, and its tracks.
  *
  * **The tracks are an ordinary browse surface**, not an inline list — a windowed
- * `SongQuery` filtered to this album and sorted by `trackNumber`, rendered by the same
+ * `SongQuery` filtered to this album and sorted by disc then track number, rendered by the same
  * `SongTable` the track list uses. A detail page that loaded its tracks whole would be
  * the one surface that ignores ADR 0004, and a 200-track compilation is exactly where
  * that stops being free.
  *
- * **Track order is `trackNumber` and cannot be better than that yet.** There is no disc
- * number anywhere in the system (MAE-123), so a multi-disc album renders `1, 1, 2, 2, 3,
- * 3…`. That is accepted rather than worked around: every workaround available here —
- * inferring discs from a gap in the numbering, from the file path, from the tag order —
- * guesses, and a guess that is usually right is worse than an ordering that is honestly
- * limited.
+ * Disc sections use boundaries returned with each song window, so a window can start
+ * in the middle of a disc without creating a false section heading.
  */
 
 /** How often a running scan is allowed to refetch the visible window. */
@@ -74,7 +73,6 @@ const SCAN_REFETCH_INTERVAL_MS = 1_500
 const INITIAL_WINDOW_LIMIT = 60
 
 const TRACKS_LABEL = 'tracks'
-const TRACK_LABEL = 'track'
 
 /** Album is one word in code and in copy alike, so the route param is `albumId`. */
 export const ALBUM_ID_PARAM = 'albumId'
@@ -82,8 +80,7 @@ export const ALBUM_ID_PARAM = 'albumId'
 /**
  * Album order, and what the URL means by carrying no sort at all.
  *
- * A multi-disc album renders `1, 1, 2, 2, 3, 3…` under this and cannot do better —
- * there is no disc number anywhere in the system until MAE-123 lands one.
+ * The read model orders by disc number before track number for this sort.
  */
 const DEFAULT_TRACK_SORT: SongSort = { field: SongSortField.trackNumber, direction: 'asc' }
 
@@ -217,12 +214,29 @@ export class AlbumDetailComponent {
      * The slice the table wants, seeded from that position so the first window fetched
      * is the right one — see `TracksComponent.viewport`.
      */
-    protected viewport = linkedSignal<SongQuery, BrowseWindow>({
-        source: () => this.query(),
-        computation: (_query, previous) => ({
-            offset: untracked(() => offsetForRestore(this.restoreScrollTop())),
-            limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
+    private viewportSource = computed(
+        () => ({
+            query: this.query(),
+            groupStarts: this.discGroups().map(group => group.startIndex),
         }),
+        {
+            equal: (a, b) =>
+                sameQuery(a.query, b.query) &&
+                a.groupStarts.length == b.groupStarts.length &&
+                a.groupStarts.every((start, index) => start == b.groupStarts[index]),
+        },
+    )
+
+    protected viewport = linkedSignal<{ query: SongQuery; groupStarts: number[] }, BrowseWindow>({
+        source: () => this.viewportSource(),
+        computation: ({ query, groupStarts }, previous) => {
+            const restore = untracked(() => this.restoreScrollTop())
+            if (previous && sameQuery(previous.source.query, query) && restore == null) return previous.value
+            return {
+                offset: offsetForRestore(restore, groupStarts),
+                limit: previous?.value.limit ?? INITIAL_WINDOW_LIMIT,
+            }
+        },
     })
 
     constructor() {
@@ -242,6 +256,14 @@ export class AlbumDetailComponent {
     })
 
     protected result = this.browse.result
+
+    protected discGroups: Signal<readonly SongTableGroup[]> = computed(() =>
+        (this.result().metadata?.discGroups ?? []).map(group => ({
+            startIndex: group.startIndex,
+            label: group.discNumber == null ? 'Disc unknown' : `Disc ${group.discNumber}`,
+            summary: formatTrackCount(group.songCount, group.trackTotal),
+        })),
+    )
 
     /**
      * Whether the retained browse window can be shown beneath the current album header.
@@ -267,8 +289,6 @@ export class AlbumDetailComponent {
     protected headerSongCount = computed(() =>
         this.songWindowMatchesAlbum() ? this.result().total : (this.album()?.songCount ?? 0),
     )
-
-    protected songCountLabel = computed(() => (this.headerSongCount() == 1 ? TRACK_LABEL : TRACKS_LABEL))
 
     /**
      * This page's columns, which differ from the default in both directions.
@@ -367,5 +387,5 @@ export class AlbumDetailComponent {
 }
 
 /** Where a window has to start for a remembered scroll position to be inside it. */
-const offsetForRestore = (scrollTop: number | null): number =>
-    scrollTop == null ? 0 : listWindowOffsetAt(scrollTop)
+const offsetForRestore = (scrollTop: number | null, groupStarts: readonly number[]): number =>
+    scrollTop == null ? 0 : listWindowOffsetAt(scrollTop, groupStarts)

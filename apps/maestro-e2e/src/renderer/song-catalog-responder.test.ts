@@ -21,7 +21,7 @@ describe('songCatalogResponder', () => {
             query: emptySongQuery(),
             window: { offset: 10, limit: 3 },
         })
-        expect(result).toEqual({ rows: [], offset: 0, total: 0 })
+        expect(result).toEqual({ rows: [], offset: 0, total: 0, metadata: { discGroups: [] } })
     })
 
     it('uses absolute catalog indices for row identity, path, and title', async () => {

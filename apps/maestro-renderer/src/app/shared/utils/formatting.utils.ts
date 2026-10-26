@@ -1,5 +1,11 @@
 import { CalendarDay, entriesOf } from '@release-maestro/core'
 
+/** Formats the query count against the tagged total, including a partial album or disc. */
+export const formatTrackCount = (count: number, total: number | null): string =>
+    total != null && total != count
+        ? `${count}/${total} tracks`
+        : `${count} ${count == 1 ? 'track' : 'tracks'}`
+
 export const formatDuration = (duration: number): string => {
     // If the duration is longer than 10 hours, its probably in milliseconds
     if (duration > 3600 * 10) {
