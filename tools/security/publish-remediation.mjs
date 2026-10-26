@@ -2,15 +2,6 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { dependencyInputs } from './remediation.mjs'
-import { nodeRuntimeInputs } from '../node-runtime.mjs'
-
-export const nodeRuntimePublication = {
-    branch: 'security/node-runtime',
-    inputs: nodeRuntimeInputs,
-    commitSubject: 'deps: update Node.js security releases',
-    bodyFile: 'dist/security/node-runtime-pr.md',
-    requireApplied: true,
-}
 // The Release Maestro CI App appears under one name in commits and another as a PR author.
 const botName = 'release-maestro-ci[bot]'
 const botLogin = 'app/release-maestro-ci'
@@ -19,20 +10,14 @@ const run = (command, args) =>
 
 // Publishes the verified remediation in the working tree as a single bot commit on `branch`, and opens or
 // updates its PR. Never overwrites commits a human pushed to the branch.
-export const publishRemediation = (
-    repo,
-    report,
-    runCommand = run,
-    {
-        branch = 'security/automated-remediation',
-        inputs = dependencyInputs,
-        commitSubject = 'deps: remediate verified npm vulnerabilities',
-        bodyFile = 'dist/security/remediation-pr.md',
-        requireApplied = false,
-    } = {},
-) => {
-    if (requireApplied && report.mode !== 'apply')
-        throw new Error('Only applied runtime updates can be published')
+// Keep the deps: prefix so release-please lists these fixes under Dependencies.
+export const publishRemediation = (repo, report, runCommand = run) => {
+    if (report.mode !== 'apply') throw new Error('Only applied remediation can be published')
+    const branch = 'security/automated-remediation'
+    const inputs = dependencyInputs
+    const commitSubject = 'deps: remediate verified security vulnerabilities'
+    const legacySubject = 'deps: remediate verified npm vulnerabilities'
+    const bodyFile = 'dist/security/remediation-pr.md'
     const gh = args => runCommand('gh', args)
     const git = args => runCommand('git', args)
 
@@ -74,7 +59,7 @@ export const publishRemediation = (
             if (
                 author !== botName ||
                 committer !== author ||
-                subject !== commitSubject ||
+                ![commitSubject, legacySubject].includes(subject) ||
                 paths.some(path => !inputs.includes(path))
             )
                 throw new Error(
@@ -133,18 +118,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try {
         if (!process.env.GH_REPO || !process.env.GH_TOKEN)
             throw new Error('GH_REPO and the Release Maestro CI App token are required')
-        const runtime = process.argv[2] === 'node-runtime'
-        if (process.argv[2] && !runtime) throw new Error('Unknown remediation publication mode')
         publishRemediation(
             process.env.GH_REPO,
-            JSON.parse(
-                readFileSync(
-                    runtime ? 'dist/security/node-runtime.json' : 'dist/security/remediation.json',
-                    'utf8',
-                ),
-            ),
-            run,
-            runtime ? nodeRuntimePublication : undefined,
+            JSON.parse(readFileSync('dist/security/remediation.json', 'utf8')),
         )
     } catch (error) {
         console.error(error.message)

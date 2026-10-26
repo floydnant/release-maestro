@@ -1,9 +1,5 @@
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { compareVersions, isStableVersion } from './security/remediation.mjs'
 
-export const nodeRuntimeInputs = ['package.json', '.node-version']
 const minimumFloors = ['22.23.4', '24.22.1']
 const rangeError =
     'engines.node must require Node 22.23.4–22.x or Node 24.22.1–24.x, allowing newer floors within these majors'
@@ -101,85 +97,4 @@ export const planNodeSecurityUpdate = (range, pin, releases, schedule, now = new
         range: formatNodeRange(packages.map(p => p.target)),
         pin: compareVersions(pinnedFloor, pin) > 0 ? pinnedFloor : pin,
     }
-}
-
-const fetchJson = async url => {
-    const response = await fetch(url, { signal: AbortSignal.timeout(30_000) })
-    if (!response.ok) throw new Error(`Node metadata request failed: ${response.status} ${url}`)
-    return response.json()
-}
-
-export const updateNodeRuntime = async (mode, root, { request = fetchJson, now = new Date() } = {}) => {
-    if (!['plan', 'apply'].includes(mode)) throw new Error('Usage: node-runtime.mjs plan|apply')
-    const output = join(root, 'dist/security')
-    mkdirSync(output, { recursive: true })
-    const reportPath = join(output, 'node-runtime.json')
-    const bodyPath = join(output, 'node-runtime-pr.md')
-    // A failed lookup must never leave a publishable report from an earlier run.
-    rmSync(reportPath, { force: true })
-    rmSync(bodyPath, { force: true })
-    const originals = new Map(nodeRuntimeInputs.map(path => [path, readFileSync(join(root, path), 'utf8')]))
-    try {
-        const manifest = JSON.parse(originals.get('package.json'))
-        const pin = originals.get('.node-version').trim()
-        const [releases, schedule] = await Promise.all([
-            request('https://nodejs.org/dist/index.json'),
-            request('https://raw.githubusercontent.com/nodejs/Release/main/schedule.json'),
-        ])
-        const report = {
-            ...planNodeSecurityUpdate(manifest.engines?.node, pin, releases, schedule, now),
-            mode,
-        }
-        const changed = report.packages.some(p => p.status === 'fixed')
-        if (mode === 'plan') {
-            for (const item of report.packages) if (item.status === 'fixed') item.status = 'planned'
-        }
-        const body = [
-            'Closes N/A',
-            '',
-            '## What changed',
-            '',
-            changed
-                ? 'Update the supported Node.js minimums to official LTS security releases.'
-                : 'No Node.js LTS security update is needed.',
-            pin === report.pin
-                ? `The development and CI runtime pin remains ${pin}.`
-                : `The development and CI runtime pin changes from ${pin} to ${report.pin}.`,
-            '',
-            ...report.packages
-                .filter(p => p.status !== 'current')
-                .map(
-                    p =>
-                        `- ${p.name}: ${p.from} to [${p.target}](https://nodejs.org/en/blog/release/v${p.target}).`,
-                ),
-            '',
-            '## Notes',
-            '',
-            'Sources: [Node release index](https://nodejs.org/dist/index.json) and [LTS schedule](https://github.com/nodejs/Release/blob/main/schedule.json).',
-            'Major upgrades and end-of-life decisions require maintainer review. Electron bundles its own runtime and is not updated here.',
-            '',
-        ].join('\n')
-        if (mode === 'apply' && changed) {
-            manifest.engines.node = report.range
-            writeFileSync(join(root, 'package.json'), JSON.stringify(manifest, null, 4) + '\n')
-            writeFileSync(join(root, '.node-version'), report.pin + '\n')
-        }
-        writeFileSync(bodyPath, body)
-        writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n')
-        return report
-    } catch (error) {
-        for (const [path, bytes] of originals) writeFileSync(join(root, path), bytes)
-        rmSync(reportPath, { force: true })
-        rmSync(bodyPath, { force: true })
-        throw error
-    }
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    updateNodeRuntime(process.argv[2], resolve(dirname(fileURLToPath(import.meta.url)), '..'))
-        .then(report => console.log(JSON.stringify(report, null, 2)))
-        .catch(error => {
-            console.error(error.message)
-            process.exitCode = 1
-        })
 }

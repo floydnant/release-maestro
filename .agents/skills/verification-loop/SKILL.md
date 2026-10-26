@@ -65,9 +65,9 @@ what ran and any meaningful gap. A named gate in the task or another workflow st
 - `make security` — current npm and Rust vulnerability advisories; requires network access and runs
   separately from `make sure`. `make sbom` generates dependency inventories; `make sbom-release`
   adds an inventory of an existing package. See `docs/security.md` for exception policy and limits.
-- `make node-security-plan` — preview official Node LTS security updates without changing runtime inputs.
-  `make node-security-update` applies the pin and engine minimums in a disposable checkout. Neither
-  command publishes a PR; the daily Security remediation workflow owns publication.
+- `make security-remediation-plan` previews npm fixes and official Node LTS security updates.
+  `make security-remediate` applies them in a disposable checkout. The daily Security remediation
+  workflow publishes the combined bot PR.
 - `make affected` — build, lint, unit tests, development Electron E2E, and renderer E2E, scoped to
   what git says changed; does not check or mutate formatting.
 - `make e2e-renderer` — renderer-only E2E and part of `make sure`.

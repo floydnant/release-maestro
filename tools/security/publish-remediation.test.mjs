@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from '@jest/globals'
-import { nodeRuntimePublication, publishRemediation } from './publish-remediation.mjs'
+import { publishRemediation } from './publish-remediation.mjs'
 
 const automationCommit =
     'tip\trelease-maestro-ci[bot]\trelease-maestro-ci[bot]\tdeps: remediate verified npm vulnerabilities'
@@ -34,7 +34,7 @@ const harness = ({
     const ran = (...prefix) => calls.some(call => prefix.every((part, index) => call[index] === part))
     return { calls, ran, run }
 }
-const fixed = { packages: [{ status: 'fixed' }] }
+const fixed = { mode: 'apply', packages: [{ status: 'fixed' }] }
 const botPr = { number: 10, author: { login: 'app/release-maestro-ci' } }
 
 test('publishes a fix with an explicit creation lease and the generated PR body', () => {
@@ -72,7 +72,7 @@ test('human edits and a PR owned by another actor cannot be overwritten', () => 
 
 test('no fix creates no branch and closes an obsolete automation PR', () => {
     const { ran, run } = harness({ pr: botPr })
-    publishRemediation('owner/repo', { packages: [] }, run)
+    publishRemediation('owner/repo', { mode: 'apply', packages: [] }, run)
     assert(!ran('git', 'push'))
     assert(ran('gh', 'pr', 'close'))
 })
@@ -81,7 +81,7 @@ test.each(['unresolved', 'covered'])(
     'a completed run with only %s packages closes the stale remediation PR',
     status => {
         const { ran, run } = harness({ remote: 'prior', pr: botPr })
-        publishRemediation('owner/repo', { packages: [{ status }] }, run)
+        publishRemediation('owner/repo', { mode: 'apply', packages: [{ status }] }, run)
         assert(ran('gh', 'pr', 'close'))
         assert(!ran('git', 'commit') && !ran('git', 'push'))
     },
@@ -89,7 +89,7 @@ test.each(['unresolved', 'covered'])(
 
 test('a run with only failed packages preserves the existing remediation PR', () => {
     const { ran, run } = harness({ pr: botPr })
-    publishRemediation('owner/repo', { packages: [{ status: 'failed' }] }, run)
+    publishRemediation('owner/repo', { mode: 'apply', packages: [{ status: 'failed' }] }, run)
     assert(!ran('gh', 'pr', 'close'))
     assert(!ran('git', 'commit') && !ran('git', 'push'))
 })
@@ -111,7 +111,7 @@ test('a failed package keeps the existing branch so a transient error cannot dro
     const { ran, run } = harness({ remote: 'prior', pr: botPr })
     publishRemediation(
         'owner/repo',
-        { packages: [{ status: 'fixed' }, { name: 'b', status: 'failed' }] },
+        { mode: 'apply', packages: [{ status: 'fixed' }, { name: 'b', status: 'failed' }] },
         run,
     )
     assert(!ran('git', 'commit') && !ran('git', 'push'))
@@ -125,42 +125,17 @@ test('a fork PR from the reserved branch name neither blocks nor receives public
     assert(ran('gh', 'pr', 'create'))
 })
 
-test('runtime publication owns a separate branch, body, commit subject, and input list', () => {
+test('combined fixes publish through the existing bot branch and include the runtime pin', () => {
     const { calls, run } = harness()
-    publishRemediation('owner/repo', { ...fixed, mode: 'apply' }, run, nodeRuntimePublication)
-    assert(calls.some(c => c.includes('--force-with-lease=refs/heads/security/node-runtime:')))
-    assert(calls.some(c => c.includes('dist/security/node-runtime-pr.md')))
-    assert.deepEqual(
-        calls.find(c => c[0] === 'git' && c[1] === 'add'),
-        ['git', 'add', '--', 'package.json', '.node-version'],
-    )
-    assert(
-        calls.some(
-            c => c[0] === 'git' && c[1] === 'commit' && c.includes('deps: update Node.js security releases'),
-        ),
-    )
+    publishRemediation('owner/repo', fixed, run)
+    assert(calls.some(c => c.includes('--force-with-lease=refs/heads/security/automated-remediation:')))
+    assert(calls.find(c => c[0] === 'git' && c[1] === 'add').includes('.node-version'))
+    assert(calls.some(c => c.includes('deps: remediate verified security vulnerabilities')))
 })
 
-test('runtime retries reuse the PR and do not push identical updates', () => {
-    const { ran, run } = harness({
-        branch: 'security/node-runtime',
-        remote: 'prior',
-        pr: botPr,
-        changed: false,
-        commits:
-            'tip\trelease-maestro-ci[bot]\trelease-maestro-ci[bot]\tdeps: update Node.js security releases',
-    })
-    publishRemediation('owner/repo', { ...fixed, mode: 'apply' }, run, nodeRuntimePublication)
-    assert(ran('gh', 'pr', 'edit'))
-    assert(!ran('git', 'commit') && !ran('git', 'push'))
-})
-
-test('runtime preview reports can never create or update a PR', () => {
+test('preview reports cannot publish combined fixes', () => {
     const { calls, run } = harness()
-    assert.throws(
-        () => publishRemediation('owner/repo', { ...fixed, mode: 'plan' }, run, nodeRuntimePublication),
-        /Only applied/,
-    )
+    assert.throws(() => publishRemediation('owner/repo', { ...fixed, mode: 'plan' }, run), /Only applied/)
     assert.deepEqual(calls, [])
 })
 
@@ -170,6 +145,6 @@ test('human commits prevent closing even an obsolete automation PR', () => {
         pr: botPr,
         commits: 'tip\tHuman\tHuman\tfix: manual change',
     })
-    assert.throws(() => publishRemediation('owner/repo', { packages: [] }, run), /human edits/)
+    assert.throws(() => publishRemediation('owner/repo', { mode: 'apply', packages: [] }, run), /human edits/)
     assert(!ran('gh', 'pr', 'close'))
 })

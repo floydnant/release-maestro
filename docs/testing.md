@@ -109,10 +109,9 @@ It includes the security gate, exception expiry, checksum verification, SBOM dep
 GitHub dependency-snapshot graph tests.
 The tools suite also covers remediation freshness, rollback, complete advisory removal, and PR
 retry behavior. Node runtime tests cover release selection, LTS status, monotonic updates, preview
-isolation, failure cleanup, and the separate bot PR configuration.
+isolation, combined rollback, failure cleanup, and publication through the existing bot PR.
 Use `make security-remediation-plan` for a live advisory preview without changing dependency inputs.
-Use `make node-security-plan` to preview official Node security updates; `make node-security-update`
-applies them to runtime inputs in a disposable checkout.
+
 Run `make security` separately for current npm and Rust vulnerability advisories, and `make sbom`
 for dependency inventories. See [security checks](security.md) for setup, CI, and exception policy.
 

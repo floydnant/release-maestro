@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { afterEach, test } from '@jest/globals'
 import { parse } from 'yaml'
 import { remediationInputs } from '../fixtures/security-remediation.mjs'
+import { nodeRuntimeFixture } from '../fixtures/node-runtime.mjs'
 import { remediate } from './remediate.mjs'
 
 const lockfile = packages =>
@@ -29,6 +30,8 @@ const checkout = ({
     failUpdate,
     failInstall,
     failRegistry = false,
+    runtimeUpdate = false,
+    failRuntime = false,
     workspace = 'minimumReleaseAge: 4320\n',
     packages = ['parser@1.0.0', 'playwright-core@1.64.0-alpha-1789764292000'],
     update = { 'parser@1.0.0': 'parser@1.1.0' },
@@ -36,8 +39,13 @@ const checkout = ({
     const root = mkdtempSync(join(tmpdir(), 'maestro-remediate-'))
     checkouts.push(root)
     mkdirSync(join(root, 'dist/security'), { recursive: true })
+    const runtime = nodeRuntimeFixture()
+    runtime.releases = runtime.releases
+        .filter(release => runtimeUpdate || ['v22.23.4', 'v24.22.1'].includes(release.version))
+        .map(release => ({ ...release, date: '2026-10-11' }))
     const files = {
-        'package.json': '{}\n',
+        'package.json': JSON.stringify({ engines: { node: runtime.range } }, null, 4) + '\n',
+        '.node-version': runtime.pin + '\n',
         'pnpm-workspace.yaml': workspace,
         'pnpm-lock.yaml': lockfile(packages),
     }
@@ -83,6 +91,10 @@ const checkout = ({
     const { advisories, registry, now } = remediationInputs()
     const fetchJson = async url => {
         const { hostname, pathname } = new URL(url)
+        if (hostname === 'nodejs.org' || hostname === 'raw.githubusercontent.com') {
+            if (failRuntime) throw new Error('Node metadata unavailable')
+            return hostname === 'nodejs.org' ? runtime.releases : runtime.schedule
+        }
         if (hostname === 'registry.npmjs.org') {
             if (failRegistry) throw new Error('Request failed: 503')
             return registry
@@ -125,7 +137,7 @@ process.exitCode = 1
         )
         for (const args of [
             ['init', '--quiet'],
-            ['add', '--', 'package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml'],
+            ['add', '--', 'package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml', '.node-version'],
             [
                 '-c',
                 'user.name=Test',
@@ -284,4 +296,45 @@ test('a pnpm policy refusal rejects the candidate and leaves the package unresol
 test('a missing minimum release age stops the run before any package is attempted', async () => {
     const { options } = checkout({ workspace: 'overrides: {}\n' })
     await assert.rejects(remediate('plan', options), /minimumReleaseAge/)
+})
+
+test('one apply run combines npm fixes and runtime changes in the existing report', async () => {
+    const { root, options, report } = checkout({ runtimeUpdate: true })
+    const result = byName(await remediate('apply', options))
+    assert.equal(result.parser.status, 'fixed')
+    assert.equal(result['Node.js 24'].status, 'fixed')
+    assert.equal(readFileSync(join(root, '.node-version'), 'utf8'), '24.23.0\n')
+    assert.match(report(), /parser/)
+    assert.match(report(), /Node.js 24.*24.23.0/)
+    const retry = byName(await remediate('apply', options))
+    assert.equal(retry['Node.js 24'].status, 'current')
+})
+
+test('combined preview leaves npm and runtime inputs unchanged', async () => {
+    const { options, assertInputsRestored } = checkout({ runtimeUpdate: true })
+    const result = byName(await remediate('plan', options))
+    assert.equal(result.parser.status, 'planned')
+    assert.equal(result['Node.js 24'].status, 'planned')
+    assertInputsRestored()
+})
+
+test('runtime lookup failure preserves npm fixes and records an unknown outcome', async () => {
+    const { root, options } = checkout({ failRuntime: true })
+    const result = byName(await remediate('apply', options))
+    assert.equal(result.parser.status, 'fixed')
+    assert.equal(result['Node.js runtime'].status, 'failed')
+    assert.equal(readFileSync(join(root, '.node-version'), 'utf8'), '24.22.1\n')
+})
+
+test('report failure rolls back npm fixes and a changed runtime pin together', async () => {
+    const { root, options, assertInputsRestored } = checkout({ runtimeUpdate: true })
+    const run = options.run
+    options.run = (command, args, ...rest) => {
+        const output = run(command, args, ...rest)
+        if (command === 'make' && readFileSync(join(root, '.node-version'), 'utf8') === '24.23.0\n')
+            symlinkSync(root, join(root, 'dist/security/remediation.json'), 'junction')
+        return output
+    }
+    await assert.rejects(remediate('apply', options), { code: 'EISDIR' })
+    assertInputsRestored()
 })

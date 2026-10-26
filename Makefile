@@ -8,21 +8,17 @@ PNPM := pnpm
 ARTIFACT_DIR := dist/executables
 TOOLS_TEST_ARGS ?=
 
-.PHONY: security security-tools security-policy-check security-remediation-plan security-remediate node-security-plan node-security-update sbom sbom-release
+.PHONY: security security-tools security-policy-check security-remediation-plan security-remediate sbom sbom-release
 security-tools: ## Download checksum-pinned security tools for this platform
 	node tools/security/cli.mjs install
 security: ## Scan both lockfiles for known vulnerabilities (requires network)
 	node tools/security/cli.mjs scan
-security-remediation-plan: ## Scan and preview eligible npm fixes without changing dependency inputs
+security-remediation-plan: ## Scan and preview eligible npm and Node fixes without changing dependency inputs
 	node tools/security/remediate.mjs plan
-security-remediate: ## Apply and verify npm fixes on committed dependency inputs
+security-remediate: ## Apply and verify npm and Node fixes on committed dependency inputs
 	node tools/security/remediate.mjs apply
 security-policy-check: ## Validate vulnerability exception fields and date formats
 	node tools/security/cli.mjs policy
-node-security-plan: ## Preview official Node LTS security updates without changing runtime inputs
-	node tools/node-runtime.mjs plan
-node-security-update: ## Apply official Node LTS security updates to the pin and engine minimums
-	node tools/node-runtime.mjs apply
 sbom: ## Generate repository and runtime CycloneDX SBOMs in dist/security
 	node tools/security/cli.mjs sbom
 sbom-release: ## Generate source and artifact SBOMs for an existing package (ARTIFACT_DIR=path)
