@@ -319,10 +319,12 @@ test('combined preview leaves npm and runtime inputs unchanged', async () => {
 })
 
 test('runtime lookup failure preserves npm fixes and records an unknown outcome', async () => {
-    const { root, options } = checkout({ failRuntime: true })
+    const { root, options, report } = checkout({ failRuntime: true })
     const result = byName(await remediate('apply', options))
     assert.equal(result.parser.status, 'fixed')
     assert.equal(result['Node.js runtime'].status, 'failed')
+    assert.match(report(), /Node.js runtime.*Node metadata unavailable/)
+    assert.doesNotMatch(report(), /applies.*Node.js LTS security releases/)
     assert.equal(readFileSync(join(root, '.node-version'), 'utf8'), '24.22.1\n')
 })
 
@@ -337,4 +339,15 @@ test('report failure rolls back npm fixes and a changed runtime pin together', a
     }
     await assert.rejects(remediate('apply', options), { code: 'EISDIR' })
     assertInputsRestored()
+})
+
+test('a pin-only repair reports the actual runtime change instead of identical minimums', async () => {
+    const { root, options, report } = checkout({ runtimeUpdate: true })
+    writeFileSync(
+        join(root, 'package.json'),
+        JSON.stringify({ engines: { node: '>= 22.24.0 < 23 || >= 24.23.0 < 25' } }),
+    )
+    await remediate('apply', options)
+    assert.match(report(), /Node.js 24 runtime pin: 24.22.1 → \[24.23.0\]/)
+    assert.doesNotMatch(report(), /24.23.0 → \[24.23.0\]/)
 })
