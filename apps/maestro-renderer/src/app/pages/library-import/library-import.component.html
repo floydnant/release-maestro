@@ -93,6 +93,17 @@
                 }"
             >
                 <div>
+                    @if (status.coverFailureCount > 0) {
+                        <p
+                            class="artwork-failures | mt-4 type-body-sm text-content-warning"
+                            aria-label="Artwork cache failures"
+                        >
+                            {{ status.coverFailureCount }} artwork cache failure{{
+                                status.coverFailureCount === 1 ? '' : 's'
+                            }}. Successful audio imports remain intact; pending artwork retries on the next
+                            scan.
+                        </p>
+                    }
                     @if (step() === 'done') {
                         <p class="text-content-success">
                             <app-icon name="success" color="content.success" size="2.5rem"></app-icon>
@@ -195,14 +206,18 @@
                             </button>
                             <button hlmBtn type="button" (click)="finish()">Take me to my library</button>
                         </div>
-                        @if (status.failedFiles > 0) {
+                        @if (status.failedFiles > 0 || status.coverFailureCount > 0) {
                             <p class="mt-4 type-body-sm">
                                 <a
                                     hlmBtn
                                     variant="link"
                                     class="underline decoration-content-muted hover:decoration-current"
                                     [routerLink]="settingsLink('library-folders')"
-                                    >View failed files</a
+                                    >{{
+                                        status.coverFailureCount > 0
+                                            ? 'View scan failures'
+                                            : 'View failed files'
+                                    }}</a
                                 >
                             </p>
                         }
@@ -230,14 +245,18 @@
                                 Continue anyway
                             </button>
                         </div>
-                        @if (status.failedFiles > 0) {
+                        @if (status.failedFiles > 0 || status.coverFailureCount > 0) {
                             <p class="mt-3 type-body-sm">
                                 <a
                                     hlmBtn
                                     variant="link"
                                     class="underline decoration-content-muted hover:decoration-current"
                                     [routerLink]="settingsLink('library-folders')"
-                                    >View failed files</a
+                                    >{{
+                                        status.coverFailureCount > 0
+                                            ? 'View scan failures'
+                                            : 'View failed files'
+                                    }}</a
                                 >
                             </p>
                         }

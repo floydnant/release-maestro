@@ -21,22 +21,11 @@ import {
     type SongQuery,
     type SongSort,
 } from '@release-maestro/core'
-import {
-    auditTime,
-    catchError,
-    distinctUntilChanged,
-    filter,
-    from,
-    map,
-    merge,
-    of,
-    startWith,
-    switchMap,
-} from 'rxjs'
+import { catchError, from, map, of, startWith, switchMap } from 'rxjs'
 import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
-import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
+import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
 import { listWindowOffsetAt } from '../../shared/browse/list-window'
 import { SongQueryParam, nextSort, songSortFromParams } from '../../shared/browse/song-query-params'
 import {
@@ -65,9 +54,6 @@ import { AlbumDetailHeaderComponent } from './album-detail-header.component'
  * Disc sections use boundaries returned with each song window, so a window can start
  * in the middle of a disc without creating a false section heading.
  */
-
-/** How often a running scan is allowed to refetch the visible window. */
-const SCAN_REFETCH_INTERVAL_MS = 1_500
 
 /** A guess, used only until the table has measured its own height. */
 const INITIAL_WINDOW_LIMIT = 60
@@ -104,7 +90,6 @@ export class AlbumDetailComponent {
     private route = inject(ActivatedRoute)
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
-    private libraryService = inject(LibraryService)
     private history = inject(HistoryService)
 
     private table = viewChild(SongTableComponent)
@@ -113,24 +98,7 @@ export class AlbumDetailComponent {
         initialValue: '',
     })
 
-    private scanStatus$ = toObservable(this.libraryService.scanStatus)
-
-    /**
-     * Refetch triggers, shared by the header and the track table. Audited while a scan
-     * runs, plus the end of one — the same pair, and the same reasoning, as the track
-     * list's; see `TracksComponent.scanProgress$`.
-     */
-    private scanProgress$ = merge(
-        this.scanStatus$.pipe(
-            filter(status => status?.phase == 'discovering' || status?.phase == 'reading'),
-            auditTime(SCAN_REFETCH_INTERVAL_MS),
-        ),
-        this.scanStatus$.pipe(
-            map(status => status?.phase),
-            distinctUntilChanged(),
-            filter(phase => phase == 'completed' || phase == 'cancelled' || phase == 'failed'),
-        ),
-    )
+    private scanProgress$ = libraryBrowseRefresh()
 
     /**
      * The album's own attributes.
