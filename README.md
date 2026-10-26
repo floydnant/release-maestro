@@ -86,6 +86,8 @@ make e2e-renderer  # renderer-only E2E (type-checks itself first)
 make security     # scan npm and Rust dependencies for known vulnerabilities
 make security-remediation-plan # preview eligible npm security fixes
 make security-remediate # apply verified fixes in a disposable checkout
+make node-security-plan # preview Node LTS security updates
+make node-security-update # update Node pin and supported minimums in a disposable checkout
 make sbom         # generate repository and runtime CycloneDX inventories
 make sbom-release # add an artifact inventory after make package
 ```
