@@ -23,6 +23,7 @@ const createWorkspace = () => {
     const workspace = mkdtempSync(join(tmpdir(), 'dependency-policy-'))
     temporaryDirectories.push(workspace)
     mkdirSync(join(workspace, '.github', 'workflows'), { recursive: true })
+    writeFileSync(join(workspace, '.node-version'), '24.22.1\n')
     writeFileSync(
         join(workspace, 'package.json'),
         JSON.stringify({

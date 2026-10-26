@@ -4,7 +4,7 @@ import { parseDocument } from 'yaml'
 // request, so everything here can be tested with plain data.
 
 // The files a remediation may change. Snapshots, restores, and the publisher's commit all use this list.
-export const dependencyInputs = ['package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml']
+export const dependencyInputs = ['package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml', '.node-version']
 
 // Accepts current lowercase names and legacy mixed-case ones such as `JSONStream`.
 const npmPackageName = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i
@@ -116,6 +116,10 @@ export const remediationBody = report => {
     const fixed = report.packages
         .filter(item => item.status === 'fixed')
         .flatMap(item => {
+            if (item.ecosystem === 'Node.js')
+                return [
+                    `- ${item.name}${item.from === item.target && item.pinFrom ? ' runtime pin' : ' minimum'}: ${item.from === item.target && item.pinFrom ? item.pinFrom : item.from} → [${item.target}](https://nodejs.org/en/blog/release/v${item.target}).`,
+                ]
             const resolved = item.resolvedVersions ?? [item.target]
             // An earlier fix can remove a package from the lockfile entirely.
             const outcome = resolved.length ? `→ ${resolved.join(', ')}` : 'removed from the lockfile'
@@ -137,9 +141,9 @@ export const remediationBody = report => {
         '',
         '## What changed',
         '',
-        'This PR moves vulnerable npm packages to releases that fix their advisories.',
-        'Each fix removes its targeted advisories and adds no other vulnerability findings.',
-        'The new releases satisfy the repository freshness and provenance policy.',
+        'This PR contains the security updates listed below.',
+        'Each npm fix removes its targeted advisories and adds no other vulnerability findings.',
+        'npm releases satisfy the repository freshness and provenance policy. Node security releases do not wait for the npm age delay.',
         ...(fixed.length ? ['', ...fixed] : []),
         '',
         '## Notes',

@@ -1,21 +1,23 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { dependencyInputs as inputs } from './remediation.mjs'
-
-const branch = 'security/automated-remediation'
+import { dependencyInputs } from './remediation.mjs'
 // The Release Maestro CI App appears under one name in commits and another as a PR author.
 const botName = 'release-maestro-ci[bot]'
 const botLogin = 'app/release-maestro-ci'
-// Matches Dependabot's prefix so release-please lists the merge under Dependencies.
-const commitSubject = 'deps: remediate verified npm vulnerabilities'
-
 const run = (command, args) =>
     execFileSync(command, args, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }).trim()
 
 // Publishes the verified remediation in the working tree as a single bot commit on `branch`, and opens or
 // updates its PR. Never overwrites commits a human pushed to the branch.
+// Keep the deps: prefix so release-please lists these fixes under Dependencies.
 export const publishRemediation = (repo, report, runCommand = run) => {
+    if (report.mode !== 'apply') throw new Error('Only applied remediation can be published')
+    const branch = 'security/automated-remediation'
+    const inputs = dependencyInputs
+    const commitSubject = 'deps: remediate verified security vulnerabilities'
+    const legacySubject = 'deps: remediate verified npm vulnerabilities'
+    const bodyFile = 'dist/security/remediation-pr.md'
     const gh = args => runCommand('gh', args)
     const git = args => runCommand('git', args)
 
@@ -44,13 +46,6 @@ export const publishRemediation = (repo, report, runCommand = run) => {
         throw new Error('The remediation PR is not owned by Release Maestro CI')
 
     const failed = report.packages.filter(p => p.status === 'failed')
-    if (!report.packages.some(p => p.status === 'fixed')) {
-        // A completed run supersedes the old verification, even when findings remain unresolved. Unknown
-        // failures cannot invalidate an earlier fix, so preserve its PR until a run completes.
-        if (pr && !failed.length) gh(['pr', 'close', String(pr.number), '--repo', repo])
-        console.log('No verified remediation changes to publish')
-        return
-    }
 
     // Every commit the branch adds on top of main must be a bot remediation commit that touches only
     // dependency inputs. Anything else is a human edit that a force-push would destroy.
@@ -64,7 +59,7 @@ export const publishRemediation = (repo, report, runCommand = run) => {
             if (
                 author !== botName ||
                 committer !== author ||
-                subject !== commitSubject ||
+                ![commitSubject, legacySubject].includes(subject) ||
                 paths.some(path => !inputs.includes(path))
             )
                 throw new Error(
@@ -78,6 +73,13 @@ export const publishRemediation = (repo, report, runCommand = run) => {
     if (remote) {
         git(['fetch', 'origin', branch])
         assertOnlyBotCommits(remote)
+    }
+
+    if (!report.packages.some(p => p.status === 'fixed')) {
+        // Preserve human work even when a completed run makes the previous bot update obsolete.
+        if (pr && !failed.length) gh(['pr', 'close', String(pr.number), '--repo', repo])
+        console.log('No verified remediation changes to publish')
+        return
     }
 
     // A failed lookup leaves some fixes unknown. Replacing the branch now could drop a fix an earlier run
@@ -105,7 +107,7 @@ export const publishRemediation = (repo, report, runCommand = run) => {
         ])
     }
 
-    const args = ['--repo', repo, '--title', commitSubject, '--body-file', 'dist/security/remediation-pr.md']
+    const args = ['--repo', repo, '--title', commitSubject, '--body-file', bodyFile]
     const url = pr
         ? gh(['pr', 'edit', String(pr.number), ...args])
         : gh(['pr', 'create', '--head', branch, '--base', 'main', ...args])
