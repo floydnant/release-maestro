@@ -1,7 +1,7 @@
 import type { BandcampFan, BandcampFeedItem, Email, ScrapedTralbumInfo } from '@release-maestro/core'
 
 export const adamFan: BandcampFan = {
-    name: 'Adam Pitts',
+    name: 'Adam Pits',
     profileUrl: 'https://bandcamp.com/adam',
     imageUrl: 'https://f4.bcbits.com/img/fan-adam.jpg',
 }
@@ -21,7 +21,7 @@ export const fansBoughtMusicEmail: Email = {
     subject: 'Fans you follow bought new music on Bandcamp',
     dateReceived: '2026-10-01T21:40:12Z',
     sender: 'Bandcamp <noreply@bandcamp.com>',
-    plainBody: 'First Release: Bought by Adam Pitts. Second Release: Bought by Maya and River & Rain.',
+    plainBody: 'First Release: Bought by Adam Pits. Second Release: Bought by Maya and River & Rain.',
     // Reduced Bandcamp email structure, with synthetic releases and fan names.
     htmlBody: `
         <a href="https://bandcamp.com/someone-else">Someone Else</a> and others bought new music.
@@ -30,7 +30,7 @@ export const fansBoughtMusicEmail: Email = {
             <div class="item-tralbum-text">
                 <a href="https://test.bandcamp.com/album/first?t=1&amp;from=fanactv-adam">First Release</a>
                 <div class="bought-by">
-                    Bought by <a href="http://bandcamp.com/adam">Adam Pitts</a>
+                    Bought by <a href="http://bandcamp.com/adam">Adam Pits</a>
                     <div class="purchaser-photos"><a href="http://bandcamp.com/adam"><img src="https://f4.bcbits.com/img/fan-adam.jpg"></a></div>
                 </div>
             </div>
@@ -66,7 +66,7 @@ export const groupedFansBoughtMusicEmail: Email = {
     htmlBody: `
         <div class="item-tralbum-text">
             <a href="https://test.bandcamp.com/album/first">First release</a>
-            <div class="bought-by"><a href="http://bandcamp.com/adam">Adam Pitts</a>
+            <div class="bought-by"><a href="http://bandcamp.com/adam">Adam Pits</a>
                 <div class="purchaser-photos"><a href="http://bandcamp.com/adam"><img src="https://f4.bcbits.com/img/fan-adam.jpg"></a></div>
             </div>
         </div>
