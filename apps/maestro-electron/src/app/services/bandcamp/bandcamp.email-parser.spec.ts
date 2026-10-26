@@ -1,10 +1,10 @@
 // eslint-disable-next-line @nx/enforce-module-boundaries -- Shared synthetic fixtures live in fixtures/, per docs/testing.md.
 import {
     adamFan,
-    mayaFan,
-    riverFan,
     fansBoughtMusicEmail,
+    mayaFan,
     newReleaseEmail,
+    riverFan,
 } from '../../../../../../fixtures/feed.fixture'
 import { parseBandcampEmail } from './bandcamp.email-parser'
 
@@ -67,7 +67,7 @@ describe('parseBandcampEmail', () => {
                 <div class="item-tralbum-text">
                     <a href='https://test.bandcamp.com/album/first?from=fanactv-taylor#artwork'>First Release</a>
                     <div class="bought-by">
-                        Bought by <a href="http://bandcamp.com/adam">Adam   Pitts</a> and
+                        Bought by <a href="http://bandcamp.com/adam">Adam   Pits</a> and
                         <a href="http://bandcamp.com/taylor"><span>Taylor</span></a>
                     </div>
                 </div>`,

@@ -30,11 +30,11 @@ describe(FanAvatarStackComponent.name, () => {
 
     describe('on a release', () => {
         it('names a single buyer as a link to their profile', () => {
-            const { stack, avatars, summary, count, links } = render([fan('Adam Pitts')], 'release')
+            const { stack, avatars, summary, count, links } = render([fan('Adam Pits')], 'release')
 
-            expect(summary()).toBe('Bought by Adam Pitts')
+            expect(summary()).toBe('Bought by Adam Pits')
             expect(links().map(link => [link.textContent?.trim(), link.getAttribute('href')])).toEqual([
-                ['Adam Pitts', 'https://bandcamp.com/adampitts'],
+                ['Adam Pits', 'https://bandcamp.com/adamPits'],
             ])
             expect(stack.getAttribute('role')).toBeNull()
             expect(stack.getAttribute('tabindex')).toBeNull()
@@ -43,25 +43,22 @@ describe(FanAvatarStackComponent.name, () => {
         })
 
         it('links every buyer to their own profile, in order, within one sentence', () => {
-            const { summary, links } = render(
-                [fan('Maya'), fan('River & Rain'), fan('Adam Pitts')],
-                'release',
-            )
+            const { summary, links } = render([fan('Maya'), fan('River & Rain'), fan('Adam Pits')], 'release')
 
-            expect(summary()).toBe('Bought by Maya, River & Rain, and Adam Pitts')
+            expect(summary()).toBe('Bought by Maya, River & Rain, and Adam Pits')
             expect(links().map(link => [link.textContent?.trim(), link.getAttribute('href')])).toEqual([
                 ['Maya', 'https://bandcamp.com/maya'],
                 ['River & Rain', 'https://bandcamp.com/riverrain'],
-                ['Adam Pitts', 'https://bandcamp.com/adampitts'],
+                ['Adam Pits', 'https://bandcamp.com/adamPits'],
             ])
         })
 
         it('renders the sentence without stray spaces even where template whitespace is preserved', () => {
             TestBed.overrideComponent(FanAvatarStackComponent, { set: { preserveWhitespaces: true } })
-            const { stack } = render([fan('Maya'), fan('River & Rain'), fan('Adam Pitts')], 'release')
+            const { stack } = render([fan('Maya'), fan('River & Rain'), fan('Adam Pits')], 'release')
 
             expect(stack.querySelector('.fan-summary')?.textContent).toBe(
-                'Bought by Maya, River & Rain, and Adam Pitts',
+                'Bought by Maya, River & Rain, and Adam Pits',
             )
         })
 
