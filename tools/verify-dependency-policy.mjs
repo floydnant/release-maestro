@@ -113,8 +113,8 @@ export const verifyDependencyPolicy = workspaceRoot => {
     } else if (rootManifest.engines?.pnpm !== packageManagerMatch[1]) {
         errors.push(`package.json: engines.pnpm must match packageManager (${packageManagerMatch[1]})`)
     }
-    if (rootManifest.engines?.node !== '>= 22.22.3 < 23 || >= 24.15.0 < 25') {
-        errors.push('package.json: engines.node must require Node 22.22.3–22.x or Node 24.15.0–24.x')
+    if (rootManifest.engines?.node !== '>= 22.23.4 < 23 || >= 24.22.1 < 25') {
+        errors.push('package.json: engines.node must require Node 22.23.4–22.x or Node 24.22.1–24.x')
     }
 
     const pnpmSettingsPath = join(workspaceRoot, 'pnpm-workspace.yaml')
