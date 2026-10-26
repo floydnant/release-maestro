@@ -3,6 +3,22 @@
 GitHub runs CodeQL, secret scanning, and push protection. Dependabot updates npm, Cargo, and
 GitHub Actions dependencies. The pnpm policy restricts provenance, release age, sources, and install scripts.
 
+## Runtime security
+
+The supported Node.js ranges start at 22.23.4 and 24.22.1. These releases include the
+[October 21, 2026 security fixes](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases),
+including the Brotli decoder vulnerability CVE-2026-111497. `.node-version` pins 24.22.1 for
+development and CI. Change the active shell runtime too; the version file does not replace an
+already running Node.js installation.
+
+Electron bundles its own runtime. Electron 45.0.0 reports Node 24.22.0, but its
+[Node build patch](https://github.com/electron/electron/blob/v45.0.0/patches/node/build_add_gn_build_files.patch)
+links Chromium's Brotli decoder. The
+[decoder shipped in Chromium 156.0.8078.48](https://github.com/chromium/chromium/blob/156.0.8078.48/third_party/brotli/dec/decode.c)
+contains the invalid-block-switch rejection and error propagation in the Brotli 1.2.1 security fix.
+Source inspection therefore indicates that Electron 45.0.0 includes the fix for this specific Brotli
+vulnerability. This does not establish coverage for every advisory in the Node.js security release.
+
 ## Commands
 
 After `make install`:

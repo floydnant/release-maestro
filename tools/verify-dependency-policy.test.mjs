@@ -28,7 +28,7 @@ const createWorkspace = () => {
         JSON.stringify({
             packageManager: 'pnpm@1.2.3',
             dependencies: { example: '1.2.3' },
-            engines: { node: '>= 22.22.3 < 23 || >= 24.15.0 < 25', pnpm: '1.2.3' },
+            engines: { node: '>= 22.23.4 < 23 || >= 24.22.1 < 25', pnpm: '1.2.3' },
         }),
     )
     writeFileSync(
@@ -122,6 +122,25 @@ test('validates effective pnpm settings instead of matching comments', () => {
     assert.match(verifyDependencyPolicy(workspace).join('\n'), /minimumReleaseAge must be 4320/)
 })
 
+test('rejects Node ranges that admit unpatched October 2026 runtimes', () => {
+    const workspace = createWorkspace()
+    const manifestPath = join(workspace, 'package.json')
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    for (const range of [
+        '>= 22.22.3 < 23 || >= 24.15.0 < 25',
+        '>= 22.23.0 < 23 || >= 24.22.1 < 25',
+        '>= 22.23.4 < 23 || >= 24.22.0 < 25',
+    ]) {
+        manifest.engines.node = range
+        writeFileSync(manifestPath, JSON.stringify(manifest))
+
+        assert.ok(
+            verifyDependencyPolicy(workspace).some(error => error.includes('engines.node')),
+            `accepted unpatched runtime range: ${range}`,
+        )
+    }
+})
+
 test('rejects Node ranges that admit unsupported releases', () => {
     const workspace = createWorkspace()
     const manifestPath = join(workspace, 'package.json')
@@ -131,7 +150,7 @@ test('rejects Node ranges that admit unsupported releases', () => {
 
     assert.match(
         verifyDependencyPolicy(workspace).join('\n'),
-        /engines\.node must require Node 22\.22\.3–22\.x or Node 24\.15\.0–24\.x/,
+        /engines\.node must require Node 22\.23\.4–22\.x or Node 24\.22\.1–24\.x/,
     )
 })
 
