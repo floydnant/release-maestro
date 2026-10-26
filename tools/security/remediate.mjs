@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseAllDocuments, parseDocument } from 'yaml'
+import { planNodeSecurityUpdate } from '../node-runtime.mjs'
 import {
     applyFirstEligibleFix,
     applyVerifiedFix,
@@ -56,7 +57,7 @@ const documents = source =>
         return document.toJS()
     })
 
-// Plans (`plan`) or applies (`apply`) verified fixes for npm findings, one package group at a time, then
+// Plans (`plan`) or applies (`apply`) verified npm fixes and official Node security updates, one package group at a time, then
 // writes dist/security/remediation.json and remediation-pr.md. In apply mode, a failed package restores the
 // inputs from before its own attempt, and a failure that aborts the run restores the inputs it started from.
 //
@@ -139,6 +140,7 @@ export const remediate = async (
     // Each verified fix replaces `currentFindings`, so later groups are judged against the updated inputs.
     let currentFindings = originalFindings
     const report = {
+        mode,
         packages: [],
         otherFindings: originalFindings.filter(f => f.ecosystem !== 'npm' && isActionable(f)),
     }
@@ -304,6 +306,41 @@ export const remediate = async (
 
             const finalLock = documents(read('pnpm-lock.yaml', 'utf8'))
             for (const item of fixed) item.resolvedVersions = lockVersions(finalLock, item.name)
+        }
+
+        // Runtime updates share the same rollback, report and bot PR as npm fixes.
+        // A metadata failure is unknown, so preserve an existing bot PR through a failed outcome.
+        const beforeRuntime = snapshot()
+        try {
+            const manifest = json(join(root, 'package.json'))
+            const [releases, schedule] = await Promise.all([
+                fetchJson('https://nodejs.org/dist/index.json'),
+                fetchJson('https://raw.githubusercontent.com/nodejs/Release/main/schedule.json'),
+            ])
+            const runtime = planNodeSecurityUpdate(
+                manifest.engines?.node,
+                read('.node-version', 'utf8').trim(),
+                releases,
+                schedule,
+                now,
+            )
+            if (mode === 'apply' && runtime.packages.some(item => item.status === 'fixed')) {
+                manifest.engines.node = runtime.range
+                writeFileSync(join(root, 'package.json'), JSON.stringify(manifest, null, 4) + '\n')
+                writeFileSync(join(root, '.node-version'), runtime.pin + '\n')
+                run('make', ['dependency-policy-check'])
+            }
+            report.packages.push(
+                ...runtime.packages.map(item => ({
+                    ...item,
+                    ecosystem: 'Node.js',
+                    status: mode === 'plan' && item.status === 'fixed' ? 'planned' : item.status,
+                    reason: `Official LTS security release: ${item.target}`,
+                })),
+            )
+        } catch (error) {
+            if (mode === 'apply') restore(beforeRuntime)
+            report.packages.push({ name: 'Node.js runtime', status: 'failed', reason: error.message })
         }
 
         // --- Reports ---
