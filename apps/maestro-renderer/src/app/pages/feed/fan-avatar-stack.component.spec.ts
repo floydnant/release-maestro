@@ -34,7 +34,7 @@ describe(FanAvatarStackComponent.name, () => {
 
             expect(summary()).toBe('Bought by Adam Pits')
             expect(links().map(link => [link.textContent?.trim(), link.getAttribute('href')])).toEqual([
-                ['Adam Pits', 'https://bandcamp.com/adamPits'],
+                ['Adam Pits', 'https://bandcamp.com/adampits'],
             ])
             expect(stack.getAttribute('role')).toBeNull()
             expect(stack.getAttribute('tabindex')).toBeNull()
@@ -49,7 +49,7 @@ describe(FanAvatarStackComponent.name, () => {
             expect(links().map(link => [link.textContent?.trim(), link.getAttribute('href')])).toEqual([
                 ['Maya', 'https://bandcamp.com/maya'],
                 ['River & Rain', 'https://bandcamp.com/riverrain'],
-                ['Adam Pits', 'https://bandcamp.com/adamPits'],
+                ['Adam Pits', 'https://bandcamp.com/adampits'],
             ])
         })
 
