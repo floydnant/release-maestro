@@ -387,8 +387,8 @@ importers:
         specifier: 0.31.11
         version: 0.31.11
       electron:
-        specifier: 44.9.0
-        version: 44.9.0(supports-color@8.1.1)
+        specifier: 45.0.0
+        version: 45.0.0(supports-color@8.1.1)
       electron-builder:
         specifier: 26.15.3
         version: 26.15.3(supports-color@8.1.1)
@@ -436,7 +436,7 @@ importers:
         version: 23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23))
       nx-electron:
         specifier: 22.0.0
-        version: 22.0.0(@nx/devkit@22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23))))(@nx/workspace@22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23)))(@swc/core@1.16.18(@swc/helpers@0.5.23))(electron@44.9.0(supports-color@8.1.1))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.30)(rxjs@7.8.2)(supports-color@8.1.1)(typescript@6.0.3)(uglify-js@3.19.3)
+        version: 22.0.0(@nx/devkit@22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23))))(@nx/workspace@22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23)))(@swc/core@1.16.18(@swc/helpers@0.5.23))(electron@45.0.0(supports-color@8.1.1))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.30)(rxjs@7.8.2)(supports-color@8.1.1)(typescript@6.0.3)(uglify-js@3.19.3)
       playwright:
         specifier: 1.64.1
         version: 1.64.1
@@ -5034,8 +5034,8 @@ packages:
   electron-to-chromium@1.5.459:
     resolution: {integrity: sha512-4SC9HHSFjO/liAhifpdOL5hG9b4BP7/5G3y3UPZVO8trlAXr1CaUEEJL0gWK3kOcYcZrOA5rkwG45Gra/lTIgg==}
 
-  electron@44.9.0:
-    resolution: {integrity: sha512-boP8zA5OIoMGYe3uWP4IqB1VJNoEzdHYgcBaVYnd1DBv5TogwXkbM4yJGSfNmYCzalVQ5J3TAIbaKOY+ILTnyg==}
+  electron@45.0.0:
+    resolution: {integrity: sha512-yjz4uhMBcO6L5X7CWgRMobf2EMJPnb9j4zuf+nu/TU/6E4Sqfx7fn/a2eACo4qngjml/0JnsoZhxYroJLxLd2w==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -12882,7 +12882,7 @@ snapshots:
 
   electron-to-chromium@1.5.459: {}
 
-  electron@44.9.0(supports-color@8.1.1):
+  electron@45.0.0(supports-color@8.1.1):
     dependencies:
       '@electron-internal/extract-zip': 1.0.5
       '@electron/get': 5.1.0(supports-color@8.1.1)
@@ -14768,12 +14768,12 @@ snapshots:
 
   nwsapi@2.2.28: {}
 
-  nx-electron@22.0.0(@nx/devkit@22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23))))(@nx/workspace@22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23)))(@swc/core@1.16.18(@swc/helpers@0.5.23))(electron@44.9.0(supports-color@8.1.1))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.30)(rxjs@7.8.2)(supports-color@8.1.1)(typescript@6.0.3)(uglify-js@3.19.3):
+  nx-electron@22.0.0(@nx/devkit@22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23))))(@nx/workspace@22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23)))(@swc/core@1.16.18(@swc/helpers@0.5.23))(electron@45.0.0(supports-color@8.1.1))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.30)(rxjs@7.8.2)(supports-color@8.1.1)(typescript@6.0.3)(uglify-js@3.19.3):
     dependencies:
       '@nx/devkit': 22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23)))
       '@nx/workspace': 22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.18(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.18(@swc/helpers@0.5.23))
       copy-webpack-plugin: 12.0.2(webpack@5.112.0(@swc/core@1.16.18(@swc/helpers@0.5.23))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))
-      electron: 44.9.0(supports-color@8.1.1)
+      electron: 45.0.0(supports-color@8.1.1)
       electron-builder: 26.15.3(supports-color@8.1.1)
       fork-ts-checker-webpack-plugin: 9.1.0(typescript@6.0.3)(webpack@5.112.0(@swc/core@1.16.18(@swc/helpers@0.5.23))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))
       license-webpack-plugin: 4.0.2(webpack@5.112.0(@swc/core@1.16.18(@swc/helpers@0.5.23))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))
