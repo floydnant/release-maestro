@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict'
 import { test } from '@jest/globals'
-import { publishRemediation } from './publish-remediation.mjs'
+import { nodeRuntimePublication, publishRemediation } from './publish-remediation.mjs'
 
 const automationCommit =
     'tip\trelease-maestro-ci[bot]\trelease-maestro-ci[bot]\tdeps: remediate verified npm vulnerabilities'
 
 // `commits` is the `git log` output for the branch, one `sha\tauthor\tcommitter\tsubject` line per commit.
-const harness = ({ main = 'base', remote, commits = automationCommit, changed = true, pr = null } = {}) => {
+const harness = ({
+    main = 'base',
+    remote,
+    commits = automationCommit,
+    changed = true,
+    pr = null,
+    branch = 'security/automated-remediation',
+} = {}) => {
     const calls = []
     const run = (command, args) => {
         calls.push([command, ...args])
@@ -14,9 +21,7 @@ const harness = ({ main = 'base', remote, commits = automationCommit, changed = 
             if (args[1].includes('/git/ref/heads/main')) return JSON.stringify({ object: { sha: main } })
             if (args[1].includes('/git/matching-refs/'))
                 return JSON.stringify(
-                    remote
-                        ? [{ ref: 'refs/heads/security/automated-remediation', object: { sha: remote } }]
-                        : [],
+                    remote ? [{ ref: `refs/heads/${branch}`, object: { sha: remote } }] : [],
                 )
         }
         if (command === 'gh' && args[0] === 'pr' && args[1] === 'list') return JSON.stringify(pr ? [pr] : [])
@@ -118,4 +123,53 @@ test('a fork PR from the reserved branch name neither blocks nor receives public
     const { ran, run } = harness({ pr: fork })
     publishRemediation('owner/repo', fixed, run)
     assert(ran('gh', 'pr', 'create'))
+})
+
+test('runtime publication owns a separate branch, body, commit subject, and input list', () => {
+    const { calls, run } = harness()
+    publishRemediation('owner/repo', { ...fixed, mode: 'apply' }, run, nodeRuntimePublication)
+    assert(calls.some(c => c.includes('--force-with-lease=refs/heads/security/node-runtime:')))
+    assert(calls.some(c => c.includes('dist/security/node-runtime-pr.md')))
+    assert.deepEqual(
+        calls.find(c => c[0] === 'git' && c[1] === 'add'),
+        ['git', 'add', '--', 'package.json', '.node-version'],
+    )
+    assert(
+        calls.some(
+            c => c[0] === 'git' && c[1] === 'commit' && c.includes('deps: update Node.js security releases'),
+        ),
+    )
+})
+
+test('runtime retries reuse the PR and do not push identical updates', () => {
+    const { ran, run } = harness({
+        branch: 'security/node-runtime',
+        remote: 'prior',
+        pr: botPr,
+        changed: false,
+        commits:
+            'tip\trelease-maestro-ci[bot]\trelease-maestro-ci[bot]\tdeps: update Node.js security releases',
+    })
+    publishRemediation('owner/repo', { ...fixed, mode: 'apply' }, run, nodeRuntimePublication)
+    assert(ran('gh', 'pr', 'edit'))
+    assert(!ran('git', 'commit') && !ran('git', 'push'))
+})
+
+test('runtime preview reports can never create or update a PR', () => {
+    const { calls, run } = harness()
+    assert.throws(
+        () => publishRemediation('owner/repo', { ...fixed, mode: 'plan' }, run, nodeRuntimePublication),
+        /Only applied/,
+    )
+    assert.deepEqual(calls, [])
+})
+
+test('human commits prevent closing even an obsolete automation PR', () => {
+    const { ran, run } = harness({
+        remote: 'prior',
+        pr: botPr,
+        commits: 'tip\tHuman\tHuman\tfix: manual change',
+    })
+    assert.throws(() => publishRemediation('owner/repo', { packages: [] }, run), /human edits/)
+    assert(!ran('gh', 'pr', 'close'))
 })

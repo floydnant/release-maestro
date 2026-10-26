@@ -103,7 +103,8 @@ can change without code changes.
 
 ## Automated remediation
 
-The Security remediation workflow runs daily on main and supports manual main runs. It retries npm
+The Security remediation workflow runs daily on main and supports manual main runs. Independent jobs
+prepare npm fixes and Node.js runtime security updates. The npm job retries npm
 findings that Dependabot cannot fix, including accepted findings. Cargo findings remain in the report
 for maintainer follow-up. Dependabot continues to handle normal version and security updates.
 
@@ -155,6 +156,36 @@ existing PR, including when every package is unresolved or covered by Dependabot
 old PR from retaining a verification claim after its candidate becomes vulnerable. A run with a
 failed package keeps the existing PR and branch unchanged. A transient failure therefore cannot
 discard a previous verified fix. A later successful run can create a new PR.
+
+### Node.js runtime security updates
+
+The independent `node-runtime` job reads the official [Node release index](https://nodejs.org/dist/index.json)
+and [LTS schedule](https://github.com/nodejs/Release/blob/main/schedule.json). It selects published,
+stable releases marked as security updates for the currently supported Node 22 and 24 lines.
+It does not wait for npm's package quarantine because the inputs are official runtime security releases.
+
+The job raises the minimum versions in `package.json` and, when needed, the runtime pin in
+`.node-version`. It never lowers a minimum or a newer pin. The dependency policy accepts higher
+floors within the supported major lines, so later updates do not require code or test edits.
+Prereleases, new major lines, missing metadata, and end-of-life decisions do not produce an update.
+Invalid metadata, request failures, or a supported line reaching end of life fail the job for review.
+
+After the proposed runtime passes setup, dependency policy, and a frozen installation, the CI App
+opens or refreshes one ready-for-review PR on `security/node-runtime`. Normal PR CI validates the
+change before a maintainer merges it. The shared publisher protects human edits, checks that main
+has not moved, avoids duplicate commits, and closes an obsolete bot PR when main already includes
+its update. The npm job continues independently if the runtime job fails, and vice versa.
+
+```bash
+make node-security-plan   # Preview security releases without changing runtime inputs
+make node-security-update # Update the pin and supported minimums in a disposable checkout
+```
+
+Both commands write `dist/security/node-runtime.json` and `node-runtime-pr.md`. A preview report
+cannot be published. A failed run removes stale reports and restores its runtime inputs.
+No Node distribution or release-provided code executes during planning. CI uses `actions/setup-node`
+to obtain the proposed runtime for verification. Electron's embedded Node and other tool pins remain
+outside this updater; npm automation continues to cover the Electron package.
 
 ## SBOMs
 

@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, lstatSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
+import { nodeRuntimeErrors } from './node-runtime.mjs'
 
 const dependencySections = ['dependencies', 'devDependencies', 'optionalDependencies']
 const ignoredDirectories = new Set([
@@ -113,8 +114,15 @@ export const verifyDependencyPolicy = workspaceRoot => {
     } else if (rootManifest.engines?.pnpm !== packageManagerMatch[1]) {
         errors.push(`package.json: engines.pnpm must match packageManager (${packageManagerMatch[1]})`)
     }
-    if (rootManifest.engines?.node !== '>= 22.23.4 < 23 || >= 24.22.1 < 25') {
-        errors.push('package.json: engines.node must require Node 22.23.4–22.x or Node 24.22.1–24.x')
+    try {
+        errors.push(
+            ...nodeRuntimeErrors(
+                rootManifest.engines?.node,
+                readFileSync(join(workspaceRoot, '.node-version'), 'utf8').trim(),
+            ),
+        )
+    } catch {
+        errors.push('.node-version must exist and pin a supported Node release')
     }
 
     const pnpmSettingsPath = join(workspaceRoot, 'pnpm-workspace.yaml')
