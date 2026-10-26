@@ -150,7 +150,8 @@ Changed inputs or a changed base update the same PR with an explicit branch leas
 revision during preparation stops publication. So do unexpected commits anywhere on the automation
 branch and a same-repository PR owned by another actor; fork PRs never count as the automation PR.
 Commit authors, committers, subjects, and changed paths identify expected automation commits; this
-check is not a cryptographic proof of authorship. Do not hand-edit the reserved branch. To resume,
+check is not a cryptographic proof of authorship. A human commit also stops a no-fix run, so the daily job fails until the branch is resolved.
+Do not hand-edit the reserved branch. To resume,
 resolve the human changes and delete the branch. A completed run without verified fixes closes the
 existing PR, including when every package is unresolved or covered by Dependabot. This prevents an
 old PR from retaining a verification claim after its candidate becomes vulnerable. A run with a
@@ -171,6 +172,8 @@ The offline policy validates the declared ranges, not whether each declared vers
 Prereleases and new major lines do not produce an update. Invalid metadata, request failures,
 or a supported line reaching end of life appear as failed runtime outcomes for maintainer review.
 These failures preserve the existing bot PR instead of dropping a previous fix.
+While a runtime failure persists, the publisher also holds new npm fixes when that PR exists.
+An expired supported line needs a maintainer policy change before the combined PR can refresh.
 
 `make security-remediation-plan` previews both npm fixes and runtime updates.
 `make security-remediate` applies both and writes the same remediation report and PR body.

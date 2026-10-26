@@ -118,7 +118,7 @@ export const remediationBody = report => {
         .flatMap(item => {
             if (item.ecosystem === 'Node.js')
                 return [
-                    `- ${item.name}: ${item.from} → [${item.target}](https://nodejs.org/en/blog/release/v${item.target}).`,
+                    `- ${item.name}${item.from === item.target && item.pinFrom ? ' runtime pin' : ' minimum'}: ${item.from === item.target && item.pinFrom ? item.pinFrom : item.from} → [${item.target}](https://nodejs.org/en/blog/release/v${item.target}).`,
                 ]
             const resolved = item.resolvedVersions ?? [item.target]
             // An earlier fix can remove a package from the lockfile entirely.
@@ -141,7 +141,7 @@ export const remediationBody = report => {
         '',
         '## What changed',
         '',
-        'This PR applies verified npm fixes and official Node.js LTS security releases.',
+        'This PR contains the security updates listed below.',
         'Each npm fix removes its targeted advisories and adds no other vulnerability findings.',
         'npm releases satisfy the repository freshness and provenance policy. Node security releases do not wait for the npm age delay.',
         ...(fixed.length ? ['', ...fixed] : []),

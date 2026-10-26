@@ -88,6 +88,7 @@ export const planNodeSecurityUpdate = (range, pin, releases, schedule, now = new
             name: `Node.js ${major}`,
             from: floor,
             target,
+            ...(changesPin ? { pinFrom: pin } : {}),
             status: target !== floor || changesPin ? 'fixed' : 'current',
         }
     })
