@@ -10,7 +10,7 @@ import {
     scenarioBuilder,
 } from '../scenario-harness'
 
-const adam = createBandcampFan('Adam Pitts')
+const adam = createBandcampFan('Adam Pits')
 const maya = createBandcampFan('Maya')
 const river = createBandcampFan('River & Rain')
 
@@ -48,16 +48,16 @@ test.describe('release feed fan purchases', () => {
     test('credits a fan who bought the whole album on the release and every track', async ({ page }) => {
         await openFeed(page, createPurchasedAlbum([[adam], [adam], [adam]]))
 
-        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pitts')
+        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pits')
         await expect(fanLink(page, adam)).toHaveAttribute('href', adam.profileUrl)
-        await expect(page.getByRole('img', { name: 'Bought by Adam Pitts', exact: true })).toHaveCount(3)
+        await expect(page.getByRole('img', { name: 'Bought by Adam Pits', exact: true })).toHaveCount(3)
         for (const index of [0, 1, 2]) {
             await expect(
-                trackRow(page, index).getByRole('img', { name: 'Bought by Adam Pitts' }),
+                trackRow(page, index).getByRole('img', { name: 'Bought by Adam Pits' }),
             ).toBeVisible()
             // Names appear only in the release sentence, never inline on a track.
-            await expect(trackRow(page, index).getByText('Adam Pitts', { exact: true })).toHaveCount(0)
-            await expect(trackRow(page, index).getByRole('link', { name: 'Adam Pitts' })).toHaveCount(0)
+            await expect(trackRow(page, index).getByText('Adam Pits', { exact: true })).toHaveCount(0)
+            await expect(trackRow(page, index).getByRole('link', { name: 'Adam Pits' })).toHaveCount(0)
         }
         await expect(releaseStack(page).getByRole('img')).toHaveCount(0)
     })
@@ -65,15 +65,15 @@ test.describe('release feed fan purchases', () => {
     test('shows each track’s own buyers and keeps durations aligned', async ({ page }) => {
         await openFeed(page, createPurchasedAlbum([[adam, maya], [], [adam, river]]))
 
-        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pitts, Maya, and River & Rain')
+        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pits, Maya, and River & Rain')
         for (const fan of [adam, maya, river]) {
             await expect(fanLink(page, fan)).toHaveAttribute('href', fan.profileUrl)
             await expect(fanLink(page, fan)).toHaveAttribute('target', '_blank')
         }
-        await expect(trackRow(page, 0).getByRole('img')).toHaveAccessibleName('Bought by Adam Pitts and Maya')
+        await expect(trackRow(page, 0).getByRole('img')).toHaveAccessibleName('Bought by Adam Pits and Maya')
         await expect(trackRow(page, 1).getByRole('img')).toHaveCount(0)
         await expect(trackRow(page, 2).getByRole('img')).toHaveAccessibleName(
-            'Bought by Adam Pitts and River & Rain',
+            'Bought by Adam Pits and River & Rain',
         )
 
         const seekerEdges = await page
@@ -90,7 +90,7 @@ test.describe('release feed fan purchases', () => {
         await expect(row.getByRole('button', { name: 'Play Karasu' }).getByRole('img')).toHaveCount(0)
         await expect(row.getByRole('button', { name: 'Seek within Karasu' }).getByRole('img')).toHaveCount(0)
 
-        await row.getByRole('img', { name: 'Bought by Adam Pitts and Maya' }).click()
+        await row.getByRole('img', { name: 'Bought by Adam Pits and Maya' }).click()
         await expect(page.getByRole('button', { name: 'Play Karasu' })).toBeVisible()
 
         await row.getByRole('button', { name: 'Play Karasu' }).click()
@@ -103,9 +103,9 @@ test.describe('release feed fan purchases', () => {
 
         await row.getByRole('button', { name: 'Seek within Karasu' }).focus()
         await page.keyboard.press('Tab')
-        const trackStack = row.getByRole('img', { name: 'Bought by Adam Pitts and Maya' })
+        const trackStack = row.getByRole('img', { name: 'Bought by Adam Pits and Maya' })
         await expect(trackStack).toBeFocused()
-        await expect(page.getByRole('tooltip')).toHaveText('Bought by Adam Pitts and Maya')
+        await expect(page.getByRole('tooltip')).toHaveText('Bought by Adam Pits and Maya')
     })
 
     test('reaches each release buyer’s profile link by keyboard, before the release title', async ({
@@ -235,7 +235,7 @@ test.describe('release feed fan purchases', () => {
         })
         await openFeed(page, release)
 
-        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pitts')
+        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pits')
         await expect(page.getByText('The Bandcamp track or album could not be found')).toBeVisible()
         await expect(page.getByRole('link', { name: release.data.releaseUrl, exact: true })).toHaveAttribute(
             'href',
