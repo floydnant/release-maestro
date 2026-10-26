@@ -63,7 +63,7 @@ uses v12. Recent Dependabot PRs have updated the lockfile successfully, but that
 complete remediation coverage. Dependency submission fills graph coverage; it cannot guarantee that
 Dependabot can resolve a compatible fix.
 
-`tools/security/exceptions.json` accepts 7 existing findings until November 2, 2026.
+`tools/security/exceptions.json` accepts 2 existing findings until November 2, 2026.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, and UTC expiry date.
 They expire at the start of that date. Full scans then block only if the matching vulnerability
 is still present; a stale entry for a resolved finding does not fail the scan. Offline policy validation
