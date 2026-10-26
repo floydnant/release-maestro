@@ -96,7 +96,7 @@ describe('FeedBackendService email import', () => {
             emailRepository,
             fromPartial<BandcampApiBackendService>({ scrapeTralbumInfo, holdFeedPriority: () => () => {} }),
             feedRepository,
-            fromPartial<SettingsBackendService>({}),
+            fromPartial<SettingsBackendService>({ getSettings: () => ({}) }),
         )
     })
 
@@ -690,7 +690,11 @@ describe('FeedBackendService email import', () => {
             totalImported: 2,
             newlyImported: 2,
         })
-        const stored = await feedRepository.listFeedItems(0, 10)
+        const stored = await feedRepository.listFeedItems({
+            index: 0,
+            count: 10,
+            snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+        })
         expect(new Set(stored.map(item => item.id)).size).toBe(2)
         expect(stored.map(item => item.dedupeIdentifier).sort()).toEqual([
             'https://other.bandcamp.com/track/second',
@@ -734,7 +738,11 @@ describe('FeedBackendService email import', () => {
             emails$.next({ current: 2, total: 2, email: fansBoughtMusicEmail })
             emails$.complete()
             await updates
-            const firstItems = await feedRepository.listFeedItems(0, 10)
+            const firstItems = await feedRepository.listFeedItems({
+                index: 0,
+                count: 10,
+                snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+            })
             expect(firstItems).toHaveLength(2)
             expect(firstItems.find(item => item.data.tralbumUrl.includes('/album/'))?.source.type).toBe(
                 'EMAIL.BANDCAMP_NEW_RELEASE',
@@ -751,7 +759,13 @@ describe('FeedBackendService email import', () => {
                 totalImported: 2,
                 newlyImported: 0,
             })
-            expect(await feedRepository.listFeedItems(0, 10)).toEqual(firstItems)
+            expect(
+                await feedRepository.listFeedItems({
+                    index: 0,
+                    count: 10,
+                    snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+                }),
+            ).toEqual(firstItems)
         } finally {
             jest.useRealTimers()
         }
@@ -799,7 +813,13 @@ describe('FeedBackendService email import', () => {
             totalImported: 0,
             newlyImported: 0,
         })
-        expect(await feedRepository.listFeedItems(0, 10)).toEqual([])
+        expect(
+            await feedRepository.listFeedItems({
+                index: 0,
+                count: 10,
+                snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+            }),
+        ).toEqual([])
     })
 
     it('reserves foreground capacity before the database read and releases it after an empty page', async () => {
