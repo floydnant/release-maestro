@@ -10,7 +10,32 @@
             </div>
         }
         @if (feedState(); as feedState) {
-            @if (feedState.status === 'error') {
+            <ng-template #pageRetryButton>
+                <button
+                    hlmBtn
+                    variant="ghost"
+                    class="page-retry | mt-3 gap-2"
+                    type="button"
+                    [disabled]="feedState.isRetryingPage"
+                    [attr.aria-busy]="feedState.isRetryingPage"
+                    (click)="pageRetry$.next()"
+                >
+                    @if (feedState.isRetryingPage) {
+                        <app-progress-ring
+                            mode="spinning"
+                            [diameter]="16"
+                            [strokeWidth]="2"
+                            color="content.secondary"
+                            bgColor="transparent"
+                        ></app-progress-ring>
+                        Retrying
+                    } @else {
+                        Retry
+                    }
+                </button>
+            </ng-template>
+
+            @if (feedState.items.length === 0 && feedState.pageFailure; as failure) {
                 <div
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
@@ -18,14 +43,12 @@
                         <app-icon name="error" color="content.danger" size="3rem"></app-icon>
                     </p>
                     <p class="mt-2 text-center type-label-md text-content-danger">
-                        {{ feedState.error }}
+                        {{ failure.message }}
                     </p>
 
-                    <button hlmBtn variant="ghost" class="mt-3" type="button" (click)="retryNotifier$.next()">
-                        Retry
-                    </button>
+                    <ng-container [ngTemplateOutlet]="pageRetryButton"></ng-container>
                 </div>
-            } @else if (feedState.status === 'caught-up') {
+            } @else if (feedState.emptyReason === 'caught-up') {
                 <div
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
@@ -34,7 +57,7 @@
                         You're all caught up! Check back later for new releases.
                     </p>
                 </div>
-            } @else if (feedState.status === 'empty') {
+            } @else if (feedState.emptyReason === 'not-set-up') {
                 <div
                     class="absolute inset-0 mx-auto flex max-w-64 -translate-y-22 flex-col items-center justify-center px-3 text-center"
                 >
@@ -52,7 +75,7 @@
                     </p>
                 </div>
             }
-            @for (feedItem of feedState.status === 'feed' ? feedState.items : []; track feedItem.id) {
+            @for (feedItem of feedState.items; track feedItem.id) {
                 <div
                     class="feed-entry | my-32 flex max-h-(--max-feed-item-height) min-h-[45vh] snap-center items-center py-[calc(var(--feed-item-padding-y)/2)] transition-all duration-slow ease-standard"
                     [ngClass]="{ 'opacity-30 blur-xs': currentFeedIndex() != $index }"
@@ -72,12 +95,18 @@
                             />
 
                             <!-- @TODO: the height on this is very fragile, keep it up to date and come up with a better approach -->
+                            <!-- Rows share the list's columns, so durations line up whether or not a track has buyers. -->
                             <ul
-                                class="tracks | mt-3 max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] overflow-y-auto"
+                                class="tracks | mt-3 grid max-h-[calc(var(--max-feed-item-height)-var(--feed-item-padding-y)-300px-0.75rem)] content-start gap-x-1 overflow-y-auto"
+                                [ngClass]="
+                                    feedItem.data.fans.length
+                                        ? 'grid-cols-[auto_minmax(0,1fr)_auto]'
+                                        : 'grid-cols-[auto_minmax(0,1fr)]'
+                                "
                             >
                                 @for (track of feedItem.data.tracks; track $index) {
                                     <li
-                                        class="track | relative flex min-h-6 items-center gap-1 type-body-sm"
+                                        class="track | relative col-span-full grid min-h-6 grid-cols-subgrid items-center type-body-sm"
                                         [attr.data-track-index]="$index"
                                         [ngClass]="{
                                             'text-content-muted': !track.streamUrl,
@@ -172,20 +201,25 @@
                                                     {{ $index + 1 }}.
                                                 }
                                             </span>
-                                            <span
-                                                class="min-w-0 grow truncate"
-                                                [hlmOverflowTooltip]="track.title"
-                                                >{{ track.title }}</span
-                                            >
-                                            <span class="shrink-0">
-                                                {{ track.duration ? formatDuration(track.duration) : '' }}
+                                            <span class="flex min-w-0 items-center gap-1">
+                                                <span
+                                                    class="min-w-0 grow truncate"
+                                                    [hlmOverflowTooltip]="track.title"
+                                                    >{{ track.title }}</span
+                                                >
+                                                <span class="shrink-0">
+                                                    {{ track.duration ? formatDuration(track.duration) : '' }}
+                                                </span>
                                             </span>
+                                        }
+                                        @if (track.fans.length) {
+                                            <app-fan-avatar-stack class="ps-1" [fans]="track.fans" />
                                         }
                                     </li>
                                 }
 
                                 <div
-                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 size-full h-12 bg-linear-to-b from-transparent to-background-canvas"
+                                    class="shadow-overlay | pointer-events-none sticky bottom-0 z-0 col-span-full size-full h-12 bg-linear-to-b from-transparent to-background-canvas"
                                 ></div>
                             </ul>
                         </div>
@@ -195,19 +229,20 @@
                         >
                             <div class="wrap-nicely overflow-x-hidden overflow-y-scroll">
                                 @if (feedItem.error; as error) {
-                                    <div class="error | mb-1.5 flex items-center gap-2">
-                                        <p class="text-content-danger">
-                                            <app-icon
-                                                name="error"
-                                                color="content.danger"
-                                                size="1.3rem"
-                                                class="translate-y-[3px]"
-                                            ></app-icon>
-                                        </p>
-                                        <p class="type-label-md text-content-danger">
-                                            {{ error.message || 'Error loading feed item' }}
-                                        </p>
-                                    </div>
+                                    <app-release-load-status
+                                        [error]="error"
+                                        [recovery]="releaseRecovery(feedState, feedItem, $index)"
+                                        [releaseName]="feedItem.data.releaseName"
+                                        (retry)="itemRetry$.next(feedItem)"
+                                    />
+                                }
+
+                                @if (feedItem.data.fans.length) {
+                                    <app-fan-avatar-stack
+                                        class="mb-2"
+                                        variant="release"
+                                        [fans]="feedItem.data.fans"
+                                    />
                                 }
 
                                 <h1 class="tralbum-title | type-hero-title">
@@ -227,21 +262,41 @@
                                         </span>
                                         <span class="text-content-muted">•</span>
                                     }
-                                    <span
-                                        class="dates | text-content-muted"
-                                        [hlmTooltip]="
-                                            'released ' +
-                                            (feedItem.data.releaseDate | date) +
-                                            ', announced ' +
-                                            formatCalendarDateRelative(feedItem.data.emailReceivedAt)
-                                        "
+                                    @if (feedItem.data.releaseDate; as releaseDate) {
+                                        @let releaseDateLabel =
+                                            'Release date: ' + (releaseDate | date: 'longDate');
+                                        <time
+                                            class="release-date | text-content-muted select-text"
+                                            [attr.datetime]="releaseDate"
+                                            [hlmTooltip]="releaseDateLabel"
+                                        >
+                                            <span aria-hidden="true">
+                                                {{ formatReleaseDate(releaseDate) }}
+                                            </span>
+                                            <span class="sr-only select-none">{{ releaseDateLabel }}</span>
+                                        </time>
+                                        <span class="text-content-muted">•</span>
+                                    }
+                                    @let emailReceivedLabel =
+                                        'Email received: ' +
+                                        (feedItem.data.emailReceivedAt | date: 'MMMM d, y, h:mm a');
+                                    <time
+                                        class="email-received | inline-flex items-baseline gap-1 whitespace-nowrap text-content-muted select-text"
+                                        [attr.datetime]="feedItem.data.emailReceivedAt.toISOString()"
+                                        [hlmTooltip]="emailReceivedLabel"
                                     >
-                                        @if (feedItem.data.releaseDate) {
-                                            {{ formatReleaseDateRelative(feedItem.data.releaseDate) + ', ' }}
-                                        }
-                                        announced
-                                        {{ formatCalendarDateRelative(feedItem.data.emailReceivedAt) }}
-                                    </span>
+                                        <!-- Centred on the date's line: on its baseline, the icon would sit above the text -->
+                                        <app-icon
+                                            class="self-center"
+                                            name="email"
+                                            size="0.875rem"
+                                            aria-hidden="true"
+                                        />
+                                        <span aria-hidden="true">
+                                            {{ formatCalendarDateRelative(feedItem.data.emailReceivedAt) }}
+                                        </span>
+                                        <span class="sr-only select-none">{{ emailReceivedLabel }}</span>
+                                    </time>
                                 </p>
 
                                 <p
@@ -252,10 +307,13 @@
                                 <!-- @TODO: abstract this into a <link-meta-previews /> -->
                                 <ul class="links | mt-5 flex flex-wrap gap-1 type-body-sm">
                                     @for (link of feedItem.data.links; track $index) {
+                                        @let preview = linkPreviews()[link.url];
+                                        @let linkTitle = preview?.title || link.title;
+                                        @let favicon = preview?.favicon ?? link.favicon;
                                         <li class="flex w-full">
                                             <ng-template #linkTemplate>
                                                 <div class="type-body-sm">
-                                                    {{ link.title }}
+                                                    {{ linkTitle }}
 
                                                     <p class="mt-0.5 type-body-xs text-content-secondary">
                                                         {{ link.url }}
@@ -271,15 +329,22 @@
                                                 class="max-w-full justify-start gap-1.5 px-2 type-body-sm hover:text-content-primary"
                                                 [hlmTooltip]="linkTemplate"
                                             >
-                                                <img
-                                                    class="favicon |"
-                                                    [src]="link.favicon"
-                                                    alt="Favicon for {{ link.title }}"
-                                                    width="16"
-                                                    height="16"
-                                                />
+                                                @if (favicon) {
+                                                    <img
+                                                        class="favicon |"
+                                                        [src]="favicon"
+                                                        alt="Favicon for {{ linkTitle }}"
+                                                        width="16"
+                                                        height="16"
+                                                    />
+                                                } @else {
+                                                    <!-- Holds the favicon's place while the preview loads -->
+                                                    <span
+                                                        class="favicon-placeholder | size-4 shrink-0"
+                                                    ></span>
+                                                }
 
-                                                <span class="inline-block truncate">{{ link.title }}</span>
+                                                <span class="inline-block truncate">{{ linkTitle }}</span>
                                             </a>
                                         </li>
                                     }
@@ -404,6 +469,17 @@
                             </div>
                         }
                     </div>
+                </div>
+            }
+
+            @if (feedState.items.length > 0 && feedState.pageFailure; as failure) {
+                <div class="page-error | my-16 flex snap-center flex-col items-center px-3 text-center">
+                    <p class="flex items-center gap-2 type-label-md text-content-danger">
+                        <app-icon name="error" color="content.danger" size="1.3rem"></app-icon>
+                        {{ failure.message }}
+                    </p>
+
+                    <ng-container [ngTemplateOutlet]="pageRetryButton"></ng-container>
                 </div>
             }
         }

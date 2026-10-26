@@ -5,6 +5,7 @@ import {
     AlbumRow,
     AlbumWindowResult,
     AppSettings,
+    BandcampFan,
     FeedLoadError,
     HydratedFeedItem,
     MainIpcContract,
@@ -154,8 +155,11 @@ const defaultScenario = (): RendererScenario => ({
         'patch-settings': { kind: 'patch-settings' },
         'trigger-email-import': { kind: 'resolve' },
         'load-feed': { kind: 'resolve', value: [] },
+        // No previews: links keep the title and favicon they arrived with.
+        'load-link-previews': { kind: 'resolve', value: {} },
         'has-feed': { kind: 'resolve', value: false },
         'mark-feed-item-viewed': { kind: 'resolve' },
+        'reload-feed-items': { kind: 'resolve', value: [] },
         'metadata:ping': { kind: 'resolve', value: { ok: true } },
         'metadata:read': { kind: 'resolve', value: null },
         'metadata:write': { kind: 'resolve' },
@@ -321,6 +325,7 @@ export const scenarioBuilder = (scenario: Partial<RendererScenario> = {}) => {
 export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {}): HydratedFeedItem => ({
     id: 'release-1',
     type: 'BANDCAMP.TRALBUM',
+    sourceType: 'EMAIL.BANDCAMP_NEW_RELEASE',
     error: null,
     data: {
         releaseUrl: 'https://example.bandcamp.com/album/gecko',
@@ -328,6 +333,7 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
         emailReceivedAt: new Date('2026-06-20T10:00:00.000Z'),
         isEmailRead: false,
         emailId: 'email-1',
+        fans: [],
         releaseName: 'Gecko',
         band: {
             name: 'Shiva Chandra',
@@ -353,9 +359,21 @@ export const createHydratedRelease = (overrides: Partial<HydratedFeedItem> = {})
                 titleLink: null,
                 albumPreorder: false,
                 streamUrl: audioFixtureUrl,
+                fans: [],
             },
         ],
     },
+    ...overrides,
+})
+
+/**
+ * A Bandcamp fan with a stand-in profile photo. Pass `imageUrl: null` for a fan without one, or a URL
+ * that fails to load to exercise the initials fallback.
+ */
+export const createBandcampFan = (name: string, overrides: Partial<BandcampFan> = {}): BandcampFan => ({
+    name,
+    profileUrl: `https://bandcamp.com/${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
+    imageUrl: coverArtDataUrl(`fan ${name}`),
     ...overrides,
 })
 

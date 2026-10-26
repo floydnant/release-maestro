@@ -6,16 +6,42 @@ import {
     ElementRef,
     HostListener,
     inject,
+    Signal,
     signal,
     viewChildren,
 } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
-import { assertUnreachable, HydratedFeedItem, resolveFeedSettings } from '@release-maestro/core'
+import {
+    assertUnreachable,
+    HydratedFeedItem,
+    resolveFeedSettings,
+    ScrapedLinkMetadata,
+} from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
-import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
+import {
+    catchError,
+    concat,
+    concatMap,
+    defer,
+    distinct,
+    EMPTY,
+    filter,
+    from,
+    fromEvent,
+    map,
+    merge,
+    mergeMap,
+    mergeScan,
+    Observable,
+    of,
+    scan,
+    Subject,
+    switchMap,
+    timer,
+} from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { SettingsService } from '../../core/settings/settings.service'
@@ -27,11 +53,17 @@ import { SafePipe } from '../../shared/pipes/safe.pipe'
 import {
     formatCalendarDateRelative,
     formatDuration,
-    formatReleaseDateRelative,
+    formatReleaseDate,
 } from '../../shared/utils/formatting.utils'
 import { settingsLink } from '../settings/settings-link'
+import { FanAvatarStackComponent } from './fan-avatar-stack.component'
+import { ReleaseLoadStatusComponent, ReleaseRecovery } from './release-load-status.component'
 
 const NUM_PREFETCH_ITEMS = 5
+/** Releases that failed on a rate limit reload on their own when current or among the next five. */
+const AUTO_RETRY_WINDOW = 6
+/** Most releases one reload request may ask for (see `reloadFeedItemsRequestSchema`). */
+const MAX_RELOAD_BATCH = 20
 const SEEK_BY_SECONDS = 30
 
 const getUserFacingErrorMessage = (error: unknown) => {
@@ -43,11 +75,59 @@ const getUserFacingErrorMessage = (error: unknown) => {
     return undefined
 }
 
-type FeedState =
-    | { status: 'feed'; items: HydratedFeedItem[] }
-    | { status: 'caught-up'; items: [] }
-    | { status: 'empty'; items: [] }
-    | { status: 'error'; items: HydratedFeedItem[]; error: string }
+type PageFailure = { message: string }
+
+type FeedState = {
+    items: HydratedFeedItem[]
+    /** Why there are no releases to show, once a page load has come back empty. */
+    emptyReason: 'caught-up' | 'not-set-up' | null
+    /** The last page load failed. Loaded releases stay; the next page waits for Retry or reconnecting. */
+    pageFailure: PageFailure | null
+    isRetryingPage: boolean
+    /** Failed releases being loaded again. */
+    reloadingIds: ReadonlySet<string>
+    /** The rate-limit deadline each release was last reloaded for automatically; each one is tried once. */
+    autoRetriedDeadlines: ReadonlyMap<string, number>
+}
+
+const INITIAL_FEED_STATE: FeedState = {
+    items: [],
+    emptyReason: null,
+    pageFailure: null,
+    isRetryingPage: false,
+    reloadingIds: new Set(),
+    autoRetriedDeadlines: new Map(),
+}
+
+type FeedAction =
+    | { kind: 'load-page'; furthestScrolledIndex: number; onlyWhenEmpty: boolean }
+    /** Retries the failure that was on screen; a retry for a failure already handled does nothing. */
+    | { kind: 'retry-page'; failure: PageFailure | null }
+    /** Reloads these releases if they are still the same failed releases the action was raised for. */
+    | { kind: 'reload-items'; items: HydratedFeedItem[]; isAutomatic: boolean }
+
+type AutoRetry = { deadline: number; items: HydratedFeedItem[] }
+
+const isSameAutoRetry = (a: AutoRetry | null, b: AutoRetry | null) =>
+    a === b ||
+    (a !== null &&
+        b !== null &&
+        a.deadline === b.deadline &&
+        a.items.length === b.items.length &&
+        a.items.every((item, index) => item === b.items[index]))
+
+const recordAutoRetry = (deadlines: ReadonlyMap<string, number>, items: HydratedFeedItem[]) => {
+    const next = new Map(deadlines)
+    for (const item of items) {
+        if (item.error?.retryAt != null) next.set(item.id, item.error.retryAt)
+    }
+    return next
+}
+
+const autoRetriedBefore = (state: FeedState, item: HydratedFeedItem) => {
+    const retryAt = item.error?.retryAt
+    return retryAt == null || (state.autoRetriedDeadlines.get(item.id) ?? -Infinity) >= retryAt
+}
 
 @Component({
     selector: 'app-feed',
@@ -62,6 +142,8 @@ type FeedState =
         IconComponent,
         RouterModule,
         HlmButtonImports,
+        FanAvatarStackComponent,
+        ReleaseLoadStatusComponent,
         HlmTooltipImports,
         HlmProgressImports,
     ],
@@ -91,77 +173,263 @@ export class FeedComponent {
     currentFeedIndex = signal(0)
     furthestScrolledIndex = signal(0)
 
-    retryNotifier$ = new Subject<void>()
+    readonly pageRetry$ = new Subject<void>()
+    readonly itemRetry$ = new Subject<HydratedFeedItem>()
 
     loadedFeedItemIds = new Set<string>()
-    feedState = toSignal(
-        toObservable(this.furthestScrolledIndex).pipe(
-            combineLatestWith(
-                this.retryNotifier$.pipe(mergeWith(fromEvent(window, 'online')), startWith(null)),
+
+    /**
+     * Failed releases due to reload when Bandcamp's rate limit lifts: those in the current window that
+     * carry a deadline not yet tried. Releases sharing the earliest deadline go together in one batch.
+     */
+    private readonly autoRetryDue: Signal<AutoRetry | null> = computed(
+        () => {
+            const state = this.feedState()
+            if (!state) return null
+
+            const waiting = state.items
+                .filter((_item, index) => this.isInAutoRetryWindow(index))
+                .flatMap(item =>
+                    item.error?.retryAt != null &&
+                    !state.reloadingIds.has(item.id) &&
+                    !autoRetriedBefore(state, item)
+                        ? [{ item, retryAt: item.error.retryAt }]
+                        : [],
+                )
+            if (waiting.length == 0) return null
+
+            const deadline = Math.min(...waiting.map(({ retryAt }) => retryAt))
+            return {
+                deadline,
+                items: waiting.filter(({ retryAt }) => retryAt <= deadline).map(({ item }) => item),
+            }
+        },
+        { equal: isSameAutoRetry },
+    )
+
+    /**
+     * Every change to the feed runs through one serial pipeline, so a page load, a retry and a release
+     * reload never race over the same state. Retries carry what they were raised for, which drops
+     * repeated clicks and reconnect bursts instead of queueing them.
+     */
+    readonly feedState: Signal<FeedState | null> = toSignal(
+        merge(
+            toObservable(this.furthestScrolledIndex).pipe(
+                map((furthestScrolledIndex): FeedAction => ({
+                    kind: 'load-page',
+                    furthestScrolledIndex,
+                    onlyWhenEmpty: false,
+                })),
             ),
-            map(([furthestScrolledIndex]) => ({ furthestScrolledIndex, refreshOnlyWhenEmpty: false })),
-            mergeWith(
-                this.feedService.emailImportProgress$.pipe(
-                    filter(update => update.phase === 'completed' && update.newlyImported > 0),
-                    map(() => ({
-                        furthestScrolledIndex: this.furthestScrolledIndex(),
-                        refreshOnlyWhenEmpty: true,
-                    })),
+            this.feedService.emailImportProgress$.pipe(
+                filter(update => update.phase === 'completed' && update.newlyImported > 0),
+                map((): FeedAction => ({
+                    kind: 'load-page',
+                    furthestScrolledIndex: this.furthestScrolledIndex(),
+                    onlyWhenEmpty: true,
+                })),
+            ),
+            merge(this.pageRetry$, fromEvent(window, 'online')).pipe(
+                map((): FeedAction => ({
+                    kind: 'retry-page',
+                    failure: this.feedState()?.pageFailure ?? null,
+                })),
+            ),
+            this.itemRetry$.pipe(
+                map((item): FeedAction => ({ kind: 'reload-items', items: [item], isAutomatic: false })),
+            ),
+            toObservable(this.autoRetryDue).pipe(
+                switchMap(due =>
+                    due
+                        ? timer(Math.max(due.deadline - Date.now(), 0)).pipe(
+                              map((): FeedAction => ({
+                                  kind: 'reload-items',
+                                  items: due.items,
+                                  isAutomatic: true,
+                              })),
+                          )
+                        : EMPTY,
                 ),
             ),
+        ).pipe(
             mergeScan(
-                async (
-                    previousState,
-                    { furthestScrolledIndex, refreshOnlyWhenEmpty },
-                ): Promise<FeedState | null> => {
-                    if (
-                        refreshOnlyWhenEmpty &&
-                        previousState?.status !== 'empty' &&
-                        previousState?.status !== 'caught-up'
-                    ) {
-                        return previousState
-                    }
-
-                    const previousItems = previousState?.items ?? []
-                    const lastLoadedItemIndex = previousItems.length - 1
-                    const itemCountToFetch =
-                        furthestScrolledIndex + NUM_PREFETCH_ITEMS - Math.max(lastLoadedItemIndex, 0)
-
-                    try {
-                        const items = await this.feedService.loadFeed(0, itemCountToFetch, [
-                            ...this.loadedFeedItemIds,
-                        ])
-                        const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
-                        if (items.length != newItems.length) {
-                            console.warn(
-                                'Duplicate feed items detected:',
-                                items.filter(item => this.loadedFeedItemIds.has(item.id)),
-                            )
-                        }
-                        newItems.forEach(item => this.loadedFeedItemIds.add(item.id))
-
-                        const allItems = previousItems.concat(newItems)
-                        if (allItems.length > 0) return { status: 'feed', items: allItems }
-
-                        return {
-                            status: (await this.feedService.hasFeed()) ? 'caught-up' : 'empty',
-                            items: [],
-                        }
-                    } catch (error) {
-                        console.error('Error loading feed state', error)
-
-                        return {
-                            status: 'error',
-                            items: previousItems,
-                            error: getUserFacingErrorMessage(error) || 'Failed to load',
-                        }
-                    }
-                },
-                null as FeedState | null,
+                (state: FeedState | null, action: FeedAction) => this.applyFeedAction(state, action),
+                null,
                 1, // Max concurrent requests: ensures we don't run into race conditions
             ),
         ),
         { initialValue: null },
+    )
+
+    private applyFeedAction(state: FeedState | null, action: FeedAction): Observable<FeedState> {
+        switch (action.kind) {
+            case 'load-page': {
+                // After a failure, the next page waits for Retry rather than failing again on every scroll.
+                if (state?.pageFailure) return EMPTY
+                if (action.onlyWhenEmpty && (!state || state.items.length > 0)) return EMPTY
+
+                return defer(() => this.loadPage(state ?? INITIAL_FEED_STATE, action.furthestScrolledIndex))
+            }
+            case 'retry-page': {
+                if (!state?.pageFailure || state.pageFailure !== action.failure) return EMPTY
+
+                const retrying: FeedState = { ...state, isRetryingPage: true }
+                return concat(
+                    of(retrying),
+                    defer(() => this.loadPage(retrying, this.furthestScrolledIndex())),
+                )
+            }
+            case 'reload-items': {
+                if (!state) return EMPTY
+
+                const currentItems = new Map(state.items.map(item => [item.id, item]))
+                const items = action.items
+                    .filter(
+                        item =>
+                            item.error &&
+                            currentItems.get(item.id) === item &&
+                            !state.reloadingIds.has(item.id) &&
+                            // Automatic retries may wait behind a page load while the user scrolls.
+                            (!action.isAutomatic ||
+                                (!autoRetriedBefore(state, item) &&
+                                    this.isInAutoRetryWindow(state.items.indexOf(item)))),
+                    )
+                    .slice(0, MAX_RELOAD_BATCH)
+                if (items.length == 0) return EMPTY
+
+                const reloading: FeedState = {
+                    ...state,
+                    reloadingIds: new Set(items.map(item => item.id)),
+                    autoRetriedDeadlines: action.isAutomatic
+                        ? recordAutoRetry(state.autoRetriedDeadlines, items)
+                        : state.autoRetriedDeadlines,
+                }
+                return concat(
+                    of(reloading),
+                    defer(() => this.reloadItems(reloading)),
+                )
+            }
+            default:
+                return assertUnreachable(action)
+        }
+    }
+
+    private async loadPage(state: FeedState, furthestScrolledIndex: number): Promise<FeedState> {
+        const previousItems = state.items
+        const lastLoadedItemIndex = previousItems.length - 1
+        const itemCountToFetch = furthestScrolledIndex + NUM_PREFETCH_ITEMS - Math.max(lastLoadedItemIndex, 0)
+
+        try {
+            const items = await this.feedService.loadFeed(0, itemCountToFetch, [...this.loadedFeedItemIds])
+            const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
+            if (items.length != newItems.length) {
+                console.warn(
+                    'Duplicate feed items detected:',
+                    items.filter(item => this.loadedFeedItemIds.has(item.id)),
+                )
+            }
+            newItems.forEach(item => this.loadedFeedItemIds.add(item.id))
+
+            const loaded = { ...state, pageFailure: null, isRetryingPage: false }
+            // Keep the same list when nothing was added, so rendered releases are left alone.
+            const allItems = newItems.length > 0 ? previousItems.concat(newItems) : previousItems
+            if (allItems.length > 0) return { ...loaded, items: allItems, emptyReason: null }
+
+            return {
+                ...loaded,
+                items: allItems,
+                emptyReason: (await this.feedService.hasFeed()) ? 'caught-up' : 'not-set-up',
+            }
+        } catch (error) {
+            console.error('Error loading feed state', error)
+
+            return {
+                ...state,
+                isRetryingPage: false,
+                pageFailure: { message: getUserFacingErrorMessage(error) || 'Failed to load' },
+            }
+        }
+    }
+
+    /** Swaps each reloaded release in by ID, so its entry and every other release stay where they are. */
+    private async reloadItems(state: FeedState): Promise<FeedState> {
+        const ids = [...state.reloadingIds]
+        const reloaded = await this.feedService.reloadFeedItems(ids).then(
+            items => new Map(items.map(item => [item.id, item])),
+            (error: unknown) => {
+                console.error('Error reloading releases', ids, error)
+                const failure = { message: getUserFacingErrorMessage(error) || 'Failed to load' }
+                return new Map(
+                    state.items
+                        .filter(item => state.reloadingIds.has(item.id))
+                        .map(item => [item.id, { ...item, error: failure }]),
+                )
+            },
+        )
+
+        return {
+            ...state,
+            reloadingIds: new Set(),
+            items: state.items.map(item =>
+                state.reloadingIds.has(item.id) ? (reloaded.get(item.id) ?? item) : item,
+            ),
+        }
+    }
+
+    releaseRecovery(state: FeedState, item: HydratedFeedItem, index: number): ReleaseRecovery {
+        if (state.reloadingIds.has(item.id)) return 'reloading'
+        if (autoRetriedBefore(state, item)) return 'manual'
+        if (!this.isInAutoRetryWindow(index)) return 'when-in-view'
+        // A passed deadline in the window reloads at once; say so rather than show a time already gone.
+        return (item.error?.retryAt ?? 0) > Date.now() ? 'scheduled' : 'reloading'
+    }
+
+    private isInAutoRetryWindow(index: number) {
+        const start = this.currentFeedIndex()
+        return index >= start && index < start + AUTO_RETRY_WINDOW
+    }
+
+    /**
+     * Link previews for loaded releases, keyed by URL. They load after the releases render, one
+     * release at a time in feed order, so the first release fills in before later ones are fetched.
+     * Each URL is requested once per visit; the backend caches previews across visits.
+     */
+    readonly linkPreviews: Signal<Record<string, ScrapedLinkMetadata>> = toSignal(
+        toObservable(this.feedState).pipe(
+            mergeMap(state => from(state?.items ?? [])),
+            // A reloaded release is a new object and may bring links the failed one lacked.
+            distinct(),
+            scan(
+                (
+                    { requested }: { requested: ReadonlySet<string>; urls: string[] },
+                    item: HydratedFeedItem,
+                ) => {
+                    const urls = [...new Set(item.data.links.map(link => link.url))].filter(
+                        url => !requested.has(url),
+                    )
+                    return { requested: new Set([...requested, ...urls]), urls }
+                },
+                { requested: new Set<string>(), urls: [] },
+            ),
+            map(({ urls }) => urls),
+            filter(urls => urls.length > 0),
+            concatMap(urls =>
+                from(this.feedService.loadLinkPreviews(urls)).pipe(
+                    catchError((error: unknown) => {
+                        console.warn('Failed to load link previews', urls, error)
+                        return of({})
+                    }),
+                ),
+            ),
+            scan(
+                (
+                    previews: Record<string, ScrapedLinkMetadata>,
+                    batch: Record<string, ScrapedLinkMetadata>,
+                ) => ({ ...previews, ...batch }),
+                {},
+            ),
+        ),
+        { initialValue: {} },
     )
 
     @HostListener('document:keydown.Shift.ArrowUp', ['$event'])
@@ -222,6 +490,8 @@ export class FeedComponent {
         }
 
         if (!this.viewedFeedItems.has(feedItem.id)) return
+        // A release that failed to load was never really seen. Leave it in the feed so it can load again.
+        if (feedItem.error) return
 
         // @TODO: Wait a bit before marking the feed item as viewed:
         // item must have been in the viewport for X ms
@@ -450,13 +720,12 @@ export class FeedComponent {
     }
 
     private getFeedItems() {
-        const feedState = this.feedState()
-        return feedState?.status === 'feed' ? feedState.items : []
+        return this.feedState()?.items ?? []
     }
 
     formatDuration = formatDuration
     formatCalendarDateRelative = formatCalendarDateRelative
-    formatReleaseDateRelative = formatReleaseDateRelative
+    formatReleaseDate = formatReleaseDate
     isAfter = (date: Date, otherDate: Date) => {
         return new Date(date).getTime() > new Date(otherDate).getTime()
     }

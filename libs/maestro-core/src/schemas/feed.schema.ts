@@ -3,8 +3,15 @@ import { CalendarDay } from './calendar-day.schema'
 import {
     bandcampEmailFansBoughtMusicFeedSourceItemSchema,
     bandcampEmailNewReleaseFeedSourceItemSchema,
+    bandcampPurchaseSchema,
+    BandcampFan,
 } from './feed-source.schema'
 import { BandData, ScrapedTralbumInfo } from './bandcamp-api.schema'
+
+export const reloadFeedItemsRequestSchema = z.object({
+    ids: z.array(z.string().min(1).max(200)).min(1).max(20),
+})
+export type ReloadFeedItemsRequest = z.infer<typeof reloadFeedItemsRequestSchema>
 
 const feedItemBaseSchema = z.object({
     id: z.string(),
@@ -30,10 +37,16 @@ export const bandcampTralbumFeedItem = feedItemBaseSchema.extend({
     data: z.object({
         tralbumUrl: z.string(),
         tralbumType: z.enum(['album', 'track']),
+        purchases: bandcampPurchaseSchema.array().default([]),
     }),
     source: z.discriminatedUnion('type', [
         bandcampEmailNewReleaseFeedSourceItemSchema,
-        bandcampEmailFansBoughtMusicFeedSourceItemSchema,
+        bandcampEmailFansBoughtMusicFeedSourceItemSchema.pick({
+            type: true,
+            messageId: true,
+            dateReceived: true,
+            isRead: true,
+        }),
     ]),
 })
 export type BandcampFeedItem = z.infer<typeof bandcampTralbumFeedItem>
@@ -52,6 +65,7 @@ export type HydratedBandcampReleaseFeedItem = {
         emailReceivedAt: Date
         isEmailRead: boolean
         emailId: string
+        fans: BandcampFan[]
         releaseName: string
         band: BandData | null
         artist: string | null
@@ -62,11 +76,12 @@ export type HydratedBandcampReleaseFeedItem = {
         unsubscribeText: string
         imageUrl: string | undefined
         iframeUrl: string | null
-        tracks: ScrapedTralbumInfo['tracks']
+        tracks: (ScrapedTralbumInfo['tracks'][number] & { fans: BandcampFan[] })[]
     }
-    error: { message: string } | null
+    error: { message: string; retryAt?: number } | null
     id: string
     type: 'BANDCAMP.TRALBUM'
+    sourceType: BandcampFeedItem['source']['type']
 }
 
 export type HydratedFeedItem = HydratedBandcampReleaseFeedItem

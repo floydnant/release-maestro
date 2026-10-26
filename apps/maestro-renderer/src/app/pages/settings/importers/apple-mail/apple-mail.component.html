@@ -60,25 +60,42 @@
             }
         </div>
 
-        @if (importUpdate(); as update) {
-            @if (update.phase === 'started' || update.phase === 'processing') {
-                <div class="email-import-progress | mt-3 flex flex-wrap items-center gap-3">
-                    <p class="flex items-center gap-2 type-body-sm text-content-secondary">
-                        <app-progress-ring
-                            mode="spinning"
-                            [diameter]="16"
-                            [strokeWidth]="2"
-                        ></app-progress-ring>
-                        @if (update.phase === 'processing') {
-                            Importing emails {{ update.current }}/{{ update.total }}
-                        } @else {
-                            Checking mail…
-                        }
-                    </p>
-                    <button hlmBtn variant="ghost" type="button" (click)="cancelImport($event)">
-                        Cancel import
-                    </button>
-                </div>
+        @if (runningImportActivity(); as activity) {
+            <div class="email-import-progress | mt-3 flex flex-wrap items-center gap-3">
+                <p class="flex items-center gap-2 type-body-sm text-content-secondary">
+                    <app-progress-ring
+                        [mode]="activity.ring"
+                        [diameter]="22"
+                        [strokeWidth]="2"
+                        [color]="activity.color"
+                        [progress]="activity.percent"
+                        [aria-label]="activity.label"
+                    ></app-progress-ring>
+                    {{ activity.label }}
+                    @if (activity.count) {
+                        <span class="font-mono">{{ activity.count }}</span>
+                    }
+                </p>
+                <button
+                    hlmBtn
+                    variant="ghost"
+                    type="button"
+                    [attr.aria-describedby]="activity.phase === 'finishing' ? 'email-import-finishing' : null"
+                    (click)="cancelImport($event)"
+                >
+                    Cancel import
+                </button>
+            </div>
+            @if (activity.phase === 'finishing') {
+                <!-- No estimate: Bandcamp can hold lookups back for a long time -->
+                <p
+                    id="email-import-finishing"
+                    class="email-import-finishing | mt-1 type-body-sm text-content-muted"
+                >
+                    Apple Mail has finished exporting. Bandcamp sometimes asks the app to slow down, so
+                    processing can pause for a while. If you cancel, releases already added are kept and the
+                    next import checks the mailbox again.
+                </p>
             }
         }
 
