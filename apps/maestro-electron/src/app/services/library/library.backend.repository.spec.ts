@@ -92,6 +92,22 @@ describe('LibraryBackendRepository', () => {
         expect(db.select().from(songsTable).get()?.addedAt).toEqual(scannedAt)
     })
 
+    it('stores disc and track totals from the extractor', () => {
+        repository.ingestMetadata(
+            newSongFixture({ track: 2, discNumber: 2, discTotal: 3, trackTotal: 8 }),
+            fact,
+            new Date('2026-07-15T10:00:00Z'),
+            EXTRACTOR_VERSION,
+        )
+
+        expect(db.select().from(songsTable).get()).toMatchObject({
+            trackNumber: 2,
+            discNumber: 2,
+            discTotal: 3,
+            trackTotal: 8,
+        })
+    })
+
     it('uses discovery time when an initial file has no creation time', () => {
         const seenAt = new Date('2026-06-15T10:00:00Z')
         repository.processPrescanBatch([{ ...fact, createdAt: undefined }], seenAt, true)

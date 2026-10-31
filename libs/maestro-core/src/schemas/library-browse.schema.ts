@@ -53,11 +53,13 @@ export interface BrowseWindow {
  * `rows` — it is what gives a virtual scrollbar its height, and what a range-based
  * selection is checked against for drift (ADR 0004).
  */
-export interface BrowseWindowResult<TRow> {
+export interface BrowseWindowResult<TRow, TMetadata = unknown> {
     rows: TRow[]
     /** Echoed back so a late response can be matched to the window that asked for it. */
     offset: number
     total: number
+    /** Read in the same snapshot as the rows and retained with them across refetches. */
+    metadata?: TMetadata
 }
 
 export type SortDirection = 'asc' | 'desc'
@@ -96,8 +98,7 @@ export const SongSortField = {
      * only orders a list that is already one album — the album detail page (MAE-119).
      * Sorting a whole library by it would interleave every record's track 1.
      *
-     * A multi-disc album orders `1,1,2,2,3,3…` and cannot do better: there is no disc
-     * number anywhere in the system until MAE-123 lands one.
+     * Album lists order by disc number before track number.
      */
     trackNumber: 'trackNumber',
 } as const
@@ -218,6 +219,7 @@ export interface SongRow {
      * this renders the `null` as unknown rather than filling it in.
      */
     trackNumber: number | null
+    discNumber: number | null
     genreText: string | null
     genres: CatalogEntityRef[]
     recordLabelId: string | null
@@ -231,7 +233,18 @@ export interface SongRow {
     dateAdded: number | null
 }
 
-export type SongWindowResult = BrowseWindowResult<SongRow>
+/** A disc boundary in the full song query's ordering, independent of the loaded window. */
+export interface SongDiscGroup {
+    discNumber: number | null
+    songCount: number
+    trackTotal: number | null
+    startIndex: number
+}
+
+/** Disc sections apply only to a single album in track-number order. */
+export interface SongWindowResult extends BrowseWindowResult<SongRow> {
+    metadata: { discGroups: SongDiscGroup[] }
+}
 
 export interface QuerySongsRequest {
     query: SongQuery
@@ -241,7 +254,7 @@ export interface QuerySongsRequest {
 /**
  * Resolves the entity ids in a filter to display names, so the filter bar can show
  * removable chips. Deliberately separate from {@link QuerySongsRequest}: a filter
- * changes far less often than a viewport, and windows stay pure rows + total.
+ * changes far less often than a viewport.
  */
 export interface DescribeSongFilterRequest {
     filter: SongFilter
@@ -429,6 +442,8 @@ export interface AlbumDetail {
     recordLabelId: string | null
     recordLabelText: string | null
     songCount: number
+    /** Sum of per-disc track totals, only when all declared discs have known totals. */
+    trackTotal: number | null
     /** Summed song durations in seconds; `null` when no song on the album has one. */
     totalDuration: number | null
     /** Distinct genres across the album's songs, for the header's genre line. */
