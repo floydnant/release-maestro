@@ -219,7 +219,7 @@ const waitFor = async (read, predicate, message, timeoutMs = 15_000) => {
 
 const listen = (host, port) =>
     new Promise((resolve, reject) => {
-        const server = net.createServer()
+        const server = net.createServer(socket => socket.destroy())
         server.once('error', reject)
         server.listen({ host, port, ipv6Only: host === '::1' }, () => {
             liveServers.push(server)
@@ -313,6 +313,253 @@ const childResult = child =>
             child.once('exit', (code, signal) => resolve({ code, signal, stdout, stderr }))
         }
     })
+
+test('renderer launches on distinct ports do not share an Nx continuous task', async () => {
+    const fixture = await createFixture()
+    await symlink(
+        join(repositoryRoot, 'node_modules'),
+        join(fixture.main, 'node_modules'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+    )
+    await writeFile(join(fixture.main, 'nx.json'), '{}')
+    const renderer = JSON.parse(
+        await readFile(join(repositoryRoot, 'apps/maestro-renderer/project.json'), 'utf8'),
+    )
+    await writeFile(
+        join(fixture.main, 'project.json'),
+        JSON.stringify({
+            name: 'renderer',
+            targets: {
+                serve: {
+                    executor: 'nx:run-commands',
+                    continuous: renderer.targets.serve.continuous,
+                    options: { command: 'node server.cjs --port={args.port}', forwardAllArgs: false },
+                },
+            },
+        }),
+    )
+    await writeFile(
+        join(fixture.main, 'server.cjs'),
+        `
+require('node:net').createServer().listen(Number(process.argv.at(-1).split('=')[1]), '127.0.0.1', function () {
+    require('node:fs').writeFileSync('ready-' + this.address().port, '')
+})
+`,
+    )
+    const launch = port => {
+        const child = spawn(
+            process.execPath,
+            [
+                join(repositoryRoot, 'node_modules/nx/dist/bin/nx.js'),
+                'run',
+                'renderer:serve',
+                '--port=' + port,
+            ],
+            {
+                cwd: fixture.main,
+                env: environmentFor(fixture, { NX_DAEMON: 'false', NX_ISOLATE_PLUGINS: 'false' }),
+                stdio: ['ignore', 'pipe', 'pipe'],
+            },
+        )
+        liveChildren.push(child)
+        return child
+    }
+    const ports = []
+    for (let index = 0; index < 2; index += 1) {
+        const server = await listen('127.0.0.1', 0)
+        ports.push(server.address().port)
+        await new Promise(resolve => server.close(resolve))
+        liveServers.splice(liveServers.indexOf(server), 1)
+    }
+    launch(ports[0])
+    await waitFor(
+        () => Promise.resolve(existsSync(join(fixture.main, 'ready-' + ports[0]))),
+        Boolean,
+        'first Nx renderer did not start',
+    )
+    const second = launch(ports[1])
+    let output = ''
+    second.stdout.on('data', chunk => {
+        output += chunk
+    })
+    await waitFor(
+        () =>
+            Promise.resolve(
+                existsSync(join(fixture.main, 'ready-' + ports[1])) || output.includes('another nx process'),
+            ),
+        Boolean,
+        'second Nx renderer did not start',
+    )
+    assert.ok(existsSync(join(fixture.main, 'ready-' + ports[1])), output)
+})
+
+test('dev-list finds unregistered worktree listeners and dev-stop recovers only direct Nx dev servers', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture({ worktrees: 2 })
+    const script = join(fixture.main, 'node_modules/nx/dist/bin/nx.js')
+    await mkdir(dirname(script), { recursive: true })
+    await writeFile(
+        script,
+        `
+require('node:net').createServer().listen(0, '127.0.0.1', function () {
+    require('node:fs').writeFileSync(process.env.READY_FILE, String(this.address().port))
+})
+`,
+    )
+    const launch = (cwd, args, name) => {
+        const ready = join(fixture.base, name)
+        const child = spawn(process.execPath, [script, ...args], {
+            cwd,
+            env: environmentFor(fixture, { READY_FILE: ready }),
+            stdio: 'ignore',
+        })
+        liveChildren.push(child)
+        return { child, ready }
+    }
+    const direct = launch(fixture.main, ['serve', 'maestro-renderer', '--port=4204'], 'direct')
+    const proxy = launch(fixture.main, [], 'proxy')
+    const foreign = launch(fixture.roots[1], ['serve', 'maestro-renderer'], 'foreign')
+    const otherTarget = launch(fixture.main, ['run', 'maestro-renderer:serve-preview'], 'other-target')
+    for (const process of [direct, proxy, foreign, otherTarget]) {
+        await waitFor(
+            () => Promise.resolve(existsSync(process.ready)),
+            Boolean,
+            'unregistered listener did not start',
+        )
+    }
+    const listed = runJson(fixture, fixture.main, ['dev-list', '--json'])
+    assert.ok(
+        listed.unmanagedProcesses.some(process => process.pid === direct.child.pid && process.stoppable),
+    )
+    assert.ok(
+        listed.unmanagedProcesses.some(process => process.pid === proxy.child.pid && !process.stoppable),
+    )
+    assert.ok(
+        listed.unmanagedProcesses.some(process => process.pid === foreign.child.pid && !process.stoppable),
+    )
+    const psBin = join(fixture.base, 'ps-bin')
+    await mkdir(psBin)
+    await writeFile(
+        join(psBin, 'ps'),
+        `#!/usr/bin/env node
+const { spawnSync } = require('node:child_process')
+const args = process.argv.slice(2)
+const result = spawnSync('/bin/ps', args, { encoding: 'utf8' })
+let output = result.stdout
+if (args[0] === '-axo' && args[1] === 'pid=,args=') {
+    output = output.split('\\n').map(line => Number(line.trim().split(/\\s+/)[0]) === ${proxy.child.pid}
+        ? ${JSON.stringify(`${proxy.child.pid} ${process.execPath} ${script} serve maestro-renderer`)} : line).join('\\n')
+}
+process.stdout.write(output)
+process.exit(result.status)
+`,
+    )
+    await chmod(join(psBin, 'ps'), 0o755)
+    const reused = runJson(fixture, fixture.main, ['dev-list', '--json'], {
+        PATH: `${psBin}:${process.env.PATH}`,
+    })
+    assert.ok(
+        reused.unmanagedProcesses.some(process => process.pid === proxy.child.pid && !process.stoppable),
+        'stale command evidence made a replacement process stoppable',
+    )
+    const stopped = runJson(fixture, fixture.main, ['dev-stop'])
+    assert.ok(stopped.stopped.some(process => process.pid === direct.child.pid))
+    assert.equal(proxy.child.exitCode, null)
+    assert.equal(foreign.child.exitCode, null)
+    assert.equal(otherTarget.child.exitCode, null)
+    const after = runJson(fixture, fixture.main, ['dev-list', '--json'])
+    assert.ok(!after.unmanagedProcesses.some(process => process.pid === direct.child.pid))
+    assert.deepEqual(runJson(fixture, fixture.main, ['dev-stop']).stopped, [])
+})
+
+test('make dev registers its supervisor before a stuck Nx startup and dev-stop cancels it', async () => {
+    const fixture = await createFixture()
+    await cp(join(repositoryRoot, 'tools/dev-instance'), join(fixture.main, 'tools/dev-instance'), {
+        recursive: true,
+    })
+    await cp(join(repositoryRoot, 'Makefile'), join(fixture.main, 'Makefile'))
+    const bin = await createFakePnpm(fixture)
+    const launched = join(fixture.base, 'launched')
+    const dev = spawn('make', ['dev', `PNPM=${join(bin, 'pnpm')}`], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, { FAKE_CHILD_PID_PATH: launched }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    const result = childResult(dev)
+    await waitFor(() => Promise.resolve(existsSync(launched)), Boolean, 'make dev did not launch Nx')
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+    assert.ok(status.holders.some(holder => holder.role === 'dev-supervisor'))
+    assert.ok(status.holders.some(holder => holder.role === 'dev-renderer'))
+    runJson(fixture, fixture.main, ['dev-stop'])
+    await result
+    assert.ok(
+        !runJson(fixture, fixture.main, ['dev-status', '--json']).holders.some(holder =>
+            holder.role.startsWith('dev-'),
+        ),
+    )
+})
+
+test('failed or stalled process discovery preserves registered status and dev-stop', async () => {
+    if (process.platform === 'win32') return
+    const fixture = await createFixture()
+    const bin = await createFakePnpm(fixture)
+    const dev = spawn(process.execPath, [cli, 'run-dev'], {
+        cwd: fixture.main,
+        env: environmentFor(fixture, { RELEASE_MAESTRO_PNPM_COMMAND: join(bin, 'pnpm') }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    liveChildren.push(dev)
+    const result = childResult(dev)
+    await waitFor(
+        () => Promise.resolve(runJson(fixture, fixture.main, ['dev-status', '--json'])),
+        status => status.holders?.some(holder => holder.role === 'dev-renderer'),
+        'dev launcher did not register',
+    )
+    await writeFile(
+        join(bin, 'ps'),
+        `#!/usr/bin/env node
+const { spawnSync } = require('node:child_process')
+const { readFileSync, writeFileSync } = require('node:fs')
+const args = process.argv.slice(2)
+let fail = false
+if (args[0] === '-axo' && args[1].startsWith('pid=,ppid=')) {
+    const calls = Number(readFileSync(process.env.FAKE_PS_COUNTER, 'utf8')) + 1
+    writeFileSync(process.env.FAKE_PS_COUNTER, String(calls))
+    fail = calls === Number(process.env.FAKE_PS_FAIL_AT)
+}
+if (fail) {
+    if (process.env.FAKE_PS_STALL) setTimeout(() => process.exit(1), 15000)
+    else process.exit(1)
+} else {
+    process.exit(spawnSync('/bin/ps', args, { stdio: 'inherit' }).status)
+}
+`,
+    )
+    await chmod(join(bin, 'ps'), 0o755)
+    const counter = join(fixture.base, 'ps-counter')
+    const extra = {
+        PATH: `${bin}:${process.env.PATH}`,
+        FAKE_PS_COUNTER: counter,
+        FAKE_PS_FAIL_AT: process.platform === 'darwin' ? '2' : '1',
+    }
+    await writeFile(counter, '0')
+    const status = runJson(fixture, fixture.main, ['dev-status', '--json'], extra)
+    assert.equal(status.processDiscovery, 'unavailable')
+    assert.ok(status.holders.some(holder => holder.role === 'dev-supervisor'))
+    const started = Date.now()
+    await writeFile(counter, '0')
+    const stalled = runJson(fixture, fixture.main, ['dev-list', '--json'], { ...extra, FAKE_PS_STALL: '1' })
+    assert.equal(stalled.processDiscovery, 'unavailable')
+    assert.ok(Date.now() - started < 8000, 'discovery ignored its subprocess deadline')
+    await writeFile(counter, '0')
+    const stopped = runJson(fixture, fixture.main, ['dev-stop'], {
+        ...extra,
+        FAKE_PS_FAIL_AT: process.platform === 'darwin' ? '3' : '1',
+    })
+    assert.ok(stopped.stopped.some(holder => holder.role === 'dev-supervisor'))
+    await result
+})
 
 test('simultaneous first allocation gives two worktrees distinct stable bundles', async () => {
     const fixture = await createFixture({ worktrees: 2 })

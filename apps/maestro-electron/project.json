@@ -55,7 +55,7 @@
         },
         "serve-internal": {
             "executor": "nx-electron:execute",
-            "continuous": true,
+            "dependsOn": ["metadata-engine:build"],
             "options": {
                 "buildTarget": "maestro-electron:build-app:development",
                 "remoteDebuggingPort": 9222,
@@ -65,8 +65,6 @@
             }
         },
         "serve": {
-            "dependsOn": ["metadata-engine:build"],
-            "continuous": true,
             "command": "node tools/dev-instance/cli.mjs run-dev"
         },
         "package": {

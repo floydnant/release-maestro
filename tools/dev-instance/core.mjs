@@ -16,6 +16,7 @@ const lockWaitMs = 60_000
 const lockStaleMs = 10_000
 const defaultLogLimitBytes = 5 * 1024 * 1024
 const retainedLogs = 3
+const processInspectionTimeoutMs = 3_000
 
 /** @typedef {{renderer: number, cdp: number, inspector: number}} PortBundle */
 /**
@@ -68,7 +69,10 @@ export const getStatePaths = () => {
 }
 
 const runGit = (cwd, args) => {
-    const result = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
+    const result = spawnSync('git', ['-C', cwd, ...args], {
+        encoding: 'utf8',
+        timeout: processInspectionTimeoutMs,
+    })
     if (result.status !== 0) {
         throw new InstanceError(`Not a Git worktree: ${cwd}`, 'NOT_A_WORKTREE')
     }
@@ -140,7 +144,7 @@ const processStartIdentity = pid => {
                 '-Command',
                 `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction Stop).CreationDate.ToUniversalTime().Ticks`,
             ],
-            { encoding: 'utf8', windowsHide: true },
+            { encoding: 'utf8', windowsHide: true, timeout: processInspectionTimeoutMs },
         )
         if (result.status !== 0) {
             if (!processExists(pid)) return null
@@ -153,6 +157,7 @@ const processStartIdentity = pid => {
     } else {
         const result = spawnSync('ps', ['-p', String(pid), '-o', 'state=', '-o', 'lstart='], {
             encoding: 'utf8',
+            timeout: processInspectionTimeoutMs,
         })
         if (result.status !== 0) {
             if (!processExists(pid)) return null
@@ -204,7 +209,7 @@ const processTable = () => {
                 '-Command',
                 'Get-CimInstance Win32_Process | ForEach-Object { [pscustomobject]@{ ProcessId=$_.ProcessId; ParentProcessId=$_.ParentProcessId; StartTicks=[string]$_.CreationDate.ToUniversalTime().Ticks } } | ConvertTo-Json -Compress',
             ],
-            { encoding: 'utf8', windowsHide: true },
+            { encoding: 'utf8', windowsHide: true, timeout: processInspectionTimeoutMs },
         )
         if (result.status !== 0) throw new InstanceError('Could not read Windows process table')
         const rows = JSON.parse(result.stdout || '[]')
@@ -215,7 +220,10 @@ const processTable = () => {
         }))
     }
     const columns = process.platform === 'darwin' ? 'pid=,ppid=,state=,lstart=' : 'pid=,ppid='
-    const result = spawnSync('ps', ['-axo', columns], { encoding: 'utf8' })
+    const result = spawnSync('ps', ['-axo', columns], {
+        encoding: 'utf8',
+        timeout: processInspectionTimeoutMs,
+    })
     if (result.status !== 0) throw new InstanceError('Could not read process table')
     return result.stdout
         .trim()
@@ -770,6 +778,136 @@ const describeDevelopmentAllocation = allocation => ({
     slot: developmentSlot(allocation.bundle),
 })
 
+// Discover bypasses of the supervisor without adopting arbitrary processes as holders.
+// A listener's cwd is useful for diagnostics; only an exact local Nx serve command is stoppable.
+const discoverUnmanagedProcesses = async (worktree, instances) => {
+    try {
+        return await readUnmanagedProcesses(worktree, instances)
+    } catch {
+        // Discovery is advisory. Keep registered status and shutdown usable when a probe fails.
+        return { unmanagedProcesses: [], processDiscovery: 'unavailable' }
+    }
+}
+
+const readUnmanagedProcesses = async (worktree, instances) => {
+    if (process.platform === 'win32') return { unmanagedProcesses: [], processDiscovery: 'unsupported' }
+    const lsof = process.platform === 'darwin' ? '/usr/sbin/lsof' : 'lsof'
+    const listeners = spawnSync(lsof, ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn'], {
+        encoding: 'utf8',
+        timeout: 3_000,
+    })
+    const commands = spawnSync('ps', ['-axo', 'pid=,args='], { encoding: 'utf8', timeout: 3_000 })
+    if (listeners.error || commands.error || commands.status !== 0 || listeners.status > 1) {
+        return { unmanagedProcesses: [], processDiscovery: 'unavailable' }
+    }
+    const portsByPid = new Map()
+    let pid
+    for (const line of listeners.stdout.split('\n')) {
+        if (line.startsWith('p')) pid = Number(line.slice(1))
+        if (line.startsWith('n') && pid) {
+            const port = Number(line.match(/:(\d+)$/)?.[1])
+            if (!Number.isSafeInteger(port)) continue
+            const ports = portsByPid.get(pid) ?? new Set()
+            ports.add(port)
+            portsByPid.set(pid, ports)
+        }
+    }
+    const nxCommands = new Map()
+    for (const line of commands.stdout.split('\n')) {
+        const match = line.trim().match(/^(\d+)\s+(.+)$/)
+        if (!match) continue
+        const invocation = match[2].match(/(?:^|\/)nx\.js\s+(serve|serve-internal|run)\s+(\S+)(?:\s|$)/)
+        if (!invocation) continue
+        const target =
+            invocation[1] === 'run'
+                ? invocation[2].split(':').slice(0, 2).join(':')
+                : `${invocation[2]}:${invocation[1]}`
+        if (
+            ['maestro-renderer:serve', 'maestro-electron:serve', 'maestro-electron:serve-internal'].includes(
+                target,
+            )
+        )
+            nxCommands.set(Number(match[1]), {
+                command: match[2],
+                target,
+            })
+    }
+    const rows = processTable()
+    const parents = new Map(rows.map(row => [row.pid, row.parentPid]))
+    const managed = new Set(instances.flatMap(instance => instance.holders.map(holder => holder.pid)))
+    const isManaged = candidate => {
+        const visited = new Set()
+        while (candidate && !visited.has(candidate)) {
+            if (managed.has(candidate)) return true
+            visited.add(candidate)
+            candidate = parents.get(candidate)
+        }
+        return false
+    }
+    const candidates = [...new Set([...portsByPid.keys(), ...nxCommands.keys()])].filter(
+        candidate => !isManaged(candidate),
+    )
+    if (!candidates.length) return { unmanagedProcesses: [], processDiscovery: 'available' }
+    // Capture identities before reading cwd, then verify again before publishing the snapshot.
+    const identities = new Map(candidates.map(candidate => [candidate, processStartIdentity(candidate)]))
+    // Bracket command evidence with identity checks so PID reuse cannot confer stale ownership.
+    const verifiedCommands = new Map()
+    const nxPids = candidates.filter(candidate => nxCommands.has(candidate))
+    if (nxPids.length) {
+        const verification = spawnSync('ps', ['-p', nxPids.join(','), '-o', 'pid=,args='], {
+            encoding: 'utf8',
+            timeout: processInspectionTimeoutMs,
+        })
+        if (verification.error || verification.status > 1) {
+            return { unmanagedProcesses: [], processDiscovery: 'unavailable' }
+        }
+        for (const line of verification.stdout.split('\n')) {
+            const match = line.trim().match(/^(\d+)\s+(.+)$/)
+            if (match) verifiedCommands.set(Number(match[1]), match[2])
+        }
+    }
+    const directories = spawnSync(lsof, ['-a', '-p', candidates.join(','), '-d', 'cwd', '-Fn'], {
+        encoding: 'utf8',
+        timeout: 3_000,
+    })
+    if (directories.error || directories.status > 1)
+        return { unmanagedProcesses: [], processDiscovery: 'unavailable' }
+    const roots = spawnSync(
+        'git',
+        ['-C', worktree?.root ?? process.cwd(), 'worktree', 'list', '--porcelain'],
+        {
+            encoding: 'utf8',
+            timeout: 3_000,
+        },
+    )
+    const paths = new Set([...(worktree ? [worktree.root] : []), ...instances.map(instance => instance.path)])
+    for (const line of (roots.stdout ?? '').split('\n')) {
+        if (line.startsWith('worktree ')) paths.add(await canonicalizePath(line.slice(9)))
+    }
+    const unmanagedProcesses = []
+    for (const line of directories.stdout.split('\n')) {
+        if (line.startsWith('p')) pid = Number(line.slice(1))
+        if (!line.startsWith('n') || !paths.has(line.slice(1))) continue
+        const path = line.slice(1)
+        const startIdentity = identities.get(pid)
+        if (!startIdentity || !holderIsLive({ pid, startIdentity })) continue
+        const candidate = nxCommands.get(pid)
+        const nx = candidate && verifiedCommands.get(pid) === candidate.command ? candidate : null
+        const script = nx?.command.match(/^\S+(?:\s+--\S+)*\s+(.+?\/node_modules\/.+?\/nx\.js)\s/)
+        const scriptRoot = script?.[1].slice(0, script[1].indexOf('/node_modules/'))
+        const localNx = Boolean(scriptRoot && (await canonicalizePath(scriptRoot)) === path)
+        unmanagedProcesses.push({
+            pid,
+            startIdentity,
+            path,
+            role: localNx ? `unmanaged-nx:${nx.target}` : 'unmanaged-listener',
+            ports: [...(portsByPid.get(pid) ?? [])].sort((a, b) => a - b),
+            stoppable: Boolean(localNx),
+        })
+    }
+    return { unmanagedProcesses, processDiscovery: 'available' }
+}
+
 const isDevelopmentHolder = holder => ['dev-supervisor', 'dev-renderer', 'dev-electron'].includes(holder.role)
 
 const activeClaims = registry => {
@@ -1049,6 +1187,7 @@ const listenerPids = port => {
         const result = spawnSync('netstat.exe', ['-ano', '-p', 'tcp'], {
             encoding: 'utf8',
             windowsHide: true,
+            timeout: processInspectionTimeoutMs,
         })
         if (result.error || typeof result.stdout !== 'string') return []
         return result.stdout
@@ -1061,6 +1200,7 @@ const listenerPids = port => {
     const lsof = process.platform === 'darwin' ? '/usr/sbin/lsof' : 'lsof'
     const result = spawnSync(lsof, ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'], {
         encoding: 'utf8',
+        timeout: processInspectionTimeoutMs,
     })
     if (result.error?.code === 'ENOENT' && process.platform === 'linux') {
         const hexPort = port.toString(16).toUpperCase().padStart(4, '0')
@@ -1623,7 +1763,9 @@ export const statusDevelopment = async () => {
     const worktree = await resolveWorktree()
     const manifest = await readManifest(worktree)
     let status
+    let instances
     await withRegistry(async registry => {
+        instances = describeInstances(registry)
         const allocation = allocationForWorktree(registry, manifest, worktree)
         if (!allocation) {
             status = manifest
@@ -1637,35 +1779,46 @@ export const statusDevelopment = async () => {
         await writeManifest(worktree, allocation, registry.generation + 1)
         status = describeDevelopmentAllocation(allocation)
     })
-    return status
+    const discovered = await discoverUnmanagedProcesses(worktree, instances)
+    return {
+        ...status,
+        ...discovered,
+        unmanagedProcesses: discovered.unmanagedProcesses.filter(
+            candidate => candidate.path === worktree.root,
+        ),
+    }
+}
+
+const describeInstances = registry => {
+    const development = Object.values(registry.allocations).map(allocation => ({
+        kind: 'development',
+        ...describeDevelopmentAllocation(allocation),
+    }))
+    const workflows = Object.values(registry.transients).map(transient => {
+        const holders = [transient.holder, transient.childHolder, transient.listenerHolder].filter(Boolean)
+        return {
+            ...transient,
+            kind: 'workflow',
+            state: 'active',
+            health: holdersHealth(holders),
+            ageMs: nowMs() - Date.parse(transient.createdAt),
+            slot: developmentSlot(transient.bundle),
+            holders,
+        }
+    })
+    return [...development, ...workflows].sort((left, right) => left.bundle.renderer - right.bundle.renderer)
 }
 
 export const listInstances = async () => {
-    let instances = []
+    let instances
     await withRegistry(async registry => {
-        const development = Object.values(registry.allocations).map(allocation => ({
-            kind: 'development',
-            ...describeDevelopmentAllocation(allocation),
-        }))
-        const workflows = Object.values(registry.transients).map(transient => {
-            const holders = [transient.holder, transient.childHolder, transient.listenerHolder].filter(
-                Boolean,
-            )
-            return {
-                ...transient,
-                kind: 'workflow',
-                state: 'active',
-                health: holdersHealth(holders),
-                ageMs: nowMs() - Date.parse(transient.createdAt),
-                slot: developmentSlot(transient.bundle),
-                holders,
-            }
-        })
-        instances = [...development, ...workflows].sort(
-            (left, right) => left.bundle.renderer - right.bundle.renderer,
-        )
+        instances = describeInstances(registry)
     })
-    return { instances }
+    const worktree = await resolveWorktree().catch(error => {
+        if (error.code === 'NOT_A_WORKTREE') return null
+        throw error
+    })
+    return { instances, ...(await discoverUnmanagedProcesses(worktree, instances)) }
 }
 
 export const stopDevelopment = async () => {
@@ -1697,8 +1850,19 @@ export const stopDevelopment = async () => {
             targets: targets.map(({ role, pid, startIdentity }) => ({ role, pid, startIdentity })),
         })
     })
-    if (holders.length === 0 && unverifiedMessage) {
-        throw new InstanceError(unverifiedMessage, 'UNVERIFIED_LISTENER')
+    const listed = await listInstances()
+    const unmanaged = listed.unmanagedProcesses.filter(
+        candidate => candidate.path === worktree.root && candidate.stoppable,
+    )
+    holders.push(...unmanaged)
+    targets.push(...unmanaged)
+    if (unmanaged.length) {
+        await withRegistry(async (_, paths) =>
+            appendEvent(paths, 'unmanaged-dev-stop-requested', {
+                path: worktree.root,
+                targets: unmanaged.map(({ role, pid, startIdentity }) => ({ role, pid, startIdentity })),
+            }),
+        )
     }
     await Promise.all(
         targets.map(holder =>
