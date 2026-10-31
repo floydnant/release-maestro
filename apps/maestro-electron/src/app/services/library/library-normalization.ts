@@ -105,8 +105,8 @@ export const albumIdentityKey = (metadata: SongMetadata): string =>
  * never read back — nothing branches on it.
  *
  * In particular it is **not** what decides whether a file is re-read. That is the file
- * fingerprint, plus {@link NORMALIZER_VERSION} for changes on our side. Adding derived
- * values here would not change that, and would not tell two tags apart either: every
+ * fingerprint, plus {@link NORMALIZER_VERSION} and the Rust extractor revision for
+ * changes on our side. Adding derived values here would not change that. Every
  * derivation in this module is a pure function of fields already hashed below.
  */
 export const metadataHash = (metadata: SongMetadata): string =>
