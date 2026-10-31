@@ -18,23 +18,11 @@ import {
     type SongQuery,
     type SongSortField,
 } from '@release-maestro/core'
-import {
-    auditTime,
-    catchError,
-    debounceTime,
-    distinctUntilChanged,
-    filter,
-    from,
-    map,
-    merge,
-    of,
-    Subject,
-    switchMap,
-} from 'rxjs'
+import { catchError, debounceTime, filter, from, of, Subject, switchMap } from 'rxjs'
 import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
-import { LibraryService } from '../../core/services/library.service'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
+import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
 import { listWindowOffsetAt } from '../../shared/browse/list-window'
 import { nextSort, songQueryFromParams, songQueryToParams } from '../../shared/browse/song-query-params'
 import {
@@ -64,9 +52,6 @@ import { SongTableComponent } from '../../shared/components/song-table/song-tabl
  * mirrored into a component signal, so back and forward simply work, and there is no
  * second copy to drift.
  */
-
-/** How often a running scan is allowed to refetch the visible window. */
-const SCAN_REFETCH_INTERVAL_MS = 1_500
 
 /** How long typing settles before a search reaches the URL and the read side. */
 const SEARCH_DEBOUNCE_MS = 200
@@ -101,7 +86,6 @@ export class TracksComponent {
     private route = inject(ActivatedRoute)
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
-    private libraryService = inject(LibraryService)
     private history = inject(HistoryService)
 
     private queryParams = toSignal(this.route.queryParams, { initialValue: {} })
@@ -160,39 +144,12 @@ export class TracksComponent {
         }),
     })
 
-    private scanStatus$ = toObservable(this.libraryService.scanStatus)
-
-    /**
-     * Browse views refetch while a scan ingests songs.
-     *
-     * While it runs the status is audited rather than taken raw, because it ticks far
-     * faster than a table needs to move, and rows shifting under the cursor is already
-     * the accepted cost (ADR 0004).
-     *
-     * The end of a scan is a separate trigger, not just another tick. Auditing emits
-     * the *last* value of each window, so whatever the scan commits after its final
-     * progress event — the closing flush, and the normalization pass behind it — lands
-     * with nothing left to announce it. Without this the table holds a stale count and
-     * a stale window until the user happens to scroll or navigate.
-     */
-    private scanProgress$ = merge(
-        this.scanStatus$.pipe(
-            filter(status => status?.phase == 'discovering' || status?.phase == 'reading'),
-            auditTime(SCAN_REFETCH_INTERVAL_MS),
-        ),
-        this.scanStatus$.pipe(
-            map(status => status?.phase),
-            distinctUntilChanged(),
-            filter(phase => phase == 'completed' || phase == 'cancelled' || phase == 'failed'),
-        ),
-    )
-
     private browse = createBrowseQuery({
         query: this.query,
         viewport: this.viewport,
         sameQuery,
         entityLabel: TRACKS_LABEL,
-        refresh: this.scanProgress$,
+        refresh: libraryBrowseRefresh(),
         fetchWindow: (query, window) => this.browseService.querySongs(query, window),
     })
 
