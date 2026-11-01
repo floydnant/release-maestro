@@ -358,7 +358,7 @@ describe(FeedComponent.name, () => {
 
             expect(feedService.reloadFeedItems.mock.calls).toEqual([[['broken']]])
             expect(brokenEntry?.querySelector('.error')?.getAttribute('aria-busy')).toBe('true')
-            expect(retryBroken()).toBeNull()
+            expect(retryBroken()?.getAttribute('aria-disabled')).toBe('true')
 
             resolveReload([withPlayableTrack(createRelease('broken', []), 'Recovered Opener')])
             await settle()

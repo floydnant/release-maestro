@@ -65,6 +65,7 @@ export class BandcampApiBackendService {
         try {
             tralbumData = parseTralbumData($)
         } catch (err) {
+            this.http.discardPage(result)
             if (err instanceof Error) {
                 throw new BandcampApiMalformedTralbumDataException(url, err)
             }
@@ -95,14 +96,26 @@ export class BandcampApiBackendService {
 
         // @TODO: we could scrape the collectors info too (people supporting the release)
 
+        // Redirects can change the serving host. Keep release identities on the original Bandcamp
+        // host, so relative and same-site absolute links still match the notification's URLs.
+        const pageUrl = new URL(result.url || url)
+        const requestedUrl = new URL(url)
+        const identityOrigin = requestedUrl.hostname.endsWith('.bandcamp.com')
+            ? requestedUrl.origin
+            : pageUrl.origin
+        const releaseLink = (href: string): string | null => {
+            const resolved = URL.parse(href, pageUrl)
+            if (!resolved) return null
+            if (resolved.origin === pageUrl.origin)
+                return normalizeBandcampReleaseUrl(identityOrigin + resolved.pathname)
+            return normalizeBandcampReleaseUrl(resolved.href)
+        }
         const parentUrl =
             tralbumData.current.type === 'track' && tralbumData.album_url
                 ? URL.parse(tralbumData.album_url, result.url || url)
                 : null
         const parentAlbumUrl =
-            parentUrl && /^\/album\/[^/]+\/?$/.test(parentUrl.pathname)
-                ? normalizeBandcampReleaseUrl(parentUrl.href)
-                : null
+            parentUrl && /^\/album\/[^/]+\/?$/.test(parentUrl.pathname) ? releaseLink(parentUrl.href) : null
 
         return {
             artworkUrl,
@@ -129,7 +142,7 @@ export class BandcampApiBackendService {
                     id: track.id || null,
                     artist: track.artist || null,
                     duration: track.duration,
-                    titleLink: track.title_link || null,
+                    titleLink: track.title_link ? releaseLink(track.title_link) : null,
                     albumPreorder: track.album_preorder,
                     streamUrl: track.file ? track.file['mp3-128'] || null : null,
                 })) || [],
