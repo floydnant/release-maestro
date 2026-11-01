@@ -47,24 +47,24 @@ export class FeedBackendRepository {
                 ids.add(id)
                 identities.set(key, ids)
             }
+            const identityUrls = (item: FeedItemMaster): string[] => [
+                item.dedupeIdentifier,
+                item.data.tralbumUrl,
+                ...item.data.purchases.map(purchase => purchase.tralbumUrl),
+                ...(item.source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' ? [item.source.releaseUrl] : []),
+            ]
+            const rememberItem = (item: FeedItemMaster) => {
+                for (const url of identityUrls(item)) rememberIdentity(item.id, item.type, url)
+            }
             for (const item of tx
-                .select({
-                    id: feedItemsTable.id,
-                    type: feedItemsTable.type,
-                    dedupeIdentifier: feedItemsTable.dedupeIdentifier,
-                })
+                .select()
                 .from(feedItemsTable)
-                .all()) {
-                rememberIdentity(item.id, item.type, item.dedupeIdentifier)
+                .all()
+                .map(row => feedItemMasterSchema.parse(row))) {
+                rememberItem(item)
             }
             for (const incoming of feedItemsToIngest) {
-                const urls = [
-                    incoming.dedupeIdentifier,
-                    ...incoming.data.purchases.map(purchase => purchase.tralbumUrl),
-                    ...(incoming.source.type === 'EMAIL.BANDCAMP_NEW_RELEASE'
-                        ? [incoming.source.releaseUrl]
-                        : []),
-                ]
+                const urls = identityUrls(incoming)
                 const ids = [
                     ...new Set(
                         urls.flatMap(url => [...(identities.get(identityKey(incoming.type, url)) ?? [])]),
@@ -80,11 +80,12 @@ export class FeedBackendRepository {
                 const retained = existing[0]
                 if (!retained) {
                     tx.insert(feedItemsTable).values(incoming).run()
-                    rememberIdentity(incoming.id, incoming.type, incoming.dedupeIdentifier)
+                    rememberItem(incoming)
                     continue
                 }
                 for (const item of existing) {
-                    identities.get(identityKey(item.type, item.dedupeIdentifier))?.delete(item.id)
+                    for (const url of identityUrls(item))
+                        identities.get(identityKey(item.type, url))?.delete(item.id)
                 }
                 const mergedIds = existing.slice(1).map(item => item.id)
                 if (mergedIds.length) {
@@ -95,21 +96,27 @@ export class FeedBackendRepository {
                     tx.delete(feedItemsTable).where(inArray(feedItemsTable.id, mergedIds)).run()
                     for (const id of mergedIds) mergedItems.set(id, retained.id)
                 }
+                // A missing track page on reimport cannot undo an album relationship already saved.
+                const release =
+                    incoming.data.tralbumType === 'album'
+                        ? incoming
+                        : (existing.find(item => item.data.tralbumType === 'album') ?? incoming)
+                const data = {
+                    ...release.data,
+                    purchases: mergeBandcampPurchases(
+                        existing.flatMap(item => item.data.purchases),
+                        incoming.data.purchases,
+                    ),
+                }
                 tx.update(feedItemsTable)
                     .set({
-                        dedupeIdentifier: incoming.dedupeIdentifier,
+                        dedupeIdentifier: release.dedupeIdentifier,
                         source: retained.source,
-                        data: {
-                            ...incoming.data,
-                            purchases: mergeBandcampPurchases(
-                                existing.flatMap(item => item.data.purchases),
-                                incoming.data.purchases,
-                            ),
-                        },
+                        data,
                     })
                     .where(eq(feedItemsTable.id, retained.id))
                     .run()
-                rememberIdentity(retained.id, incoming.type, incoming.dedupeIdentifier)
+                rememberItem({ ...retained, dedupeIdentifier: release.dedupeIdentifier, data })
             }
         })
         // Publish aliases only after the transaction commits.

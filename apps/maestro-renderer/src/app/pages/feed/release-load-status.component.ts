@@ -30,30 +30,16 @@ export type ReleaseRecovery = 'reloading' | 'scheduled' | 'when-in-view' | 'manu
                 bgColor="transparent"
             ></app-progress-ring>
         </ng-template>
-        <ng-template #retryButton>
-            <button
-                hlmBtn
-                variant="ghost"
-                size="xs"
-                type="button"
-                class="release-retry |"
-                [attr.aria-label]="'Retry loading ' + releaseName()"
-                (click)="retry.emit()"
-            >
-                Retry
-            </button>
-        </ng-template>
-
-        @if (error().retryAt != null) {
-            <div
-                class="rate-limit | mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 type-body-sm text-content-muted"
-                [attr.aria-busy]="recovery() === 'reloading'"
-            >
+        <div
+            [class]="
+                error().retryAt != null
+                    ? 'rate-limit | mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 type-body-sm text-content-muted'
+                    : 'error | mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1'
+            "
+            [attr.aria-busy]="recovery() === 'reloading'"
+        >
+            @if (error().retryAt != null) {
                 @switch (recovery()) {
-                    @case ('reloading') {
-                        <ng-container [ngTemplateOutlet]="progress"></ng-container>
-                        <p>Loading this release again</p>
-                    }
                     @case ('scheduled') {
                         <p>
                             Bandcamp asked us to slow down. This release loads again at
@@ -67,15 +53,9 @@ export type ReleaseRecovery = 'reloading' | 'scheduled' | 'when-in-view' | 'manu
                     }
                     @case ('manual') {
                         <p>Bandcamp asked us to slow down.</p>
-                        <ng-container [ngTemplateOutlet]="retryButton"></ng-container>
                     }
                 }
-            </div>
-        } @else {
-            <div
-                class="error | mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1"
-                [attr.aria-busy]="recovery() === 'reloading'"
-            >
+            } @else {
                 <p class="text-content-danger">
                     <app-icon
                         name="error"
@@ -87,16 +67,29 @@ export type ReleaseRecovery = 'reloading' | 'scheduled' | 'when-in-view' | 'manu
                 <p class="type-label-md text-content-danger">
                     {{ error().message || 'Error loading feed item' }}
                 </p>
-                @if (recovery() === 'reloading') {
-                    <p class="flex items-center gap-1.5 type-body-sm text-content-muted">
-                        <ng-container [ngTemplateOutlet]="progress"></ng-container>
-                        Retrying
-                    </p>
-                } @else {
-                    <ng-container [ngTemplateOutlet]="retryButton"></ng-container>
-                }
-            </div>
-        }
+            }
+            @if (recovery() === 'reloading') {
+                <p class="flex items-center gap-1.5 type-body-sm text-content-muted">
+                    <ng-container [ngTemplateOutlet]="progress"></ng-container>
+                    {{ error().retryAt != null ? 'Loading this release again' : 'Retrying' }}
+                </p>
+            }
+            @if (recovery() === 'manual' || recovery() === 'reloading') {
+                <!-- Keep the control mounted and focusable while busy, so a failed attempt keeps focus. -->
+                <button
+                    hlmBtn
+                    variant="ghost"
+                    size="xs"
+                    type="button"
+                    class="release-retry | aria-disabled:text-content-muted"
+                    [attr.aria-label]="'Retry loading ' + releaseName()"
+                    [attr.aria-disabled]="recovery() === 'reloading'"
+                    (click)="recovery() !== 'reloading' && retry.emit()"
+                >
+                    Retry
+                </button>
+            }
+        </div>
     `,
 })
 export class ReleaseLoadStatusComponent {

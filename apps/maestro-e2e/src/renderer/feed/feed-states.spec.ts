@@ -124,7 +124,7 @@ test.describe('release feed scenario states', () => {
 
         await retry.click()
         await expect(page.getByText('Retrying', { exact: true })).toBeVisible()
-        await expect(retry).toHaveCount(0)
+        await expect(retry).toBeDisabled()
         expect(await controller.lastCall('reload-feed-items')).toMatchObject({
             payload: { ids: ['failed-release'] },
         })
@@ -134,6 +134,34 @@ test.describe('release feed scenario states', () => {
         await expect(page.getByText('Could not reach Bandcamp')).toBeHidden()
         await expect(page.getByRole('link', { name: 'Failed release' })).toBeVisible()
         expect(await controller.calls('reload-feed-items')).toHaveLength(1)
+    })
+
+    test('keeps keyboard focus when a release retry fails again', async ({ page }) => {
+        const base = createHydratedRelease()
+        const failed = createHydratedRelease({
+            id: 'keyboard-retry',
+            error: { message: 'Could not reach Bandcamp' },
+            data: { ...base.data, releaseName: 'Keyboard release', tracks: [] },
+        })
+        const controller = await createRendererScenario(
+            page,
+            scenarioBuilder().feed([failed]).handler('reload-feed-items', { kind: 'pending' }).build(),
+        )
+        const retry = page.getByRole('button', { name: 'Retry loading Keyboard release' })
+        await retry.focus()
+        await retry.press('Enter')
+        await expect(retry).toBeDisabled()
+        await expect(retry).toBeFocused()
+        await retry.press('Enter')
+        await expect.poll(async () => (await controller.calls('reload-feed-items')).length).toBe(1)
+
+        await controller.resolvePending('reload-feed-items', [failed])
+        await expect(retry).toBeEnabled()
+        await expect(retry).toBeFocused()
+        await retry.press('Enter')
+        await expect.poll(async () => (await controller.calls('reload-feed-items')).length).toBe(2)
+        await controller.resolvePending('reload-feed-items', [{ ...failed, error: null, data: base.data }])
+        await expect(retry).toBeHidden()
     })
 
     test('renders a populated release feed from mocked IPC state', async ({ page }) => {

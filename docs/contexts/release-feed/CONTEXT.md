@@ -111,8 +111,9 @@ list includes everyone involved. Reimporting the same purchase adds no duplicate
 The Bandcamp album containing a track. Import reads the track page to resolve its parent album
 before choosing the feed item's identity. A genuine standalone track keeps its own release URL.
 A missing or malformed track page keeps the original track URL because its album is unknown.
+If an earlier import already found that track's album, reimport retains the album and its view state.
 Network failures leave the import checkpoint unchanged so the next pass can retry.
-Import schedules parent lookups across each email batch. The shared request gate limits active
+Import schedules parent lookups continuously across emails. The shared request gate limits active
 Bandcamp requests. Network and server failures get two retries.
 Bandcamp page requests share the app-wide cooldown described below. A
 processing failure stops the remaining export before the import reports its final error.
@@ -181,8 +182,9 @@ The app remembers up to 1,000 releases confirmed unplayable for five minutes to 
 again on every scroll. Later hydration rechecks them after that interval. Disabling the filter
 bypasses the interval. Hydration errors stay visible because their track availability is unknown.
 One release's page failure does not prevent other releases from loading. Repeated redirect URLs end
-the page lookup immediately. A failed next page preserves the releases already loaded and their
-playback. Retrying hydration replaces only the failed release's details, without reopening the feed.
+the page lookup immediately. Retrying a malformed page fetches it again. A failed next page preserves
+the releases already loaded and their playback. Retrying hydration replaces only the failed release's
+details, without reopening the feed.
 Automatic retries cover the current release and the nearby releases being prefetched.
 _Avoid_: scraping — that names the implementation, not the behavior
 
@@ -199,8 +201,9 @@ item even when a release announcement supplied its source. When track entries co
 album, the first imported entry keeps its identity, source, viewed state and snooze state. The view
 history from every merged entry follows that identity. The same URL with a different feed item
 type would not collapse.
-Bandcamp release URLs use HTTPS and omit tracking queries, fragments and trailing slashes. Open
-windows can still mark a merged track as viewed or snoozed through its original ID until they close.
+Bandcamp release URLs use HTTPS and omit tracking queries, fragments and trailing slashes. Links
+served through a custom domain retain their original Bandcamp host for release and track identities.
+Open windows can still mark a merged track as viewed or snoozed through its original ID until they close.
 
 **Event date**:
 When the thing the feed item describes actually happened — for a notification, when the email was

@@ -87,6 +87,14 @@ export class BandcampHttpClient {
         return this.gate.holdForeground()
     }
 
+    /** A page consumer rejected this document; don't keep serving it on Retry. */
+    discardPage(page: Page): void {
+        for (const [key, cached] of this.pages) {
+            // A late parser failure must not remove a newer response for the same URL.
+            if (cached.page === page) this.forgetPage(key)
+        }
+    }
+
     async get(
         url: string,
         { signal, purpose = 'feed' }: { signal?: AbortSignal; purpose?: BandcampRequestPurpose } = {},

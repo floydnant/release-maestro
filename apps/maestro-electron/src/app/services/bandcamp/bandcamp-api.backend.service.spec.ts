@@ -30,6 +30,23 @@ describe('BandcampApiBackendService release links', () => {
 
     afterEach(() => jest.restoreAllMocks())
 
+    it('fetches a recovered release on Retry instead of reusing malformed cached HTML', async () => {
+        const html = `<div data-tralbum='${JSON.stringify({
+            current: { title: 'Recovered', type: 'album', id: 1 },
+            trackinfo: [],
+        })}'></div>`
+        const fetchMock = jest
+            .spyOn(globalThis, 'fetch')
+            .mockResolvedValueOnce(new Response('<html>Please try again later</html>'))
+            .mockResolvedValueOnce(new Response(html))
+        const service = new BandcampApiBackendService(new BandcampHttpClient())
+
+        await expect(service.scrapeTralbumInfo(releaseUrl)).rejects.toThrow('Failed to parse tralbum data')
+        await expect(service.scrapeTralbumInfo(releaseUrl)).resolves.toMatchObject({ title: 'Recovered' })
+        await expect(service.scrapeTralbumInfo(releaseUrl)).resolves.toMatchObject({ title: 'Recovered' })
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
     it.each(['/', '/album/', '/track/elemento', null, undefined])(
         'keeps a track without an album when album_url is %s',
         async albumUrl => {

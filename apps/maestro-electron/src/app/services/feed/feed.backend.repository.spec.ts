@@ -13,6 +13,58 @@ import { bandcampFeedItem } from '../../../test/fixtures/feed.fixture'
 import { FeedBackendRepository } from './feed.backend.repository'
 
 describe('FeedBackendRepository album purchases', () => {
+    it.each([false, true])(
+        'keeps an album and its history when a reimport falls back to its track URL: snoozed=%s',
+        async isSnoozed => {
+            const database = createMigratedTestDatabase()
+            try {
+                const repository = new FeedBackendRepository(database.client)
+                const trackUrl = 'https://test.bandcamp.com/track/first-track'
+                const album: BandcampFeedItem = {
+                    ...fansBoughtMusicFeedItem,
+                    data: {
+                        ...fansBoughtMusicFeedItem.data,
+                        purchases: [{ tralbumUrl: trackUrl, fans: [mayaFan] }],
+                    },
+                }
+                await repository.ingestFeedItems([album])
+                await repository.markFeedItemViewed(album.id, album.type, isSnoozed)
+                const original = database.db.select().from(feedItemsTable).all()[0]
+                // Start a new repository, so identity comes from persisted purchases, not a run's memo.
+                const next = new FeedBackendRepository(database.client)
+                const fallback: BandcampFeedItem = {
+                    ...album,
+                    id: 'fallback-track',
+                    dedupeIdentifier: trackUrl,
+                    data: {
+                        tralbumUrl: trackUrl,
+                        tralbumType: 'track',
+                        purchases: [{ tralbumUrl: trackUrl, fans: [riverFan] }],
+                    },
+                }
+                await next.ingestFeedItems([fallback, { ...fallback, id: 'another-fallback' }])
+                const rows = database.db.select().from(feedItemsTable).all()
+                expect(rows).toHaveLength(1)
+                expect(rows[0]).toMatchObject({
+                    id: album.id,
+                    dedupeIdentifier: album.dedupeIdentifier,
+                    lastViewedAt: original?.lastViewedAt,
+                    isSnoozed,
+                    data: {
+                        tralbumUrl: album.data.tralbumUrl,
+                        tralbumType: 'album',
+                        purchases: [{ tralbumUrl: trackUrl, fans: [mayaFan, riverFan] }],
+                    },
+                })
+                expect(database.db.select().from(feedItemHistoryEntriesTable).all()).toMatchObject([
+                    { feedItemId: album.id },
+                ])
+            } finally {
+                database.sqlite.close()
+            }
+        },
+    )
+
     it.each(['announcement first', 'purchase first'])(
         'keeps one album with its fans across release and purchase notifications: %s',
         async order => {
