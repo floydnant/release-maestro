@@ -1,16 +1,13 @@
-import bandcampFetch, { Artist, Label } from 'bandcamp-fetch'
 import { CheerioAPI, load as cheerioLoad } from 'cheerio'
 import {
-    FetchFailedException,
     AttributeTralbumData,
     BandData,
     ScrapedTralbumInfo,
     tralbumDataAttrSchema,
+    normalizeBandcampReleaseUrl,
 } from '@release-maestro/core'
-import {
-    BandcampApiFailedToFetchTralbumException,
-    BandcampApiMalformedTralbumDataException,
-} from './bandcamp-api.exceptions'
+import { BandcampApiMalformedTralbumDataException } from './bandcamp-api.exceptions'
+import { BandcampHttpClient, BandcampRequestPurpose } from './bandcamp-http.client'
 
 const parseTralbumData = ($: CheerioAPI): AttributeTralbumData => {
     const tralbumJson = $('[data-tralbum]').attr('data-tralbum')
@@ -48,34 +45,27 @@ const parseBandData = ($: CheerioAPI): BandData | null => {
 }
 
 export class BandcampApiBackendService {
-    async getBand(url: string): Promise<Label | Artist> {
-        return await bandcampFetch.band.getInfo({ bandUrl: url })
+    constructor(private readonly http: BandcampHttpClient) {}
+
+    /** Covers a complete feed load, including database reads and parsing between HTTP requests. */
+    holdFeedPriority(): () => void {
+        return this.http.holdFeedPriority()
     }
 
-    async scrapeTralbumInfo(url: string): Promise<ScrapedTralbumInfo> {
-        const result = await fetch(url).catch(err => {
-            if (err instanceof Error) {
-                throw new FetchFailedException(
-                    'Failed to fetch tralbum',
-                    url,
-                    err,
-                    'Check your internet connection and retry.',
-                )
-            }
-            throw err
-        })
-        if (!result.ok) {
-            throw new BandcampApiFailedToFetchTralbumException(url, result.status)
-        }
-
-        const html = await result.text()
-        const $ = cheerioLoad(html)
+    async scrapeTralbumInfo(
+        url: string,
+        signal?: AbortSignal,
+        purpose: Exclude<BandcampRequestPurpose, 'preview'> = 'feed',
+    ): Promise<ScrapedTralbumInfo> {
+        const result = await this.http.get(url, { signal, purpose })
+        const $ = cheerioLoad(result.html)
 
         const artworkUrl = $('#tralbumArt img').attr('src') || null
         let tralbumData: AttributeTralbumData | null = null
         try {
             tralbumData = parseTralbumData($)
         } catch (err) {
+            this.http.discardPage(result)
             if (err instanceof Error) {
                 throw new BandcampApiMalformedTralbumDataException(url, err)
             }
@@ -83,7 +73,19 @@ export class BandcampApiBackendService {
         }
         const bandData = parseBandData($)
 
-        let about = $('#trackInfoInner > div.tralbumData.tralbum-about').html() || ''
+        // Resolve links before extracting either section. Electron must receive Bandcamp URLs.
+        $('#trackInfoInner > div.tralbumData a[href]')
+            .toArray()
+            .forEach(link => {
+                const cheerioLink = $(link)
+                const href = cheerioLink.attr('href')
+                const resolved = href ? URL.parse(href, result.url || url) : null
+                if (resolved) cheerioLink.attr('href', resolved.href)
+                cheerioLink.attr('target', '_blank')
+                cheerioLink.attr('rel', 'noopener noreferrer')
+            })
+
+        const about = $('#trackInfoInner > div.tralbumData.tralbum-about').html() || ''
         const aboutLinks = $('#trackInfoInner > div.tralbumData.tralbum-about a')
             .toArray()
             .map(link => ({ url: $(link).attr('href') || '', text: $(link).text().trim() }))
@@ -92,22 +94,28 @@ export class BandcampApiBackendService {
             .toArray()
             .map(link => ({ url: $(link).attr('href') || '', text: $(link).text().trim() }))
 
-        // Ensure links open in a new tab
-        $('#trackInfoInner > div.tralbumData a')
-            .toArray()
-            .forEach(link => {
-                const cheerioLink = $(link)
-                const originalHtml = cheerioLink.prop('outerHTML')
-                cheerioLink.attr('target', '_blank')
-                cheerioLink.attr('rel', 'noopener noreferrer')
-                const fixedHtml = cheerioLink.prop('outerHTML')
-
-                if (!originalHtml || !fixedHtml) return
-
-                about = about.replace(originalHtml, fixedHtml)
-            })
-
         // @TODO: we could scrape the collectors info too (people supporting the release)
+
+        // Redirects can change the serving host. Keep release identities on the original Bandcamp
+        // host, so relative and same-site absolute links still match the notification's URLs.
+        const pageUrl = new URL(result.url || url)
+        const requestedUrl = new URL(url)
+        const identityOrigin = requestedUrl.hostname.endsWith('.bandcamp.com')
+            ? requestedUrl.origin
+            : pageUrl.origin
+        const releaseLink = (href: string): string | null => {
+            const resolved = URL.parse(href, pageUrl)
+            if (!resolved) return null
+            if (resolved.origin === pageUrl.origin)
+                return normalizeBandcampReleaseUrl(identityOrigin + resolved.pathname)
+            return normalizeBandcampReleaseUrl(resolved.href)
+        }
+        const parentUrl =
+            tralbumData.current.type === 'track' && tralbumData.album_url
+                ? URL.parse(tralbumData.album_url, result.url || url)
+                : null
+        const parentAlbumUrl =
+            parentUrl && /^\/album\/[^/]+\/?$/.test(parentUrl.pathname) ? releaseLink(parentUrl.href) : null
 
         return {
             artworkUrl,
@@ -115,6 +123,7 @@ export class BandcampApiBackendService {
             artist: tralbumData?.current.artist || null,
             releaseDate: tralbumData?.album_release_date || tralbumData?.current.release_date || null,
             type: tralbumData?.current.type || 'album',
+            parentAlbumUrl,
             id: tralbumData?.current.id || null,
             about: about + credits,
             aboutLinks: [...aboutLinks, ...creditsLinks],
@@ -133,7 +142,7 @@ export class BandcampApiBackendService {
                     id: track.id || null,
                     artist: track.artist || null,
                     duration: track.duration,
-                    titleLink: track.title_link || null,
+                    titleLink: track.title_link ? releaseLink(track.title_link) : null,
                     albumPreorder: track.album_preorder,
                     streamUrl: track.file ? track.file['mp3-128'] || null : null,
                 })) || [],

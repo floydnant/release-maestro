@@ -13,6 +13,7 @@ import {
     EmailImportState,
 } from './services/feed/email-import.service'
 import { BandcampApiBackendService } from './services/bandcamp/bandcamp-api.backend.service'
+import { BandcampHttpClient } from './services/bandcamp/bandcamp-http.client'
 import { WebScrapingService } from './services/web-scraping/web-scraping.service'
 import { MetadataBackendService } from './services/metadata/metadata.backend.service'
 import { SidecarProcessService } from './services/metadata/sidecar-process.service'
@@ -47,12 +48,16 @@ export const diContainer = new DiContainer({
             useFactory: async di => new FeedBackendRepository(await di.get(DatabaseClient)),
         },
         {
+            provide: BandcampHttpClient,
+            useValue: new BandcampHttpClient(),
+        },
+        {
             provide: BandcampApiBackendService,
-            useFactory: () => new BandcampApiBackendService(),
+            useFactory: async di => new BandcampApiBackendService(await di.get(BandcampHttpClient)),
         },
         {
             provide: WebScrapingService,
-            useFactory: () => new WebScrapingService(),
+            useFactory: async di => new WebScrapingService(await di.get(BandcampHttpClient)),
         },
         {
             provide: FeedBackendService,
@@ -60,7 +65,6 @@ export const diContainer = new DiContainer({
                 new FeedBackendService(
                     await di.get(EmailBackendRepository),
                     await di.get(BandcampApiBackendService),
-                    await di.get(WebScrapingService),
                     await di.get(FeedBackendRepository),
                     await di.get(SettingsBackendService),
                 ),

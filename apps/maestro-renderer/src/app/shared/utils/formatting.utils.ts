@@ -74,24 +74,53 @@ export const formatDateRelative = (date: Date, referenceDate: Date = new Date())
     return relativeTimeFormatter.format(roundedDifference, unit)
 }
 
-const localCalendarDay = (date: Date): number => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+/** The viewer's local calendar day of a timestamp, as that day's UTC midnight so day arithmetic never meets a DST change. */
+const localCalendarDay = (date: Date): Date =>
+    new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
 
-const formatCalendarDaysRelative = (days: number): string =>
-    Math.abs(days) <= 1
-        ? relativeTimeFormatter.format(days, 'day')
-        : formatDateRelative(new Date(days * conversionFactorMap.day), new Date(0))
+/** A calendar day as its UTC midnight, comparable with {@link localCalendarDay}. */
+const calendarDayDate = (date: CalendarDay): Date => new Date(`${date}T00:00:00Z`)
 
-/** Compare Bandcamp's release day with the viewer's current calendar day. */
-export const formatReleaseDateRelative = (date: CalendarDay, referenceDate: Date = new Date()): string => {
-    const days = (Date.parse(`${date}T00:00:00Z`) - localCalendarDay(referenceDate)) / conversionFactorMap.day
-    return `${days < 0 ? 'released' : 'releases'} ${formatCalendarDaysRelative(days)}`
+/**
+ * The distance from one calendar day to another in the largest whole unit — `today`, `16d ago`,
+ * `in 7d`, `2mo ago`, `1y ago`. Days until a whole calendar month has passed, then whole months until a
+ * whole year has. No week unit, so 16 days stays `16d`; whole years round down, so 23 months is `1y`.
+ * Both days are UTC midnights from {@link localCalendarDay} or {@link calendarDayDate}.
+ */
+const formatCalendarDayDistance = (date: Date, referenceDay: Date): string => {
+    const days = Math.round((date.valueOf() - referenceDay.valueOf()) / conversionFactorMap.day)
+    if (days === 0) return 'today'
+
+    const [earlier, later] = days > 0 ? [referenceDay, date] : [date, referenceDay]
+    const months =
+        (later.getUTCFullYear() - earlier.getUTCFullYear()) * 12 +
+        later.getUTCMonth() -
+        earlier.getUTCMonth() -
+        (later.getUTCDate() < earlier.getUTCDate() ? 1 : 0)
+    const amount =
+        months < 1 ? `${Math.abs(days)}d` : months < 12 ? `${months}mo` : `${Math.floor(months / 12)}y`
+
+    return days > 0 ? `in ${amount}` : `${amount} ago`
 }
 
-/** Format a timestamp at calendar-day precision in the viewer's timezone. */
-export const formatCalendarDateRelative = (date: Date, referenceDate: Date = new Date()): string => {
-    const days = (localCalendarDay(date) - localCalendarDay(referenceDate)) / conversionFactorMap.day
-    return formatCalendarDaysRelative(days)
+const shortMonthFormatter = new Intl.DateTimeFormat('en', { month: 'short', timeZone: 'UTC' })
+
+/**
+ * Bandcamp's release day with its distance from the viewer's current calendar day —
+ * `released Oct 7 (16d ago)`, `releases Oct 30 (in 7d)`, `released Mar 5 2025 (1y ago)`. The year
+ * appears only outside the viewer's current year. A release on the current day `releases … (today)`.
+ */
+export const formatReleaseDate = (date: CalendarDay, referenceDate: Date = new Date()): string => {
+    const day = calendarDayDate(date)
+    const today = localCalendarDay(referenceDate)
+    const verb = day.valueOf() < today.valueOf() ? 'released' : 'releases'
+    const year = day.getUTCFullYear() === today.getUTCFullYear() ? '' : ` ${day.getUTCFullYear()}`
+    return `${verb} ${shortMonthFormatter.format(day)} ${day.getUTCDate()}${year} (${formatCalendarDayDistance(day, today)})`
 }
+
+/** A timestamp's distance from now at calendar-day precision in the viewer's timezone — `today`, `20d ago`. */
+export const formatCalendarDateRelative = (date: Date, referenceDate: Date = new Date()): string =>
+    formatCalendarDayDistance(localCalendarDay(date), localCalendarDay(referenceDate))
 
 const shortDateFormatter = new Intl.DateTimeFormat('en', { year: 'numeric', month: 'short', day: 'numeric' })
 
