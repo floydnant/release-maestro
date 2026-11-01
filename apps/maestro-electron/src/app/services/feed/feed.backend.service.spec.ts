@@ -111,6 +111,82 @@ describe('FeedBackendService email import', () => {
         return { updates, abortController, reported }
     }
 
+    it.each(['announcement first', 'purchase first'])(
+        'keeps custom-domain purchases with their announcement and track buyers: %s',
+        async order => {
+            const albumUrl = 'https://test.bandcamp.com/album/first'
+            const trackUrl = 'https://test.bandcamp.com/track/first-track'
+            const customOrigin = 'https://label.example.com'
+            const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+                const url = new URL(String(input))
+                if (url.hostname === 'test.bandcamp.com')
+                    return new Response(null, {
+                        status: 302,
+                        headers: { Location: customOrigin + url.pathname },
+                    })
+                return new Response(
+                    `<div data-tralbum='${JSON.stringify({
+                        album_url: '/album/first',
+                        current: {
+                            title: 'First release',
+                            type: url.pathname.includes('/track/') ? 'track' : 'album',
+                            id: 123,
+                        },
+                        trackinfo: [
+                            {
+                                title: 'First track',
+                                id: 456,
+                                duration: 120,
+                                title_link: customOrigin + '/track/first-track',
+                                album_preorder: false,
+                                file: { 'mp3-128': 'https://audio.example.com/first.mp3' },
+                            },
+                        ],
+                    })}'></div>`,
+                )
+            })
+            try {
+                service = new FeedBackendService(
+                    fromPartial<EmailBackendRepository>({ loadEmails, getMailboxName: () => mailboxName }),
+                    new BandcampApiBackendService(new BandcampHttpClient()),
+                    feedRepository,
+                    fromPartial<SettingsBackendService>({ getSettings: () => ({}) }),
+                )
+                const announcement = releasePacket('2026-10-01T21:40:12', albumUrl)
+                const purchase = {
+                    current: 2,
+                    total: 2,
+                    email: {
+                        ...fansBoughtMusicEmail,
+                        htmlBody: fansBoughtMusicEmail.htmlBody.replaceAll(
+                            'https://other.bandcamp.com/track/second',
+                            trackUrl,
+                        ),
+                    },
+                }
+                const { updates } = await runImport()
+                for (const email of order === 'announcement first'
+                    ? [announcement, purchase]
+                    : [purchase, announcement])
+                    emails$.next(email)
+                emails$.complete()
+                await updates
+                const stored = await feedRepository.listFeedItems({
+                    index: 0,
+                    count: 10,
+                    snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+                })
+                expect(stored).toHaveLength(1)
+                expect(stored[0]?.dedupeIdentifier).toBe(albumUrl)
+                const hydrated = await service.loadFeed(0, 5)
+                expect(hydrated).toHaveLength(1)
+                expect(hydrated[0]?.data.tracks[0]?.fans).toEqual([adamFan, mayaFan, riverFan])
+            } finally {
+                fetchMock.mockRestore()
+            }
+        },
+    )
+
     it('completes an empty export without reporting queued processing', async () => {
         const { updates } = await runImport()
         emails$.complete()
