@@ -7,7 +7,7 @@ GitHub Actions dependencies. The pnpm policy restricts provenance, release age, 
 
 The supported Node.js ranges start at 22.23.4 and 24.22.1. These releases include the
 [October 21, 2026 security fixes](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases),
-including the Brotli decoder vulnerability CVE-2026-111497. `.node-version` pins 24.22.1 for
+including the Brotli decoder vulnerability CVE-2026-111497. `.node-version` pins 24.22.2 for
 development and CI. Change the active shell runtime too; the version file does not replace an
 already running Node.js installation.
 
