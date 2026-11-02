@@ -63,7 +63,8 @@ uses v12. Recent Dependabot PRs have updated the lockfile successfully, but that
 complete remediation coverage. Dependency submission fills graph coverage; it cannot guarantee that
 Dependabot can resolve a compatible fix.
 
-`tools/security/exceptions.json` accepts 7 existing findings until November 2, 2026.
+`tools/security/exceptions.json` retains two extract-zip exceptions that expired on November 2, 2026.
+They no longer accept either finding. The other five exceptions were removed after their findings disappeared.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, and UTC expiry date.
 They expire at the start of that date. Full scans then block only if the matching vulnerability
 is still present; a stale entry for a resolved finding does not fail the scan. Offline policy validation
@@ -71,12 +72,26 @@ checks date formats rather than whether the date has passed. Keep exceptions wit
 30 days, review extensions in a PR, and remove them after fixes. Never regenerate the baseline
 automatically or suppress whole packages. Acceptance does not establish safety.
 
-Nx pins Axios, brace-expansion, smol-toml, follow-redirects, and Undici to vulnerable versions.
-Angular's build package pins Vite to an affected version. Exact-version overrides in
+Nx and other build tools still pin vulnerable dependency versions. Exact-version overrides in
 `pnpm-workspace.yaml` select Axios 1.20.0, brace-expansion 5.0.12, smol-toml 1.9.1,
-follow-redirects 1.16.1, Undici 7.30.1, and Vite 8.3.4. Remove an override when upstream uses a
-fixed version. Automated remediation PRs can add further scoped overrides; each PR body names
-the packages it overrides.
+follow-redirects 1.16.2, Undici 7.30.1, basic-ftp 6.2.1, esbuild 0.25.0,
+serialize-javascript 7.1.4, Zod 4.6.6, and Glob 14.0.2.
+The Angular build package now uses fixed Vite 8.3.5, so its override was removed.
+Minimatch remains on the versions required by upstream callers. Version 11 removes `makeRe`,
+which Nx needs for wildcard project selection and generators. Overriding legacy versions 3 and 5
+also produced an empty archive in a fixture packaging check. Remove an override when upstream uses
+a fixed version.
+
+The November 2, 2026 full scan still blocks eight findings:
+
+| Package                                       | Advisory                                 | Remediation                                                                                  |
+| --------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------- |
+| deepmerge 4.3.1                               | GHSA-gcqx-w48m-w2h4                      | No published fix. Update or replace the upstream caller when a compatible fix exists.        |
+| extract-zip 2.0.1                             | GHSA-7pqw-9j4j-h8q3, GHSA-jmr9-qjv8-65gv | No published fix. Both exceptions expired.                                                   |
+| minimatch 3.1.5, 5.1.9, 9.0.9, 10.2.5, 10.2.6 | GHSA-g3hv-75wg-m249                      | The available fix starts at 11.0.1. Nx and packaging callers need an upstream API migration. |
+
+No new acceptance or exception extension applies to these findings. The Rust `paste` 1.0.15
+maintenance notice, RUSTSEC-2024-0436, remains informational.
 
 Release-please checks main before creating a release. The Release workflow checks the immutable
 tag commit before building or publishing installers, including manual publications and retries.
