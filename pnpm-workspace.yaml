@@ -42,7 +42,6 @@ savePrefix: ''
 # These exact versions were accepted before their three-day quarantine expired. No later version is
 # exempt.
 minimumReleaseAgeExclude:
-    - '@es-joy/jsdoccomment@0.98.0'
     - '@jest/console@30.5.2'
     - '@jest/core@30.5.2'
     - '@jest/environment-jsdom-abstract@30.5.2'
@@ -80,12 +79,13 @@ overrides:
     axios@1.18.1: 1.20.0
     brace-expansion@5.0.8: 5.0.12
     smol-toml@1.6.1: 1.9.1
-    follow-redirects@1.16.0: 1.16.1
+    follow-redirects@1.16.0: 1.16.2
     undici@7.29.0: 7.30.1
-    vite@8.3.0: 8.3.4
     basic-ftp@5.3.1: 6.2.1
     esbuild@0.18.20: 0.25.0
-    serialize-javascript@6.0.2: 7.0.5
+    serialize-javascript@6.0.2: 7.1.4
     zod@3.25.76: 4.6.6
+    glob@10.5.0: 14.0.2
+    glob@13.0.6: 14.0.2
 patchedDependencies:
-    '@spartan-ng/brain@1.8.0': patches/@spartan-ng__brain@1.8.0.patch
+    '@spartan-ng/brain@1.9.0': patches/@spartan-ng__brain@1.9.0.patch
