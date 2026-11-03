@@ -114,6 +114,9 @@ Use `make security-remediation-plan` for a live advisory preview without changin
 
 Run `make security` separately for current npm and Rust vulnerability advisories, and `make sbom`
 for dependency inventories. See [security checks](security.md) for setup, CI, and exception policy.
+`make security-runtimes` separately inventories locked Electron, Playwright, and Puppeteer browser
+declarations against current upstream releases. A review-required result is not a confirmed CVE.
+The tools suite covers runtime freshness, missing inventories, stale feeds, and network failures.
 
 Production packaging is cached. The launcher resolves electron-builder's unpacked layout on macOS,
 Windows, and Linux, and CI runs the production suite on all three. E2E windows remain visible but

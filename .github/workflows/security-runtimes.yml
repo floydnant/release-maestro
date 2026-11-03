@@ -1,0 +1,32 @@
+name: 'Runtime security freshness'
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+    schedule:
+        - cron: '38 6 * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    runtimes:
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: ./.github/actions/setup-node
+              with:
+                  install-command: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Inventory bundled runtimes and check upstream freshness
+              run: make security-runtimes
+            - name: Upload runtime inventory including unresolved reviews
+              if: always()
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: runtime-security
+                  path: dist/security/runtimes.json
+                  if-no-files-found: error
