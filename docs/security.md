@@ -260,7 +260,7 @@ empty package advisory report as safety.
 ## Security automation health and AI investigation
 
 The Security failure notification workflow handles unsuccessful main-branch Security, Security
-remediation, Runtime security freshness, Security automation health, Release please, and published-tag Release runs. It posts only workflow
+remediation, Runtime security freshness, Security automation health, Release please, and published-tag Release runs and manual release retries. It posts only workflow
 metadata to the T3 webhook stored in the repository secret `SECURITY_T3_WEBHOOK_URL`. It never checks
 out triggering code or executes artifacts. Missing configuration or unsuccessful delivery fails
 visibly. Manual workflow dispatch tests delivery. Keep the token-bearing endpoint out of source,
