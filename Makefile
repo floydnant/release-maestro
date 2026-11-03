@@ -13,9 +13,9 @@ security-tools: ## Download checksum-pinned security tools for this platform
 	node tools/security/cli.mjs install
 security: ## Scan both lockfiles for known vulnerabilities (requires network)
 	node tools/security/cli.mjs scan
-security-remediation-plan: ## Scan and preview eligible npm fixes without changing dependency inputs
+security-remediation-plan: ## Scan and preview eligible npm and Node fixes without changing dependency inputs
 	node tools/security/remediate.mjs plan
-security-remediate: ## Apply and verify npm fixes on committed dependency inputs
+security-remediate: ## Apply and verify npm and Node fixes on committed dependency inputs
 	node tools/security/remediate.mjs apply
 security-policy-check: ## Validate vulnerability exception fields and date formats
 	node tools/security/cli.mjs policy
