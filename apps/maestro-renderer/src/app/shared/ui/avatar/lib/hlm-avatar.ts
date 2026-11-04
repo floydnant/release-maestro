@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core'
+import { ChangeDetectionStrategy, Component, forwardRef, input } from '@angular/core'
 import { BrnAvatar } from '@spartan-ng/brain/avatar'
 import { classes, hlm } from '@spartan-ng/helm/utils'
 import { cva, type VariantProps } from 'class-variance-authority'
@@ -29,13 +29,14 @@ export type AvatarVariants = VariantProps<typeof avatarVariants>
  */
 @Component({
     selector: 'hlm-avatar',
+    providers: [{ provide: BrnAvatar, useExisting: forwardRef(() => HlmAvatar) }],
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
         'data-slot': 'avatar',
         '[attr.data-size]': 'size()',
     },
     template: `
-        @if (_image()?.canShow()) {
+        @if (status() === 'loaded') {
             <ng-content select="[hlmAvatarImage],[brnAvatarImage]" />
         } @else {
             <ng-content select="[hlmAvatarFallback],[brnAvatarFallback]" />

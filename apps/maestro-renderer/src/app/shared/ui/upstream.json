@@ -54,6 +54,7 @@
         "Inline link buttons can shrink with their containing row",
         "Sidebar copies only the static menu, group and sub-menu parts; the collapsible container, mobile sheet, cookie state, rail, trigger, inset, input, skeleton and badge are omitted, and menu buttons follow aria-current like the navigation button",
         "Switch uses whole-pixel track, inset and thumb sizes so the thumb rests symmetrically in both directions, and exposes focus() for focus restoration",
-        "Avatar copies the avatar, image, fallback, group and group-count parts and omits the badge; it replaces the upstream style-preset classes with token classes, adds an xs size for single-line rows, rings grouped avatars in the canvas color, and lets the group count widen into a pill for multi-digit counts"
+        "Avatar copies the avatar, image, fallback, group and group-count parts and omits the badge; it replaces the upstream style-preset classes with token classes, adds an xs size for single-line rows, rings grouped avatars in the canvas color, and lets the group count widen into a pill for multi-digit counts",
+        "Avatar uses Brain 1.9.0's public loading status and provides its container to the image and fallback directives"
     ]
 }
