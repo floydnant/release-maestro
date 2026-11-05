@@ -1,87 +1,41 @@
-import { setTimeout as waitForRetry } from 'node:timers/promises'
 import {
-    connect,
-    concatMap,
-    concatWith,
-    defer,
-    endWith,
-    filter,
-    from,
-    ignoreElements,
-    materialize,
-    map,
-    merge,
-    mergeMap,
-    Observable,
-    tap,
-} from 'rxjs'
-import {
-    BandcampEmailFeedSourceItem,
     BandcampFeedItem,
-    BandcampPurchase,
     EmailImportProgress,
-    EmailImportStreamPacket,
     FetchFailedException,
     HydratedBandcampReleaseFeedItem,
     HydratedFeedItem,
     assertUnreachable,
     mapBandcampReleaseFeedItemToHydratedFeedItem,
     resolveFeedSettings,
-    mergeBandcampPurchases,
 } from '@release-maestro/core'
+import { Observable } from 'rxjs'
 import { BandcampApiBackendService } from '../bandcamp/bandcamp-api.backend.service'
 import {
     BandcampApiException,
-    BandcampApiFailedToFetchTralbumException,
     BandcampApiMalformedTralbumDataException,
-    BandcampApiRedirectException,
 } from '../bandcamp/bandcamp-api.exceptions'
-import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
 import { EmailBackendRepository } from '../email/email.backend.repository'
 import { SettingsBackendService } from '../settings.backend.service'
+import { EmailImportPass } from './email-import-pass'
 import { FeedBackendRepository } from './feed.backend.repository'
 
-/**
- * How far before the import checkpoint the next import starts reading. A message can land in the
- * mailbox after a newer one already has (sync lag, a Mac that was offline), and its date received is
- * then older than the checkpoint. Re-reading this window catches it; dedupe keeps the re-read from
- * creating duplicate feed items.
- */
-const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
 const UNPLAYABLE_RELEASE_RECHECK_MS = 1000 * 60 * 5
 const MAX_UNPLAYABLE_RELEASE_CHECKS = 1000
-// Keeps the request gate's background slots filled; the gate owns the network limit.
-const MAX_PARENT_ALBUM_LOOKUPS = 8
-const EMAIL_IMPORT_SAVE_BATCH_SIZE = 50
-const PARENT_ALBUM_LOOKUP_RETRY_MS = [250, 1000]
 
-const createBandcampFeedItem = (
-    email: BandcampEmailFeedSourceItem,
-    releaseUrl: string,
-    purchases: BandcampPurchase[],
-): BandcampFeedItem => ({
-    id: crypto.randomUUID(),
-    type: 'BANDCAMP.TRALBUM',
-    dedupeIdentifier: releaseUrl,
-    ingestedAt: new Date(),
-    eventDate: new Date(email.dateReceived),
-    isSnoozed: false,
-    lastViewedAt: null,
-    data: {
-        tralbumUrl: releaseUrl,
-        tralbumType: releaseUrl.includes('/album/') ? 'album' : 'track',
-        purchases,
-    },
-    source:
-        email.type === 'EMAIL.BANDCAMP_NEW_RELEASE'
-            ? email
-            : {
-                  type: email.type,
-                  messageId: email.messageId,
-                  dateReceived: email.dateReceived,
-                  isRead: email.isRead,
-              },
-})
+/** A release page that could not be loaded becomes the release's error card. Cancellation is rethrown. */
+const toHydrationError = (
+    tralbumUrl: string,
+    error: unknown,
+): BandcampApiException | FetchFailedException => {
+    if (error instanceof BandcampApiException || error instanceof FetchFailedException) {
+        console.log(error)
+        return error
+    }
+    console.error('Failed to load tralbum:', tralbumUrl, error)
+    if (error instanceof Error && error.name !== 'AbortError')
+        return new BandcampApiMalformedTralbumDataException(tralbumUrl, error)
+    throw error
+}
 
 export class FeedBackendService {
     private readonly unplayableReleaseChecks = new Map<string, number>()
@@ -92,290 +46,30 @@ export class FeedBackendService {
         private settingsService: SettingsBackendService,
     ) {}
 
-    private async resolveParentAlbumUrl(releaseUrl: string, signal: AbortSignal): Promise<string> {
-        for (let attempt = 0; ; attempt++) {
-            try {
-                const track = await this.bandcampApiService.scrapeTralbumInfo(releaseUrl, signal, 'import')
-                return track.parentAlbumUrl ?? releaseUrl
-            } catch (error) {
-                if (
-                    error instanceof BandcampApiRedirectException ||
-                    error instanceof BandcampApiMalformedTralbumDataException ||
-                    (error instanceof BandcampApiFailedToFetchTralbumException &&
-                        [404, 410].includes(error.status))
-                )
-                    return releaseUrl
-
-                const retryDelay = PARENT_ALBUM_LOOKUP_RETRY_MS[attempt]
-                const retryable =
-                    error instanceof FetchFailedException ||
-                    (error instanceof BandcampApiFailedToFetchTralbumException &&
-                        [500, 502, 503, 504].includes(error.status))
-                if (signal.aborted || retryDelay === undefined || !retryable) throw error
-                await waitForRetry(retryDelay, undefined, { signal })
-            }
-        }
-    }
-
+    /** Starts one import pass; see {@link EmailImportPass} for its progress and terminal updates. */
     async triggerEmailImport(abortSignal: AbortSignal): Promise<Observable<EmailImportProgress>> {
         console.log('Running email import...')
-
-        const importStartedAt = new Date()
-        let totalProcessed = 0
-        let totalImported = 0
-        let skippedEmails = 0
-        const processingFailure = new AbortController()
-        const workSignal = AbortSignal.any([abortSignal, processingFailure.signal])
-
-        const vendor = 'APPLE_MAIL'
-        const mailboxName = this.emailRepo.getMailboxName(vendor)
-        const checkpoint = mailboxName
-            ? await this.feedBackendRepository.getEmailImportCheckpoint(vendor, mailboxName)
-            : null
-        const receivedSince = checkpoint
-            ? new Date(checkpoint.getTime() - EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS)
-            : null
-        let newestReceivedAt: Date | null = null
-        let terminalUpdate: EmailImportProgress | null = null
-        let totalExported = 0
-        let exportFinished = false
-        const finishingProgress = (): Extract<EmailImportProgress, { phase: 'finishing' }> => ({
-            phase: 'finishing',
-            current: totalProcessed,
-            total: totalExported,
-        })
-        type PendingEmail = {
-            email: BandcampEmailFeedSourceItem | null
-            purchases: BandcampPurchase[]
-        }
-        const pendingEmails: PendingEmail[] = []
-        // A null value reserves a lookup before it reaches the concurrency limit.
-        const parentAlbums = new Map<string, string | null>()
-        const resolveReleaseUrl = (url: string): string | null =>
-            url.includes('/track/') ? (parentAlbums.get(url) ?? null) : url
-        const enqueue = ({ email: rawEmail }: EmailImportStreamPacket): string[] => {
-            if (!rawEmail) {
-                skippedEmails++
-            } else {
-                const receivedAt = new Date(rawEmail.dateReceived)
-                if (receivedAt.getTime() > (newestReceivedAt?.getTime() ?? -Infinity)) {
-                    newestReceivedAt = receivedAt
-                }
-            }
-            const email = rawEmail ? parseBandcampEmail(rawEmail) : null
-            const purchases: BandcampPurchase[] =
-                email?.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC'
-                    ? email.purchases
-                    : email
-                      ? [{ tralbumUrl: email.releaseUrl, fans: [] }]
-                      : []
-            // Skipped and unrelated emails still count, in the same order as the export.
-            pendingEmails.push({ email, purchases })
-            const lookups: string[] = []
-            for (const { tralbumUrl } of purchases) {
-                if (tralbumUrl.includes('/track/') && !parentAlbums.has(tralbumUrl)) {
-                    parentAlbums.set(tralbumUrl, null)
-                    lookups.push(tralbumUrl)
-                }
-            }
-            return lookups
-        }
-        const takeReadyChunks = (): PendingEmail[][] => {
-            if (workSignal.aborted) return []
-            const firstPending = pendingEmails.findIndex(({ purchases }) =>
-                purchases.some(purchase => resolveReleaseUrl(purchase.tralbumUrl) === null),
-            )
-            const readyCount = firstPending === -1 ? pendingEmails.length : firstPending
-            // Batch fast export traffic; after export, show real progress as lookups finish.
-            const count = exportFinished
-                ? readyCount
-                : readyCount - (readyCount % EMAIL_IMPORT_SAVE_BATCH_SIZE)
-            const ready = pendingEmails.splice(0, count)
-            return Array.from({ length: Math.ceil(count / EMAIL_IMPORT_SAVE_BATCH_SIZE) }, (_, index) =>
-                ready.slice(index * EMAIL_IMPORT_SAVE_BATCH_SIZE, (index + 1) * EMAIL_IMPORT_SAVE_BATCH_SIZE),
-            )
-        }
-
-        const emails$ = await this.emailRepo.loadEmails(vendor, workSignal, mailboxName, receivedSince)
-
-        return merge(
-            emails$.pipe(
-                materialize(),
-                map((notification): EmailImportProgress | null => {
-                    if (notification.kind == 'C') {
-                        return totalExported > 0 && !workSignal.aborted ? finishingProgress() : null
-                    }
-                    // The buffered stream reports the final error after export progress drains.
-                    if (notification.kind == 'E') return null
-                    if (notification.kind == 'N') {
-                        totalExported++
-                        return {
-                            phase: 'processing' as const,
-                            current: notification.value.current,
-                            total: notification.value.total,
-                            // @TODO: this needs to be localized
-                            message: notification.value.email?.subject.replace(/�/g, '') ?? '',
-                        }
-                    }
-
-                    return assertUnreachable(notification, 'Unhandled notification kind:')
-                }),
-            ),
-            emails$.pipe(
-                map(enqueue),
-                // Subscribe all three branches before consuming even a synchronous export source.
-                connect(enqueued$ => {
-                    const exportComplete = Symbol('Email export complete')
-                    const resolved$ = enqueued$.pipe(
-                        mergeMap(urls => from(urls)),
-                        mergeMap(
-                            url =>
-                                defer(() => this.resolveParentAlbumUrl(url, workSignal)).pipe(
-                                    tap(albumUrl => parentAlbums.set(url, albumUrl)),
-                                ),
-                            MAX_PARENT_ALBUM_LOOKUPS,
-                        ),
-                    )
-                    return merge(
-                        enqueued$,
-                        resolved$,
-                        enqueued$.pipe(ignoreElements(), endWith(exportComplete)),
-                    ).pipe(
-                        tap(event => {
-                            if (event === exportComplete) exportFinished = true
-                        }),
-                        mergeMap(() => from(takeReadyChunks())),
-                    )
-                }),
-                // A lookup failure waits for any earlier save to settle before it ends the import.
-                materialize(),
-                concatMap(async (notification): Promise<EmailImportProgress | null> => {
-                    if (notification.kind === 'E') throw notification.error
-                    if (notification.kind === 'C') {
-                        if (!workSignal.aborted && pendingEmails.length > 0)
-                            throw new Error('Email import ended with unresolved emails')
-                        return null
-                    }
-                    workSignal.throwIfAborted()
-                    const readyEmails = notification.value
-                    const feedItems: BandcampFeedItem[] = []
-                    for (const { email, purchases } of readyEmails) {
-                        if (!email) continue
-                        const releases = new Map<string, BandcampFeedItem>()
-                        for (const purchase of purchases) {
-                            const releaseUrl = resolveReleaseUrl(purchase.tralbumUrl)
-                            if (releaseUrl === null)
-                                throw new Error(`No release URL was resolved for ${purchase.tralbumUrl}`)
-                            const attribution =
-                                email.type === 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC' ? [purchase] : []
-                            const previous = releases.get(releaseUrl)
-                            if (previous) {
-                                previous.data.purchases = mergeBandcampPurchases(
-                                    previous.data.purchases,
-                                    attribution,
-                                )
-                            } else {
-                                releases.set(
-                                    releaseUrl,
-                                    createBandcampFeedItem(email, releaseUrl, attribution),
-                                )
-                            }
-                        }
-                        feedItems.push(...releases.values())
-                    }
-                    await this.feedBackendRepository.ingestFeedItems(feedItems)
-                    totalImported += feedItems.length
-                    totalProcessed += readyEmails.length
-                    return exportFinished && !workSignal.aborted ? finishingProgress() : null
-                }),
-                materialize(),
-                concatMap(async (notification): Promise<EmailImportProgress | null> => {
-                    if (notification.kind == 'C') {
-                        // A cancelled export completes too, but only a full pass covers the mailbox
-                        if (abortSignal.aborted) return { phase: 'cancelled' as const }
-                        if (mailboxName && newestReceivedAt && skippedEmails === 0) {
-                            // A message dated in the future (a bad server clock) must not hide the
-                            // mail that really arrives before then
-                            const coveredUntil = new Date(
-                                Math.min(newestReceivedAt.getTime(), importStartedAt.getTime()),
-                            )
-                            // The import itself succeeded; without a checkpoint the next one is just slower
-                            await this.feedBackendRepository
-                                .advanceEmailImportCheckpoint(vendor, mailboxName, coveredUntil)
-                                .catch(error =>
-                                    console.error('Failed to save the email import checkpoint:', error),
-                                )
-                        }
-
-                        const newlyImported =
-                            await this.feedBackendRepository.countItemsIngestedAfterDate(importStartedAt)
-
-                        return {
-                            phase: 'completed' as const,
-                            totalProcessed,
-                            totalImported,
-                            newlyImported,
-                            ...(skippedEmails > 0 ? { skippedEmails } : {}),
-                        }
-                    }
-                    if (notification.kind == 'E') {
-                        if (abortSignal.aborted) return { phase: 'cancelled' as const }
-                        processingFailure.abort()
-                        console.error('Error during email import:', notification.error)
-
-                        return {
-                            phase: 'error' as const,
-                            errorMessage:
-                                notification.error instanceof Error
-                                    ? notification.error.message
-                                    : 'Unknown error during email import',
-                        }
-                    }
-                    if (notification.kind == 'N') {
-                        return notification.value
-                    }
-
-                    return assertUnreachable(notification, 'Unhandled notification kind:')
-                }),
-                tap(update => {
-                    if (update && update.phase !== 'finishing') terminalUpdate = update
-                }),
-                filter(update => update?.phase === 'finishing'),
-            ),
-        ).pipe(
-            // A failed lookup can precede the export's final emails. Drain their progress first.
-            concatWith(defer(() => Promise.resolve(terminalUpdate))),
-            filter((update): update is EmailImportProgress => update !== null),
-        )
+        return new EmailImportPass(
+            this.emailRepo,
+            this.feedBackendRepository,
+            this.bandcampApiService,
+            abortSignal,
+        ).start()
     }
 
     // @TODO: error handling
     async hydrateBandcampFeedItem(item: BandcampFeedItem): Promise<HydratedBandcampReleaseFeedItem> {
-        if (!item.data.tralbumUrl) {
+        const { tralbumUrl } = item.data
+        if (!tralbumUrl) {
             console.warn('No tralbum link found:', item)
             return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null)
-        } else {
-            const scrapedData = await this.bandcampApiService
-                .scrapeTralbumInfo(item.data.tralbumUrl)
-                .catch(error => {
-                    if (error instanceof BandcampApiException || error instanceof FetchFailedException) {
-                        console.log(error)
-                        return { isError: true as const, error }
-                    }
-                    console.error('Failed to load tralbum:', item.data.tralbumUrl, error)
-                    if (error instanceof Error && error.name !== 'AbortError')
-                        return {
-                            isError: true as const,
-                            error: new BandcampApiMalformedTralbumDataException(item.data.tralbumUrl, error),
-                        }
-                    throw error
-                })
-
-            if ('isError' in scrapedData)
-                return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, scrapedData.error)
-
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedData, null, null)
         }
+        const tralbum = await this.bandcampApiService
+            .scrapeTralbumInfo(tralbumUrl)
+            .catch((error: unknown) => toHydrationError(tralbumUrl, error))
+        return tralbum instanceof Error
+            ? mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, tralbum)
+            : mapBandcampReleaseFeedItemToHydratedFeedItem(item, tralbum, null, null)
     }
 
     async hydrateFeed(
