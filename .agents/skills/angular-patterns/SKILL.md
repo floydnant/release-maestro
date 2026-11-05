@@ -29,9 +29,10 @@ Anything a template reads, anything derived synchronously, anything a user actio
 `toObservable()` to enter a pipeline from signal state; `toSignal()` to land the result back where the
 template can read it. State in, stream in the middle, signal out.
 
-The worked example is `pages/feed/feed.component.ts`: paginated infinite scroll as
-`toSignal(toObservable(furthestScrolledIndex).pipe(combineLatestWith(...), mergeScan(...)))`. Read it
-before writing a new pipeline in a component.
+The worked example is `pages/feed/feed.component.ts`: scrolling, retries and timers become typed
+actions, merged into `toSignal(merge(...actions).pipe(mergeScan(..., 1)))` so one action changes the
+state at a time. The pure transitions live beside it in `pages/feed/feed-state.ts`. Read both before
+writing a new pipeline in a component.
 
 **Do not subscribe in order to `set()` a signal.** That is the anti-pattern this rule exists to
 prevent, and it is the most common way the convention gets broken — it reintroduces the imperative

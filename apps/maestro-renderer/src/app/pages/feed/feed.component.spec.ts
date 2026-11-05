@@ -370,6 +370,24 @@ describe(FeedComponent.name, () => {
             expect(feedService.reloadFeedItems).toHaveBeenCalledTimes(1)
         })
 
+        it('drops a queued retry once an earlier retry has replaced the failed release', async () => {
+            const broken = failedToLoad(createRelease('broken', []), { message: 'Could not reach Bandcamp' })
+            let resolveReload!: (items: HydratedFeedItem[]) => void
+            feedService.loadFeed.mockResolvedValueOnce([broken])
+            feedService.reloadFeedItems.mockReturnValueOnce(new Promise(resolve => (resolveReload = resolve)))
+            const { feed, settle } = await renderFeed()
+
+            // Both retries name the release that failed; the second queues behind the first.
+            feed.itemRetry$.next(broken)
+            feed.itemRetry$.next(broken)
+            await settle()
+            resolveReload([failedToLoad(createRelease('broken', []), { message: 'Still unreachable' })])
+            await settle()
+
+            expect(feedService.reloadFeedItems).toHaveBeenCalledTimes(1)
+            expect(feed.feedState()?.items[0]?.error?.message).toBe('Still unreachable')
+        })
+
         describe('on a rate limit', () => {
             const now = new Date('2026-10-23T12:00:00.000Z').getTime()
             const retryAt = now + 60_000
