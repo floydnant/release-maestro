@@ -142,11 +142,12 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
     const newRelease = source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' ? source : null
     const sourceLinks = newRelease?.links ?? []
     const releaseType = tralbum?.type ?? data.tralbumType
-    const releaseFans = mergeBandcampFans(
-        ...data.purchases
-            .filter(purchase => purchase.tralbumUrl === data.tralbumUrl)
-            .map(purchase => purchase.fans),
-    )
+    // Purchase attribution: an album's buyers appear on every track, a track's buyers on that track.
+    const fansWhoBought = (url: string | null) =>
+        mergeBandcampFans(
+            ...data.purchases.filter(purchase => purchase.tralbumUrl === url).map(purchase => purchase.fans),
+        )
+    const albumBuyers = fansWhoBought(data.tralbumUrl)
 
     const unsubscribeUrl = sourceLinks.find(isUnsubscribeLink) ?? null
 
@@ -193,15 +194,7 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
                 const trackUrl = track.titleLink
                     ? normalizeBandcampReleaseUrl(track.titleLink, data.tralbumUrl)
                     : null
-                return {
-                    ...track,
-                    fans: mergeBandcampFans(
-                        releaseFans,
-                        ...data.purchases
-                            .filter(purchase => purchase.tralbumUrl === trackUrl)
-                            .map(purchase => purchase.fans),
-                    ),
-                }
+                return { ...track, fans: mergeBandcampFans(albumBuyers, fansWhoBought(trackUrl)) }
             }),
         },
     }
