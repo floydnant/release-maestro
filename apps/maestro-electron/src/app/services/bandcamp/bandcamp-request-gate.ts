@@ -20,6 +20,7 @@ const REQUEST_WINDOW_MS = 5 * 60_000
 const INITIAL_WINDOW_LIMIT = 150
 const MIN_WINDOW_LIMIT = 30
 
+/** Releases an admitted request's slot; null when a cooldown turned a feed or preview request away. */
 type Permit = (() => void) | null
 type WaitingRequest = {
     purpose: BandcampRequestPurpose
@@ -29,7 +30,18 @@ type WaitingRequest = {
     onAbort: () => void
 }
 
-/** Owns admission for all Bandcamp requests. A null permit means the foreground must wait for a cooldown. */
+/**
+ * Owns admission for all Bandcamp requests.
+ *
+ * - Feed requests start at once, up to five at a time. While a feed load holds the foreground, and
+ *   for two seconds after, background work waits.
+ * - Background requests (previews before imports) share four slots, start at least 200 ms apart,
+ *   and follow a short burst budget and a five-minute window. Feed starts count against both.
+ * - A 429 starts a cooldown. Feed and preview requests are refused during it; imports wait. A
+ *   rejection streak also slows background work and lowers the window limit once; clean background
+ *   responses restore the spacing, then the concurrency. Rate-limit epochs keep a burst of late
+ *   responses from counting as several attempts.
+ */
 export class BandcampRequestGate {
     private waiting: WaitingRequest[] = []
     private wakeup: ReturnType<typeof setTimeout> | undefined
@@ -157,66 +169,94 @@ export class BandcampRequestGate {
         return this.requestStarts.filter(start => start > now - REQUEST_WINDOW_MS)
     }
 
+    /** Admits every waiting request the current state allows, then sleeps until the next can start. */
     private pump(): void {
         clearTimeout(this.wakeup)
         this.wakeup = undefined
         const now = Date.now()
         this.requestStarts = this.startsInWindow(now)
-        if (this.cooldown > now) {
-            for (const request of [...this.waiting]) {
-                if (request.purpose !== 'import') this.admit(request, null)
-            }
-        } else {
-            for (const request of [...this.waiting]) {
-                if (request.purpose !== 'feed' || this.activeForeground >= MAX_FOREGROUND_REQUESTS) continue
-                this.activeForeground++
-                this.requestStarts.push(now)
-                // Feed never waits for this budget. Its traffic holds background work back instead.
-                this.budgetFinishAt = Math.min(
-                    Math.max(this.budgetFinishAt, now) + REQUEST_BUDGET_COST_MS,
-                    now + REQUEST_BURST_TOLERANCE_MS + MAX_FEED_BUDGET_DELAY_MS,
-                )
-                this.admit(
-                    request,
-                    this.once(() => {
-                        this.activeForeground--
-                        this.pump()
-                    }),
-                )
-            }
+        if (this.cooldown > now) this.refuseDuringCooldown()
+        else this.admitFeed(now)
+        this.admitBackground(now)
+    }
+
+    /** Feed and preview requests fail fast during a cooldown; only imports wait it out. */
+    private refuseDuringCooldown(): void {
+        for (const request of [...this.waiting]) {
+            if (request.purpose !== 'import') this.admit(request, null)
         }
-        if (this.foregroundLeases || this.activeForeground || this.activeBackground >= this.backgroundLimit)
-            return
-        const next =
-            this.waiting.find(request => request.purpose === 'preview') ??
-            this.waiting.find(request => request.purpose === 'import')
-        if (!next) return
+    }
+
+    /** Feed requests start at once, up to five, without waiting for any budget or background work. */
+    private admitFeed(now: number): void {
+        for (const request of [...this.waiting]) {
+            if (request.purpose !== 'feed' || this.activeForeground >= MAX_FOREGROUND_REQUESTS) continue
+            this.activeForeground++
+            this.requestStarts.push(now)
+            // Feed traffic still spends the budget, which holds background work back instead.
+            this.budgetFinishAt = Math.min(
+                Math.max(this.budgetFinishAt, now) + REQUEST_BUDGET_COST_MS,
+                now + REQUEST_BURST_TOLERANCE_MS + MAX_FEED_BUDGET_DELAY_MS,
+            )
+            this.admit(
+                request,
+                this.once(() => {
+                    this.activeForeground--
+                    this.pump()
+                }),
+            )
+        }
+    }
+
+    /**
+     * Previews, then imports, start while no feed work is active or held and a background slot is
+     * free, each once every pacing constraint allows it. Otherwise the gate wakes up when it does.
+     */
+    private admitBackground(now: number): void {
+        while (
+            !this.foregroundLeases &&
+            !this.activeForeground &&
+            this.activeBackground < this.backgroundLimit
+        ) {
+            const next =
+                this.waiting.find(request => request.purpose === 'preview') ??
+                this.waiting.find(request => request.purpose === 'import')
+            if (!next) return
+            const readyAt = this.backgroundReadyAt()
+            if (readyAt > now) {
+                this.wakeup = setTimeout(() => this.pump(), readyAt - now)
+                return
+            }
+            this.activeBackground++
+            this.requestStarts.push(now)
+            this.budgetFinishAt = Math.max(this.budgetFinishAt, now) + REQUEST_BUDGET_COST_MS
+            this.nextBackgroundAt = now + this.backgroundInterval
+            this.admit(
+                next,
+                this.once(() => {
+                    this.activeBackground--
+                    this.pump()
+                }),
+            )
+            // The next start waits for its paced slot, not for this request's body.
+        }
+    }
+
+    /** The earliest time the next background request may start. */
+    private backgroundReadyAt(): number {
         // Feed may exceed the window limit. Wait for enough starts, not just the oldest, to expire.
         const windowStart = this.requestStarts.at(-this.windowLimit)
-        // Leave the first post-cooldown window for the renderer's automatic foreground retry.
-        const readyAt = Math.max(
+        return Math.max(
+            // Spacing between background starts.
             this.nextBackgroundAt,
+            // The tail after a feed load.
             this.quietUntil,
+            // Leave the first post-cooldown window for the renderer's automatic foreground retry.
             this.cooldown ? this.cooldown + FOREGROUND_QUIET_MS : 0,
+            // The short burst budget.
             this.budgetFinishAt - REQUEST_BURST_TOLERANCE_MS,
+            // The sustained five-minute window.
             windowStart === undefined ? 0 : windowStart + REQUEST_WINDOW_MS,
         )
-        if (readyAt > now) {
-            this.wakeup = setTimeout(() => this.pump(), readyAt - now)
-            return
-        }
-        this.activeBackground++
-        this.requestStarts.push(now)
-        this.budgetFinishAt = Math.max(this.budgetFinishAt, now) + REQUEST_BUDGET_COST_MS
-        this.nextBackgroundAt = now + this.backgroundInterval
-        this.admit(
-            next,
-            this.once(() => {
-                this.activeBackground--
-                this.pump()
-            }),
-        )
-        // Fill remaining slots at the next paced start, without waiting for an earlier body.
-        this.pump()
     }
 }
