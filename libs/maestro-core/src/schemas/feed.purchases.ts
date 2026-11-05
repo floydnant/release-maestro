@@ -15,9 +15,11 @@ export const mergeBandcampPurchases = (
 ): BandcampPurchase[] => {
     const purchases = new Map<string, BandcampPurchase>()
     for (const purchase of [...previous, ...incoming]) {
+        const earlier = purchases.get(purchase.tralbumUrl)
         purchases.set(purchase.tralbumUrl, {
             tralbumUrl: purchase.tralbumUrl,
-            fans: mergeBandcampFans(purchases.get(purchase.tralbumUrl)?.fans ?? [], purchase.fans),
+            title: earlier?.title ?? purchase.title,
+            fans: mergeBandcampFans(earlier?.fans ?? [], purchase.fans),
         })
     }
     return [...purchases.values()]

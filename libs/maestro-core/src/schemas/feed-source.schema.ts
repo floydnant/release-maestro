@@ -8,8 +8,11 @@ export const bandcampFanSchema = z.object({
 })
 export type BandcampFan = z.infer<typeof bandcampFanSchema>
 
+/** A bought album or track and the fans who bought it, as one notification reports them. */
 export const bandcampPurchaseSchema = z.object({
     tralbumUrl: z.string(),
+    /** The title the notification gives the album or track, when it names one. */
+    title: z.string().nullable(),
     fans: bandcampFanSchema.array(),
 })
 export type BandcampPurchase = z.infer<typeof bandcampPurchaseSchema>

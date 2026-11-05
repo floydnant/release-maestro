@@ -51,9 +51,14 @@ describe('parseBandcampEmail', () => {
             dateReceived: fansBoughtMusicEmail.dateReceived,
             isRead: true,
             purchases: [
-                { tralbumUrl: 'https://test.bandcamp.com/album/first', fans: [adamFan] },
+                {
+                    tralbumUrl: 'https://test.bandcamp.com/album/first',
+                    title: 'First Release',
+                    fans: [adamFan],
+                },
                 {
                     tralbumUrl: 'https://other.bandcamp.com/track/second',
+                    title: 'Second Release',
                     fans: [mayaFan, riverFan],
                 },
             ],
