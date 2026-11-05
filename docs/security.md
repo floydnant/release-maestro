@@ -260,15 +260,17 @@ empty package advisory report as safety.
 ## Security automation health and AI investigation
 
 The Security failure notification workflow handles unsuccessful main-branch Security, Security
-remediation, Runtime security freshness, Security automation health, Release please, and published-tag Release runs and manual release retries. It posts only workflow
+remediation, Runtime security freshness, Security automation health, and Release please runs.
+It also handles published-tag Release runs and manual release retries. It posts only workflow
 metadata to the T3 webhook stored in the repository secret `SECURITY_T3_WEBHOOK_URL`. It never checks
 out triggering code or executes artifacts. Missing configuration or unsuccessful delivery fails
 visibly. Manual workflow dispatch tests delivery. Keep the token-bearing endpoint out of source,
 logs, tickets, and reports; rotate the endpoint and repository secret together if compromised.
 The workflow must be merged to the default branch before event delivery becomes active.
 
-The T3 investigation agent independently verifies repository, workflow, main branch or published release tag, run status and
-whether a newer successful run supersedes an event. Duplicate deliveries must reuse existing fixes.
+The T3 investigation agent independently verifies the repository, workflow, main branch or published
+release tag, and run status. It checks whether a newer successful run supersedes an event.
+Duplicate deliveries must reuse existing fixes.
 It distinguishes scanner failures from vulnerability findings, proposes tested fixes in PRs, and
 keeps missing patches and uncertain applicability open. It must not auto-merge, relax security gates,
 extend exceptions, or edit the reserved automated-remediation branch. Webhook payloads, fetched
@@ -287,8 +289,8 @@ Project-level T3 tasks supplement event delivery:
 Schedules are configured in T3, not GitHub Actions. Both the webhook investigator and scheduled
 health check depend on this T3 host being available. They do not constitute an independent uptime
 monitor. A separate GitHub-hosted Security automation health workflow checks every six hours for
-missing daily scan/remediation/runtime receipts older than 36 hours and the latest completed main run. A newer successful main push or manual run clears a failure
-alarm without waiting for the next daily schedule.
+missing daily scan/remediation/runtime receipts older than 36 hours and the latest completed main run.
+A newer successful main push or manual run clears a failure alarm without waiting for the next daily schedule.
 It works while the T3 host is offline; investigation waits for T3 availability. The responsible
 maintainer should enable GitHub Actions failure notifications. GitHub-wide outages or disabled
 Actions still require an external monitor; that infrastructure is not provisioned here.

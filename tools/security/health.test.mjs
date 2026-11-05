@@ -44,5 +44,10 @@ test('recognizes recovery on main while retaining a recent scheduled-run receipt
             .status,
         'unhealthy',
     )
+    assert.equal(
+        workflowHealth({ workflow_runs: [{ created_at: '2026-11-04T00:00:00Z' }] }, recent, repository, now)
+            .status,
+        'unhealthy',
+    )
     assert.throws(() => workflowHealth({}, recent, repository, now), /Invalid GitHub/)
 })

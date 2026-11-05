@@ -36,6 +36,13 @@ test('checks Electron patch freshness without claiming older Chromium lacks back
     assert.equal(assessRuntime({ ...runtime, packageVersion: '42.9.0' }, upstream).status, 'review-required')
 })
 
+test('finds the newest Electron patch without relying on feed order', () => {
+    const runtime = { package: 'electron', packageVersion: '44.9.4', version: '152.0.7977.180' }
+    const assessed = assessRuntime(runtime, { ...upstream, electron: upstream.electron.toReversed() })
+    assert.equal(assessed.status, 'current')
+    assert.equal(assessed.latestPackageVersion, '44.9.4')
+})
+
 test('parses browser declarations as data and rejects changed manifest formats', () => {
     assert.equal(
         declaredBrowsers('puppeteer-core', '1.0.0', () => "chrome: '148.0.7778.97'")[0].version,
@@ -128,6 +135,7 @@ test('writes unknown coverage on network errors and stale feeds; inventories eve
         const missing = await checkRuntimes(options)
         assert.equal(missing.status, 'review-required')
         assert.match(missing.errors[0], /puppeteer-core/)
+        assert.equal(missing.runtimes.length, 3)
     } finally {
         rmSync(directory, { recursive: true, force: true })
     }
