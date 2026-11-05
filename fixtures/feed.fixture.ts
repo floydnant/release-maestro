@@ -1,4 +1,4 @@
-import type { BandcampFan, BandcampFeedItem, Email, ScrapedTralbumInfo } from '@release-maestro/core'
+import type { BandcampFan, Email, FeedItemWithPurchases, ScrapedTralbumInfo } from '@release-maestro/core'
 
 export const adamFan: BandcampFan = {
     name: 'Adam Pits',
@@ -85,7 +85,7 @@ export const groupedFansBoughtMusicEmail: Email = {
     `,
 }
 
-export const fansBoughtMusicFeedItem: BandcampFeedItem = {
+export const fansBoughtMusicFeedItem: FeedItemWithPurchases = {
     id: 'fan-purchase-album',
     type: 'BANDCAMP.TRALBUM',
     dedupeIdentifier: 'https://test.bandcamp.com/album/first',
@@ -96,7 +96,6 @@ export const fansBoughtMusicFeedItem: BandcampFeedItem = {
     data: {
         tralbumUrl: 'https://test.bandcamp.com/album/first',
         tralbumType: 'album',
-        purchases: [{ tralbumUrl: 'https://test.bandcamp.com/album/first', fans: [adamFan] }],
     },
     source: {
         type: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
@@ -104,6 +103,9 @@ export const fansBoughtMusicFeedItem: BandcampFeedItem = {
         dateReceived: fansBoughtMusicEmail.dateReceived,
         isRead: fansBoughtMusicEmail.isRead,
     },
+    purchases: [
+        { tralbumUrl: 'https://test.bandcamp.com/album/first', title: 'First Release', fans: [adamFan] },
+    ],
 }
 
 export const scrapedBandcampAlbum: ScrapedTralbumInfo = {

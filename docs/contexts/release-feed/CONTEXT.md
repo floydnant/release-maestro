@@ -99,13 +99,18 @@ and its fan attribution available.
 
 **Fan**:
 A Bandcamp listener named in a purchase notification. The profile URL identifies the fan; display
-names are not unique. A fan has a display name and may have a profile photo. Track portraits name
-their fans in a tooltip. Above a release, each fan's name links to their Bandcamp profile.
+names are not unique. A fan has a display name and may have a profile photo. The app keeps each fan
+once: a later notification updates the name, and a notification without a photo keeps the known one.
+Track portraits name their fans in a tooltip. Above a release, each fan's name links to their
+Bandcamp profile.
 
 **Purchase attribution**:
 The association between a bought album or track and its fans. Buying an album attributes every
 track to that fan. Buying individual tracks attributes only those tracks, while the album's fan
 list includes everyone involved. Reimporting the same purchase adds no duplicate fans.
+A purchase is recorded once per fan and bought URL, with the title the notification gave it and when
+it was first reported. It belongs to whichever feed item answers to that URL, so it follows the item
+through merges.
 
 **Parent album**:
 The Bandcamp album containing a track. Import reads the track page to resolve its parent album
@@ -201,6 +206,9 @@ item even when a release announcement supplied its source. When track entries co
 album, the first imported entry keeps its identity, source, viewed state and snooze state. The view
 history from every merged entry follows that identity. The same URL with a different feed item
 type would not collapse.
+**Release URLs** are every URL a feed item answers to: its own release, its announcement's release,
+and each URL bought through it. Import finds an existing item through any of them, so a reimported
+track whose page has become unavailable still reaches its known album.
 Bandcamp release URLs use HTTPS and omit tracking queries, fragments and trailing slashes. Links
 served through a custom domain retain their original Bandcamp host for release and track identities.
 Open windows can still mark a merged track as viewed or snoozed through its original ID until they close.

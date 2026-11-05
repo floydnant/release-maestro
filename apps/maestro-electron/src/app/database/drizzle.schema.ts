@@ -62,6 +62,58 @@ export const feedItemsTable = sqliteTable(
     table => [uniqueIndex('feed_item_type_dedupe_identifier_key').on(table.type, table.dedupeIdentifier)],
 )
 
+/**
+ * The normalized release URLs each feed item answers to: its own release, its announcement, and
+ * every URL bought through it. Import finds an existing item through these rows, and purchases reach
+ * their item through them. A URL normally names one item; rows saved by earlier parser versions can
+ * name several until an import merges them.
+ */
+export const feedReleaseUrlsTable = sqliteTable(
+    'feed_release_urls',
+    {
+        url: text('url').notNull(),
+        feedItemId: text('feed_item_id')
+            .notNull()
+            .references(() => feedItemsTable.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    },
+    table => [
+        primaryKey({ columns: [table.url, table.feedItemId] }),
+        index('feed_release_urls_feed_item_id_idx').on(table.feedItemId),
+    ],
+)
+
+/** A Bandcamp listener named in a purchase notification, identified by their profile URL. */
+export const feedFansTable = sqliteTable(
+    'feed_fans',
+    {
+        id: text('id').primaryKey(),
+        profileUrl: text('profile_url').notNull(),
+        name: text('name').notNull(),
+        imageUrl: text('image_url'),
+    },
+    table => [uniqueIndex('feed_fans_profile_url_key').on(table.profileUrl)],
+)
+
+/** A fan bought an album or a track. Each pair is stored once, however many notifications report it. */
+export const feedPurchasesTable = sqliteTable(
+    'feed_purchases',
+    {
+        fanId: text('fan_id')
+            .notNull()
+            .references(() => feedFansTable.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+        /** The normalized URL that was bought; `feed_release_urls` names its feed item. */
+        boughtUrl: text('bought_url').notNull(),
+        /** The title the notification gave the purchase, kept for listings without the release page. */
+        boughtTitle: text('bought_title'),
+        /** When the first notification reporting this purchase was received. */
+        firstReportedAt: integer('first_reported_at', { mode: 'timestamp' }).notNull(),
+    },
+    table => [
+        primaryKey({ columns: [table.fanId, table.boughtUrl] }),
+        index('feed_purchases_bought_url_idx').on(table.boughtUrl),
+    ],
+)
+
 export const feedItemHistoryEntriesTable = sqliteTable('feed_item_history_entries', {
     id: text('id').primaryKey(),
     ts: integer('ts', { mode: 'timestamp' }).notNull(),

@@ -141,7 +141,7 @@ describe('feed hydration playable-track filter', () => {
         const trackUrl = 'https://test.bandcamp.com/track/unavailable'
         const track = bandcampFeedItem('retained', new Date())
         track.dedupeIdentifier = trackUrl
-        track.data = { tralbumUrl: trackUrl, tralbumType: 'track', purchases: [] }
+        track.data = { tralbumUrl: trackUrl, tralbumType: 'track' }
         await repository.ingestFeedItems([track])
         await expect(service.loadFeed(0, 5)).resolves.toEqual([])
 
@@ -151,11 +151,8 @@ describe('feed hydration playable-track filter', () => {
                 ...track,
                 id: 'album',
                 dedupeIdentifier: albumUrl,
-                data: {
-                    tralbumUrl: albumUrl,
-                    tralbumType: 'album',
-                    purchases: [{ tralbumUrl: trackUrl, fans: [] }],
-                },
+                data: { tralbumUrl: albumUrl, tralbumType: 'album' },
+                purchases: [{ tralbumUrl: trackUrl, title: null, fans: [] }],
             },
         ])
         scrape.mockResolvedValue(scrapedRelease(['https://audio.example/preview.mp3']))

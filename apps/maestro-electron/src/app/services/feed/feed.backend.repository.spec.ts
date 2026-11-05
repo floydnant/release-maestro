@@ -1,4 +1,4 @@
-import { BandcampFeedItem, DEFAULT_FEED_SNOOZE_HOURS } from '@release-maestro/core'
+import { DEFAULT_FEED_SNOOZE_HOURS, FeedItemWithPurchases } from '@release-maestro/core'
 // eslint-disable-next-line @nx/enforce-module-boundaries -- Shared synthetic fixtures live in fixtures/, per docs/testing.md.
 import {
     adamFan,
@@ -20,27 +20,21 @@ describe('FeedBackendRepository album purchases', () => {
             try {
                 const repository = new FeedBackendRepository(database.client)
                 const trackUrl = 'https://test.bandcamp.com/track/first-track'
-                const album: BandcampFeedItem = {
+                const album: FeedItemWithPurchases = {
                     ...fansBoughtMusicFeedItem,
-                    data: {
-                        ...fansBoughtMusicFeedItem.data,
-                        purchases: [{ tralbumUrl: trackUrl, fans: [mayaFan] }],
-                    },
+                    purchases: [{ tralbumUrl: trackUrl, title: null, fans: [mayaFan] }],
                 }
                 await repository.ingestFeedItems([album])
                 await repository.markFeedItemViewed(album.id, album.type, isSnoozed)
                 const original = database.db.select().from(feedItemsTable).all()[0]
-                // Start a new repository, so identity comes from persisted purchases, not a run's memo.
+                // Start a new repository, so identity comes from persisted release URLs, not a run's memo.
                 const next = new FeedBackendRepository(database.client)
-                const fallback: BandcampFeedItem = {
+                const fallback: FeedItemWithPurchases = {
                     ...album,
                     id: 'fallback-track',
                     dedupeIdentifier: trackUrl,
-                    data: {
-                        tralbumUrl: trackUrl,
-                        tralbumType: 'track',
-                        purchases: [{ tralbumUrl: trackUrl, fans: [riverFan] }],
-                    },
+                    data: { tralbumUrl: trackUrl, tralbumType: 'track' },
+                    purchases: [{ tralbumUrl: trackUrl, title: null, fans: [riverFan] }],
                 }
                 await next.ingestFeedItems([fallback, { ...fallback, id: 'another-fallback' }])
                 const rows = database.db.select().from(feedItemsTable).all()
@@ -50,12 +44,13 @@ describe('FeedBackendRepository album purchases', () => {
                     dedupeIdentifier: album.dedupeIdentifier,
                     lastViewedAt: original?.lastViewedAt,
                     isSnoozed,
-                    data: {
-                        tralbumUrl: album.data.tralbumUrl,
-                        tralbumType: 'album',
-                        purchases: [{ tralbumUrl: trackUrl, fans: [mayaFan, riverFan] }],
-                    },
+                    data: { tralbumUrl: album.data.tralbumUrl, tralbumType: 'album' },
                 })
+                // Purchases live in their own tables and reach the album through the track's URL.
+                expect(rows[0]?.data).not.toHaveProperty('purchases')
+                expect((await next.getFeedItems([album.id]))[0]?.purchases).toEqual([
+                    { tralbumUrl: trackUrl, title: null, fans: [mayaFan, riverFan] },
+                ])
                 expect(database.db.select().from(feedItemHistoryEntriesTable).all()).toMatchObject([
                     { feedItemId: album.id },
                 ])
@@ -72,7 +67,7 @@ describe('FeedBackendRepository album purchases', () => {
             try {
                 const repository = new FeedBackendRepository(database.client)
                 const purchase = fansBoughtMusicFeedItem
-                const announcement: BandcampFeedItem = {
+                const announcement: FeedItemWithPurchases = {
                     ...purchase,
                     id: 'album-announcement',
                     source: {
@@ -82,7 +77,7 @@ describe('FeedBackendRepository album purchases', () => {
                         releaseType: 'album',
                         links: [],
                     },
-                    data: { ...purchase.data, purchases: [] },
+                    purchases: [],
                 }
                 const items =
                     order === 'announcement first' ? [announcement, purchase] : [purchase, announcement]
@@ -95,7 +90,7 @@ describe('FeedBackendRepository album purchases', () => {
                 expect(stored).toHaveLength(1)
                 expect(stored[0]).toMatchObject({
                     id: items[0]?.id,
-                    data: { purchases: purchase.data.purchases },
+                    purchases: purchase.purchases,
                 })
             } finally {
                 database.sqlite.close()
@@ -142,19 +137,21 @@ describe('FeedBackendRepository album purchases', () => {
         try {
             const repository = new FeedBackendRepository(database.client)
             await repository.ingestFeedItems([fansBoughtMusicFeedItem])
-            const later: BandcampFeedItem = {
+            const later: FeedItemWithPurchases = {
                 ...fansBoughtMusicFeedItem,
                 id: 'later-notification',
-                data: {
-                    ...fansBoughtMusicFeedItem.data,
-                    purchases: [
-                        {
-                            tralbumUrl: fansBoughtMusicFeedItem.data.tralbumUrl,
-                            fans: [{ ...adamFan, imageUrl: null }, mayaFan],
-                        },
-                        { tralbumUrl: 'https://test.bandcamp.com/track/first-track', fans: [riverFan] },
-                    ],
-                },
+                purchases: [
+                    {
+                        tralbumUrl: fansBoughtMusicFeedItem.data.tralbumUrl,
+                        title: 'First Release',
+                        fans: [{ ...adamFan, imageUrl: null }, mayaFan],
+                    },
+                    {
+                        tralbumUrl: 'https://test.bandcamp.com/track/first-track',
+                        title: 'First track',
+                        fans: [riverFan],
+                    },
+                ],
             }
             await repository.ingestFeedItems([later, later])
 
@@ -165,9 +162,17 @@ describe('FeedBackendRepository album purchases', () => {
             })
             expect(items).toHaveLength(1)
             expect(items[0]?.id).toBe(fansBoughtMusicFeedItem.id)
-            expect(items[0]?.data.purchases).toEqual([
-                { tralbumUrl: fansBoughtMusicFeedItem.data.tralbumUrl, fans: [adamFan, mayaFan] },
-                { tralbumUrl: 'https://test.bandcamp.com/track/first-track', fans: [riverFan] },
+            expect(items[0]?.purchases).toEqual([
+                {
+                    tralbumUrl: fansBoughtMusicFeedItem.data.tralbumUrl,
+                    title: 'First Release',
+                    fans: [adamFan, mayaFan],
+                },
+                {
+                    tralbumUrl: 'https://test.bandcamp.com/track/first-track',
+                    title: 'First track',
+                    fans: [riverFan],
+                },
             ])
         } finally {
             database.sqlite.close()
@@ -183,7 +188,7 @@ describe('FeedBackendRepository album purchases', () => {
                 'https://test.bandcamp.com/track/z-earlier',
                 'https://test.bandcamp.com/track/a-later',
             ]
-            const tracks: BandcampFeedItem[] = trackUrls.map((url, index) => ({
+            const tracks: FeedItemWithPurchases[] = trackUrls.map((url, index) => ({
                 ...bandcampFeedItem(`track-${index}`, new Date(Date.UTC(2026, 9, 1))),
                 dedupeIdentifier: url.replace('https:', 'http:'),
                 source: {
@@ -193,11 +198,8 @@ describe('FeedBackendRepository album purchases', () => {
                     releaseType: 'track',
                     links: [],
                 },
-                data: {
-                    tralbumUrl: url,
-                    tralbumType: 'track',
-                    purchases: [{ tralbumUrl: url, fans: [mayaFan] }],
-                },
+                data: { tralbumUrl: url, tralbumType: 'track' },
+                purchases: [{ tralbumUrl: url, title: null, fans: [mayaFan] }],
             }))
             await repository.ingestFeedItems(tracks)
             await repository.markFeedItemViewed('track-0', 'BANDCAMP.TRALBUM', true)
@@ -206,10 +208,7 @@ describe('FeedBackendRepository album purchases', () => {
             await repository.ingestFeedItems([
                 {
                     ...fansBoughtMusicFeedItem,
-                    data: {
-                        ...fansBoughtMusicFeedItem.data,
-                        purchases: trackUrls.map(tralbumUrl => ({ tralbumUrl, fans: [riverFan] })),
-                    },
+                    purchases: trackUrls.map(tralbumUrl => ({ tralbumUrl, title: null, fans: [riverFan] })),
                 },
             ])
 
