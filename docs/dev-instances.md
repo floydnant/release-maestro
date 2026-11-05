@@ -20,10 +20,10 @@ Run these from the worktree whose instance you want to manage.
 | `make dev`                    | Build the host sidecar and start the renderer and Electron under one supervisor.           |
 | `make dev-allocate`           | Reserve a stable bundle without starting the app. Reuses an existing allocation.           |
 | `make dev-status`             | Show this worktree's bundle, slot, holders, claims, age, and health. `JSON=1` prints JSON. |
-| `make dev-list`               | Show all registered development and verification instances. `JSON=1` prints JSON.          |
+| `make dev-list`               | Show registered instances and unregistered worktree processes. `JSON=1` prints JSON.       |
 | `make dev-release`            | Release an idle allocation now. Refuses while holders are live.                            |
 | `make dev-reallocate`         | Give an idle instance a new bundle after a port conflict or a manual override.             |
-| `make dev-stop`               | Stop validated dev processes and orphaned E2E processes owned by this worktree.            |
+| `make dev-stop`               | Stop validated dev processes, direct local Nx dev servers, and orphaned E2E processes.     |
 | `make dev-recover`            | Reset a blocked registry after stopping live processes and inspecting quarantined copies.  |
 | `make dev-log`                | Read lifecycle events. `FOLLOW=1` follows; `JSON=1` prints JSON Lines.                     |
 | `make dev-instance-self-test` | Start two temporary worktrees and verify independent stacks and shutdown.                  |
@@ -66,6 +66,13 @@ the setting for one command. `0` releases an inactive allocation at the next rec
 `RELEASE_MAESTRO_STARTUP_TIMEOUT_MS` sets a deadline for each renderer and Electron startup, including
 listener ownership checks. The default is ten minutes per process. A child exit fails startup immediately.
 
+`make dev` enters the supervisor before launching Nx, so startup and its child processes are visible
+to status and stop commands even while Nx is building dependencies. The Electron launch builds the
+host sidecar before starting the app. The development serve targets intentionally omit Nx's
+`continuous` flag. Nx shares continuous tasks by target ID across invocations, ignoring port
+overrides, which can make a second renderer wait indefinitely for the first. The supervisor owns
+development concurrency and listener readiness instead.
+
 A claim names a mutable resource held by a workflow. `make dev` and Electron E2E use separate
 Electron build outputs, so they can run together in one worktree. Electron E2E and renderer E2E
 can also run together. Two copies of the same mutating E2E target cannot. E2E workflows
@@ -85,6 +92,13 @@ process took a persisted port, stop your dev stack and MCP clients, then run `ma
 Errors and failed log entries appear red in color-capable terminals; JSON output and stored logs stay plain.
 `make dev-stop` is the manual resort for stuck processes in agent terminals and orphaned E2E
 processes. It checks both worktree ownership and process start identity before signaling them.
+On macOS and Linux with `lsof`, status and list commands also discover unregistered TCP listeners
+and direct Nx dev launches in Git worktrees, including ports outside the allocated bundle. These
+appear separately from registered holders as `unmanagedProcesses` in JSON. Discovery has bounded
+command timeouts and reports when it is unavailable, including on Windows. `make dev-stop` can stop
+a direct Nx serve process only when its cwd and local Nx script belong to this worktree and its
+start identity still matches. Other listeners, including preview proxies and editor test servers,
+are reported for manual shutdown. Discovery does not adopt them or change their allocation.
 For a transient port with no verified holder, stop the port owner manually; the claim clears when
 the port is free.
 For an unverified dev listener, `make dev-status` and `make dev-stop` report its port and PID.

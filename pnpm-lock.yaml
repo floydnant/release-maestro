@@ -174,6 +174,9 @@ overrides:
   zod@3.25.76: 4.6.6
   glob@10.5.0: 14.0.2
   glob@13.0.6: 14.0.2
+  minimatch@10.2.5: 11.0.1
+  minimatch@10.2.6: 11.0.1
+  minimatch@9.0.9: 11.0.1
 
 patchedDependencies:
   '@spartan-ng/brain@1.9.0': 2f6af9b84cca39b4b1aee34272c0d29f3ec902883568b64f59105257e48d24f2
@@ -331,8 +334,8 @@ importers:
         specifier: 22.7.12
         version: 22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))
       '@playwright/mcp':
-        specifier: 0.0.83
-        version: 0.0.83
+        specifier: 0.0.84
+        version: 0.0.84
       '@playwright/test':
         specifier: 1.64.1
         version: 1.64.1
@@ -388,8 +391,8 @@ importers:
         specifier: 0.31.11
         version: 0.31.11
       electron:
-        specifier: 45.1.0
-        version: 45.1.0(supports-color@8.1.1)
+        specifier: 45.2.1
+        version: 45.2.1(supports-color@8.1.1)
       electron-builder:
         specifier: 26.18.1
         version: 26.18.1(supports-color@8.1.1)
@@ -437,7 +440,7 @@ importers:
         version: 23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))
       nx-electron:
         specifier: 22.0.0
-        version: 22.0.0(@nx/devkit@22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))))(@nx/workspace@22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23)))(@swc/core@1.16.20(@swc/helpers@0.5.23))(electron@45.1.0(supports-color@8.1.1))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(rxjs@7.8.2)(supports-color@8.1.1)(typescript@6.0.3)(uglify-js@3.19.3)
+        version: 22.0.0(@nx/devkit@22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))))(@nx/workspace@22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23)))(@swc/core@1.16.20(@swc/helpers@0.5.23))(electron@45.2.1(supports-color@8.1.1))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(rxjs@7.8.2)(supports-color@8.1.1)(typescript@6.0.3)(uglify-js@3.19.3)
       playwright:
         specifier: 1.64.1
         version: 1.64.1
@@ -3238,8 +3241,8 @@ packages:
     resolution: {integrity: sha512-SEeaJLb3qBNF/OaXnaR1NmmBbFYk1zC0ZH/52fATcRPLFg/p791YrcyFFy44Bo9sLaGuSuLp5Q6axbb/O+v/RA==}
     engines: {node: ^14.18.0 || >=16.0.0}
 
-  '@playwright/mcp@0.0.83':
-    resolution: {integrity: sha512-oNcl+Ae2/IAjhfPeP46BfIkSakfmprY+aOtkv5MjrQ4lPav4/yNtPhL0iq8SlIM90oApWgBDUxaNKvktazUKOg==}
+  '@playwright/mcp@0.0.84':
+    resolution: {integrity: sha512-weqLrA7/D8MJzNV9/t3Hnjp100tS2sxFXKeb2gH6Nhktqmdfvx5qRA9AZ5Mhjnre1jY0wltsrRK5VZS5NBgcvw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -4962,8 +4965,8 @@ packages:
   electron-to-chromium@1.5.468:
     resolution: {integrity: sha512-8XdEp3sIqO+PzmVPxhzqHq/3+yCxp44m27cm2WY1sRn3ZhwKyKmqSi2hx6gEhmnOXmh8NUuYE00z6Onzn5m6DA==}
 
-  electron@45.1.0:
-    resolution: {integrity: sha512-i7qKVAh/KR5v1pf56NhGGX2QYHcdjvLgS7koL6ui50c+zUDGLRunR95nXcTpHPURKOQ4GDBG8BmXiDgOQ8DD0A==}
+  electron@45.2.1:
+    resolution: {integrity: sha512-t433yuo8Kh8WG/mTStnPRT/NtpWw8A+caNLJgeU0tS/FlfOkeNEntFsac4ViLgDxZOmDe7BeSkOANVqrqNHhDA==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -6368,12 +6371,8 @@ packages:
     resolution: {integrity: sha512-z0yWI+4FDrrweS8Zmt4Ej5HdJmky15+L2e6Wgn3+iK5fWzb6T3fhNFq2+MeTRb064c6Wr4N/wv0DzQTjNzHNGQ==}
     engines: {node: '>=10'}
 
-  minimatch@10.2.5:
-    resolution: {integrity: sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==}
-    engines: {node: 18 || 20 || >=22}
-
-  minimatch@10.2.6:
-    resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
+  minimatch@11.0.1:
+    resolution: {integrity: sha512-t+Vn6DX4wPCxS23y03C0uhF7S1jpi1GfqPrnlEipCJaA2ykiNbMkVlDutZtmvLfRcUN6R8AYVlzTsQrT4RZoLQ==}
     engines: {node: 18 || 20 || >=22}
 
   minimatch@11.0.3:
@@ -6386,10 +6385,6 @@ packages:
   minimatch@5.1.9:
     resolution: {integrity: sha512-7o1wEA2RyMP7Iu7GNba9vc0RWWGACJOCZBJX2GJWip0ikV+wcOsgVuY9uE8CPiyQhkGFSlhuSkZPavN7u1c2Fw==}
     engines: {node: '>=10'}
-
-  minimatch@9.0.9:
-    resolution: {integrity: sha512-OBwBN9AL4dqmETlpS2zasx+vTeWclWzkblfZk7KTA5j3jeOONz/tRCnZomUyvNg83wL5Zv9Ss6HMJXAgL8R2Yg==}
-    engines: {node: '>=16 || 14 >=14.17'}
 
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
@@ -6821,23 +6816,23 @@ packages:
     resolution: {integrity: sha512-V9kOzaItwDgqlryhXysQsAXUEKi5O7kqWUaP3dXI7MLvkPqWWMb4wVb1QAtmEDCKI+XIAINsZoNKMFF7sZb1eg==}
     engines: {node: '>=16.0.0'}
 
-  playwright-core@1.64.0-alpha-1790635538000:
-    resolution: {integrity: sha512-pNwaXirhXMRLaRQs4NQ18EpTdtDoFwyPH9FOaaDC7YXG4hpwE2xmwCic/1srbuExVQC7zT9LJSJpDBAru+Vo9A==}
-    engines: {node: '>=20'}
-    hasBin: true
-
   playwright-core@1.64.1:
     resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==}
     engines: {node: '>=20'}
     hasBin: true
 
-  playwright@1.64.0-alpha-1790635538000:
-    resolution: {integrity: sha512-/5XDUMxpOd/9AojJtWDFIRV3EJZNQ0AwvK69wgt3CPzy8wTgiBG9pX45VfxtqtvIRGwfWzMhrvawNKreG69Snw==}
+  playwright-core@1.65.0-alpha-2026-10-30:
+    resolution: {integrity: sha512-LPMw8B/HRQKMcJeXTqWSrkB/AfCKKmbDQMbu0p7zg8MgibOWaKMjZWR/StAtrQkOxvOmZEju1o1TnPgdoOCwrg==}
     engines: {node: '>=20'}
     hasBin: true
 
   playwright@1.64.1:
     resolution: {integrity: sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.65.0-alpha-2026-10-30:
+    resolution: {integrity: sha512-dmAJMVHKzHvMQjn+XDcaq/pxaZ0W6n8i78rwTM+VGRtQ3WBF5ZiSdB1yL/cyoYUGUMwg3jxN65KqC9cERaCbIg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -9548,7 +9543,7 @@ snapshots:
       debug: 4.4.3(supports-color@8.1.1)
       dir-compare: 4.2.0
       fs-extra: 11.4.1
-      minimatch: 9.0.9
+      minimatch: 11.0.1
       plist: 3.1.0
     transitivePeerDependencies:
       - supports-color
@@ -9896,7 +9891,7 @@ snapshots:
     dependencies:
       '@eslint/object-schema': 3.0.5
       debug: 4.4.3(supports-color@8.1.1)
-      minimatch: 10.2.6
+      minimatch: 11.0.1
     transitivePeerDependencies:
       - supports-color
 
@@ -10623,7 +10618,7 @@ snapshots:
       '@zkochan/js-yaml': 0.0.7
       ejs: 5.0.1
       enquirer: 2.3.6
-      minimatch: 10.2.5
+      minimatch: 11.0.1
       nx: 22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))
       semver: 7.8.5
       tslib: 2.8.1
@@ -10634,7 +10629,7 @@ snapshots:
       '@zkochan/js-yaml': 0.0.7
       ejs: 5.0.1
       enquirer: 2.3.6
-      minimatch: 10.2.5
+      minimatch: 11.0.1
       nx: 23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))
       semver: 7.8.5
       tslib: 2.8.1
@@ -10696,7 +10691,7 @@ snapshots:
       jest-config: 30.5.2(@types/node@24.19.2)(babel-plugin-macros@3.1.0)(supports-color@8.1.1)(ts-node@10.9.2(@swc/core@1.16.20(@swc/helpers@0.5.23))(@types/node@24.19.2)(typescript@6.0.3))
       jest-resolve: 30.5.1
       jest-util: 30.5.1
-      minimatch: 10.2.5
+      minimatch: 11.0.1
       picocolors: 1.1.1
       resolve.exports: 2.0.3
       semver: 7.8.5
@@ -10816,7 +10811,7 @@ snapshots:
       '@nx/devkit': 22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23)))
       '@nx/eslint': 22.7.12(fca138c5c8ec85aadb845fd11d9a0259)
       '@nx/js': 22.7.12(@babel/traverse@7.29.12(supports-color@8.1.1))(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23)))(supports-color@8.1.1)
-      minimatch: 10.2.5
+      minimatch: 11.0.1
       tslib: 2.8.1
     optionalDependencies:
       '@playwright/test': 1.64.1
@@ -11082,10 +11077,10 @@ snapshots:
 
   '@pkgr/core@0.3.6': {}
 
-  '@playwright/mcp@0.0.83':
+  '@playwright/mcp@0.0.84':
     dependencies:
-      playwright: 1.64.0-alpha-1790635538000
-      playwright-core: 1.64.0-alpha-1790635538000
+      playwright: 1.65.0-alpha-2026-10-30
+      playwright-core: 1.65.0-alpha-2026-10-30
 
   '@playwright/test@1.64.1':
     dependencies:
@@ -11556,7 +11551,7 @@ snapshots:
       '@typescript-eslint/types': 8.72.1
       '@typescript-eslint/visitor-keys': 8.72.1
       debug: 4.4.3(supports-color@8.1.1)
-      minimatch: 10.2.6
+      minimatch: 11.0.1
       semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@6.0.3)
@@ -11879,7 +11874,7 @@ snapshots:
       js-yaml: 4.3.2
       json5: 2.2.3
       lazy-val: 1.0.5
-      minimatch: 10.2.6
+      minimatch: 11.0.1
       pkijs: 3.4.3
       plist: 3.1.0
       proper-lockfile: 4.1.2
@@ -12787,7 +12782,7 @@ snapshots:
 
   electron-to-chromium@1.5.468: {}
 
-  electron@45.1.0(supports-color@8.1.1):
+  electron@45.2.1(supports-color@8.1.1):
     dependencies:
       '@electron-internal/extract-zip': 1.0.8
       '@electron/get': 5.1.0(supports-color@8.1.1)
@@ -13061,7 +13056,7 @@ snapshots:
       imurmurhash: 0.1.4
       is-glob: 4.0.3
       json-stable-stringify-without-jsonify: 1.0.1
-      minimatch: 10.2.6
+      minimatch: 11.0.1
       natural-compare: 1.4.0
       optionator: 0.9.4
     optionalDependencies:
@@ -14492,12 +14487,9 @@ snapshots:
 
   mimic-response@3.1.0: {}
 
-  minimatch@10.2.5:
+  minimatch@11.0.1:
     dependencies:
-      brace-expansion: 5.0.12
-
-  minimatch@10.2.6:
-    dependencies:
+      '@isaacs/nonrecursive-glob-match': 1.0.3
       brace-expansion: 5.0.12
 
   minimatch@11.0.3:
@@ -14510,10 +14502,6 @@ snapshots:
       brace-expansion: 1.1.21
 
   minimatch@5.1.9:
-    dependencies:
-      brace-expansion: 2.1.7
-
-  minimatch@9.0.9:
     dependencies:
       brace-expansion: 2.1.7
 
@@ -14661,12 +14649,12 @@ snapshots:
 
   nwsapi@2.2.28: {}
 
-  nx-electron@22.0.0(@nx/devkit@22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))))(@nx/workspace@22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23)))(@swc/core@1.16.20(@swc/helpers@0.5.23))(electron@45.1.0(supports-color@8.1.1))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(rxjs@7.8.2)(supports-color@8.1.1)(typescript@6.0.3)(uglify-js@3.19.3):
+  nx-electron@22.0.0(@nx/devkit@22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))))(@nx/workspace@22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23)))(@swc/core@1.16.20(@swc/helpers@0.5.23))(electron@45.2.1(supports-color@8.1.1))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(rxjs@7.8.2)(supports-color@8.1.1)(typescript@6.0.3)(uglify-js@3.19.3):
     dependencies:
       '@nx/devkit': 22.7.12(nx@23.3.0(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23)))
       '@nx/workspace': 22.7.12(@swc-node/register@1.12.1(@swc/core@1.16.20(@swc/helpers@0.5.23))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@6.0.3))(@swc/core@1.16.20(@swc/helpers@0.5.23))
       copy-webpack-plugin: 12.0.2(webpack@5.112.2(@swc/core@1.16.20(@swc/helpers@0.5.23))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(uglify-js@3.19.3))
-      electron: 45.1.0(supports-color@8.1.1)
+      electron: 45.2.1(supports-color@8.1.1)
       electron-builder: 26.18.1(supports-color@8.1.1)
       fork-ts-checker-webpack-plugin: 9.1.0(typescript@6.0.3)(webpack@5.112.2(@swc/core@1.16.20(@swc/helpers@0.5.23))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(uglify-js@3.19.3))
       license-webpack-plugin: 4.0.2(webpack@5.112.2(@swc/core@1.16.20(@swc/helpers@0.5.23))(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(uglify-js@3.19.3))
@@ -14781,7 +14769,7 @@ snapshots:
       mime-db: 1.52.0
       mime-types: 2.1.35
       mimic-fn: 2.1.0
-      minimatch: 10.2.5
+      minimatch: 11.0.1
       minimist: 1.2.8
       ms: 2.1.3
       npm-run-path: 4.0.1
@@ -14893,7 +14881,7 @@ snapshots:
       lines-and-columns: 2.0.3
       log-symbols: 4.1.0
       mimic-fn: 2.1.0
-      minimatch: 10.2.5
+      minimatch: 11.0.1
       minimist: 1.2.8
       npm-run-path: 4.0.1
       once: 1.4.0
@@ -15230,17 +15218,17 @@ snapshots:
       pvutils: 1.2.0
       tslib: 2.8.1
 
-  playwright-core@1.64.0-alpha-1790635538000: {}
-
   playwright-core@1.64.1: {}
 
-  playwright@1.64.0-alpha-1790635538000:
-    dependencies:
-      playwright-core: 1.64.0-alpha-1790635538000
+  playwright-core@1.65.0-alpha-2026-10-30: {}
 
   playwright@1.64.1:
     dependencies:
       playwright-core: 1.64.1
+
+  playwright@1.65.0-alpha-2026-10-30:
+    dependencies:
+      playwright-core: 1.65.0-alpha-2026-10-30
 
   plist@3.1.0:
     dependencies:
@@ -16076,7 +16064,7 @@ snapshots:
     dependencies:
       '@istanbuljs/schema': 0.1.6
       glob: 14.0.2
-      minimatch: 10.2.5
+      minimatch: 11.0.1
 
   text-decoder@1.2.7:
     dependencies:
