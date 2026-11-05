@@ -57,7 +57,7 @@
         "@ngx-translate/http-loader": "18.1.0",
         "@nx/devkit": "22.7.12",
         "@nx/eslint": "22.7.12",
-        "@nx/eslint-plugin": "22.7.12",
+        "@nx/eslint-plugin": "24.0.3",
         "@nx/jest": "22.7.12",
         "@nx/js": "22.7.12",
         "@nx/playwright": "22.7.12",
