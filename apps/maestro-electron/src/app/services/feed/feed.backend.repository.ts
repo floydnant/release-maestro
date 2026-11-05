@@ -19,6 +19,75 @@ import {
  */
 const FEED_VIEW_HISTORY_THROTTLE_TIME_MS = 1000 * 60 * 3
 
+/**
+ * Which stored feed items answer to each release URL, per feed item type. An item answers to its
+ * dedupe identifier, its release URL, every URL bought through it, and its announcement's release
+ * URL. URLs are normalized, so rows saved by earlier parser versions with HTTP, tracking queries or
+ * trailing slashes still match.
+ */
+class FeedItemIdentities {
+    private readonly idsByIdentity = new Map<string, Set<string>>()
+
+    constructor(items: FeedItemMaster[]) {
+        for (const item of items) this.add(item)
+    }
+
+    /** Stored items that share any identity with this item. */
+    matching(item: FeedItemMaster): string[] {
+        return [...new Set(this.keys(item).flatMap(key => [...(this.idsByIdentity.get(key) ?? [])]))]
+    }
+
+    add(item: FeedItemMaster): void {
+        for (const key of this.keys(item)) {
+            const ids = this.idsByIdentity.get(key) ?? new Set<string>()
+            ids.add(item.id)
+            this.idsByIdentity.set(key, ids)
+        }
+    }
+
+    remove(item: FeedItemMaster): void {
+        for (const key of this.keys(item)) this.idsByIdentity.get(key)?.delete(item.id)
+    }
+
+    private keys(item: FeedItemMaster): string[] {
+        const urls = [
+            item.dedupeIdentifier,
+            item.data.tralbumUrl,
+            ...item.data.purchases.map(purchase => purchase.tralbumUrl),
+            ...(item.source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' ? [item.source.releaseUrl] : []),
+        ]
+        return urls.map(url => `${item.type}:${normalizeBandcampReleaseUrl(url) ?? url}`)
+    }
+}
+
+/**
+ * The oldest matching item, after absorbing the other matches and the incoming item. It keeps its
+ * own ID, source, viewed and snoozed state. Its release is the album whenever the incoming item or
+ * a match names one, so an unavailable track page on reimport cannot undo a known album. The
+ * purchases of all of them merge, which adds each fan once.
+ */
+const mergeIntoRetained = (
+    [retained, ...absorbed]: [FeedItemMaster, ...FeedItemMaster[]],
+    incoming: FeedItemMaster,
+): FeedItemMaster => {
+    const matches = [retained, ...absorbed]
+    const release =
+        incoming.data.tralbumType === 'album'
+            ? incoming
+            : (matches.find(item => item.data.tralbumType === 'album') ?? incoming)
+    return {
+        ...retained,
+        dedupeIdentifier: release.dedupeIdentifier,
+        data: {
+            ...release.data,
+            purchases: mergeBandcampPurchases(
+                matches.flatMap(item => item.data.purchases),
+                incoming.data.purchases,
+            ),
+        },
+    }
+}
+
 export class FeedBackendRepository {
     // Open renderer windows can still write to track IDs collapsed during this app session.
     private readonly mergedItemIds = new Map<string, string>()
@@ -31,96 +100,67 @@ export class FeedBackendRepository {
         return current
     }
 
+    /**
+     * Saves imported items. An item that shares a release with stored items merges into the oldest
+     * of them (see {@link mergeIntoRetained}); the others are deleted after their view history moves
+     * to the retained item, and their IDs stay addressable as aliases.
+     */
     async ingestFeedItems(feedItemsToIngest: FeedItemMaster[]) {
         if (feedItemsToIngest.length == 0) return
 
-        const mergedItems = new Map<string, string>()
+        const aliases = new Map<string, string>()
         this.db.db.transaction(tx => {
-            // Index normalized identities once per batch. Existing announcements can still carry
-            // HTTP, tracking fragments or trailing slashes from earlier parser versions.
-            const identities = new Map<string, Set<string>>()
-            const identityKey = (type: string, url: string) =>
-                `${type}:${normalizeBandcampReleaseUrl(url) ?? url}`
-            const rememberIdentity = (id: string, type: string, url: string) => {
-                const key = identityKey(type, url)
-                const ids = identities.get(key) ?? new Set<string>()
-                ids.add(id)
-                identities.set(key, ids)
-            }
-            const identityUrls = (item: FeedItemMaster): string[] => [
-                item.dedupeIdentifier,
-                item.data.tralbumUrl,
-                ...item.data.purchases.map(purchase => purchase.tralbumUrl),
-                ...(item.source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' ? [item.source.releaseUrl] : []),
-            ]
-            const rememberItem = (item: FeedItemMaster) => {
-                for (const url of identityUrls(item)) rememberIdentity(item.id, item.type, url)
-            }
-            for (const item of tx
-                .select()
-                .from(feedItemsTable)
-                .all()
-                .map(row => feedItemMasterSchema.parse(row))) {
-                rememberItem(item)
-            }
-            for (const incoming of feedItemsToIngest) {
-                const urls = identityUrls(incoming)
-                const ids = [
-                    ...new Set(
-                        urls.flatMap(url => [...(identities.get(identityKey(incoming.type, url)) ?? [])]),
-                    ),
-                ]
-                const existing = tx
+            const identities = new FeedItemIdentities(
+                tx
                     .select()
                     .from(feedItemsTable)
-                    .where(and(eq(feedItemsTable.type, incoming.type), inArray(feedItemsTable.id, ids)))
+                    .all()
+                    .map(row => feedItemMasterSchema.parse(row)),
+            )
+
+            for (const incoming of feedItemsToIngest) {
+                const [retained, ...absorbed] = tx
+                    .select()
+                    .from(feedItemsTable)
+                    .where(
+                        and(
+                            eq(feedItemsTable.type, incoming.type),
+                            inArray(feedItemsTable.id, identities.matching(incoming)),
+                        ),
+                    )
                     .orderBy(asc(feedItemsTable.ingestedAt), sql`rowid`)
                     .all()
                     .map(row => feedItemMasterSchema.parse(row))
-                const retained = existing[0]
                 if (!retained) {
                     tx.insert(feedItemsTable).values(incoming).run()
-                    rememberItem(incoming)
+                    identities.add(incoming)
                     continue
                 }
-                for (const item of existing) {
-                    for (const url of identityUrls(item))
-                        identities.get(identityKey(item.type, url))?.delete(item.id)
-                }
-                const mergedIds = existing.slice(1).map(item => item.id)
-                if (mergedIds.length) {
+
+                const merged = mergeIntoRetained([retained, ...absorbed], incoming)
+                for (const item of [retained, ...absorbed]) identities.remove(item)
+                if (absorbed.length > 0) {
+                    const absorbedIds = absorbed.map(item => item.id)
                     tx.update(feedItemHistoryEntriesTable)
                         .set({ feedItemId: retained.id })
-                        .where(inArray(feedItemHistoryEntriesTable.feedItemId, mergedIds))
+                        .where(inArray(feedItemHistoryEntriesTable.feedItemId, absorbedIds))
                         .run()
-                    tx.delete(feedItemsTable).where(inArray(feedItemsTable.id, mergedIds)).run()
-                    for (const id of mergedIds) mergedItems.set(id, retained.id)
-                }
-                // A missing track page on reimport cannot undo an album relationship already saved.
-                const release =
-                    incoming.data.tralbumType === 'album'
-                        ? incoming
-                        : (existing.find(item => item.data.tralbumType === 'album') ?? incoming)
-                const data = {
-                    ...release.data,
-                    purchases: mergeBandcampPurchases(
-                        existing.flatMap(item => item.data.purchases),
-                        incoming.data.purchases,
-                    ),
+                    tx.delete(feedItemsTable).where(inArray(feedItemsTable.id, absorbedIds)).run()
+                    for (const id of absorbedIds) aliases.set(id, retained.id)
                 }
                 tx.update(feedItemsTable)
                     .set({
-                        dedupeIdentifier: release.dedupeIdentifier,
-                        source: retained.source,
-                        data,
+                        dedupeIdentifier: merged.dedupeIdentifier,
+                        source: merged.source,
+                        data: merged.data,
                     })
                     .where(eq(feedItemsTable.id, retained.id))
                     .run()
-                rememberItem({ ...retained, dedupeIdentifier: release.dedupeIdentifier, data })
+                identities.add(merged)
             }
         })
         // Publish aliases only after the transaction commits.
-        for (const [id, retainedId] of mergedItems) this.mergedItemIds.set(id, retainedId)
+        for (const [id, retainedId] of aliases) this.mergedItemIds.set(id, retainedId)
     }
 
     async listFeedItems({
