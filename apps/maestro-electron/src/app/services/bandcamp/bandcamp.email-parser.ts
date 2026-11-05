@@ -82,8 +82,10 @@ export const parseBandcampEmail = (email: Email): BandcampEmailFeedSourceItem | 
         const purchases: BandcampPurchase[] = []
         $('.item-tralbum-text').each((_, element) => {
             const item = $(element)
-            const tralbumUrl = canonicalBandcampReleaseUrl(item.children('a[href]').first().attr('href'))
+            const releaseLink = item.children('a[href]').first()
+            const tralbumUrl = canonicalBandcampReleaseUrl(releaseLink.attr('href'))
             if (!tralbumUrl) return
+            const title = releaseLink.text().replace(/\s+/g, ' ').trim() || null
 
             const fans = new Map<string, BandcampFan>()
             item.find('.bought-by a[href]').each((_, link) => {
@@ -100,14 +102,14 @@ export const parseBandcampEmail = (email: Email): BandcampEmailFeedSourceItem | 
                     fan.imageUrl = imageUrl.href
                 }
             })
-            purchases.push({ tralbumUrl, fans: [...fans.values()] })
+            purchases.push({ tralbumUrl, title, fans: [...fans.values()] })
         })
 
         return {
             ...email,
             type: 'EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC',
             purchases: mergeBandcampPurchases(
-                tralbumUrls.map(tralbumUrl => ({ tralbumUrl, fans: [] })),
+                tralbumUrls.map(tralbumUrl => ({ tralbumUrl, title: null, fans: [] })),
                 purchases,
             ),
         }

@@ -1,5 +1,5 @@
 import { ScrapedTralbumInfo } from './bandcamp-api.schema'
-import { BandcampFeedItem, HydratedBandcampReleaseFeedItem } from './feed.schema'
+import { FeedItemWithPurchases, HydratedBandcampReleaseFeedItem } from './feed.schema'
 import { ScrapedLinkMetadata } from './web-scraping.schema'
 import { mergeBandcampFans } from './feed.purchases'
 import { normalizeBandcampReleaseUrl } from '../utils/bandcamp-release-url'
@@ -134,7 +134,7 @@ const renderEmailAbout = (plainBody: string, unsubscribeLink: string | null, rel
 }
 
 export function mapBandcampReleaseFeedItemToHydratedFeedItem(
-    { data, source, ...item }: Extract<BandcampFeedItem, { type: 'BANDCAMP.TRALBUM' }>,
+    { data, source, purchases, ...item }: Extract<FeedItemWithPurchases, { type: 'BANDCAMP.TRALBUM' }>,
     tralbum: ScrapedTralbumInfo | null,
     linkMetadataMap: Record<string, ScrapedLinkMetadata | null> | null,
     error: { userFacingMessage: string; retryAt?: Date } | null,
@@ -145,7 +145,7 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
     // Purchase attribution: an album's buyers appear on every track, a track's buyers on that track.
     const fansWhoBought = (url: string | null) =>
         mergeBandcampFans(
-            ...data.purchases.filter(purchase => purchase.tralbumUrl === url).map(purchase => purchase.fans),
+            ...purchases.filter(purchase => purchase.tralbumUrl === url).map(purchase => purchase.fans),
         )
     const albumBuyers = fansWhoBought(data.tralbumUrl)
 
@@ -166,7 +166,7 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
             emailReceivedAt: new Date(source.dateReceived),
             isEmailRead: source.isRead,
             emailId: source.messageId,
-            fans: mergeBandcampFans(...data.purchases.map(purchase => purchase.fans)),
+            fans: mergeBandcampFans(...purchases.map(purchase => purchase.fans)),
             releaseName: tralbum?.title || newRelease?.subject || data.tralbumUrl,
             band: tralbum?.band || null,
             artist: tralbum?.artist || null,

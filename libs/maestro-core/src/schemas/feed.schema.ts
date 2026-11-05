@@ -3,8 +3,8 @@ import { CalendarDay } from './calendar-day.schema'
 import {
     bandcampEmailFansBoughtMusicFeedSourceItemSchema,
     bandcampEmailNewReleaseFeedSourceItemSchema,
-    bandcampPurchaseSchema,
     BandcampFan,
+    BandcampPurchase,
 } from './feed-source.schema'
 import { BandData, ScrapedTralbumInfo } from './bandcamp-api.schema'
 
@@ -37,7 +37,6 @@ export const bandcampTralbumFeedItem = feedItemBaseSchema.extend({
     data: z.object({
         tralbumUrl: z.string(),
         tralbumType: z.enum(['album', 'track']),
-        purchases: bandcampPurchaseSchema.array().default([]),
     }),
     source: z.discriminatedUnion('type', [
         bandcampEmailNewReleaseFeedSourceItemSchema,
@@ -53,6 +52,12 @@ export type BandcampFeedItem = z.infer<typeof bandcampTralbumFeedItem>
 
 export const feedItemMasterSchema = z.discriminatedUnion('type', [bandcampTralbumFeedItem])
 export type FeedItemMaster = z.infer<typeof feedItemMasterSchema>
+
+/**
+ * A feed item with the purchases that name its release URLs. Purchases and their fans live in their
+ * own tables, not in the item's `data`; the feed repository joins them on read and splits them on write.
+ */
+export type FeedItemWithPurchases = FeedItemMaster & { purchases: BandcampPurchase[] }
 
 ////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////// HYDRATED ///////////////////////////////////

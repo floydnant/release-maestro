@@ -1,6 +1,6 @@
 import {
-    BandcampFeedItem,
     EmailImportProgress,
+    FeedItemWithPurchases,
     FetchFailedException,
     HydratedBandcampReleaseFeedItem,
     HydratedFeedItem,
@@ -58,7 +58,7 @@ export class FeedBackendService {
     }
 
     // @TODO: error handling
-    async hydrateBandcampFeedItem(item: BandcampFeedItem): Promise<HydratedBandcampReleaseFeedItem> {
+    async hydrateBandcampFeedItem(item: FeedItemWithPurchases): Promise<HydratedBandcampReleaseFeedItem> {
         const { tralbumUrl } = item.data
         if (!tralbumUrl) {
             console.warn('No tralbum link found:', item)
@@ -73,7 +73,7 @@ export class FeedBackendService {
     }
 
     async hydrateFeed(
-        items: BandcampFeedItem[],
+        items: FeedItemWithPurchases[],
         hideUnplayableReleases = resolveFeedSettings(this.settingsService.getSettings().feed)
             .hideUnplayableReleases,
     ): Promise<HydratedFeedItem[]> {

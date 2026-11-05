@@ -1,4 +1,4 @@
-import { BandcampEmailFeedSourceItem, BandcampFeedItem, BandcampPurchase } from '@release-maestro/core'
+import { BandcampEmailFeedSourceItem, BandcampPurchase, FeedItemWithPurchases } from '@release-maestro/core'
 
 /** Emails saved together while the export is still running. */
 export const EMAIL_IMPORT_SAVE_BATCH_SIZE = 50
@@ -7,7 +7,7 @@ export const EMAIL_IMPORT_SAVE_BATCH_SIZE = 50
 export type EmailSaveBatch = {
     /** Exported emails in the batch, including skipped and unrelated ones that produce no items. */
     emailCount: number
-    feedItems: BandcampFeedItem[]
+    feedItems: FeedItemWithPurchases[]
 }
 
 const isTrackUrl = (url: string) => url.includes('/track/')
@@ -16,7 +16,7 @@ const createBandcampFeedItem = (
     email: BandcampEmailFeedSourceItem,
     releaseUrl: string,
     purchases: BandcampPurchase[],
-): BandcampFeedItem => ({
+): FeedItemWithPurchases => ({
     id: crypto.randomUUID(),
     type: 'BANDCAMP.TRALBUM',
     dedupeIdentifier: releaseUrl,
@@ -27,8 +27,8 @@ const createBandcampFeedItem = (
     data: {
         tralbumUrl: releaseUrl,
         tralbumType: releaseUrl.includes('/album/') ? 'album' : 'track',
-        purchases,
     },
+    purchases,
     source:
         email.type === 'EMAIL.BANDCAMP_NEW_RELEASE'
             ? email
@@ -50,7 +50,7 @@ const createBandcampFeedItem = (
 const feedItemsForEmail = (
     email: BandcampEmailFeedSourceItem,
     releaseUrlOf: (url: string) => string | undefined,
-): BandcampFeedItem[] | null => {
+): FeedItemWithPurchases[] | null => {
     if (email.type === 'EMAIL.BANDCAMP_NEW_RELEASE') {
         const releaseUrl = releaseUrlOf(email.releaseUrl)
         return releaseUrl === undefined ? null : [createBandcampFeedItem(email, releaseUrl, [])]
@@ -80,7 +80,7 @@ export class EmailImportQueue {
     /** Not yet ready, in export order: the first waits for a parent album, the rest wait behind it. */
     private readonly waiting: (BandcampEmailFeedSourceItem | null)[] = []
     /** Ready to save, in export order: each email's feed items. */
-    private readonly ready: BandcampFeedItem[][] = []
+    private readonly ready: FeedItemWithPurchases[][] = []
     /** The release each bought or announced track belongs to; null while its lookup runs. */
     private readonly trackReleases = new Map<string, string | null>()
 

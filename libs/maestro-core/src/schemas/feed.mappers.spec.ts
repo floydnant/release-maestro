@@ -9,10 +9,10 @@ import {
     scrapedGroupedAlbum,
 } from '../../../../fixtures/feed.fixture'
 import { ScrapedTralbumInfo } from './bandcamp-api.schema'
-import { BandcampFeedItem } from './feed.schema'
+import { FeedItemWithPurchases } from './feed.schema'
 import { isUsefulUrlFromBandcampEmail, mapBandcampReleaseFeedItemToHydratedFeedItem } from './feed.mappers'
 
-const release = (plainBody: string, links: string[] = []): BandcampFeedItem => ({
+const release = (plainBody: string, links: string[] = []): FeedItemWithPurchases => ({
     id: 'release',
     ingestedAt: new Date('2026-01-01'),
     eventDate: new Date('2026-01-01'),
@@ -20,7 +20,7 @@ const release = (plainBody: string, links: string[] = []): BandcampFeedItem => (
     lastViewedAt: null,
     dedupeIdentifier: 'release',
     type: 'BANDCAMP.TRALBUM',
-    data: { tralbumUrl: 'https://artist.bandcamp.com/album/release', tralbumType: 'album', purchases: [] },
+    data: { tralbumUrl: 'https://artist.bandcamp.com/album/release', tralbumType: 'album' },
     source: {
         type: 'EMAIL.BANDCAMP_NEW_RELEASE',
         vendor: 'APPLE_MAIL',
@@ -35,6 +35,7 @@ const release = (plainBody: string, links: string[] = []): BandcampFeedItem => (
         releaseUrl: 'https://artist.bandcamp.com/album/release',
         links,
     },
+    purchases: [],
 })
 const tralbum = (about: string): ScrapedTralbumInfo => ({
     title: 'Release',
@@ -121,16 +122,17 @@ it('escapes email text and URL attributes before rendering generated HTML', () =
 
 describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
     it('applies album buyers to every track and keeps track buyers specific', () => {
-        const item: BandcampFeedItem = {
+        const item: FeedItemWithPurchases = {
             ...fansBoughtMusicFeedItem,
-            data: {
-                ...fansBoughtMusicFeedItem.data,
-                purchases: [
-                    { tralbumUrl: fansBoughtMusicFeedItem.data.tralbumUrl, fans: [adamFan] },
-                    { tralbumUrl: 'https://test.bandcamp.com/track/first-track', fans: [mayaFan, riverFan] },
-                    { tralbumUrl: 'https://test.bandcamp.com/track/second-track', fans: [mayaFan] },
-                ],
-            },
+            purchases: [
+                { tralbumUrl: fansBoughtMusicFeedItem.data.tralbumUrl, title: null, fans: [adamFan] },
+                {
+                    tralbumUrl: 'https://test.bandcamp.com/track/first-track',
+                    title: null,
+                    fans: [mayaFan, riverFan],
+                },
+                { tralbumUrl: 'https://test.bandcamp.com/track/second-track', title: null, fans: [mayaFan] },
+            ],
         }
         const result = mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedGroupedAlbum, null, null)
 
@@ -173,15 +175,16 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
     })
 
     it('uses the track type for a fan-purchase player', () => {
-        const trackItem: BandcampFeedItem = {
+        const trackItem: FeedItemWithPurchases = {
             ...fansBoughtMusicFeedItem,
-            data: {
-                tralbumUrl: 'https://other.bandcamp.com/track/second',
-                tralbumType: 'track',
-                purchases: [
-                    { tralbumUrl: 'https://other.bandcamp.com/track/second', fans: [mayaFan, riverFan] },
-                ],
-            },
+            data: { tralbumUrl: 'https://other.bandcamp.com/track/second', tralbumType: 'track' },
+            purchases: [
+                {
+                    tralbumUrl: 'https://other.bandcamp.com/track/second',
+                    title: null,
+                    fans: [mayaFan, riverFan],
+                },
+            ],
         }
         const result = mapBandcampReleaseFeedItemToHydratedFeedItem(
             trackItem,
@@ -218,9 +221,9 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
     })
 
     it('hydrates a fan purchase when no fan names were parsed from the email', () => {
-        const unattributedItem: BandcampFeedItem = {
+        const unattributedItem: FeedItemWithPurchases = {
             ...fansBoughtMusicFeedItem,
-            data: { ...fansBoughtMusicFeedItem.data, purchases: [] },
+            purchases: [],
         }
 
         const result = mapBandcampReleaseFeedItemToHydratedFeedItem(unattributedItem, null, null, null)
@@ -232,7 +235,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
     it('retains new-release email fallbacks, links, artwork, and unsubscribe actions', () => {
         const unsubscribeUrl = 'https://test.bandcamp.com/fan_unsubscribe?id=1'
         const website = 'https://artist.example.com/'
-        const newReleaseItem: BandcampFeedItem = {
+        const newReleaseItem: FeedItemWithPurchases = {
             ...fansBoughtMusicFeedItem,
             source: {
                 ...newReleaseEmail,
@@ -277,7 +280,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
         ['First  ?   ?  Second', 'First<br><br>Second'],
         [`First${' '.repeat(1000)}Second`, `First${' '.repeat(1000)}Second`],
     ])('preserves email whitespace formatting for %s', (plainBody, expected) => {
-        const item: BandcampFeedItem = {
+        const item: FeedItemWithPurchases = {
             ...fansBoughtMusicFeedItem,
             source: {
                 ...newReleaseEmail,
