@@ -43,16 +43,22 @@ export const workflowHealth = (scheduled, recent, repository, now = new Date()) 
     }
 }
 
-const checkWorkflow = (workflow, repository) => {
-    const runs = query =>
-        JSON.parse(
-            execFileSync(
-                'gh',
-                ['api', `repos/${repository}/actions/workflows/${workflow}/runs?branch=main${query}`],
-                { encoding: 'utf8' },
-            ),
-        )
-    return workflowHealth(runs('&event=schedule&per_page=1'), runs('&per_page=100'), repository)
+export const checkWorkflow = (workflow, repository, run = execFileSync) => {
+    try {
+        const runs = query =>
+            JSON.parse(
+                run(
+                    'gh',
+                    ['api', `repos/${repository}/actions/workflows/${workflow}/runs?branch=main${query}`],
+                    // Full run records include repository metadata; 100 runs exceed the 1 MiB default.
+                    { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 },
+                ),
+            )
+        return workflowHealth(runs('&event=schedule&per_page=1'), runs('&per_page=100'), repository)
+    } catch (error) {
+        // One unavailable workflow must not hide the remaining workflows' health.
+        return { status: 'unhealthy', reason: `Unable to check workflow: ${error.message}` }
+    }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

@@ -291,6 +291,10 @@ health check depend on this T3 host being available. They do not constitute an i
 monitor. A separate GitHub-hosted Security automation health workflow checks every six hours for
 missing daily scan/remediation/runtime receipts older than 36 hours and the latest completed main run.
 A newer successful main push or manual run clears a failure alarm without waiting for the next daily schedule.
+Health checks deliberately repeat alarms for unsuccessful runs until recovery, even when a failure
+already sent a notification. Investigations should group these events by their root cause.
+Each workflow has a separate health result. An API failure marks that workflow unhealthy and does
+not prevent checks of the remaining workflows.
 It works while the T3 host is offline; investigation waits for T3 availability. The responsible
 maintainer should enable GitHub Actions failure notifications. GitHub-wide outages or disabled
 Actions still require an external monitor; that infrastructure is not provisioned here.
