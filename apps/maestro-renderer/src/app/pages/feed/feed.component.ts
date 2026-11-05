@@ -57,13 +57,20 @@ import {
 } from '../../shared/utils/formatting.utils'
 import { settingsLink } from '../settings/settings-link'
 import { FanAvatarStackComponent } from './fan-avatar-stack.component'
+import {
+    FeedAction,
+    FeedState,
+    finishReloading,
+    INITIAL_FEED_STATE,
+    isSameAutomaticReload,
+    nextAutomaticReload,
+    recoveryOfRelease,
+    releasesToReload,
+    startReloading,
+} from './feed-state'
 import { ReleaseLoadStatusComponent, ReleaseRecovery } from './release-load-status.component'
 
 const NUM_PREFETCH_ITEMS = 5
-/** Releases that failed on a rate limit reload on their own when current or among the next five. */
-const AUTO_RETRY_WINDOW = 6
-/** Most releases one reload request may ask for (see `reloadFeedItemsRequestSchema`). */
-const MAX_RELOAD_BATCH = 20
 const SEEK_BY_SECONDS = 30
 
 const getUserFacingErrorMessage = (error: unknown) => {
@@ -73,60 +80,6 @@ const getUserFacingErrorMessage = (error: unknown) => {
     }
 
     return undefined
-}
-
-type PageFailure = { message: string }
-
-type FeedState = {
-    items: HydratedFeedItem[]
-    /** Why there are no releases to show, once a page load has come back empty. */
-    emptyReason: 'caught-up' | 'not-set-up' | null
-    /** The last page load failed. Loaded releases stay; the next page waits for Retry or reconnecting. */
-    pageFailure: PageFailure | null
-    isRetryingPage: boolean
-    /** Failed releases being loaded again. */
-    reloadingIds: ReadonlySet<string>
-    /** The rate-limit deadline each release was last reloaded for automatically; each one is tried once. */
-    autoRetriedDeadlines: ReadonlyMap<string, number>
-}
-
-const INITIAL_FEED_STATE: FeedState = {
-    items: [],
-    emptyReason: null,
-    pageFailure: null,
-    isRetryingPage: false,
-    reloadingIds: new Set(),
-    autoRetriedDeadlines: new Map(),
-}
-
-type FeedAction =
-    | { kind: 'load-page'; furthestScrolledIndex: number; onlyWhenEmpty: boolean }
-    /** Retries the failure that was on screen; a retry for a failure already handled does nothing. */
-    | { kind: 'retry-page'; failure: PageFailure | null }
-    /** Reloads these releases if they are still the same failed releases the action was raised for. */
-    | { kind: 'reload-items'; items: HydratedFeedItem[]; isAutomatic: boolean }
-
-type AutoRetry = { deadline: number; items: HydratedFeedItem[] }
-
-const isSameAutoRetry = (a: AutoRetry | null, b: AutoRetry | null) =>
-    a === b ||
-    (a !== null &&
-        b !== null &&
-        a.deadline === b.deadline &&
-        a.items.length === b.items.length &&
-        a.items.every((item, index) => item === b.items[index]))
-
-const recordAutoRetry = (deadlines: ReadonlyMap<string, number>, items: HydratedFeedItem[]) => {
-    const next = new Map(deadlines)
-    for (const item of items) {
-        if (item.error?.retryAt != null) next.set(item.id, item.error.retryAt)
-    }
-    return next
-}
-
-const autoRetriedBefore = (state: FeedState, item: HydratedFeedItem) => {
-    const retryAt = item.error?.retryAt
-    return retryAt == null || (state.autoRetriedDeadlines.get(item.id) ?? -Infinity) >= retryAt
 }
 
 @Component({
@@ -178,39 +131,18 @@ export class FeedComponent {
 
     loadedFeedItemIds = new Set<string>()
 
-    /**
-     * Failed releases due to reload when Bandcamp's rate limit lifts: those in the current window that
-     * carry a deadline not yet tried. Releases sharing the earliest deadline go together in one batch.
-     */
-    private readonly autoRetryDue: Signal<AutoRetry | null> = computed(
+    /** The rate-limited releases in the current window to reload next, and when. */
+    private readonly automaticReload = computed(
         () => {
             const state = this.feedState()
-            if (!state) return null
-
-            const waiting = state.items
-                .filter((_item, index) => this.isInAutoRetryWindow(index))
-                .flatMap(item =>
-                    item.error?.retryAt != null &&
-                    !state.reloadingIds.has(item.id) &&
-                    !autoRetriedBefore(state, item)
-                        ? [{ item, retryAt: item.error.retryAt }]
-                        : [],
-                )
-            if (waiting.length == 0) return null
-
-            const deadline = Math.min(...waiting.map(({ retryAt }) => retryAt))
-            return {
-                deadline,
-                items: waiting.filter(({ retryAt }) => retryAt <= deadline).map(({ item }) => item),
-            }
+            return state ? nextAutomaticReload(state, this.currentFeedIndex()) : null
         },
-        { equal: isSameAutoRetry },
+        { equal: isSameAutomaticReload },
     )
 
     /**
      * Every change to the feed runs through one serial pipeline, so a page load, a retry and a release
-     * reload never race over the same state. Retries carry what they were raised for, which drops
-     * repeated clicks and reconnect bursts instead of queueing them.
+     * reload never race over the same state. See {@link FeedAction} for how repeated retries drop.
      */
     readonly feedState: Signal<FeedState | null> = toSignal(
         merge(
@@ -238,7 +170,7 @@ export class FeedComponent {
             this.itemRetry$.pipe(
                 map((item): FeedAction => ({ kind: 'reload-items', items: [item], isAutomatic: false })),
             ),
-            toObservable(this.autoRetryDue).pipe(
+            toObservable(this.automaticReload).pipe(
                 switchMap(due =>
                     due
                         ? timer(Math.max(due.deadline - Date.now(), 0)).pipe(
@@ -282,28 +214,10 @@ export class FeedComponent {
             case 'reload-items': {
                 if (!state) return EMPTY
 
-                const currentItems = new Map(state.items.map(item => [item.id, item]))
-                const items = action.items
-                    .filter(
-                        item =>
-                            item.error &&
-                            currentItems.get(item.id) === item &&
-                            !state.reloadingIds.has(item.id) &&
-                            // Automatic retries may wait behind a page load while the user scrolls.
-                            (!action.isAutomatic ||
-                                (!autoRetriedBefore(state, item) &&
-                                    this.isInAutoRetryWindow(state.items.indexOf(item)))),
-                    )
-                    .slice(0, MAX_RELOAD_BATCH)
+                const items = releasesToReload(state, action, this.currentFeedIndex())
                 if (items.length == 0) return EMPTY
 
-                const reloading: FeedState = {
-                    ...state,
-                    reloadingIds: new Set(items.map(item => item.id)),
-                    autoRetriedDeadlines: action.isAutomatic
-                        ? recordAutoRetry(state.autoRetriedDeadlines, items)
-                        : state.autoRetriedDeadlines,
-                }
+                const reloading = startReloading(state, items, action.isAutomatic)
                 return concat(
                     of(reloading),
                     defer(() => this.reloadItems(reloading)),
@@ -351,7 +265,7 @@ export class FeedComponent {
         }
     }
 
-    /** Swaps each reloaded release in by ID, so its entry and every other release stay where they are. */
+    /** Loads the reloading releases again. If the request itself fails, each keeps its place with that error. */
     private async reloadItems(state: FeedState): Promise<FeedState> {
         const ids = [...state.reloadingIds]
         const reloaded = await this.feedService.reloadFeedItems(ids).then(
@@ -366,27 +280,11 @@ export class FeedComponent {
                 )
             },
         )
-
-        return {
-            ...state,
-            reloadingIds: new Set(),
-            items: state.items.map(item =>
-                state.reloadingIds.has(item.id) ? (reloaded.get(item.id) ?? item) : item,
-            ),
-        }
+        return finishReloading(state, reloaded)
     }
 
     releaseRecovery(state: FeedState, item: HydratedFeedItem, index: number): ReleaseRecovery {
-        if (state.reloadingIds.has(item.id)) return 'reloading'
-        if (autoRetriedBefore(state, item)) return 'manual'
-        if (!this.isInAutoRetryWindow(index)) return 'when-in-view'
-        // A passed deadline in the window reloads at once; say so rather than show a time already gone.
-        return (item.error?.retryAt ?? 0) > Date.now() ? 'scheduled' : 'reloading'
-    }
-
-    private isInAutoRetryWindow(index: number) {
-        const start = this.currentFeedIndex()
-        return index >= start && index < start + AUTO_RETRY_WINDOW
+        return recoveryOfRelease(state, item, index, this.currentFeedIndex())
     }
 
     /**
