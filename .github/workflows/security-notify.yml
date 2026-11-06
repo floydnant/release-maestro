@@ -33,7 +33,6 @@ jobs:
             - name: Notify T3 investigation agent
               env:
                   SECURITY_T3_WEBHOOK_URL: ${{ secrets.SECURITY_T3_WEBHOOK_URL }}
-                  EVENT_PATH: ${{ github.event_path }}
                   REPOSITORY: ${{ github.repository }}
                   RUN_ID: ${{ github.run_id }}
                   EVENT_NAME: ${{ github.event_name }}
@@ -43,11 +42,11 @@ jobs:
                       echo '::error::SECURITY_T3_WEBHOOK_URL is missing. Security failure investigation is not connected.'
                       exit 1
                   fi
-                  jq -n --arg repo "$REPOSITORY" --arg id "$RUN_ID" --arg event "$EVENT_NAME" --slurpfile source "$EVENT_PATH" \
-                    '{repository: $repo, notification_run_id: $id, event: $event, workflow_run: ($source[0].workflow_run | if . then {id, name, path, head_sha, head_branch, conclusion, html_url} else null end)}' > /tmp/security-notification.json
-                  curl --silent --output /tmp/security-notification-response --fail --max-time 30 \
+                  jq -n --arg repo "$REPOSITORY" --arg id "$RUN_ID" --arg event "$EVENT_NAME" --slurpfile source "$GITHUB_EVENT_PATH" \
+                    '{repository: $repo, notification_run_id: $id, event: $event, workflow_run: ($source[0].workflow_run | if . then {id, name, path, head_sha, head_branch, conclusion, html_url} else null end)}' > "$RUNNER_TEMP/security-notification.json"
+                  curl --silent --output "$RUNNER_TEMP/security-notification-response" --fail --max-time 30 \
                     --retry 2 --retry-all-errors --header 'Content-Type: application/json' \
-                    --data-binary @/tmp/security-notification.json "$SECURITY_T3_WEBHOOK_URL" || {
+                    --data-binary "@$RUNNER_TEMP/security-notification.json" "$SECURITY_T3_WEBHOOK_URL" || {
                       echo '::error::T3 security notification delivery failed. Inspect this workflow and the daily health check.'
                       exit 1
                     }
