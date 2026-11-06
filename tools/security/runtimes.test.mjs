@@ -4,7 +4,14 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from '@jest/globals'
-import { assessRuntime, checkRuntimes, compareVersions, declaredBrowsers, sources } from './runtimes.mjs'
+import {
+    assessRuntime,
+    checkRuntimes,
+    compareVersions,
+    declaredBrowsers,
+    runtimeGateFailed,
+    sources,
+} from './runtimes.mjs'
 
 const upstream = {
     chrome: '156.0.8078.80',
@@ -139,4 +146,12 @@ test('writes unknown coverage on network errors and stale feeds; inventories eve
     } finally {
         rmSync(directory, { recursive: true, force: true })
     }
+})
+
+test('PR inventory reports freshness reviews but always fails on unknown coverage', () => {
+    const review = { status: 'review-required', errors: [] }
+    assert.equal(runtimeGateFailed(review), true)
+    assert.equal(runtimeGateFailed(review, true), false)
+    assert.equal(runtimeGateFailed({ ...review, errors: ['upstream unavailable'] }, true), true)
+    assert.equal(runtimeGateFailed({ status: 'current', errors: [] }), false)
 })

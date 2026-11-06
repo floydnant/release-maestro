@@ -250,6 +250,11 @@ being current does not establish that an upstream vendor has fixed every known i
 automatic exceptions for runtime findings. This workflow is an additional signal, not part of the
 existing required PR comparison or release publication gate.
 
+PR runs use `make security-runtimes INVENTORY_ONLY=1`. They publish the same freshness findings in
+an artifact and job summary, and fail on missing or unknown inventory. They do not enforce freshness findings as a PR correctness gate, including newly introduced stale
+runtimes. Main pushes, schedules and manual runs use the full
+freshness gate. This mode does not clear findings or grant exceptions; MAE-179 tracks remediation.
+
 The inventory describes package declarations, not binary attestation. It does not prove that a
 cached or custom browser executable matches its package, inspect a running CDP endpoint, or establish
 which optional components shipped in an installer. It does not yet map Chromium/Node advisories,

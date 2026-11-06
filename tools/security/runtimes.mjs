@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseAllDocuments } from 'yaml'
@@ -206,10 +206,26 @@ const describeRuntime = runtime =>
     `${runtime.status.toUpperCase()} ${runtime.package}@${runtime.packageVersion}: ` +
     `${runtime.browser} ${runtime.version}${runtime.node ? `, Node ${runtime.node}` : ''}`
 
+// PRs report freshness reviews. Unknown coverage always fails.
+// Main and scheduled scans also fail on freshness reviews.
+export const runtimeGateFailed = (report, inventoryOnly = false) =>
+    report.errors.length > 0 || (!inventoryOnly && report.status !== 'current')
+
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+    const inventoryOnly = process.argv.includes('--inventory-only')
     const report = await checkRuntimes()
     for (const runtime of report.runtimes) console.log(describeRuntime(runtime))
     for (const error of report.errors) console.error(`UNKNOWN ${error}`)
     console.log('Runtime freshness is not proof of CVE coverage. Report: dist/security/runtimes.json')
-    if (report.status !== 'current') process.exitCode = 1
+    if (process.env.GITHUB_STEP_SUMMARY) {
+        const reviews = report.runtimes.filter(runtime => runtime.status !== 'current').length
+        appendFileSync(
+            process.env.GITHUB_STEP_SUMMARY,
+            `Runtime inventory: ${reviews} freshness reviews, ${report.errors.length} inventory errors. See the runtime-security artifact.\n` +
+                (inventoryOnly
+                    ? 'This PR reports freshness findings. Main and scheduled scans enforce them.\n'
+                    : 'This run enforces freshness findings.\n'),
+        )
+    }
+    if (runtimeGateFailed(report, inventoryOnly)) process.exitCode = 1
 }

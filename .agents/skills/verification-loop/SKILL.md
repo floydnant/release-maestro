@@ -71,6 +71,8 @@ what ran and any meaningful gap. A named gate in the task or another workflow st
 - `make security-runtimes` — inventories locked Electron, Playwright, and Puppeteer browser
   declarations and checks upstream freshness. Requires network access and installed locked packages.
   Stale versions or unknown coverage require review; this does not establish CVE applicability.
+  `INVENTORY_ONLY=1` reports freshness reviews and still fails on inventory errors. PRs use this mode;
+  main and scheduled scans enforce freshness reviews.
 - `make affected` — build, lint, unit tests, development Electron E2E, and renderer E2E, scoped to
   what git says changed; does not check or mutate formatting.
 - `make e2e-renderer` — renderer-only E2E and part of `make sure`.

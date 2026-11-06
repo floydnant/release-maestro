@@ -14,7 +14,7 @@ security-tools: ## Download checksum-pinned security tools for this platform
 security: ## Scan both lockfiles for known vulnerabilities (requires network)
 	node tools/security/cli.mjs scan
 security-runtimes: ## Inventory bundled browser engines and flag stale or unknown versions (requires network)
-	node tools/security/runtimes.mjs
+	node tools/security/runtimes.mjs $(if $(filter 1,$(INVENTORY_ONLY)),--inventory-only,)
 security-remediation-plan: ## Scan and preview eligible npm and Node fixes without changing dependency inputs
 	node tools/security/remediate.mjs plan
 security-remediate: ## Apply and verify npm and Node fixes on committed dependency inputs

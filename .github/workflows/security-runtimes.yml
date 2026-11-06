@@ -22,7 +22,9 @@ jobs:
               with:
                   install-command: pnpm install --frozen-lockfile --ignore-scripts
             - name: Inventory bundled runtimes and check upstream freshness
-              run: make security-runtimes
+              env:
+                  INVENTORY_ONLY: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+              run: make security-runtimes INVENTORY_ONLY="$INVENTORY_ONLY"
             - name: Upload runtime inventory including unresolved reviews
               if: always()
               uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

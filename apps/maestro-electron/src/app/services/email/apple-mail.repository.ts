@@ -27,7 +27,7 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
         .trim()
 
     for (const line of frontMatter?.trim().split('\n') || []) {
-        const key = line.match(/^(\w+)+: /)?.[1]
+        const key = line.match(/^(\w+): /)?.[1]
         if (!key) continue
 
         const value = line.replace(/^\w+: /, '').trim()

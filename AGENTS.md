@@ -59,6 +59,7 @@ intentional convenience summaries.
   [docs/security.md](docs/security.md) for tooling, exception policy, and output limitations.
 - `make security-runtimes` inventories locked Electron, Playwright, and Puppeteer browser declarations
   against upstream releases. Stale or unknown versions require review, not an automatic CVE verdict.
+  PRs use `INVENTORY_ONLY=1` to report freshness reviews while still failing on unknown inventory.
 - `make e2e-production` packages the app for the host OS and runs the production-compatible Electron
   suite. Use it for file-URL, lazy-loading, packaging, and cross-platform behavior.
 - `make affected` runs build, lint, unit tests, development Electron E2E, and renderer E2E for
