@@ -87,7 +87,8 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
 
 ## Rules
 
-- Migrations always take a name: `make db-generate NAME=cool-migration`
+- Migrations always take a name: `make db-generate NAME=cool-migration`. `make db-check` confirms
+  the schema needs no further migration
 - Commit messages use Conventional Commits with a mandatory `type:` prefix on the subject line
 - Tests: prefer shared fixture files for reusable fixtures; keep fixtures inline only when clearly
   one-off to that spec
