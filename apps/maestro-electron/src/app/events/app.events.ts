@@ -15,6 +15,7 @@ import {
     MetadataIpcChannel,
 } from '@release-maestro/core'
 import App from '../app'
+import { openUrlInNativeBrowser } from '../external-url'
 import { LibraryBrowseRepository } from '../services/library/library-browse.repository'
 import { LibraryFoldersService } from '../services/library/library-folders.service'
 import { LibraryScanService } from '../services/library/library-scan.service'
@@ -31,7 +32,7 @@ export default class AppEvents {
 
 // Handle opening URLs in external browser
 ipc.handle('open-url', async (_event, url) => {
-    shell.openExternal(url)
+    openUrlInNativeBrowser(url)
 })
 
 // Reveal a file/folder in the OS file manager (e.g. a failed import from settings)
