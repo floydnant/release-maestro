@@ -30,7 +30,7 @@ for (const event of [
         const captured = join(directory, 'captured.json')
         try {
             writeFileSync(eventPath, JSON.stringify(event ? { workflow_run: event } : {}))
-            // Replace only the network sender. Execute the workflow's real shell and jq payload code.
+            // Execute the real payload code with a fake network sender and no usable jq.
             const curl = join(directory, 'curl')
             writeFileSync(
                 curl,
@@ -42,6 +42,12 @@ fs.writeFileSync(process.env.CAPTURE_PATH, fs.readFileSync(payload));
 `,
             )
             chmodSync(curl, 0o755)
+            const jq = join(directory, 'jq')
+            writeFileSync(
+                jq,
+                '#!/usr/bin/env node\nprocess.stderr.write("jq is not installed"); process.exit(127);\n',
+            )
+            chmodSync(jq, 0o755)
             const env = {
                 ...process.env,
                 PATH: `${directory}${delimiter}${process.env.PATH}`,

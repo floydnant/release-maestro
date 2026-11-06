@@ -42,8 +42,20 @@ jobs:
                       echo '::error::SECURITY_T3_WEBHOOK_URL is missing. Security failure investigation is not connected.'
                       exit 1
                   fi
-                  jq -n --arg repo "$REPOSITORY" --arg id "$RUN_ID" --arg event "$EVENT_NAME" --slurpfile source "$GITHUB_EVENT_PATH" \
-                    '{repository: $repo, notification_run_id: $id, event: $event, workflow_run: ($source[0].workflow_run | if . then {id, name, path, head_sha, head_branch, conclusion, html_url} else null end)}' > "$RUNNER_TEMP/security-notification.json"
+                  node <<'NODE'
+                  const fs = require('node:fs');
+                  const path = require('node:path');
+                  const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+                  const fields = ['id', 'name', 'path', 'head_sha', 'head_branch', 'conclusion', 'html_url'];
+                  const run = event.workflow_run;
+                  const payload = {
+                    repository: process.env.REPOSITORY,
+                    notification_run_id: process.env.RUN_ID,
+                    event: process.env.EVENT_NAME,
+                    workflow_run: run ? Object.fromEntries(fields.map(key => [key, run[key] ?? null])) : null,
+                  };
+                  fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'security-notification.json'), JSON.stringify(payload));
+                  NODE
                   curl --silent --output "$RUNNER_TEMP/security-notification-response" --fail --max-time 30 \
                     --retry 2 --retry-all-errors --header 'Content-Type: application/json' \
                     --data-binary "@$RUNNER_TEMP/security-notification.json" "$SECURITY_T3_WEBHOOK_URL" || {
