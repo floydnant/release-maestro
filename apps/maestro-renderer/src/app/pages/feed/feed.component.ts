@@ -6,16 +6,42 @@ import {
     ElementRef,
     HostListener,
     inject,
+    Signal,
     signal,
     viewChildren,
 } from '@angular/core'
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop'
 import { RouterModule } from '@angular/router'
-import { assertUnreachable, HydratedFeedItem, resolveFeedSettings } from '@release-maestro/core'
+import {
+    assertUnreachable,
+    HydratedFeedItem,
+    resolveFeedSettings,
+    ScrapedLinkMetadata,
+} from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
 import { HlmProgressImports } from '@spartan-ng/helm/progress'
-import { combineLatestWith, filter, fromEvent, map, mergeScan, mergeWith, startWith, Subject } from 'rxjs'
+import {
+    catchError,
+    concat,
+    concatMap,
+    defer,
+    distinct,
+    EMPTY,
+    filter,
+    from,
+    fromEvent,
+    map,
+    merge,
+    mergeMap,
+    mergeScan,
+    Observable,
+    of,
+    scan,
+    Subject,
+    switchMap,
+    timer,
+} from 'rxjs'
 import { ElectronService } from '../../core/services'
 import { WebAudioPlayer } from '../../core/services/audio-player.service'
 import { SettingsService } from '../../core/settings/settings.service'
@@ -27,9 +53,22 @@ import { SafePipe } from '../../shared/pipes/safe.pipe'
 import {
     formatCalendarDateRelative,
     formatDuration,
-    formatReleaseDateRelative,
+    formatReleaseDate,
 } from '../../shared/utils/formatting.utils'
 import { settingsLink } from '../settings/settings-link'
+import { FanAvatarStackComponent } from './fan-avatar-stack.component'
+import {
+    FeedAction,
+    FeedState,
+    finishReloading,
+    INITIAL_FEED_STATE,
+    isSameAutomaticReload,
+    nextAutomaticReload,
+    recoveryOfRelease,
+    releasesToReload,
+    startReloading,
+} from './feed-state'
+import { ReleaseLoadStatusComponent, ReleaseRecovery } from './release-load-status.component'
 
 const NUM_PREFETCH_ITEMS = 5
 const SEEK_BY_SECONDS = 30
@@ -42,12 +81,6 @@ const getUserFacingErrorMessage = (error: unknown) => {
 
     return undefined
 }
-
-type FeedState =
-    | { status: 'feed'; items: HydratedFeedItem[] }
-    | { status: 'caught-up'; items: [] }
-    | { status: 'empty'; items: [] }
-    | { status: 'error'; items: HydratedFeedItem[]; error: string }
 
 @Component({
     selector: 'app-feed',
@@ -62,6 +95,8 @@ type FeedState =
         IconComponent,
         RouterModule,
         HlmButtonImports,
+        FanAvatarStackComponent,
+        ReleaseLoadStatusComponent,
         HlmTooltipImports,
         HlmProgressImports,
     ],
@@ -91,77 +126,208 @@ export class FeedComponent {
     currentFeedIndex = signal(0)
     furthestScrolledIndex = signal(0)
 
-    retryNotifier$ = new Subject<void>()
+    readonly pageRetry$ = new Subject<void>()
+    readonly itemRetry$ = new Subject<HydratedFeedItem>()
 
     loadedFeedItemIds = new Set<string>()
-    feedState = toSignal(
-        toObservable(this.furthestScrolledIndex).pipe(
-            combineLatestWith(
-                this.retryNotifier$.pipe(mergeWith(fromEvent(window, 'online')), startWith(null)),
+
+    /** The rate-limited releases in the current window to reload next, and when. */
+    private readonly automaticReload = computed(
+        () => {
+            const state = this.feedState()
+            return state ? nextAutomaticReload(state, this.currentFeedIndex()) : null
+        },
+        { equal: isSameAutomaticReload },
+    )
+
+    /**
+     * Every change to the feed runs through one serial pipeline, so a page load, a retry and a release
+     * reload never race over the same state. See {@link FeedAction} for how repeated retries drop.
+     */
+    readonly feedState: Signal<FeedState | null> = toSignal(
+        merge(
+            toObservable(this.furthestScrolledIndex).pipe(
+                map((furthestScrolledIndex): FeedAction => ({
+                    kind: 'load-page',
+                    furthestScrolledIndex,
+                    onlyWhenEmpty: false,
+                })),
             ),
-            map(([furthestScrolledIndex]) => ({ furthestScrolledIndex, refreshOnlyWhenEmpty: false })),
-            mergeWith(
-                this.feedService.emailImportProgress$.pipe(
-                    filter(update => update.phase === 'completed' && update.newlyImported > 0),
-                    map(() => ({
-                        furthestScrolledIndex: this.furthestScrolledIndex(),
-                        refreshOnlyWhenEmpty: true,
-                    })),
+            this.feedService.emailImportProgress$.pipe(
+                filter(update => update.phase === 'completed' && update.newlyImported > 0),
+                map((): FeedAction => ({
+                    kind: 'load-page',
+                    furthestScrolledIndex: this.furthestScrolledIndex(),
+                    onlyWhenEmpty: true,
+                })),
+            ),
+            merge(this.pageRetry$, fromEvent(window, 'online')).pipe(
+                map((): FeedAction => ({
+                    kind: 'retry-page',
+                    failure: this.feedState()?.pageFailure ?? null,
+                })),
+            ),
+            this.itemRetry$.pipe(
+                map((item): FeedAction => ({ kind: 'reload-items', items: [item], isAutomatic: false })),
+            ),
+            toObservable(this.automaticReload).pipe(
+                switchMap(due =>
+                    due
+                        ? timer(Math.max(due.deadline - Date.now(), 0)).pipe(
+                              map((): FeedAction => ({
+                                  kind: 'reload-items',
+                                  items: due.items,
+                                  isAutomatic: true,
+                              })),
+                          )
+                        : EMPTY,
                 ),
             ),
+        ).pipe(
             mergeScan(
-                async (
-                    previousState,
-                    { furthestScrolledIndex, refreshOnlyWhenEmpty },
-                ): Promise<FeedState | null> => {
-                    if (
-                        refreshOnlyWhenEmpty &&
-                        previousState?.status !== 'empty' &&
-                        previousState?.status !== 'caught-up'
-                    ) {
-                        return previousState
-                    }
-
-                    const previousItems = previousState?.items ?? []
-                    const lastLoadedItemIndex = previousItems.length - 1
-                    const itemCountToFetch =
-                        furthestScrolledIndex + NUM_PREFETCH_ITEMS - Math.max(lastLoadedItemIndex, 0)
-
-                    try {
-                        const items = await this.feedService.loadFeed(0, itemCountToFetch, [
-                            ...this.loadedFeedItemIds,
-                        ])
-                        const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
-                        if (items.length != newItems.length) {
-                            console.warn(
-                                'Duplicate feed items detected:',
-                                items.filter(item => this.loadedFeedItemIds.has(item.id)),
-                            )
-                        }
-                        newItems.forEach(item => this.loadedFeedItemIds.add(item.id))
-
-                        const allItems = previousItems.concat(newItems)
-                        if (allItems.length > 0) return { status: 'feed', items: allItems }
-
-                        return {
-                            status: (await this.feedService.hasFeed()) ? 'caught-up' : 'empty',
-                            items: [],
-                        }
-                    } catch (error) {
-                        console.error('Error loading feed state', error)
-
-                        return {
-                            status: 'error',
-                            items: previousItems,
-                            error: getUserFacingErrorMessage(error) || 'Failed to load',
-                        }
-                    }
-                },
-                null as FeedState | null,
+                (state: FeedState | null, action: FeedAction) => this.applyFeedAction(state, action),
+                null,
                 1, // Max concurrent requests: ensures we don't run into race conditions
             ),
         ),
         { initialValue: null },
+    )
+
+    private applyFeedAction(state: FeedState | null, action: FeedAction): Observable<FeedState> {
+        switch (action.kind) {
+            case 'load-page': {
+                // After a failure, the next page waits for Retry rather than failing again on every scroll.
+                if (state?.pageFailure) return EMPTY
+                if (action.onlyWhenEmpty && (!state || state.items.length > 0)) return EMPTY
+
+                return defer(() => this.loadPage(state ?? INITIAL_FEED_STATE, action.furthestScrolledIndex))
+            }
+            case 'retry-page': {
+                if (!state?.pageFailure || state.pageFailure !== action.failure) return EMPTY
+
+                const retrying: FeedState = { ...state, isRetryingPage: true }
+                return concat(
+                    of(retrying),
+                    defer(() => this.loadPage(retrying, this.furthestScrolledIndex())),
+                )
+            }
+            case 'reload-items': {
+                if (!state) return EMPTY
+
+                const items = releasesToReload(state, action, this.currentFeedIndex())
+                if (items.length == 0) return EMPTY
+
+                const reloading = startReloading(state, items, action.isAutomatic)
+                return concat(
+                    of(reloading),
+                    defer(() => this.reloadItems(reloading)),
+                )
+            }
+            default:
+                return assertUnreachable(action)
+        }
+    }
+
+    private async loadPage(state: FeedState, furthestScrolledIndex: number): Promise<FeedState> {
+        const previousItems = state.items
+        const lastLoadedItemIndex = previousItems.length - 1
+        const itemCountToFetch = furthestScrolledIndex + NUM_PREFETCH_ITEMS - Math.max(lastLoadedItemIndex, 0)
+
+        try {
+            const items = await this.feedService.loadFeed(0, itemCountToFetch, [...this.loadedFeedItemIds])
+            const newItems = items.filter(item => !this.loadedFeedItemIds.has(item.id))
+            if (items.length != newItems.length) {
+                console.warn(
+                    'Duplicate feed items detected:',
+                    items.filter(item => this.loadedFeedItemIds.has(item.id)),
+                )
+            }
+            newItems.forEach(item => this.loadedFeedItemIds.add(item.id))
+
+            const loaded = { ...state, pageFailure: null, isRetryingPage: false }
+            // Keep the same list when nothing was added, so rendered releases are left alone.
+            const allItems = newItems.length > 0 ? previousItems.concat(newItems) : previousItems
+            if (allItems.length > 0) return { ...loaded, items: allItems, emptyReason: null }
+
+            return {
+                ...loaded,
+                items: allItems,
+                emptyReason: (await this.feedService.hasFeed()) ? 'caught-up' : 'not-set-up',
+            }
+        } catch (error) {
+            console.error('Error loading feed state', error)
+
+            return {
+                ...state,
+                isRetryingPage: false,
+                pageFailure: { message: getUserFacingErrorMessage(error) || 'Failed to load' },
+            }
+        }
+    }
+
+    /** Loads the reloading releases again. If the request itself fails, each keeps its place with that error. */
+    private async reloadItems(state: FeedState): Promise<FeedState> {
+        const ids = [...state.reloadingIds]
+        const reloaded = await this.feedService.reloadFeedItems(ids).then(
+            items => new Map(items.map(item => [item.id, item])),
+            (error: unknown) => {
+                console.error('Error reloading releases', ids, error)
+                const failure = { message: getUserFacingErrorMessage(error) || 'Failed to load' }
+                return new Map(
+                    state.items
+                        .filter(item => state.reloadingIds.has(item.id))
+                        .map(item => [item.id, { ...item, error: failure }]),
+                )
+            },
+        )
+        return finishReloading(state, reloaded)
+    }
+
+    releaseRecovery(state: FeedState, item: HydratedFeedItem, index: number): ReleaseRecovery {
+        return recoveryOfRelease(state, item, index, this.currentFeedIndex())
+    }
+
+    /**
+     * Link previews for loaded releases, keyed by URL. They load after the releases render, one
+     * release at a time in feed order, so the first release fills in before later ones are fetched.
+     * Each URL is requested once per visit; the backend caches previews across visits.
+     */
+    readonly linkPreviews: Signal<Record<string, ScrapedLinkMetadata>> = toSignal(
+        toObservable(this.feedState).pipe(
+            mergeMap(state => from(state?.items ?? [])),
+            // A reloaded release is a new object and may bring links the failed one lacked.
+            distinct(),
+            scan(
+                (
+                    { requested }: { requested: ReadonlySet<string>; urls: string[] },
+                    item: HydratedFeedItem,
+                ) => {
+                    const urls = [...new Set(item.data.links.map(link => link.url))].filter(
+                        url => !requested.has(url),
+                    )
+                    return { requested: new Set([...requested, ...urls]), urls }
+                },
+                { requested: new Set<string>(), urls: [] },
+            ),
+            map(({ urls }) => urls),
+            filter(urls => urls.length > 0),
+            concatMap(urls =>
+                from(this.feedService.loadLinkPreviews(urls)).pipe(
+                    catchError((error: unknown) => {
+                        console.warn('Failed to load link previews', urls, error)
+                        return of({})
+                    }),
+                ),
+            ),
+            scan(
+                (
+                    previews: Record<string, ScrapedLinkMetadata>,
+                    batch: Record<string, ScrapedLinkMetadata>,
+                ) => ({ ...previews, ...batch }),
+                {},
+            ),
+        ),
+        { initialValue: {} },
     )
 
     @HostListener('document:keydown.Shift.ArrowUp', ['$event'])
@@ -222,6 +388,8 @@ export class FeedComponent {
         }
 
         if (!this.viewedFeedItems.has(feedItem.id)) return
+        // A release that failed to load was never really seen. Leave it in the feed so it can load again.
+        if (feedItem.error) return
 
         // @TODO: Wait a bit before marking the feed item as viewed:
         // item must have been in the viewport for X ms
@@ -450,13 +618,12 @@ export class FeedComponent {
     }
 
     private getFeedItems() {
-        const feedState = this.feedState()
-        return feedState?.status === 'feed' ? feedState.items : []
+        return this.feedState()?.items ?? []
     }
 
     formatDuration = formatDuration
     formatCalendarDateRelative = formatCalendarDateRelative
-    formatReleaseDateRelative = formatReleaseDateRelative
+    formatReleaseDate = formatReleaseDate
     isAfter = (date: Date, otherDate: Date) => {
         return new Date(date).getTime() > new Date(otherDate).getTime()
     }
