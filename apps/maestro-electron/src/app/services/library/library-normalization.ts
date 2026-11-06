@@ -1,6 +1,6 @@
-import { PrescanFileFact, SongMetadata } from '@release-maestro/core'
+import { ExternalRefKeys, ExternalRefs, PrescanFileFact, SongMetadata } from '@release-maestro/core'
 import { createHash } from 'crypto'
-import { ExternalRefKeys, ExternalRefs, NormalizationIssue } from '../../database/drizzle.schema'
+import { NormalizationIssue } from '../../database/drizzle.schema'
 
 const MULTI_VALUE_SEPARATOR = /(?:\s(?:&|feat\.?|ft\.?|vs\.?|x|×)\s|[;/,])/i
 const EXTERNAL_REF_KEYS: Record<string, ExternalRefKeys> = {

@@ -192,6 +192,9 @@ To generate a new migration after changing the schema — the name is required:
 make db-generate NAME=add_users_table
 ```
 
+`make db-check`, which CI runs, fails when the schema has changes without a migration or when
+drizzle-kit cannot load the schema.
+
 Not all state lives in SQLite. User settings are a `conf` file in the app's **config** dir; library
 scan state (`library-state.json`) is a separate `conf` file in the **data** dir, because it is derived
 state that belongs with the database rather than user configuration

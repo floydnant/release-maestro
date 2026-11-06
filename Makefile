@@ -162,8 +162,20 @@ db-generate: ## Generate a new migration with the given NAME (e.g. make db-gener
 	$(drizzleCommand) generate --name=$(NAME)
 db-studio: ## Open drizzle studio
 	$(drizzleCommand) studio 
-db-check: ## Check the database
+# db-check generates into scratch directories. drizzle-kit exits 0 even when it cannot load the
+# schema, so a generate from scratch must write a migration to prove the schema loads. A generate
+# into a copy of the migrations then writes something only if the schema changed without one.
+# drizzle-kit ignores drizzle.config.ts once flags are passed, and needs a relative --out.
+dbCheckDir = tmp/db-check
+drizzleGenerateFromSchema = $(drizzleCommand) generate --dialect=sqlite --schema=apps/maestro-electron/src/app/database/drizzle.schema.ts
+db-check: ## Check the migrations are consistent and the schema needs no new migration
 	$(drizzleCommand) check
+	rm -rf $(dbCheckDir) && mkdir -p $(dbCheckDir)/fresh $(dbCheckDir)/migrations && cp -R drizzle/. $(dbCheckDir)/migrations
+	$(drizzleGenerateFromSchema) --out=$(dbCheckDir)/fresh --name=fresh
+	@ls $(dbCheckDir)/fresh/*.sql >/dev/null 2>&1 || (echo "drizzle-kit could not load the schema; see the error above." && exit 1)
+	$(drizzleGenerateFromSchema) --out=$(dbCheckDir)/migrations --name=unmigrated
+	@diff -rq drizzle $(dbCheckDir)/migrations || (echo "The schema has changes without a migration: run make db-generate NAME=<name>." && exit 1)
+	rm -rf $(dbCheckDir)
 db-truncate-library: ## Truncate library tables (keeps migrations + feed tables) and delete the library scan state
 	ELECTRON_RUN_AS_NODE=1 $(PNPM) exec electron apps/maestro-electron/tools/db-truncate-library.cjs
 

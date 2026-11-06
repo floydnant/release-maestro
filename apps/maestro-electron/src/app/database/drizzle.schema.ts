@@ -1,7 +1,6 @@
 import { EmailVendor, type ExternalRefs } from '@release-maestro/core'
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
-export { ExternalRefKeys } from '@release-maestro/core'
 export type { ExternalRefs } from '@release-maestro/core'
 
 export interface NormalizationIssue {
