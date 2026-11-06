@@ -533,7 +533,7 @@ describe('LibraryBrowseRepository albums at library scale', () => {
 
         // Either album_id-leading index will do; which one SQLite picks is its business
         // and it has changed with the seed. What is being asserted is the seek.
-        expect(plan).toMatch(/SEARCH songs USING (COVERING )?INDEX songs_album_id\w* \(album_id=\?\)/)
+        expect(plan).toMatch(/SEARCH songs USING (COVERING )?INDEX songs_album_\w+ \(album_id=\?\)/)
         expect(plan).not.toMatch(/SCAN songs/)
         // The outer scan of `albums` is the accepted `LIKE '%…%'` cost (ADR 0004); what
         // must not join it is the ordering falling back to a sort of every match.

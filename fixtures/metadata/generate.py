@@ -480,5 +480,34 @@ for extension in ["mp3", "flac", "m4a"]:
     case(path.name, {"title": "External references"},
          extras=[["Isrc", "GBABC2600001"], ["Barcode", "001234"], ["AcoustId", "acoustid-1"], *extras])
 
+# Numeric tags are authored independently, including Vorbis slash pairs and separate-total precedence.
+for ext in ["mp3", "wav", "aiff", "flac", "ogg", "opus", "wv", "m4a"]:
+    for variant in ["pairs", "zeros", "totals"]:
+        path = ROOT / f"numbers-{variant}.{ext}"
+        shutil.copyfile(ROOT / f"vardae-invocacion-del-cielo.{ext}", path)
+        file = mutagen.File(path)
+        file.tags.clear()
+        zero = variant == "zeros"
+        if ext in ["mp3", "wav", "aiff"]:
+            file.tags.add(id3.TRCK(encoding=3, text=["3/0" if zero else "3/12"]))
+            file.tags.add(id3.TPOS(encoding=3, text=["0/0" if zero else "1/2"]))
+        elif ext == "m4a":
+            file["trkn"] = [(3, 0 if zero else 12)]
+            file["disk"] = [(0 if zero else 1, 0 if zero else 2)]
+        elif ext == "wv":
+            file["Track"] = "3/0" if zero else "3/12"
+            file["Disc"] = "0/0" if zero else "1/2"
+        else:
+            file["TRACKNUMBER"] = "3/0" if zero else "3/12"
+            file["DISCNUMBER"] = "0/0" if zero else "1/2"
+            if variant == "totals":
+                file["TRACKTOTAL"] = "14"
+                file["DISCTOTAL"] = "4"
+        file.save()
+        separate = variant == "totals" and ext in ["flac", "ogg", "opus"]
+        case(path.name, {"track": 3, "discNumber": None if zero else 1,
+                         "discTotal": None if zero else 4 if separate else 2,
+                         "trackTotal": None if zero else 14 if separate else 12})
+
 (ROOT / "cover.png").write_bytes(PNG)
 (ROOT / "cases.json").write_text(json.dumps(CASES, indent=4, ensure_ascii=False) + "\n")

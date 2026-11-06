@@ -557,6 +557,51 @@
         "writable": true
     },
     {
+        "file": "repeated-ape.wv",
+        "expected": {
+            "title": "Invocación Del Cielo",
+            "artist": "Vardae",
+            "albumTitle": "BNJ Serie, Vol. 1",
+            "albumArtist": "Various Artists",
+            "genre": "Electronic",
+            "track": 3,
+            "comment": "First line\nSecond line",
+            "lyrics": "Words\nMore words",
+            "musicalKey": "Am",
+            "bpm": 127.5,
+            "catalogNumber": "BNJS001",
+            "label": "Blue Night Jungle"
+        },
+        "extras": [["Custom: X-MAESTRO", "first\u0000second"]],
+        "writable": true
+    },
+    {
+        "file": "editable-mixed.m4a",
+        "expected": {
+            "energy": "7"
+        }
+    },
+    {
+        "file": "editable-alias.m4a",
+        "expected": {
+            "energy": "7"
+        }
+    },
+    {
+        "file": "editable-aliases.m4a",
+        "expected": {
+            "energy": "7"
+        }
+    },
+    {
+        "file": "riff-aliases.wav",
+        "expected": {
+            "bpm": 127.5,
+            "musicalKey": "Am"
+        },
+        "extras": [["Custom: XTRA", "keep me"]]
+    },
+    {
         "file": "secondary-ape.mp3",
         "expected": {
             "title": "Invocación Del Cielo",
@@ -617,51 +662,6 @@
             "date": null
         },
         "writable": true
-    },
-    {
-        "file": "repeated-ape.wv",
-        "expected": {
-            "title": "Invocación Del Cielo",
-            "artist": "Vardae",
-            "albumTitle": "BNJ Serie, Vol. 1",
-            "albumArtist": "Various Artists",
-            "genre": "Electronic",
-            "track": 3,
-            "comment": "First line\nSecond line",
-            "lyrics": "Words\nMore words",
-            "musicalKey": "Am",
-            "bpm": 127.5,
-            "catalogNumber": "BNJS001",
-            "label": "Blue Night Jungle"
-        },
-        "extras": [["Custom: X-MAESTRO", "first\u0000second"]],
-        "writable": true
-    },
-    {
-        "file": "editable-mixed.m4a",
-        "expected": {
-            "energy": "7"
-        }
-    },
-    {
-        "file": "editable-alias.m4a",
-        "expected": {
-            "energy": "7"
-        }
-    },
-    {
-        "file": "editable-aliases.m4a",
-        "expected": {
-            "energy": "7"
-        }
-    },
-    {
-        "file": "riff-aliases.wav",
-        "expected": {
-            "bpm": 127.5,
-            "musicalKey": "Am"
-        },
-        "extras": [["Custom: XTRA", "keep me"]]
     },
     {
         "file": "recording-date.wv",
@@ -921,5 +921,221 @@
             ["Custom: ----:com.apple.iTunes:SPOTIFY_TRACK_ID", "spotify-song-1"],
             ["Custom: ----:org.example:SPOTIFY_TRACK_ID", "private-id"]
         ]
+    },
+    {
+        "file": "numbers-pairs.mp3",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-zeros.mp3",
+        "expected": {
+            "track": 3,
+            "discNumber": null,
+            "discTotal": null,
+            "trackTotal": null
+        }
+    },
+    {
+        "file": "numbers-totals.mp3",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-pairs.wav",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-zeros.wav",
+        "expected": {
+            "track": 3,
+            "discNumber": null,
+            "discTotal": null,
+            "trackTotal": null
+        }
+    },
+    {
+        "file": "numbers-totals.wav",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-pairs.aiff",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-zeros.aiff",
+        "expected": {
+            "track": 3,
+            "discNumber": null,
+            "discTotal": null,
+            "trackTotal": null
+        }
+    },
+    {
+        "file": "numbers-totals.aiff",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-pairs.flac",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-zeros.flac",
+        "expected": {
+            "track": 3,
+            "discNumber": null,
+            "discTotal": null,
+            "trackTotal": null
+        }
+    },
+    {
+        "file": "numbers-totals.flac",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 4,
+            "trackTotal": 14
+        }
+    },
+    {
+        "file": "numbers-pairs.ogg",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-zeros.ogg",
+        "expected": {
+            "track": 3,
+            "discNumber": null,
+            "discTotal": null,
+            "trackTotal": null
+        }
+    },
+    {
+        "file": "numbers-totals.ogg",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 4,
+            "trackTotal": 14
+        }
+    },
+    {
+        "file": "numbers-pairs.opus",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-zeros.opus",
+        "expected": {
+            "track": 3,
+            "discNumber": null,
+            "discTotal": null,
+            "trackTotal": null
+        }
+    },
+    {
+        "file": "numbers-totals.opus",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 4,
+            "trackTotal": 14
+        }
+    },
+    {
+        "file": "numbers-pairs.wv",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-zeros.wv",
+        "expected": {
+            "track": 3,
+            "discNumber": null,
+            "discTotal": null,
+            "trackTotal": null
+        }
+    },
+    {
+        "file": "numbers-totals.wv",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-pairs.m4a",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
+    },
+    {
+        "file": "numbers-zeros.m4a",
+        "expected": {
+            "track": 3,
+            "discNumber": null,
+            "discTotal": null,
+            "trackTotal": null
+        }
+    },
+    {
+        "file": "numbers-totals.m4a",
+        "expected": {
+            "track": 3,
+            "discNumber": 1,
+            "discTotal": 2,
+            "trackTotal": 12
+        }
     }
 ]

@@ -98,6 +98,9 @@ pub struct SongMetadata {
     pub cover_path: Option<String>,
     pub year: Option<i32>,
     pub track: Option<u16>,
+    pub disc_number: Option<u16>,
+    pub disc_total: Option<u16>,
+    pub track_total: Option<u16>,
     pub genre: Option<String>,
     pub label: Option<String>,
     pub catalog_number: Option<String>,
@@ -684,6 +687,9 @@ pub fn read_song_metadata_v2(
     let mut album_title = None;
     let mut album_artist = None;
     let mut track_number = None;
+    let mut disc_number = None;
+    let mut disc_total = None;
+    let mut track_total = None;
     let mut comment = None;
     let mut year = None;
     let mut date = None;
@@ -764,7 +770,38 @@ pub fn read_song_metadata_v2(
                         .value()
                         .to_owned()
                         .into_string()
-                        .and_then(|s| s.parse::<u16>().ok());
+                        .and_then(|s| s.parse::<u16>().ok())
+                        .filter(|number| *number > 0);
+                }
+            }
+            ItemKey::DiscNumber => {
+                if allow_overwrite || (!has_primary_tag && disc_number.is_none()) {
+                    disc_number = item
+                        .value()
+                        .to_owned()
+                        .into_string()
+                        .and_then(|s| s.parse::<u16>().ok())
+                        .filter(|number| *number > 0);
+                }
+            }
+            ItemKey::DiscTotal => {
+                if allow_overwrite || (!has_primary_tag && disc_total.is_none()) {
+                    disc_total = item
+                        .value()
+                        .to_owned()
+                        .into_string()
+                        .and_then(|s| s.parse::<u16>().ok())
+                        .filter(|number| *number > 0);
+                }
+            }
+            ItemKey::TrackTotal => {
+                if allow_overwrite || (!has_primary_tag && track_total.is_none()) {
+                    track_total = item
+                        .value()
+                        .to_owned()
+                        .into_string()
+                        .and_then(|s| s.parse::<u16>().ok())
+                        .filter(|number| *number > 0);
                 }
             }
             ItemKey::CatalogNumber => {
@@ -932,6 +969,9 @@ pub fn read_song_metadata_v2(
         label,
         catalog_number,
         track: track_number,
+        disc_number,
+        disc_total,
+        track_total,
         duration: Some(file_info.duration),
         file_info: Some(file_info),
         cover_path,
@@ -1081,6 +1121,9 @@ mod tests {
             cover_path: None,
             year: None,
             track: None,
+            disc_number: Some(2),
+            disc_total: Some(3),
+            track_total: Some(8),
             genre: None,
             label: None,
             catalog_number: None,
@@ -1109,6 +1152,9 @@ mod tests {
 
         let serialized = serde_json::to_value(metadata).expect("should serialize metadata");
         assert_eq!(serialized["musicalKey"], "Am");
+        assert_eq!(serialized["discNumber"], 2);
+        assert_eq!(serialized["discTotal"], 3);
+        assert_eq!(serialized["trackTotal"], 8);
         assert!(serialized.get("key").is_none());
 
         let update: SongMetadataUpdateable =

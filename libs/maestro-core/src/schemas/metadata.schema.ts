@@ -39,6 +39,9 @@ export interface SongMetadata {
     coverPath: string | null
     year: number | null
     track: number | null
+    discNumber: number | null
+    discTotal: number | null
+    trackTotal: number | null
     genre: string | null
     label: string | null
     catalogNumber: string | null

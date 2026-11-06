@@ -183,6 +183,35 @@ describe('createBrowseQuery', () => {
         expect(browse.result().rows).toHaveLength(20)
     })
 
+    it('retains window metadata through loading and failure, then replaces it with the successful window', async () => {
+        const browse = create()
+        await settle()
+        const first = { ...windowOf(0, 100, 20), metadata: { groupStarts: [0, 50] } }
+        latest().resolve(first)
+        await settle()
+
+        refresh.next()
+        await settle()
+        expect(browse.result()).toMatchObject({ ...first, status: 'loading' })
+        latest().reject(new Error('Refresh failed'))
+        await settle()
+        expect(browse.result()).toMatchObject({ ...first, status: 'error' })
+
+        browse.retry()
+        await settle()
+        const next = { ...windowOf(0, 101, 20), metadata: { groupStarts: [0, 51] } }
+        latest().resolve(next)
+        await settle()
+        expect(browse.result()).toMatchObject({ ...next, status: 'ready' })
+
+        query.set({ sort: 'bpm' })
+        await settle()
+        expect(browse.result()).toMatchObject({ ...next, status: 'loading' })
+        latest().resolve(windowOf(0, 101, 20))
+        await settle()
+        expect(browse.result().metadata).toBeUndefined()
+    })
+
     it('retries the current window after a failure', async () => {
         const browse = create()
         await settle()
