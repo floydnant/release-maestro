@@ -1,0 +1,22 @@
+name: 'Security automation health'
+
+on:
+    schedule:
+        - cron: '17 */6 * * *'
+    workflow_dispatch:
+
+permissions:
+    actions: read
+    contents: read
+
+jobs:
+    health:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - name: Check scheduled receipts and latest main results
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+              run: node tools/security/health.mjs

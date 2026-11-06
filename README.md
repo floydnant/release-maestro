@@ -87,6 +87,8 @@ make e2e           # full Electron E2E against the development build
 make e2e-production # package and test the production desktop app for this OS
 make e2e-renderer  # renderer-only E2E (type-checks itself first)
 make security     # scan npm and Rust dependencies for known vulnerabilities
+make security-runtimes # inventory bundled Chromium/Node and flag stale or unknown browser versions
+make security-runtimes INVENTORY_ONLY=1 # report freshness reviews; fail on unknown inventory
 make security-remediation-plan # preview eligible npm and Node security fixes
 make security-remediate # apply verified fixes in a disposable checkout
 make sbom         # generate repository and runtime CycloneDX inventories

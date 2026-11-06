@@ -237,6 +237,20 @@ describe('AppleMailRepository', () => {
         await expect(result).resolves.toEqual([{ current: 1, total: 1, email: null }])
     })
 
+    it('ignores a long malformed header and imports the remaining message', async () => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const filePath = join(exportPath, 'email-1.txt')
+        await writeEmail(filePath, 'a'.repeat(100_000) + '!\n' + dataFile('Recovered', '2026-10-01T08:00:00'))
+        osascript.log(`Processed email 1/1: ${filePath}\n`)
+        await osascript.exit(0)
+        await expect(result).resolves.toEqual([
+            { current: 1, total: 1, email: expect.objectContaining({ subject: 'Recovered' }) },
+        ])
+    })
+
     it('accepts an explicitly exported empty HTML file', async () => {
         const osascript = fakeExport()
         const result = loadAll()

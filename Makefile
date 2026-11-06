@@ -8,11 +8,13 @@ PNPM := pnpm
 ARTIFACT_DIR := dist/executables
 TOOLS_TEST_ARGS ?=
 
-.PHONY: security security-tools security-policy-check security-remediation-plan security-remediate sbom sbom-release
+.PHONY: security security-runtimes security-tools security-policy-check security-remediation-plan security-remediate sbom sbom-release
 security-tools: ## Download checksum-pinned security tools for this platform
 	node tools/security/cli.mjs install
 security: ## Scan both lockfiles for known vulnerabilities (requires network)
 	node tools/security/cli.mjs scan
+security-runtimes: ## Inventory bundled browser engines and flag stale or unknown versions (requires network)
+	node tools/security/runtimes.mjs $(if $(filter 1,$(INVENTORY_ONLY)),--inventory-only,)
 security-remediation-plan: ## Scan and preview eligible npm and Node fixes without changing dependency inputs
 	node tools/security/remediate.mjs plan
 security-remediate: ## Apply and verify npm and Node fixes on committed dependency inputs
