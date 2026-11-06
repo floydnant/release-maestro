@@ -183,6 +183,7 @@ export class LibraryScanService {
                         failureStage = 'read'
                         status.phase = 'reading'
                         status.readTotal = update.total
+                        status.refreshTotal = update.refreshTotal
                         break
                     case 'progress':
                         status.readDone = update.done
@@ -216,6 +217,7 @@ export class LibraryScanService {
                             error: null,
                         })
                         this.stateStore.set('lastScan', {
+                            refreshTotal: status.refreshTotal,
                             count: update.count,
                             total: update.total,
                             unchanged: update.unchanged,
@@ -305,6 +307,7 @@ export class LibraryScanService {
             unchanged: 0,
             readDone: 0,
             readTotal: 0,
+            refreshTotal: 0,
             imported: 0,
             failedFiles: 0,
             normalizationIssues: 0,
@@ -340,6 +343,7 @@ export class LibraryScanService {
             unavailableFolders: status.unavailableFolders,
             readTotal: status.readTotal,
             readsAttempted: status.readDone,
+            refreshTotal: status.refreshTotal,
             imported: status.imported,
             discoveryFailureCount: details.discoveryFailureCount,
             readFailureCount: details.readFailureCount,
