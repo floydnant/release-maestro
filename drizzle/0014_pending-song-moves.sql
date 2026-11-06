@@ -1,0 +1,1 @@
+ALTER TABLE `songs` ADD `move_origin_id` text;

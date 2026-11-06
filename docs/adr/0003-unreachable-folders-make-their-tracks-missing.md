@@ -19,8 +19,10 @@ empty library for a stale full one.
 
 - A scan can report a large `missing` count that is not the user's doing. Both scan UIs therefore show
   which folders were unreachable alongside the count — the number is misleading without it.
-- Reconciliation is still skipped when a scan is **cancelled**, because a cancelled discovery stopped
-  early and genuinely has not seen every file. Unreachable is knowledge; interrupted is not.
+- Absence marking and identity merges are still skipped when a scan is **cancelled**, because a
+  cancelled discovery stopped early and has not seen every file. Positive availability and
+  coexistence evidence may still be recorded; it proves presence without inferring absence.
+  Unreachable is knowledge; interrupted is not.
 - Reconciliation is also still skipped when discovery reported **per-file errors** inside a reachable
   folder. That guard is deliberately left in place and is a narrower question than this ADR settles:
   an
