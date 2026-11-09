@@ -31,9 +31,3 @@ runs:
         - name: Install dependencies
           shell: bash
           run: ${{ inputs.install-command }}
-
-        # Repeat installs can skip the root lifecycle after the policy-only install above.
-        - name: Install Electron binary
-          if: ${{ !contains(inputs.install-command, '--ignore-scripts') }}
-          shell: bash
-          run: pnpm exec install-electron

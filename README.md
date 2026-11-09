@@ -44,8 +44,9 @@ make install # or make i
 make dev
 ```
 
-Node.js, pnpm, and Rust are required. Normal installs download the Electron binary before rebuilding
-native modules. `make install` and normal CI setup also ensure the binary is present after repeat installs. `.node-version` selects the development and CI Node.js
+Node.js, pnpm, and Rust are required. Electron downloads its binary on first use, so the first app
+launch or Electron test run needs network access or a populated Electron download cache.
+`.node-version` selects the development and CI Node.js
 version on the supported Node.js 24 LTS line. `package.json` declares the supported range and project
 pnpm release. Use `pnpm` normally; pnpm downloads and runs the project's declared release when necessary.
 If an older pnpm fails to switch versions with `ENOEXEC` on macOS, install the declared release

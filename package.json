@@ -6,7 +6,7 @@
     "private": true,
     "packageManager": "pnpm@12.18.0",
     "scripts": {
-        "postinstall": "pnpm exec install-electron && electron-builder install-app-deps",
+        "postinstall": "electron-builder install-app-deps",
         "list-project-dev-scripts": "echo 'ALWAYS USE MAKEFILE SCRIPTS' && make help",
         "dev": "make dev",
         "test": "make test"
