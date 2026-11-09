@@ -2168,6 +2168,29 @@ test('an MCP child retains its allocation after the wrapper is killed', async ()
     }
 })
 
+test('a Linux process that exits during stat inspection is no longer a live holder', () => {
+    const script = `
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
+Object.defineProperty(process, 'platform', { value: 'linux' })
+const readFileSync = fs.readFileSync
+fs.readFileSync = (path, ...args) => {
+    if (path === '/proc/12345/stat') {
+        throw Object.assign(new Error('no such process, read'), { code: 'ESRCH' })
+    }
+    return readFileSync(path, ...args)
+}
+syncBuiltinESMExports()
+const { holderIsLive } = await import(${JSON.stringify(new URL('./core.mjs', import.meta.url).href)})
+assert.equal(holderIsLive({ pid: 12345, startIdentity: 'previous-process' }), false)
+`
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+        encoding: 'utf8',
+    })
+    assert.equal(result.status, 0, result.stderr)
+})
+
 test('run-workflow records a replacement detached listener before its wrapper exits', async () => {
     if (process.platform === 'win32') return
     const fixture = await createFixture()

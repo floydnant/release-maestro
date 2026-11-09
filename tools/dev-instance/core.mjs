@@ -126,6 +126,7 @@ const processStartIdentity = pid => {
             if (/[ZX]/.test(afterName[0] ?? '')) return null
             started = afterName[19] ?? ''
         } catch (error) {
+            if (error?.code === 'ESRCH') return null
             if (error?.code === 'ENOENT' && !processExists(pid)) return null
             if (error?.code === 'EACCES' || error?.code === 'EPERM') {
                 throw new InstanceError(
