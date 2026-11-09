@@ -44,11 +44,12 @@ make install # or make i
 make dev
 ```
 
-Node.js, pnpm, and Rust are required. `.node-version` selects the development and CI Node.js
+Node.js, pnpm, and Rust are required. Normal installs download the Electron binary before rebuilding
+native modules. `make install` and normal CI setup also ensure the binary is present after repeat installs. `.node-version` selects the development and CI Node.js
 version on the supported Node.js 24 LTS line. `package.json` declares the supported range and project
 pnpm release. Use `pnpm` normally; pnpm downloads and runs the project's declared release when necessary.
 If an older pnpm fails to switch versions with `ENOEXEC` on macOS, install the declared release
-with `npm install --global --allow-scripts=pnpm pnpm@12.16.1`, then retry. `make install`
+with `npm install --global --allow-scripts=pnpm pnpm@12.18.0`, then retry. `make install`
 installs the root package from the lockfile, fetches the locked Rust crates, and installs Playwright
 Chromium with its system dependencies. Linux system dependencies may require sudo. Chromium
 requires an OS supported by the installed Playwright version.

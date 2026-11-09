@@ -186,6 +186,7 @@ clean: ## Clean build outputs and caches
 .PHONY: i
 install: ## Install pnpm packages, Rust crates, and Playwright Chromium dependencies
 	$(PNPM) install --frozen-lockfile
+	$(PNPM) exec install-electron
 	cargo fetch --locked --manifest-path apps/metadata-engine/Cargo.toml
 	$(PNPM) exec playwright install --with-deps chromium
 i: install ## Alias for install
