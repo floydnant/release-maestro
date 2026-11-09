@@ -8,8 +8,10 @@ with HTTP 504. This note checks that change against Electron's design and recomm
 
 ## Recommendation
 
-Remove all three prefetches. Electron 45 downloads its binary on first use, so none of them is needed
-for correctness. Keep `electron-builder install-app-deps` in `postinstall`.
+Remove all three general-install prefetches. Keep `electron-builder install-app-deps` in `postinstall`.
+Development Electron E2E now prepares the binary once in Playwright global setup, before its two local
+workers start. This consumer-specific preparation prevents concurrent first-use downloads and checks
+for stale binaries. Production E2E uses the packaged executable; renderer E2E needs no Electron binary.
 
 If you want one explicit step, keep only the `make install` line, documented as warming a
 full development checkout. Don't put the prefetch back in the shared CI action. Formatting, lint, and security scans do not need the Electron runtime. Database checks use the
@@ -81,7 +83,7 @@ option. Upstream treats prefetch as optional and something each project chooses,
 - Download errors move from install time to the first launch, an RFC drawback the authors accepted.
   The `index.js` error message tells users to run `npx install-electron --no`.
 - Both Electron E2E configurations use one worker in CI. Local runs use two and could attempt
-  simultaneous first-use downloads. This is an unverified upstream risk, not evidence for a shared
-  prefetch. A demonstrated failure would justify preparation in that consumer alone.
+  simultaneous first-use downloads. The development suite now avoids that risk with one global setup
+  step. This serializes workers within one invocation; it does not lock separate test runs or worktrees.
 - The cleanup removes the README promise that repeat installs ensure the binary is present.
   First use requires network access or a populated download cache.
