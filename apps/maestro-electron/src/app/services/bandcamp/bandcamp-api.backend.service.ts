@@ -1,4 +1,3 @@
-import bandcampFetch, { Artist, Label } from 'bandcamp-fetch'
 import { CheerioAPI, load as cheerioLoad } from 'cheerio'
 import {
     FetchFailedException,
@@ -48,10 +47,6 @@ const parseBandData = ($: CheerioAPI): BandData | null => {
 }
 
 export class BandcampApiBackendService {
-    async getBand(url: string): Promise<Label | Artist> {
-        return await bandcampFetch.band.getInfo({ bandUrl: url })
-    }
-
     async scrapeTralbumInfo(url: string): Promise<ScrapedTralbumInfo> {
         const result = await fetch(url).catch(err => {
             if (err instanceof Error) {

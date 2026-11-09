@@ -1,18 +1,1 @@
-[
-    {
-        "name": "extract-zip",
-        "version": "2.0.1",
-        "ecosystem": "npm",
-        "id": "GHSA-7pqw-9j4j-h8q3",
-        "expires": "2026-11-02",
-        "reason": "Existing Puppeteer dependency under bandcamp-fetch. Browser archive extraction can write through unsafe symlinks. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
-    },
-    {
-        "name": "extract-zip",
-        "version": "2.0.1",
-        "ecosystem": "npm",
-        "id": "GHSA-jmr9-qjv8-65gv",
-        "expires": "2026-11-02",
-        "reason": "Existing Puppeteer dependency under bandcamp-fetch. Browser archive extraction can write through unsafe symlinks. Accepted temporarily to introduce scanning without changing dependency resolution in MAE-54; this is not a finding that the package is safe."
-    }
-]
+[]

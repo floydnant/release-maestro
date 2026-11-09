@@ -24,7 +24,6 @@
         "@ng-icons/octicons": "36.1.0",
         "@ng-icons/solar-icons": "36.1.0",
         "@spartan-ng/brain": "1.9.0",
-        "bandcamp-fetch": "3.2.1",
         "better-sqlite3": "13.0.3",
         "cheerio": "1.2.0",
         "class-variance-authority": "0.7.1",

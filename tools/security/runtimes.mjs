@@ -18,6 +18,7 @@ export const sources = {
     chrome: 'https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json',
 }
 const runtimePackages = ['electron', 'playwright-core', 'puppeteer-core']
+const requiredRuntimePackages = new Set(['electron', 'playwright-core'])
 const supportedElectronMajorCount = 3
 const hour = 60 * 60 * 1000
 const maxChromeFeedAge = 48 * hour
@@ -178,7 +179,8 @@ const inventoryRuntimes = (directory, lockfile, upstream) => {
     const errors = []
     for (const name of runtimePackages) {
         const versions = lockVersions(lockfile, name)
-        if (!versions.length) errors.push(`Runtime package missing from lockfile: ${name}`)
+        if (!versions.length && requiredRuntimePackages.has(name))
+            errors.push(`Runtime package missing from lockfile: ${name}`)
         for (const version of versions) {
             try {
                 const browsers =

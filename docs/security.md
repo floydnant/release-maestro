@@ -80,8 +80,8 @@ uses v12. Recent Dependabot PRs have updated the lockfile successfully, but that
 complete remediation coverage. Dependency submission fills graph coverage; it cannot guarantee that
 Dependabot can resolve a compatible fix.
 
-`tools/security/exceptions.json` retains two extract-zip exceptions that expired on November 2, 2026.
-They no longer accept either finding. The other five exceptions were removed after their findings disappeared.
+`tools/security/exceptions.json` is empty. Removing the unused Bandcamp browser dependency removed
+extract-zip and its two expired exceptions.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, and UTC expiry date.
 They expire at the start of that date. Full scans then block only if the matching vulnerability
 is still present; a stale entry for a resolved finding does not fail the scan. Offline policy validation
@@ -98,15 +98,12 @@ Minimatch 9 and 10 use exact-version overrides to 11.0.1. Legacy versions 3 and 
 on their upstream ranges because overriding them produced an empty fixture archive.
 Remove an override when upstream uses a fixed version.
 
-The November 9, 2026 full scan blocks three findings. Scanning the original locks at
-`f81573a2dd32dbd2b0afb8ccdd37ce18a8c9ce4d` with the same OSV version reports the same findings.
-The old minimatch table was stale. The base already contains the 9.x and 10.x overrides,
-and the current scan reports no minimatch findings.
+The November 9, 2026 full scan blocks one finding after removing the unused bandcamp-fetch dependency.
+That removal also removes extract-zip and both of its findings. The scan reports no minimatch findings.
 
-| Package           | Advisory                                 | Remediation                                                   |
-| ----------------- | ---------------------------------------- | ------------------------------------------------------------- |
-| deepmerge 4.3.1   | GHSA-gcqx-w48m-w2h4                      | No published fix. The upstream caller needs a compatible fix. |
-| extract-zip 2.0.1 | GHSA-7pqw-9j4j-h8q3, GHSA-jmr9-qjv8-65gv | No published fix. Both exceptions expired.                    |
+| Package         | Advisory            | Remediation                                                   |
+| --------------- | ------------------- | ------------------------------------------------------------- |
+| deepmerge 4.3.1 | GHSA-gcqx-w48m-w2h4 | No published fix. The upstream caller needs a compatible fix. |
 
 No new acceptance or exception extension applies to these findings. The Rust `paste` 1.0.15
 maintenance notice, RUSTSEC-2024-0436, remains informational.
@@ -235,7 +232,8 @@ Dependabot finding for Electron or Playwright. The npm remediation job starts fr
 so a successful run does not establish that bundled runtimes are secure.
 
 `make security-runtimes` writes `dist/security/runtimes.json`. It inventories every locked Electron,
-Playwright Core, and Puppeteer Core version, including Playwright MCP's separate prerelease.
+Playwright Core, and Puppeteer Core version when present. Electron and Playwright are required;
+Puppeteer is no longer a dependency. A locked Puppeteer version still requires a complete inventory.
 Electron's official release feed supplies its Chromium and Node versions. Lockfile-matched installed
 package manifests supply Playwright's Chromium and headless-shell versions and Puppeteer's Chrome
 revision. Package JavaScript is read as text, never executed. Install the frozen lockfile first;
@@ -254,7 +252,9 @@ existing required PR comparison or release publication gate.
 PR runs use `make security-runtimes INVENTORY_ONLY=1`. They publish the same freshness findings in
 an artifact and job summary, and fail on missing or unknown inventory. They do not fail on freshness
 findings, including newly introduced stale runtimes. Main pushes, schedules, and manual runs fail on
-both. This mode does not clear findings or grant exceptions; MAE-179 tracks remediation.
+both. This mode does not clear findings or grant exceptions.
+The [November 9 runtime review](research/bundled-browser-runtimes.md) records executable evidence,
+remediation, and the remaining historical exposure investigation under MAE-179.
 
 The inventory describes package declarations, not binary attestation. It does not prove that a
 cached or custom browser executable matches its package, inspect a running CDP endpoint, or establish

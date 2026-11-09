@@ -24,7 +24,7 @@ Download the latest installer from [GitHub releases](https://github.com/floydnan
 | Audio tags | Rust (metadata-engine sidecar)       |
 | Database   | SQLite (better-sqlite3), Drizzle ORM |
 | Validation | Zod                                  |
-| Scraping   | Cheerio, bandcamp-fetch              |
+| Scraping   | Native fetch, Cheerio                |
 | Build      | Nx (monorepo), electron-builder      |
 | Testing    | Jest (unit), Playwright (E2E)        |
 
