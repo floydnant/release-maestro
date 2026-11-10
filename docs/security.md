@@ -82,8 +82,7 @@ Dependabot can resolve a compatible fix.
 
 `tools/security/exceptions.json` contains one patch-bound allowance for deepmerge 4.3.1 and
 GHSA-gcqx-w48m-w2h4, expiring November 24, 2026 at 00:00 UTC. Floyd Haremsa owns the upstream
-replacement and removal in [MAE-181](https://linear.app/floyd-haremsa/issue/MAE-181), with the next
-review due November 12. Removing the unused Bandcamp browser dependency removed
+replacement and removal, recorded in [MAE-181](https://linear.app/floyd-haremsa/issue/MAE-181). Removing the unused Bandcamp browser dependency removed
 extract-zip and its two expired exceptions.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, and UTC expiry date.
 They expire at the start of that date. Full scans then block only if the matching vulnerability
@@ -120,8 +119,9 @@ The PR comparison still uses no exceptions, so new vulnerabilities remain blocke
 
 This is a reviewed mitigation, not an upstream fix. Remove the patch and allowance together after
 an upstream fix passes the full scan and affected tooling checks. Expiry blocks the advisory again
-at midnight UTC; extensions require a separate maintainer decision and review. MAE-181 remains open
-for upstream replacement and unresolved applicability or shipped exposure.
+at midnight UTC; extensions require a separate maintainer decision and review. The expiring gate
+triggers follow-up without keeping the mitigation ticket open. MAE-181 records the patch and the
+unresolved applicability or shipped-exposure limitations.
 The Rust `paste` 1.0.15
 maintenance notice, RUSTSEC-2024-0436, remains informational.
 
