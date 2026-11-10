@@ -8,6 +8,7 @@ const electronE2EBaseURL = `http://localhost:${electronE2EPort}`
 
 export default defineConfig({
     ...nxE2EPreset(__filename, { testDir: './src/electron' }),
+    globalSetup: require.resolve('./src/support/prepare-electron'),
     outputDir: `${workspaceRoot}/dist/.playwright/maestro-e2e-electron/test-output`,
     reporter: [
         ['html', { open: 'never', outputFolder: `${workspaceRoot}/playwright-report/electron` }],

@@ -92,20 +92,21 @@ automatically or suppress whole packages. Acceptance does not establish safety.
 Nx and other build tools still pin vulnerable dependency versions. Exact-version overrides in
 `pnpm-workspace.yaml` select Axios 1.20.0, brace-expansion 5.0.12, smol-toml 1.9.1,
 follow-redirects 1.16.2, Undici 7.30.1, basic-ftp 6.2.1, esbuild 0.25.0,
-serialize-javascript 7.1.4, Zod 4.6.6, and Glob 14.0.2.
+serialize-javascript 7.1.4, Zod 4.6.6, Glob 14.0.2, and Minimatch 11.0.1.
 The Angular build package now uses fixed Vite 8.3.5, so its override was removed.
-Minimatch remains on the versions required by upstream callers. Version 11 removes `makeRe`,
-which Nx needs for wildcard project selection and generators. Overriding legacy versions 3 and 5
-also produced an empty archive in a fixture packaging check. Remove an override when upstream uses
-a fixed version.
+Minimatch 9 and 10 use exact-version overrides to 11.0.1. Legacy versions 3 and 5 remain
+on their upstream ranges because overriding them produced an empty fixture archive.
+Remove an override when upstream uses a fixed version.
 
-The November 2, 2026 full scan still blocks eight findings:
+The November 9, 2026 full scan blocks three findings. Scanning the original locks at
+`f81573a2dd32dbd2b0afb8ccdd37ce18a8c9ce4d` with the same OSV version reports the same findings.
+The old minimatch table was stale. The base already contains the 9.x and 10.x overrides,
+and the current scan reports no minimatch findings.
 
-| Package                                       | Advisory                                 | Remediation                                                                                  |
-| --------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------- |
-| deepmerge 4.3.1                               | GHSA-gcqx-w48m-w2h4                      | No published fix. Update or replace the upstream caller when a compatible fix exists.        |
-| extract-zip 2.0.1                             | GHSA-7pqw-9j4j-h8q3, GHSA-jmr9-qjv8-65gv | No published fix. Both exceptions expired.                                                   |
-| minimatch 3.1.5, 5.1.9, 9.0.9, 10.2.5, 10.2.6 | GHSA-g3hv-75wg-m249                      | The available fix starts at 11.0.1. Nx and packaging callers need an upstream API migration. |
+| Package           | Advisory                                 | Remediation                                                   |
+| ----------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| deepmerge 4.3.1   | GHSA-gcqx-w48m-w2h4                      | No published fix. The upstream caller needs a compatible fix. |
+| extract-zip 2.0.1 | GHSA-7pqw-9j4j-h8q3, GHSA-jmr9-qjv8-65gv | No published fix. Both exceptions expired.                    |
 
 No new acceptance or exception extension applies to these findings. The Rust `paste` 1.0.15
 maintenance notice, RUSTSEC-2024-0436, remains informational.

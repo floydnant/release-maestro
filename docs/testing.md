@@ -22,6 +22,11 @@ Chromium with its system dependencies before running the checks below.
   designed for 50k–500k songs ([ADR 0004](adr/0004-browse-queries-are-windowed-and-selections-carry-a-query.md));
   adding a sortable column means adding its index and a case to `library-browse.scale.spec.ts`.
 
+Development Electron E2E runs `prepare-electron.ts` once through Playwright global setup before
+starting its workers. The installer checks the pinned version and refreshes a missing or stale binary.
+This prevents parallel workers from initiating the same download. Production E2E uses the packaged
+executable, prepared by its packaging dependency. Renderer E2E needs no Electron binary.
+
 Both application E2E layers live in `apps/maestro-e2e/`. Do not use renderer E2E for routing smoke tests or happy
 paths that need real IPC, files, database state, or the sidecar.
 

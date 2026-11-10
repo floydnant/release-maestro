@@ -1324,7 +1324,8 @@ test('MCP wrapper stops a server descendant when its package-manager exits', asy
         server,
         `const { writeFileSync } = require('node:fs')
 writeFileSync(${JSON.stringify(serverPidPath)}, String(process.pid))
-require('node:net').createServer(() => {}).listen(Number(process.env.RELEASE_MAESTRO_CDP_PORT), '127.0.0.1', () => writeFileSync(${JSON.stringify(ready)}, 'ready'))
+const listener = require('node:net').createServer(() => {})
+listener.listen(0, '127.0.0.1', () => writeFileSync(${JSON.stringify(ready)}, String(listener.address().port)))
 `,
     )
     await writeFile(
@@ -1343,9 +1344,10 @@ const timer = setInterval(() => { if (existsSync(${JSON.stringify(ready)})) { cl
         const result = await childResult(wrapper)
         assert.equal(result.code, 0, result.stderr)
         assert.equal(existsSync(ready), true)
+        const serverPort = Number(await readFile(ready, 'utf8'))
         const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
         await waitFor(
-            () => portIsAvailable(status.bundle.cdp),
+            () => portIsAvailable(serverPort),
             available => available,
             'MCP server descendant survived wrapper cleanup',
         )
@@ -2166,6 +2168,29 @@ test('an MCP child retains its allocation after the wrapper is killed', async ()
             if (error?.code !== 'ESRCH') throw error
         }
     }
+})
+
+test('a Linux process that exits during stat inspection is no longer a live holder', () => {
+    const script = `
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
+Object.defineProperty(process, 'platform', { value: 'linux' })
+const readFileSync = fs.readFileSync
+fs.readFileSync = (path, ...args) => {
+    if (path === '/proc/12345/stat') {
+        throw Object.assign(new Error('no such process, read'), { code: 'ESRCH' })
+    }
+    return readFileSync(path, ...args)
+}
+syncBuiltinESMExports()
+const { holderIsLive } = await import(${JSON.stringify(new URL('./core.mjs', import.meta.url).href)})
+assert.equal(holderIsLive({ pid: 12345, startIdentity: 'previous-process' }), false)
+`
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+        encoding: 'utf8',
+    })
+    assert.equal(result.status, 0, result.stderr)
 })
 
 test('run-workflow records a replacement detached listener before its wrapper exits', async () => {
