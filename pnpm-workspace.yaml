@@ -77,6 +77,7 @@ minimumReleaseAgeExcludePrune: true
 # Upstream tools pin these vulnerable versions. Replace only the affected versions with fixes.
 overrides:
     # MCP 0.0.84 pins an older alpha. Keep its client and core on the tested stable release.
+    # Remove these overrides when an eligible MCP release selects current browser packages.
     '@playwright/mcp@0.0.84>playwright': 1.65.0
     '@playwright/mcp@0.0.84>playwright-core': 1.65.0
     axios@1.18.1: 1.20.0

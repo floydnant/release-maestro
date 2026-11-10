@@ -253,8 +253,6 @@ PR runs use `make security-runtimes INVENTORY_ONLY=1`. They publish the same fre
 an artifact and job summary, and fail on missing or unknown inventory. They do not fail on freshness
 findings, including newly introduced stale runtimes. Main pushes, schedules, and manual runs fail on
 both. This mode does not clear findings or grant exceptions.
-The [November 9 runtime review](research/bundled-browser-runtimes.md) records executable evidence,
-remediation, and the remaining historical exposure investigation under MAE-179.
 
 The inventory describes package declarations, not binary attestation. It does not prove that a
 cached or custom browser executable matches its package, inspect a running CDP endpoint, or establish
@@ -262,6 +260,11 @@ which optional components shipped in an installer. It does not yet map Chromium/
 support dates, native libraries embedded in Rust binaries, or previous published installers to
 fixed versions. Keep these coverage gaps visible in investigations rather than interpreting an
 empty package advisory report as safety.
+
+Development MCP servers attach to Electron over CDP, so their browser declarations do not identify
+the connected runtime. Renderer E2E uses Playwright's default headless shell. When verifying binaries,
+record the launched executable and its reported version; `chromium.executablePath()` names full
+Chromium, which can differ from the executable used by a headless launch.
 
 ## Security automation health and AI investigation
 
