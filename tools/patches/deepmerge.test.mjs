@@ -5,14 +5,13 @@ import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
 const root = fileURLToPath(new URL('../../', import.meta.url))
-const consumers = globSync(
-    [
-        'node_modules/.pnpm/jest-config@30.5.2*/node_modules/jest-config/package.json',
-        'node_modules/.pnpm/fork-ts-checker-webpack-plugin@9.1.0*/node_modules/fork-ts-checker-webpack-plugin/package.json',
-    ],
-    { cwd: root },
-)
-if (consumers.length < 2) throw new Error('Expected both deepmerge consumers to be installed')
+const consumers = ['jest-config', 'fork-ts-checker-webpack-plugin'].flatMap(name => {
+    const manifests = globSync(`node_modules/.pnpm/${name}@*/node_modules/${name}/package.json`, {
+        cwd: root,
+    })
+    if (manifests.length === 0) throw new Error(`Expected deepmerge consumer ${name} to be installed`)
+    return manifests
+})
 const entrypoints = [...new Set(consumers.map(path => createRequire(`${root}/${path}`).resolve('deepmerge')))]
 
 const builds = entrypoints.flatMap(entrypoint => [entrypoint, join(dirname(entrypoint), 'umd.js')])
