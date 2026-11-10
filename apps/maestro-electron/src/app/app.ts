@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, session, shell } from 'electron'
+import { BrowserWindow, screen, session } from 'electron'
 import { join } from 'path'
 import { format } from 'url'
 import { environment } from '../environments/environment'
@@ -6,14 +6,7 @@ import { showMainWindow } from './app-window'
 import { developmentAppName, rendererAppName, rendererAppPort } from './constants'
 import { nativeWindowBackgroundColor } from './design-tokens.generated'
 import { configurePermissionPolicy } from './permissions'
-
-const isSafeExternalUrl = (url: string) => {
-    try {
-        return ['http:', 'https:'].includes(new URL(url).protocol)
-    } catch {
-        return false
-    }
-}
+import { openUrlInNativeBrowser } from './external-url'
 
 const isSameWebOrigin = (url: string, currentUrl: string) => {
     try {
@@ -24,14 +17,6 @@ const isSameWebOrigin = (url: string, currentUrl: string) => {
     } catch {
         return false
     }
-}
-
-const openUrlInNativeBrowser = (url: string) => {
-    if (!isSafeExternalUrl(url)) return
-
-    void shell.openExternal(url).catch(error => {
-        console.error('Failed to open URL in the native browser:', error)
-    })
 }
 
 export default class App {

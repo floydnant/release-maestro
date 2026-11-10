@@ -1318,13 +1318,19 @@ test('MCP wrapper stops a server descendant when its package-manager exits', asy
     const bin = join(fixture.base, 'bin')
     const ready = join(fixture.base, 'mcp-server-ready')
     const serverPidPath = join(fixture.base, 'mcp-server.pid')
+    const serverPortPath = join(fixture.base, 'mcp-server.port')
     const server = join(fixture.base, 'mcp-server.cjs')
     await mkdir(bin)
     await writeFile(
         server,
         `const { writeFileSync } = require('node:fs')
 writeFileSync(${JSON.stringify(serverPidPath)}, String(process.pid))
-require('node:net').createServer(() => {}).listen(Number(process.env.RELEASE_MAESTRO_CDP_PORT), '127.0.0.1', () => writeFileSync(${JSON.stringify(ready)}, 'ready'))
+// An MCP descendant must not claim the Electron CDP endpoint during holder registration.
+const listener = require('node:net').createServer(() => {})
+listener.listen(0, '127.0.0.1', () => {
+    writeFileSync(${JSON.stringify(serverPortPath)}, String(listener.address().port))
+    writeFileSync(${JSON.stringify(ready)}, 'ready')
+})
 `,
     )
     await writeFile(
@@ -1344,8 +1350,9 @@ const timer = setInterval(() => { if (existsSync(${JSON.stringify(ready)})) { cl
         assert.equal(result.code, 0, result.stderr)
         assert.equal(existsSync(ready), true)
         const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
+        const serverPort = Number(await readFile(serverPortPath, 'utf8'))
         await waitFor(
-            () => portIsAvailable(status.bundle.cdp),
+            () => portIsAvailable(serverPort),
             available => available,
             'MCP server descendant survived wrapper cleanup',
         )
