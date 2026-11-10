@@ -180,10 +180,11 @@ or hit a stop condition.
 
 ## Health
 
-Check `security.yml`, `security-remediation.yml`, `security-runtimes.yml`, `security-health.yml` and
-`security-notify.yml` on the default branch. A problem is:
+Check the scheduled workflows `security.yml`, `security-remediation.yml`, `security-runtimes.yml` and
+`security-health.yml` on the default branch. `security-notify.yml` has no schedule; check only its
+configuration and its deliveries. A problem is:
 
-- no completed scheduled run within 36 hours;
+- a scheduled workflow with no completed scheduled run within 36 hours;
 - a latest run that failed, was cancelled or timed out;
 - a failed or unconfigured webhook delivery;
 - an allowance due under step 5;
