@@ -1,6 +1,8 @@
 import { ScrapedTralbumInfo } from './bandcamp-api.schema'
-import { BandcampFeedItem, HydratedBandcampReleaseFeedItem } from './feed.schema'
+import { FeedItemWithPurchases, HydratedBandcampReleaseFeedItem } from './feed.schema'
 import { ScrapedLinkMetadata } from './web-scraping.schema'
+import { mergeBandcampFans } from './feed.purchases'
+import { normalizeBandcampReleaseUrl } from '../utils/bandcamp-release-url'
 
 // Email content is untrusted. Classify links by their parsed host and path, never by substring, and
 // scan text in linear time: nested or adjacent quantifiers backtrack polynomially on long input.
@@ -132,33 +134,47 @@ const renderEmailAbout = (plainBody: string, unsubscribeLink: string | null, rel
 }
 
 export function mapBandcampReleaseFeedItemToHydratedFeedItem(
-    { data, source, ...item }: Extract<BandcampFeedItem, { type: 'BANDCAMP.TRALBUM' }>,
+    { data, source, purchases, ...item }: Extract<FeedItemWithPurchases, { type: 'BANDCAMP.TRALBUM' }>,
     tralbum: ScrapedTralbumInfo | null,
     linkMetadataMap: Record<string, ScrapedLinkMetadata | null> | null,
-    error: { userFacingMessage: string } | null,
+    error: { userFacingMessage: string; retryAt?: Date } | null,
 ): HydratedBandcampReleaseFeedItem {
-    if (source.type != 'EMAIL.BANDCAMP_NEW_RELEASE')
-        throw new Error('Cannot map fans bought music email to hydrated feed item')
+    const newRelease = source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' ? source : null
+    const sourceLinks = newRelease?.links ?? []
+    const releaseType = tralbum?.type ?? data.tralbumType
+    // Purchase attribution: an album's buyers appear on every track, a track's buyers on that track.
+    const fansWhoBought = (url: string | null) =>
+        mergeBandcampFans(
+            ...purchases.filter(purchase => purchase.tralbumUrl === url).map(purchase => purchase.fans),
+        )
+    const albumBuyers = fansWhoBought(data.tralbumUrl)
 
-    const unsubscribeUrl = source.links.find(isUnsubscribeLink) ?? null
+    const unsubscribeUrl = sourceLinks.find(isUnsubscribeLink) ?? null
 
     return {
         ...item,
-        error: error?.userFacingMessage ? { message: error.userFacingMessage } : null,
+        sourceType: source.type,
+        error: error?.userFacingMessage
+            ? {
+                  message: error.userFacingMessage,
+                  ...(error.retryAt ? { retryAt: error.retryAt.getTime() } : {}),
+              }
+            : null,
         data: {
             releaseUrl: data.tralbumUrl,
             releaseDate: tralbum?.releaseDate ?? null,
             emailReceivedAt: new Date(source.dateReceived),
             isEmailRead: source.isRead,
             emailId: source.messageId,
-            releaseName: tralbum?.title || source.subject,
+            fans: mergeBandcampFans(...purchases.map(purchase => purchase.fans)),
+            releaseName: tralbum?.title || newRelease?.subject || data.tralbumUrl,
             band: tralbum?.band || null,
             artist: tralbum?.artist || null,
-            releaseType: source.releaseType,
+            releaseType,
             about:
                 (tralbum && renderTralbumAbout(tralbum.about)) ||
-                renderEmailAbout(source.plainBody, unsubscribeUrl, source.releaseUrl),
-            links: [...new Set(source.links)].filter(isUsefulUrlFromBandcampEmail).map(url => {
+                renderEmailAbout(newRelease?.plainBody ?? '', unsubscribeUrl, data.tralbumUrl),
+            links: [...new Set(sourceLinks)].filter(isUsefulUrlFromBandcampEmail).map(url => {
                 const meta = linkMetadataMap?.[url]
                 return {
                     title: meta?.title || url,
@@ -168,12 +184,18 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
             }),
             unsubscribeUrl,
             unsubscribeText:
-                findUnsubscribeText(source.plainBody)?.replaceAll(REPLACEMENT_CHARACTER, '') || 'Unfollow',
-            imageUrl: tralbum?.artworkUrl || source.links.find(isArtworkLink)?.replace('_9.jpg', '_16.jpg'),
+                findUnsubscribeText(newRelease?.plainBody ?? '')?.replaceAll(REPLACEMENT_CHARACTER, '') ||
+                'Unfollow',
+            imageUrl: tralbum?.artworkUrl || sourceLinks.find(isArtworkLink)?.replace('_9.jpg', '_16.jpg'),
             iframeUrl: tralbum?.id
-                ? `https://bandcamp.com/EmbeddedPlayer/${source.releaseType}=${tralbum.id}/size=large/bgcol=999999/linkcol=0687f5`
+                ? `https://bandcamp.com/EmbeddedPlayer/${releaseType}=${tralbum.id}/size=large/bgcol=999999/linkcol=0687f5`
                 : null,
-            tracks: tralbum?.tracks || [],
+            tracks: (tralbum?.tracks ?? []).map(track => {
+                const trackUrl = track.titleLink
+                    ? normalizeBandcampReleaseUrl(track.titleLink, data.tralbumUrl)
+                    : null
+                return { ...track, fans: mergeBandcampFans(albumBuyers, fansWhoBought(trackUrl)) }
+            }),
         },
     }
 }

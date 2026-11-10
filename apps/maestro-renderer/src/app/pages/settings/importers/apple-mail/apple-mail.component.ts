@@ -10,7 +10,11 @@ import {
 import { FormsModule } from '@angular/forms'
 import { HlmButton } from '@spartan-ng/helm/button'
 import { HlmInput } from '@spartan-ng/helm/input'
-import { FeedService } from '../../../../core/services/feed.service'
+import {
+    emailImportActivity,
+    FeedService,
+    isEmailImportRunning,
+} from '../../../../core/services/feed.service'
 import { SettingsService } from '../../../../core/settings/settings.service'
 import { ProgressRingComponent } from '../../../../shared/components/progress-ring/progress-ring.component'
 
@@ -41,9 +45,19 @@ export class AppleMailImporterComponent {
 
     /** The running or last import of this session, whichever started it. */
     readonly importUpdate = this.feedService.emailImportUpdate
-    readonly isImporting = computed(() => {
-        const phase = this.importUpdate()?.phase
-        return phase === 'started' || phase === 'processing'
+    /** The running import, or null once it has ended. */
+    readonly runningImport = computed(() => {
+        const update = this.importUpdate()
+        return isEmailImportRunning(update) ? update : null
+    })
+    readonly isImporting = computed(() => this.runningImport() !== null)
+    /** What the running import shows, live rather than paced as in the title bar. */
+    readonly runningImportActivity = computed(() => {
+        const update = this.runningImport()
+        if (update === null) return null
+        const activity = emailImportActivity(update)
+        const color = activity.ring === 'spinning' ? 'content.action' : 'content.success'
+        return { ...activity, color } as const
     })
 
     /** Why "Import now" is disabled, or null when it is not, or settings have not loaded yet. */

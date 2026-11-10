@@ -3,8 +3,15 @@ import { CalendarDay } from './calendar-day.schema'
 import {
     bandcampEmailFansBoughtMusicFeedSourceItemSchema,
     bandcampEmailNewReleaseFeedSourceItemSchema,
+    BandcampFan,
+    BandcampPurchase,
 } from './feed-source.schema'
 import { BandData, ScrapedTralbumInfo } from './bandcamp-api.schema'
+
+export const reloadFeedItemsRequestSchema = z.object({
+    ids: z.array(z.string().min(1).max(200)).min(1).max(20),
+})
+export type ReloadFeedItemsRequest = z.infer<typeof reloadFeedItemsRequestSchema>
 
 const feedItemBaseSchema = z.object({
     id: z.string(),
@@ -33,13 +40,24 @@ export const bandcampTralbumFeedItem = feedItemBaseSchema.extend({
     }),
     source: z.discriminatedUnion('type', [
         bandcampEmailNewReleaseFeedSourceItemSchema,
-        bandcampEmailFansBoughtMusicFeedSourceItemSchema,
+        bandcampEmailFansBoughtMusicFeedSourceItemSchema.pick({
+            type: true,
+            messageId: true,
+            dateReceived: true,
+            isRead: true,
+        }),
     ]),
 })
 export type BandcampFeedItem = z.infer<typeof bandcampTralbumFeedItem>
 
 export const feedItemMasterSchema = z.discriminatedUnion('type', [bandcampTralbumFeedItem])
 export type FeedItemMaster = z.infer<typeof feedItemMasterSchema>
+
+/**
+ * A feed item with the purchases that name its release URLs. Purchases and their fans live in their
+ * own tables, not in the item's `data`; the feed repository joins them on read and splits them on write.
+ */
+export type FeedItemWithPurchases = FeedItemMaster & { purchases: BandcampPurchase[] }
 
 ////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////// HYDRATED ///////////////////////////////////
@@ -52,6 +70,7 @@ export type HydratedBandcampReleaseFeedItem = {
         emailReceivedAt: Date
         isEmailRead: boolean
         emailId: string
+        fans: BandcampFan[]
         releaseName: string
         band: BandData | null
         artist: string | null
@@ -62,11 +81,12 @@ export type HydratedBandcampReleaseFeedItem = {
         unsubscribeText: string
         imageUrl: string | undefined
         iframeUrl: string | null
-        tracks: ScrapedTralbumInfo['tracks']
+        tracks: (ScrapedTralbumInfo['tracks'][number] & { fans: BandcampFan[] })[]
     }
-    error: { message: string } | null
+    error: { message: string; retryAt?: number } | null
     id: string
     type: 'BANDCAMP.TRALBUM'
+    sourceType: BandcampFeedItem['source']['type']
 }
 
 export type HydratedFeedItem = HydratedBandcampReleaseFeedItem

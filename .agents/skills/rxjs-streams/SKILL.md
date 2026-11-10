@@ -58,17 +58,18 @@ bookkeeping.
 `library.service.ts` adapt `ipcRenderer.on` into a stream. Prefer it over a hand-rolled `Subject` when
 the source is already an add/remove listener pair.
 
-**Batching a fast producer.** `feed.backend.service.ts` uses `bufferCount(50)` followed by
-`concatMap` — collect 50, then process batches strictly in order. That pairing is the idiom for a
-producer faster than its consumer where order still matters; `bufferCount` with `mergeMap` would
-silently interleave.
+**Parallel preparation, ordered persistence.** `feed/email-import-pass.ts` uses `connect` to share
+exported emails between the import queue, a bounded `mergeMap` of parent album lookups, and the end
+of the export. The pure `EmailImportQueue` releases ready emails in export order, and `concatMap`
+serializes their saves. `materialize` before that `concatMap` and `dematerialize` after it queue the
+stream's error or completion behind earlier saves.
 
-**Carrying errors across a boundary.** The same file uses `materialize()` so completion and error
-become ordinary values that survive the IPC hop, then reconstitutes them on the far side. A raw error
-thrown inside a stream does not cross `ipcRenderer` intact.
+**Carrying errors across a boundary.** The same pass turns a failure into state and an ordinary
+terminal progress update (`completed`, `cancelled` or `error`), so the outcome survives the IPC hop.
+A raw error thrown inside a stream does not cross `ipcRenderer` intact.
 
-**Combining independent progress sources.** `merge()` of several materialized branches into one
-progress stream, so the renderer subscribes once.
+**Combining independent progress sources.** The pass `merge()`s its export and save progress into
+one stream, then `concat`s the terminal update after both, so the renderer subscribes once.
 
 ## Cancellation
 
