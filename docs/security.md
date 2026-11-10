@@ -101,9 +101,17 @@ Remove an override when upstream uses a fixed version.
 The November 9, 2026 full scan blocks one finding after removing the unused bandcamp-fetch dependency.
 That removal also removes extract-zip and both of its findings. The scan reports no minimatch findings.
 
-| Package         | Advisory            | Remediation                                                   |
-| --------------- | ------------------- | ------------------------------------------------------------- |
-| deepmerge 4.3.1 | GHSA-gcqx-w48m-w2h4 | No published fix. The upstream caller needs a compatible fix. |
+| Package         | Advisory            | Remediation                                                                                            |
+| --------------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| deepmerge 4.3.1 | GHSA-gcqx-w48m-w2h4 | Local pnpm patch blocks `__proto__` copying; no published fix, so the version-based scan still blocks. |
+
+The local `patches/deepmerge@4.3.1.patch` rejects `__proto__` in both target and source
+copy loops, in the source and both distributed builds. Regression tests exercise the installed
+package through Jest and fork-ts-checker-webpack-plugin dependency resolution. This mitigates the
+reported returned-object prototype poisoning; it does not change the package version or establish
+packaged/shipped exposure. The lockfile scanner still reports the advisory. [MAE-181](https://linear.app/floyd-haremsa/issue/MAE-181)
+remains open until a reviewed fix passes `make security`; remove the patch when an upstream fix
+replaces it. No scanner suppression or exception applies to this patch.
 
 No new acceptance or exception extension applies to these findings. The Rust `paste` 1.0.15
 maintenance notice, RUSTSEC-2024-0436, remains informational.

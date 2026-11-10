@@ -96,3 +96,4 @@ overrides:
     minimatch@9.0.9: 11.0.1
 patchedDependencies:
     '@spartan-ng/brain@1.9.0': patches/@spartan-ng__brain@1.9.0.patch
+    deepmerge@4.3.1: patches/deepmerge@4.3.1.patch
