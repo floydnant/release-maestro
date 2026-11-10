@@ -99,6 +99,14 @@ Details in [.agents/skills/verification-loop/SKILL.md](.agents/skills/verificati
 
 ## Keeping the docs true
 
+Repository documentation describes current behavior, supported workflows, domain terms, and lasting
+design decisions. Keep dated research reports, status updates, verification logs, and investigation
+trails in the conversation or related Linear issue or PR discussion. Use ignored `tmp/` for local
+working notes.
+Extract lasting conclusions into the existing documentation or code comments that own the behavior,
+with source links where useful. A research request alone does not call for a repository document;
+honor an explicitly requested file destination. Dates in ADRs or maintained reference docs are fine.
+
 These documents are only worth loading if they still describe the repository. Update them as part of
 the change that invalidates them, not afterwards.
 

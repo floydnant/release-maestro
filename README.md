@@ -134,9 +134,8 @@ or [route history](docs/adr/0006-only-route-changes-are-history-steps.md). The d
 shows the shared components and their interaction states.
 
 For new controls and component updates, follow
-[frontend-design](.agents/skills/frontend-design/SKILL.md). The
-[library evaluation](docs/research/angular-ui-libraries.md) records the selection and compatibility
-checks.
+[frontend-design](.agents/skills/frontend-design/SKILL.md) and the
+[shared UI maintenance guide](apps/maestro-renderer/src/app/shared/ui/README.md).
 
 ## Projects
 

@@ -1,6 +1,6 @@
 ---
 name: research
-description: Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
+description: Investigate a question against high-trust primary sources and return sourced findings. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
 ---
 
 Spin up a **background agent** to do the research, so you keep working while it reads.
@@ -8,5 +8,5 @@ Spin up a **background agent** to do the research, so you keep working while it 
 Its job:
 
 1. Investigate the question against **primary sources** (official docs, source code, specs, first-party APIs), not a secondary write-up of them. Follow every claim back to the source that owns it.
-2. Write the findings to a single Markdown file, citing each claim's source.
-3. Save it where the repo already keeps such notes; match the existing convention, and if there is none, put it somewhere sensible and say where.
+2. Return the findings with source links to the caller. When the task calls for saving them, use the related Linear issue or PR discussion. Honor an explicitly requested file destination.
+3. Before changing repository docs, apply the [repository documentation rule](../../../AGENTS.md#keeping-the-docs-true).
