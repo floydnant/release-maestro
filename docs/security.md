@@ -80,7 +80,10 @@ uses v12. Recent Dependabot PRs have updated the lockfile successfully, but that
 complete remediation coverage. Dependency submission fills graph coverage; it cannot guarantee that
 Dependabot can resolve a compatible fix.
 
-`tools/security/exceptions.json` is empty. Removing the unused Bandcamp browser dependency removed
+`tools/security/exceptions.json` contains one patch-bound allowance for deepmerge 4.3.1 and
+GHSA-gcqx-w48m-w2h4, expiring November 24, 2026 at 00:00 UTC. Floyd Haremsa owns the upstream
+replacement and removal in [MAE-181](https://linear.app/floyd-haremsa/issue/MAE-181), with the next
+review due November 12. Removing the unused Bandcamp browser dependency removed
 extract-zip and its two expired exceptions.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, and UTC expiry date.
 They expire at the start of that date. Full scans then block only if the matching vulnerability
@@ -98,22 +101,28 @@ Minimatch 9 and 10 use exact-version overrides to 11.0.1. Legacy versions 3 and 
 on their upstream ranges because overriding them produced an empty fixture archive.
 Remove an override when upstream uses a fixed version.
 
-The November 9, 2026 full scan blocks one finding after removing the unused bandcamp-fetch dependency.
-That removal also removes extract-zip and both of its findings. The scan reports no minimatch findings.
+The full scan reports one accepted finding while the reviewed deepmerge patch allowance remains valid.
+Removing bandcamp-fetch also removed extract-zip and both of its findings. The scan reports no minimatch findings.
 
-| Package         | Advisory            | Remediation                                                                                            |
-| --------------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
-| deepmerge 4.3.1 | GHSA-gcqx-w48m-w2h4 | Local pnpm patch blocks `__proto__` copying; no published fix, so the version-based scan still blocks. |
+| Package         | Advisory            | Remediation                                                                                   |
+| --------------- | ------------------- | --------------------------------------------------------------------------------------------- |
+| deepmerge 4.3.1 | GHSA-gcqx-w48m-w2h4 | Local pnpm patch blocks `__proto__` copying; patch-bound allowance expires November 24, 2026. |
 
 The local `patches/deepmerge@4.3.1.patch` rejects `__proto__` in both target and source
 copy loops, in the source and both distributed builds. Regression tests exercise the installed
 package through Jest and fork-ts-checker-webpack-plugin dependency resolution. This mitigates the
-reported returned-object prototype poisoning; it does not change the package version or establish
-packaged/shipped exposure. The lockfile scanner still reports the advisory. [MAE-181](https://linear.app/floyd-haremsa/issue/MAE-181)
-remains open until a reviewed fix passes `make security`; remove the patch when an upstream fix
-replaces it. No scanner suppression or exception applies to this patch.
+reported returned-object prototype poisoning. It does not establish packaged/shipped exposure.
+The scanner still reports the advisory as accepted until the allowance expires. Before scanning,
+the gate verifies the patch SHA-256, workspace registration, lockfile patch hash, and every locked
+snapshot for that package version. Missing, changed or unregistered patches fail closed. Frozen
+installation and installed-package regression tests verify application and behavior in CI.
+The PR comparison still uses no exceptions, so new vulnerabilities remain blocked.
 
-No new acceptance or exception extension applies to these findings. The Rust `paste` 1.0.15
+This is a reviewed mitigation, not an upstream fix. Remove the patch and allowance together after
+an upstream fix passes the full scan and affected tooling checks. Expiry blocks the advisory again
+at midnight UTC; extensions require a separate maintainer decision and review. MAE-181 remains open
+for upstream replacement and unresolved applicability or shipped exposure.
+The Rust `paste` 1.0.15
 maintenance notice, RUSTSEC-2024-0436, remains informational.
 
 Release-please checks main before creating a release. The Release workflow checks the immutable

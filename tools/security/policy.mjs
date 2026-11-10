@@ -14,6 +14,15 @@ export const validateExceptions = exceptions => {
         if (!Number.isFinite(expires.getTime()) || expires.toISOString().slice(0, 10) !== exception.expires) {
             throw new Error(`Invalid security exception expiry: ${exception.id}`)
         }
+        if (
+            'patch' in exception &&
+            (!exception.patch ||
+                typeof exception.patch !== 'object' ||
+                exception.ecosystem !== 'npm' ||
+                !/^patches\/[a-zA-Z0-9_@.+-]+\.patch$/.test(exception.patch.path ?? '') ||
+                !/^[a-f0-9]{64}$/.test(exception.patch.sha256 ?? ''))
+        )
+            throw new Error(`Invalid security patch binding: ${exception.id}`)
         const key = JSON.stringify([exception.ecosystem, exception.name, exception.version, exception.id])
         if (keys.has(key)) throw new Error(`Duplicate security exception: ${exception.id}`)
         keys.add(key)
