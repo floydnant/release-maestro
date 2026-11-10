@@ -173,14 +173,33 @@ describe('checkRuntimes', () => {
         assert.equal(report.runtimes.length, 3)
     })
 
-    test('records a runtime package missing from the lockfile and inventories the others', async () => {
+    test('does not inventory Puppeteer when no dependency locks it, even with stale store entries', async () => {
         write('pnpm-lock.yaml', 'packages:\n  electron@44.9.4: {}\n  playwright-core@1.0.0: {}\n')
         const report = await check()
-        assert.deepEqual(report.errors, ['Runtime package missing from lockfile: puppeteer-core'])
+        assert.deepEqual(report.errors, [])
+        assert.equal(report.status, 'current')
         assert.deepEqual(
             report.runtimes.map(r => r.package),
             ['electron', 'playwright-core'],
         )
+    })
+
+    test('records required runtimes missing from the lockfile', async () => {
+        write('pnpm-lock.yaml', 'packages:\n  puppeteer-core@2.0.0: {}\n')
+        const report = await check()
+        assert.deepEqual(report.errors, [
+            'Runtime package missing from lockfile: electron',
+            'Runtime package missing from lockfile: playwright-core',
+        ])
+        assert.equal(report.status, 'review-required')
+    })
+
+    test('fails when locked Puppeteer is not installed', async () => {
+        rmSync(join(directory, puppeteerDirectory), { recursive: true })
+        const report = await check()
+        assert.equal(report.errors.length, 1)
+        assert.match(report.errors[0], /^puppeteer-core@2\.0\.0: /)
+        assert.equal(report.status, 'review-required')
     })
 
     test('rejects a store entry whose installed identity differs from the lockfile', async () => {
