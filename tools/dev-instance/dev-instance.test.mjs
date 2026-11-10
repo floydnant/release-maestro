@@ -1324,7 +1324,8 @@ test('MCP wrapper stops a server descendant when its package-manager exits', asy
         server,
         `const { writeFileSync } = require('node:fs')
 writeFileSync(${JSON.stringify(serverPidPath)}, String(process.pid))
-require('node:net').createServer(() => {}).listen(Number(process.env.RELEASE_MAESTRO_CDP_PORT), '127.0.0.1', () => writeFileSync(${JSON.stringify(ready)}, 'ready'))
+const listener = require('node:net').createServer(() => {})
+listener.listen(0, '127.0.0.1', () => writeFileSync(${JSON.stringify(ready)}, String(listener.address().port)))
 `,
     )
     await writeFile(
@@ -1343,9 +1344,10 @@ const timer = setInterval(() => { if (existsSync(${JSON.stringify(ready)})) { cl
         const result = await childResult(wrapper)
         assert.equal(result.code, 0, result.stderr)
         assert.equal(existsSync(ready), true)
+        const serverPort = Number(await readFile(ready, 'utf8'))
         const status = runJson(fixture, fixture.main, ['dev-status', '--json'])
         await waitFor(
-            () => portIsAvailable(status.bundle.cdp),
+            () => portIsAvailable(serverPort),
             available => available,
             'MCP server descendant survived wrapper cleanup',
         )
