@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { parseAllDocuments } from 'yaml'
 import { installTool, sha256 } from './install.mjs'
 import { evaluateScan, validateExceptions } from './policy.mjs'
+import { verifyPatchExceptions } from './patch-exceptions.mjs'
 import { cargoRuntimePackages, npmRuntimePackages, scopeSbom } from './sbom.mjs'
 import { dependencySnapshot } from './snapshot.mjs'
 
@@ -20,6 +21,7 @@ const security = async () => {
     for (const file of ['osv.json', 'findings.json']) rmSync(join(output, file), { force: true })
     const accepted = exceptions()
     validateExceptions(accepted)
+    verifyPatchExceptions(accepted, root)
     const tool = await installTool('osv-scanner', root)
     const reportPath = join(output, 'osv.json')
     try {
@@ -192,6 +194,7 @@ try {
             break
         case 'policy':
             validateExceptions(exceptions())
+            verifyPatchExceptions(exceptions(), root)
             console.log('Security exception policy passed')
             break
         case 'install':

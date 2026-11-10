@@ -1,1 +1,14 @@
-[]
+[
+    {
+        "ecosystem": "npm",
+        "name": "deepmerge",
+        "version": "4.3.1",
+        "id": "GHSA-gcqx-w48m-w2h4",
+        "expires": "2026-11-24",
+        "reason": "Reviewed local patch blocks __proto__ in both copy loops and all distributed builds. Installed-package regression tests cover the reported bypasses. Owner: Floyd Haremsa; mitigation recorded in MAE-181. Expiry triggers follow-up. Replace with a verified upstream fix and remove the patch and allowance by expiry; no automatic extension.",
+        "patch": {
+            "path": "patches/deepmerge@4.3.1.patch",
+            "sha256": "a502f744ddf4e378b546e9aa607bb91b859bece527fdea5b90266633479b65c6"
+        }
+    }
+]
