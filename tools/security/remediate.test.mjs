@@ -228,6 +228,24 @@ test('an update to a version the planner did not vet falls back to the vetted ov
     assert.deepEqual(parser.resolvedVersions, ['1.1.0'])
 })
 
+test.each([
+    ['lockfile update', {}],
+    ['scoped override', { update: { 'parser@1.0.0': 'parser@1.3.0' } }],
+    ['scoped override', { update: {} }],
+])('a %s fix unregisters the local patch for the replaced version', async (method, fixture) => {
+    const { root, options, report } = checkout({
+        ...fixture,
+        workspace:
+            'minimumReleaseAge: 4320\npatchedDependencies:\n    parser@1.0.0: patches/parser@1.0.0.patch\n    other@2.0.0: patches/other@2.0.0.patch\n',
+    })
+    const { parser } = byName(await remediate('apply', options))
+    assert.equal(parser.method, method)
+    assert.deepEqual(parser.removedPatches, ['parser@1.0.0'])
+    const workspace = parse(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'))
+    assert.deepEqual(workspace.patchedDependencies, { 'other@2.0.0': 'patches/other@2.0.0.patch' })
+    assert.match(report(), /Unregistered local patches: parser@1\.0\.0/)
+})
+
 test('a finding that an earlier fix already removed is not attempted again', async () => {
     const { options } = checkout({
         packages: ['parser@1.0.0', 'transitive@1.0.0'],

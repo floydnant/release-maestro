@@ -49,7 +49,9 @@ exceptions for findings no longer present. Review dependency overrides and remov
 versions include the fixes. Keep the exception count and tooling instructions in `docs/security.md`
 current. Report remaining blocking findings and expired exceptions with their package versions,
 advisory IDs, and available fixes. Risk acceptance and exception extensions require an explicit
-maintainer decision; do not regenerate the baseline or extend expiry dates to make the scan pass.
+maintainer decision, except patch-bound allowance renewals under the
+[security-automation](../security-automation/SKILL.md) lifecycle. Do not regenerate the baseline or
+extend expiry dates to make the scan pass.
 
 ## Verify and publish
 

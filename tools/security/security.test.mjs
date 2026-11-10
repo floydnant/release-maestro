@@ -10,6 +10,7 @@ const exception = {
     name: 'client',
     version: '1.0.0',
     id: 'GHSA-existing',
+    reviewed: '2026-10-03',
     expires: '2026-11-02',
     reason: 'Waiting for the upstream fix.',
 }
@@ -64,6 +65,13 @@ test('rejects invalid, incomplete, and duplicate exceptions', () => {
     }
     assert.throws(() => validateExceptions([{ ...exception, reason: '' }]), /reason/)
     assert.throws(() => validateExceptions([exception, exception]), /Duplicate/)
+})
+
+test('limits each acceptance to 30 days after a review that has already happened', () => {
+    assert.doesNotThrow(() => validateExceptions([exception], now))
+    assert.throws(() => validateExceptions([{ ...exception, expires: '2026-11-03' }], now), /30 days/)
+    for (const reviewed of [undefined, '2026-10-04', '2026-02-30'])
+        assert.throws(() => validateExceptions([{ ...exception, reviewed }], now), /review date/)
 })
 
 test('expiry blocks the matching vulnerability at midnight UTC, while resolved findings stay clean', () => {

@@ -20,6 +20,7 @@ import {
     scopedOverrides,
     targetsGroup,
     verifiedRemediation,
+    withoutPatches,
 } from './remediation.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -258,13 +259,35 @@ export const remediate = async (
             apply: target => {
                 log(`ATTEMPT ${group.name}@${target}`)
                 if (mode === 'plan') return {}
-                return applyVerifiedFix(currentFindings, group, {
-                    update: () => updateLockfile(group, target),
-                    override: () => overrideVersions(group, target),
+                // Each strategy starts from restored inputs, so each one unregisters the replaced patches.
+                let removed = []
+                const unregisterPatches = () => {
+                    const result = withoutPatches(read('pnpm-workspace.yaml', 'utf8'), group)
+                    removed = result.removed
+                    if (removed.length) writeFileSync(join(root, 'pnpm-workspace.yaml'), result.source)
+                }
+                const fix = applyVerifiedFix(currentFindings, group, {
+                    update: () => {
+                        unregisterPatches()
+                        updateLockfile(group, target)
+                        // A retained version without its patch fails patch verification instead of the rescan.
+                        if (
+                            removed.length &&
+                            lockedVersions(group.name).some(v => group.versions.includes(v))
+                        )
+                            throw new RejectedFix(
+                                'pnpm update retained a version whose patch was unregistered',
+                            )
+                    },
+                    override: () => {
+                        unregisterPatches()
+                        overrideVersions(group, target)
+                    },
                     scan,
                     restore: () => restore(before),
                     policy: checkPolicy,
                 })
+                return removed.length ? { ...fix, removedPatches: removed } : fix
             },
             // A rejected attempt has already restored the inputs that `currentFindings` describes.
             rejected: (target, error) => {

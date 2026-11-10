@@ -23,6 +23,9 @@ export const verifyPatchExceptions = (exceptions, root) => {
                 .filter(key => key === pkg || key.startsWith(`${pkg}(`))
                 .map(key => ({ key, digest: lock.patchedDependencies?.[pkg] })),
         )
+        // Like any exception for a resolved finding, an allowance whose version is neither locked nor
+        // registered accepts nothing. Upgrading past the patched version leaves it stale until removal.
+        if (!snapshots.length && !workspace.patchedDependencies?.[pkg]) continue
         if (
             sha256(readFileSync(join(root, path))) !== digest ||
             workspace.patchedDependencies?.[pkg] !== path ||

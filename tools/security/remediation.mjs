@@ -126,6 +126,11 @@ export const remediationBody = report => {
             return [
                 `- \`${item.name}\`: ${item.versions.join(', ')} ${outcome}. Method: ${item.method}.`,
                 `  Advisories: ${item.ids.join(', ')}.`,
+                ...(item.removedPatches?.length
+                    ? [
+                          `  Unregistered local patches: ${item.removedPatches.join(', ')}. Their patch files and allowances are now stale; remove them in a follow-up PR.`,
+                      ]
+                    : []),
             ]
         })
     const unresolved = [
@@ -213,6 +218,21 @@ export const applyFirstEligibleFix = async (candidates, actions) => {
 
 // A PR branch can only cover a finding if it already contains main. Otherwise its lockfile is stale.
 export const currentPrContainsMain = comparison => ['ahead', 'identical'].includes(comparison.status)
+
+// A fix replaces the vulnerable versions, so their local patches no longer apply and pnpm would reject them as
+// unused. Returns the workspace without those registrations and the keys removed.
+export const withoutPatches = (source, group) => {
+    const workspace = parseDocument(source)
+    if (workspace.errors.length) throw workspace.errors[0]
+
+    const removed = group.versions
+        .map(version => `${group.name}@${version}`)
+        .filter(key => workspace.hasIn(['patchedDependencies', key]))
+    for (const key of removed) workspace.deleteIn(['patchedDependencies', key])
+    if (removed.length && !workspace.get('patchedDependencies')?.items.length)
+        workspace.delete('patchedDependencies')
+    return { source: workspace.toString({ indent: 4, lineWidth: 0, singleQuote: true }), removed }
+}
 
 // Pins each vulnerable installed version to the target, leaving other versions of the package alone.
 // An existing override for the same key is never replaced, because a maintainer added it on purpose.

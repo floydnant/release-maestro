@@ -54,7 +54,7 @@ const security = async () => {
         writeJson(join(output, 'findings.json'), findings)
         for (const finding of findings) {
             console.log(
-                `${finding.status.toUpperCase()} ${finding.ecosystem} ${finding.name}@${finding.version} ${finding.id}: ${finding.summary}${finding.expires ? ` (expires ${finding.expires})` : ''}`,
+                `${finding.status.toUpperCase()} ${finding.ecosystem} ${finding.name}@${finding.version} ${finding.id}: ${finding.summary}${finding.expires ? ` (expires ${finding.expires})` : ''}${finding.status === 'blocked' && finding.reason ? ` (${finding.reason})` : ''}`,
             )
         }
         const blocked = findings.filter(finding => finding.status === 'blocked')
