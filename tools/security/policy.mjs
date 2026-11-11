@@ -43,7 +43,11 @@ export const validateExceptions = (exceptions, now = new Date()) => {
                 !since ||
                 since > reviewed ||
                 typeof patch.advisoryModified !== 'string' ||
-                !Number.isFinite(Date.parse(patch.advisoryModified))
+                !Number.isFinite(Date.parse(patch.advisoryModified)) ||
+                !Array.isArray(patch.tests) ||
+                !patch.tests.length ||
+                new Set(patch.tests).size !== patch.tests.length ||
+                patch.tests.some(test => !/^tools\/patches\/[a-zA-Z0-9_@.+-]+\.test\.mjs$/.test(test))
             )
                 throw new Error(`Invalid security patch binding: ${exception.id}`)
         }

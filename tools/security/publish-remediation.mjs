@@ -14,7 +14,11 @@ const run = (command, args) =>
 export const publishRemediation = (repo, report, runCommand = run) => {
     if (report.mode !== 'apply') throw new Error('Only applied remediation can be published')
     const branch = 'security/automated-remediation'
-    const inputs = dependencyInputs
+    // Besides dependency inputs, a fix may remove the allowance, patch file and tests of a replaced version.
+    const inputs = [...dependencyInputs, 'tools/security/exceptions.json', ...(report.removedFiles ?? [])]
+    const allowed = ([status, path]) =>
+        [...dependencyInputs, 'tools/security/exceptions.json'].includes(path) ||
+        (status === 'D' && /^(patches|tools\/patches)\/[^/]+$/.test(path ?? ''))
     const commitSubject = 'deps: remediate verified security vulnerabilities'
     const legacySubject = 'deps: remediate verified npm vulnerabilities'
     const bodyFile = 'dist/security/remediation-pr.md'
@@ -48,19 +52,20 @@ export const publishRemediation = (repo, report, runCommand = run) => {
     const failed = report.packages.filter(p => p.status === 'failed')
 
     // Every commit the branch adds on top of main must be a bot remediation commit that touches only
-    // dependency inputs. Anything else is a human edit that a force-push would destroy.
+    // dependency inputs or removes patch files. Anything else is a human edit that a force-push would destroy.
     const assertOnlyBotCommits = remote => {
         const commits = git(['log', `${main}..${remote}`, '--format=%H\t%an\t%cn\t%s'])
         for (const line of commits.split('\n').filter(Boolean)) {
             const [sha, author, committer, subject] = line.split('\t')
-            const paths = git(['diff-tree', '--no-commit-id', '--name-only', '-r', sha])
+            const changes = git(['diff-tree', '--no-commit-id', '--name-status', '-r', sha])
                 .split('\n')
                 .filter(Boolean)
+                .map(line => line.split('\t'))
             if (
                 author !== botName ||
                 committer !== author ||
                 ![commitSubject, legacySubject].includes(subject) ||
-                paths.some(path => !inputs.includes(path))
+                !changes.every(allowed)
             )
                 throw new Error(
                     'The remediation branch contains an unexpected commit; resolve human edits before retrying',
@@ -96,7 +101,7 @@ export const publishRemediation = (repo, report, runCommand = run) => {
         git(['checkout', '-B', branch])
         git(['config', 'user.name', botName])
         git(['config', 'user.email', `${botName}@users.noreply.github.com`])
-        git(['add', '--', ...inputs])
+        git(['add', '--all', '--', ...inputs])
         git(['commit', '-m', commitSubject])
         // The lease fails the push if someone moved the branch since it was checked above.
         git([

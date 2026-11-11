@@ -109,8 +109,9 @@ Removing bandcamp-fetch also removed extract-zip and both of its findings. The s
 | deepmerge 4.3.1 | GHSA-gcqx-w48m-w2h4 | Local pnpm patch blocks `__proto__` copying; patch-bound allowance expires November 24, 2026. |
 
 The local `patches/deepmerge@4.3.1.patch` rejects `__proto__` in both target and source
-copy loops, in the source and both distributed builds. Regression tests exercise the installed
-package through Jest and fork-ts-checker-webpack-plugin dependency resolution. This mitigates the
+copy loops, in the source and both distributed builds. Regression tests in
+`tools/patches/deepmerge.test.mjs` exercise the installed package through Jest and
+fork-ts-checker-webpack-plugin dependency resolution. This mitigates the
 reported returned-object prototype poisoning. It does not establish packaged/shipped exposure.
 The scanner still reports the advisory as accepted until the allowance expires. Before scanning,
 the gate verifies the patch SHA-256, workspace registration, lockfile patch hash, and every locked
@@ -121,8 +122,11 @@ The PR comparison still uses no exceptions, so new vulnerabilities remain blocke
 A patch-bound allowance also records `patch.since`, its first acceptance date, and
 `patch.advisoryModified`, the OSV `modified` timestamp of the advisory revision that was reviewed.
 When the advisory changes, the finding blocks again with that reason until someone re-reviews the
-patch against the new revision. An allowance whose version is neither locked nor registered is stale
-and accepts nothing; remove it with its patch file.
+patch against the new revision. `patch.tests` lists the patch's regression tests in `tools/patches/`;
+a registered patch fails closed when one is missing. The policy check and the scan also fail on any
+file in `patches/` or `tools/patches/` that no registration or allowance owns, so a removed allowance
+cannot leave its patch or tests behind. An allowance whose version is neither locked nor registered is
+stale and accepts nothing; remove it with its patch file and tests.
 
 This is a reviewed mitigation, not an upstream fix. Remove the patch and allowance together after
 an upstream fix passes the full scan and affected tooling checks. Expiry blocks the advisory again
@@ -172,8 +176,10 @@ Each run clears earlier remediation and scan reports before preflight. A failed 
 reports that describe discarded changes. Scanner failures include the command's stdout and stderr in their
 diagnostics when no valid findings report was written.
 When a fix replaces a version with a local patch, the run unregisters that patch from
-`pnpm-workspace.yaml`, because pnpm rejects unused patches. The PR body lists the patch file and
-allowance that are now stale.
+`pnpm-workspace.yaml`, because pnpm rejects unused patches. It also removes the version's patch-bound
+allowance, the patch file and its regression tests, and the final scan verifies that nothing the
+patch owned remains. The bot commit may delete files in `patches/` and `tools/patches/` but never
+add or change them. The PR body lists every removal.
 Reports name the versions actually resolved. Findings without an eligible fix, including findings on
 installed prereleases, remain visible; the remediation workflow never extends exceptions.
 

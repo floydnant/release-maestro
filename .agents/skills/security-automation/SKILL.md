@@ -82,18 +82,21 @@ reason to stop.
       seeing a vendored crate, and no allowance binds or expires it, so this is class C.
 
 The patch is minimal: it blocks the vulnerable path in every file the package ships (source and each
-distributed build) and nothing else. A regression test exercises the installed package through every
-consumer. Watch it go red without the patch and green with it.
+distributed build) and nothing else. A regression test in `tools/patches/` exercises the installed
+package through every consumer. Watch it go red without the patch and green with it.
 
 A patch-bound allowance in `tools/security/exceptions.json` names the exact ecosystem, package,
 version and advisory and carries:
 
 - `reviewed`: today; `expires`: at most 30 days later;
 - `patch.path` and `patch.sha256` of the reviewed bytes;
+- `patch.tests`: the regression test files in `tools/patches/` that belong to this patch;
 - `patch.since`: the first acceptance date, kept across renewals;
 - `patch.advisoryModified`: the advisory's `modified` value from `dist/security/osv.json`.
 
-`make security-policy-check` enforces these fields; `make security` verifies the locked application.
+`make security-policy-check` enforces these fields and fails on any file in `patches/` or
+`tools/patches/` that no registration or allowance owns; `make security` verifies the locked
+application.
 
 Branch `security/<ecosystem>-<package>-<advisory>`. Title with `fix:` (or `deps:` for a pure upgrade).
 Follow the PR template; the body names the advisory, the original run link and the merge class.
@@ -117,8 +120,7 @@ Each health run reads `tools/security/exceptions.json` on `origin/main`. For eac
 seven days, or blocked because its advisory changed:
 
 - **Upstream fix available:** a class A PR upgrades the package and removes the patch file, its
-  registration and the allowance. The remediation bot unregisters the patch when it upgrades; its PR
-  body then lists the stale patch file and allowance to remove.
+  registration, its tests and the allowance. The remediation bot does all of this in its own PR.
 - **Advisory changed:** compare the new revision with the reviewed one. If the patch still blocks every
   described vector, update `advisoryModified` and renew as below. Otherwise extend the patch, or stop.
 - **No upstream fix:** renew as class B when the patch bytes are unchanged (or extended under step 3),
@@ -127,7 +129,8 @@ seven days, or blocked because its advisory changed:
 - **Past the 90-day cap:** open the renewal as class C. The maintainer decides whether to keep
   carrying the patch.
 
-An allowance whose version is no longer locked is stale: remove it and its patch file (class A).
+An allowance whose version is no longer locked is stale: remove it with its patch file and tests
+(class A).
 
 ## 6. Tickets
 

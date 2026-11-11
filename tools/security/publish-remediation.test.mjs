@@ -13,6 +13,7 @@ const harness = ({
     changed = true,
     pr = null,
     branch = 'security/automated-remediation',
+    tree = '',
 } = {}) => {
     const calls = []
     const run = (command, args) => {
@@ -27,6 +28,7 @@ const harness = ({
         if (command === 'gh' && args[0] === 'pr' && args[1] === 'list') return JSON.stringify(pr ? [pr] : [])
         if (command === 'git' && args[0] === 'rev-parse') return 'base'
         if (command === 'git' && args[0] === 'log') return commits
+        if (command === 'git' && args[0] === 'diff-tree') return tree
         if (command === 'git' && args[0] === 'diff') return changed ? 'diff' : ''
         return ''
     }
@@ -147,4 +149,28 @@ test('human commits prevent closing even an obsolete automation PR', () => {
     })
     assert.throws(() => publishRemediation('owner/repo', { mode: 'apply', packages: [] }, run), /human edits/)
     assert(!ran('gh', 'pr', 'close'))
+})
+
+test('a fix publishes the removed allowance, patch file and tests of a replaced version', () => {
+    const { calls, run } = harness()
+    const removedFiles = ['patches/parser@1.0.0.patch', 'tools/patches/parser.test.mjs']
+    publishRemediation('owner/repo', { ...fixed, removedFiles }, run)
+    const add = calls.find(c => c[0] === 'git' && c[1] === 'add')
+    for (const path of ['tools/security/exceptions.json', ...removedFiles]) assert(add.includes(path), path)
+})
+
+test.each([
+    [
+        'removes patch files and edits the allowance list',
+        'D\tpatches/a.patch\nD\ttools/patches/a.test.mjs\nM\ttools/security/exceptions.json',
+        true,
+    ],
+    ['changes a patch test', 'M\ttools/patches/a.test.mjs', false],
+    ['adds a patch file', 'A\tpatches/a.patch', false],
+    ['deletes another tool', 'D\ttools/security/policy.mjs', false],
+])('an earlier bot commit that %s is accepted only for removals', (_case, tree, accepted) => {
+    const { run } = harness({ remote: 'prior', pr: botPr, tree })
+    const publish = () => publishRemediation('owner/repo', fixed, run)
+    if (accepted) assert.doesNotThrow(publish)
+    else assert.throws(publish, /human edits/)
 })

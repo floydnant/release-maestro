@@ -127,9 +127,7 @@ export const remediationBody = report => {
                 `- \`${item.name}\`: ${item.versions.join(', ')} ${outcome}. Method: ${item.method}.`,
                 `  Advisories: ${item.ids.join(', ')}.`,
                 ...(item.removedPatches?.length
-                    ? [
-                          `  Unregistered local patches: ${item.removedPatches.join(', ')}. Their patch files and allowances are now stale; remove them in a follow-up PR.`,
-                      ]
+                    ? [`  Unregistered local patches: ${item.removedPatches.join(', ')}.`]
                     : []),
             ]
         })
@@ -150,6 +148,14 @@ export const remediationBody = report => {
         'Each npm fix removes its targeted advisories and adds no other vulnerability findings.',
         'npm releases satisfy the repository freshness and provenance policy. Node security releases do not wait for the npm age delay.',
         ...(fixed.length ? ['', ...fixed] : []),
+        ...(report.removedAllowances?.length || report.removedFiles?.length
+            ? [
+                  '',
+                  'The replaced versions no longer need their local patches, so this PR also removes them:',
+                  ...(report.removedAllowances ?? []).map(item => `- Allowance \`${item}\``),
+                  ...(report.removedFiles ?? []).map(file => `- \`${file}\``),
+              ]
+            : []),
         '',
         '## Notes',
         '',
@@ -232,6 +238,27 @@ export const withoutPatches = (source, group) => {
     if (removed.length && !workspace.get('patchedDependencies')?.items.length)
         workspace.delete('patchedDependencies')
     return { source: workspace.toString({ indent: 4, lineWidth: 0, singleQuote: true }), removed }
+}
+
+// A replaced patched version leaves its allowance, patch file and regression tests behind. Returns the
+// exceptions without allowances for the replaced keys, and the files that no remaining registration or
+// allowance owns. `registered` maps the original `patchedDependencies`; `kept` is what is still registered.
+export const withoutPatchArtifacts = (exceptions, replaced, registered, kept) => {
+    const replacedKey = item => item.patch && replaced.includes(`${item.name}@${item.version}`)
+    const remaining = exceptions.filter(item => !replacedKey(item))
+    const owned = new Set([
+        ...Object.values(kept),
+        ...remaining.flatMap(item => (item.patch ? [item.patch.path, ...(item.patch.tests ?? [])] : [])),
+    ])
+    const candidates = [
+        ...replaced.flatMap(key => (registered[key] ? [registered[key]] : [])),
+        ...exceptions.filter(replacedKey).flatMap(item => [item.patch.path, ...(item.patch.tests ?? [])]),
+    ]
+    return {
+        exceptions: remaining,
+        allowances: exceptions.filter(replacedKey).map(item => `${item.name}@${item.version} ${item.id}`),
+        files: [...new Set(candidates)].filter(file => !owned.has(file)).sort(),
+    }
 }
 
 // Pins each vulnerable installed version to the target, leaving other versions of the package alone.
