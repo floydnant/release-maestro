@@ -12,7 +12,7 @@
             "sha256": "a502f744ddf4e378b546e9aa607bb91b859bece527fdea5b90266633479b65c6",
             "since": "2026-11-10",
             "advisoryModified": "2026-10-27T21:45:04.256048049Z",
-            "tests": ["tools/patches/deepmerge.test.mjs"]
+            "tests": ["tools/security-patches/deepmerge.test.mjs"]
         }
     }
 ]

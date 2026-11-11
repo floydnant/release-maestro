@@ -116,8 +116,8 @@ const patchArtifacts = [
     exceptionsFile,
     'patches/parser@1.0.0.patch',
     'patches/other@2.0.0.patch',
-    'tools/patches/parser.test.mjs',
-    'tools/patches/other.test.mjs',
+    'tools/security-patches/parser.test.mjs',
+    'tools/security-patches/other.test.mjs',
 ]
 // Adds patch-bound allowances for parser@1.0.0 and other@2.0.0, with their patch files and tests.
 const withPatchArtifacts = repository => {
@@ -128,10 +128,10 @@ const withPatchArtifacts = repository => {
         id: `GHSA-${name}`,
         patch: {
             path: `patches/${name}@${version}.patch`,
-            tests: [`tools/patches/${name}.test.mjs`],
+            tests: [`tools/security-patches/${name}.test.mjs`],
         },
     })
-    for (const directory of ['patches', 'tools/patches', 'tools/security'])
+    for (const directory of ['patches', 'tools/security-patches', 'tools/security'])
         mkdirSync(join(repository.root, directory), { recursive: true })
     for (const file of patchArtifacts.slice(1)) writeFileSync(join(repository.root, file), file)
     writeFileSync(
@@ -276,16 +276,19 @@ test.each([
         const workspace = parse(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'))
         assert.deepEqual(workspace.patchedDependencies, { 'other@2.0.0': 'patches/other@2.0.0.patch' })
         assert.deepEqual(result.removedAllowances, ['parser@1.0.0 GHSA-parser'])
-        assert.deepEqual(result.removedFiles, ['patches/parser@1.0.0.patch', 'tools/patches/parser.test.mjs'])
+        assert.deepEqual(result.removedFiles, [
+            'patches/parser@1.0.0.patch',
+            'tools/security-patches/parser.test.mjs',
+        ])
         for (const file of result.removedFiles) assert(!existsSync(join(root, file)), file)
-        for (const file of ['patches/other@2.0.0.patch', 'tools/patches/other.test.mjs'])
+        for (const file of ['patches/other@2.0.0.patch', 'tools/security-patches/other.test.mjs'])
             assert(existsSync(join(root, file)), file)
         assert.deepEqual(
             JSON.parse(readFileSync(join(root, exceptionsFile), 'utf8')).map(item => item.name),
             ['other'],
         )
         assert.match(report(), /Unregistered local patches: parser@1\.0\.0/)
-        assert.match(report(), /- `tools\/patches\/parser\.test\.mjs`/)
+        assert.match(report(), /- `tools\/security-patches\/parser\.test\.mjs`/)
     },
 )
 

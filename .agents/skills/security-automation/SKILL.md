@@ -82,7 +82,7 @@ reason to stop.
       seeing a vendored crate, and no allowance binds or expires it, so this is class C.
 
 The patch is minimal: it blocks the vulnerable path in every file the package ships (source and each
-distributed build) and nothing else. A regression test in `tools/patches/` exercises the installed
+distributed build) and nothing else. A regression test in `tools/security-patches/` exercises the installed
 package through every consumer. Watch it go red without the patch and green with it.
 
 A patch-bound allowance in `tools/security/exceptions.json` names the exact ecosystem, package,
@@ -90,12 +90,12 @@ version and advisory and carries:
 
 - `reviewed`: today; `expires`: at most 30 days later;
 - `patch.path` and `patch.sha256` of the reviewed bytes;
-- `patch.tests`: the regression test files in `tools/patches/` that belong to this patch;
+- `patch.tests`: the regression test files in `tools/security-patches/` that belong to this patch;
 - `patch.since`: the first acceptance date, kept across renewals;
 - `patch.advisoryModified`: the advisory's `modified` value from `dist/security/osv.json`.
 
 `make security-policy-check` enforces these fields and fails on any file in `patches/` or
-`tools/patches/` that no registration or allowance owns; `make security` verifies the locked
+`tools/security-patches/` that no registration or allowance owns; `make security` verifies the locked
 application.
 
 Branch `security/<ecosystem>-<package>-<advisory>`. Title with `fix:` (or `deps:` for a pure upgrade).

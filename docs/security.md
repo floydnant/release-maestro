@@ -110,7 +110,7 @@ Removing bandcamp-fetch also removed extract-zip and both of its findings. The s
 
 The local `patches/deepmerge@4.3.1.patch` rejects `__proto__` in both target and source
 copy loops, in the source and both distributed builds. Regression tests in
-`tools/patches/deepmerge.test.mjs` exercise the installed package through Jest and
+`tools/security-patches/deepmerge.test.mjs` exercise the installed package through Jest and
 fork-ts-checker-webpack-plugin dependency resolution. This mitigates the
 reported returned-object prototype poisoning. It does not establish packaged/shipped exposure.
 The scanner still reports the advisory as accepted until the allowance expires. Before scanning,
@@ -122,9 +122,9 @@ The PR comparison still uses no exceptions, so new vulnerabilities remain blocke
 A patch-bound allowance also records `patch.since`, its first acceptance date, and
 `patch.advisoryModified`, the OSV `modified` timestamp of the advisory revision that was reviewed.
 When the advisory changes, the finding blocks again with that reason until someone re-reviews the
-patch against the new revision. `patch.tests` lists the patch's regression tests in `tools/patches/`;
+patch against the new revision. `patch.tests` lists the patch's regression tests in `tools/security-patches/`;
 a registered patch fails closed when one is missing. The policy check and the scan also fail on any
-file in `patches/` or `tools/patches/` that no registration or allowance owns, so a removed allowance
+file in `patches/` or `tools/security-patches/` that no registration or allowance owns, so a removed allowance
 cannot leave its patch or tests behind. An allowance whose version is neither locked nor registered is
 stale and accepts nothing; remove it with its patch file and tests.
 
@@ -178,7 +178,7 @@ diagnostics when no valid findings report was written.
 When a fix replaces a version with a local patch, the run unregisters that patch from
 `pnpm-workspace.yaml`, because pnpm rejects unused patches. It also removes the version's patch-bound
 allowance, the patch file and its regression tests, and the final scan verifies that nothing the
-patch owned remains. The bot commit may delete files in `patches/` and `tools/patches/` but never
+patch owned remains. The bot commit may delete files in `patches/` and `tools/security-patches/` but never
 add or change them. The PR body lists every removal.
 Reports name the versions actually resolved. Findings without an eligible fix, including findings on
 installed prereleases, remain visible; the remediation workflow never extends exceptions.

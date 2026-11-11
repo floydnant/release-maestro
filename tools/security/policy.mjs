@@ -47,7 +47,9 @@ export const validateExceptions = (exceptions, now = new Date()) => {
                 !Array.isArray(patch.tests) ||
                 !patch.tests.length ||
                 new Set(patch.tests).size !== patch.tests.length ||
-                patch.tests.some(test => !/^tools\/patches\/[a-zA-Z0-9_@.+-]+\.test\.mjs$/.test(test))
+                patch.tests.some(
+                    test => !/^tools\/security-patches\/[a-zA-Z0-9_@.+-]+\.test\.mjs$/.test(test),
+                )
             )
                 throw new Error(`Invalid security patch binding: ${exception.id}`)
         }

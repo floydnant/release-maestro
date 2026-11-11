@@ -4,7 +4,7 @@ import { parseAllDocuments } from 'yaml'
 import { sha256 } from './install.mjs'
 
 // Security patch regression tests live here, one allowance owning each file.
-export const patchTestDirectory = 'tools/patches'
+export const patchTestDirectory = 'tools/security-patches'
 
 // A local patch allowance is valid only for the reviewed bytes and their locked application.
 // Frozen installs and CI regression tests verify that pnpm applies those bytes correctly.

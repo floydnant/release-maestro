@@ -22,7 +22,7 @@ const exception = {
         sha256: digest,
         since: '2026-11-10',
         advisoryModified: '2026-10-27T21:45:04.256048049Z',
-        tests: ['tools/patches/client.test.mjs'],
+        tests: ['tools/security-patches/client.test.mjs'],
     },
 }
 const modified = exception.patch.advisoryModified
@@ -34,11 +34,11 @@ function withRepository(change, check) {
         patchedDependencies: { 'client@1.0.0': digest },
         snapshots: { [`client@1.0.0(patch_hash=${digest})`]: {} },
     }
-    const state = { patch, workspace, lock, files: { 'tools/patches/client.test.mjs': 'test' } }
+    const state = { patch, workspace, lock, files: { 'tools/security-patches/client.test.mjs': 'test' } }
     try {
         change(state)
         mkdirSync(join(root, 'patches'))
-        mkdirSync(join(root, 'tools/patches'), { recursive: true })
+        mkdirSync(join(root, 'tools/security-patches'), { recursive: true })
         if (state.patch !== null) writeFileSync(join(root, 'patches/client.patch'), state.patch)
         for (const [path, contents] of Object.entries(state.files)) writeFileSync(join(root, path), contents)
         writeFileSync(join(root, 'pnpm-workspace.yaml'), JSON.stringify(workspace))
@@ -108,7 +108,7 @@ test('a registered patch fails closed when its regression test is missing', () =
 })
 
 test.each([
-    ['a patch test no allowance lists', { 'tools/patches/old.test.mjs': 'test' }],
+    ['a patch test no allowance lists', { 'tools/security-patches/old.test.mjs': 'test' }],
     ['a patch file nothing registers', { 'patches/old@1.0.0.patch': 'patch' }],
 ])('%s lingers and fails verification', (_case, files) => {
     withRepository(
@@ -122,8 +122,8 @@ test.each([
 test('unowned patch files fail even without patch allowances', () => {
     const root = mkdtempSync(join(tmpdir(), 'patch-exception-'))
     try {
-        mkdirSync(join(root, 'tools/patches'), { recursive: true })
-        writeFileSync(join(root, 'tools/patches/client.test.mjs'), 'test')
+        mkdirSync(join(root, 'tools/security-patches'), { recursive: true })
+        writeFileSync(join(root, 'tools/security-patches/client.test.mjs'), 'test')
         writeFileSync(join(root, 'pnpm-workspace.yaml'), 'minimumReleaseAge: 4320\n')
         assert.throws(() => verifyPatchExceptions([], root), /Unowned security patch files/)
     } finally {
@@ -156,9 +156,9 @@ test('rejects unsafe patch paths, malformed hashes and non-npm bindings', () => 
         { advisoryModified: 'unknown' },
         { tests: undefined },
         { tests: [] },
-        { tests: ['tools/patches/a.test.mjs', 'tools/patches/a.test.mjs'] },
+        { tests: ['tools/security-patches/a.test.mjs', 'tools/security-patches/a.test.mjs'] },
         { tests: ['tools/security/a.test.mjs'] },
-        { tests: ['tools/patches/../a.test.mjs'] },
+        { tests: ['tools/security-patches/../a.test.mjs'] },
     ])
         assert.throws(
             () => validateExceptions([{ ...exception, patch: { ...exception.patch, ...change } }]),

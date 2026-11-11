@@ -18,7 +18,7 @@ export const publishRemediation = (repo, report, runCommand = run) => {
     const inputs = [...dependencyInputs, 'tools/security/exceptions.json', ...(report.removedFiles ?? [])]
     const allowed = ([status, path]) =>
         [...dependencyInputs, 'tools/security/exceptions.json'].includes(path) ||
-        (status === 'D' && /^(patches|tools\/patches)\/[^/]+$/.test(path ?? ''))
+        (status === 'D' && /^(patches|tools\/security-patches)\/[^/]+$/.test(path ?? ''))
     const commitSubject = 'deps: remediate verified security vulnerabilities'
     const legacySubject = 'deps: remediate verified npm vulnerabilities'
     const bodyFile = 'dist/security/remediation-pr.md'

@@ -153,7 +153,7 @@ test('human commits prevent closing even an obsolete automation PR', () => {
 
 test('a fix publishes the removed allowance, patch file and tests of a replaced version', () => {
     const { calls, run } = harness()
-    const removedFiles = ['patches/parser@1.0.0.patch', 'tools/patches/parser.test.mjs']
+    const removedFiles = ['patches/parser@1.0.0.patch', 'tools/security-patches/parser.test.mjs']
     publishRemediation('owner/repo', { ...fixed, removedFiles }, run)
     const add = calls.find(c => c[0] === 'git' && c[1] === 'add')
     for (const path of ['tools/security/exceptions.json', ...removedFiles]) assert(add.includes(path), path)
@@ -162,10 +162,10 @@ test('a fix publishes the removed allowance, patch file and tests of a replaced 
 test.each([
     [
         'removes patch files and edits the allowance list',
-        'D\tpatches/a.patch\nD\ttools/patches/a.test.mjs\nM\ttools/security/exceptions.json',
+        'D\tpatches/a.patch\nD\ttools/security-patches/a.test.mjs\nM\ttools/security/exceptions.json',
         true,
     ],
-    ['changes a patch test', 'M\ttools/patches/a.test.mjs', false],
+    ['changes a patch test', 'M\ttools/security-patches/a.test.mjs', false],
     ['adds a patch file', 'A\tpatches/a.patch', false],
     ['deletes another tool', 'D\ttools/security/policy.mjs', false],
 ])('an earlier bot commit that %s is accepted only for removals', (_case, tree, accepted) => {
