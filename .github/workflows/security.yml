@@ -46,18 +46,31 @@ jobs:
                   SCAN_RESULT: ${{ needs.pr-dependencies.result }}
               run: test "$SCAN_RESULT" = success
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 0
             - uses: ./.github/actions/setup-node
               with:
                   install-command: pnpm install --frozen-lockfile --ignore-scripts
             - name: Validate exception structure
               run: make security-policy-check
-            # Match combined and component-specific release-please PR branches.
-            # Keep the full scan inside the required gate so release blockers prevent merging.
+            # Release-please PRs (combined and component-specific branches) and PRs that change accepted risk
+            # run the full scan inside the required gate, so the exceptions they add or keep are proven to apply.
+            - name: Select full scan
+              id: scope
+              env:
+                  HEAD_REF: ${{ github.head_ref }}
+                  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+              # A failed diff selects the full scan, so the gate fails closed.
+              run: |
+                  changed=$(git diff --name-only "$BASE_SHA" HEAD -- tools/security/exceptions.json patches/) || changed=unknown
+                  if [[ "$HEAD_REF" == release-please--* || -n "$changed" ]]; then
+                      echo full=true >> "$GITHUB_OUTPUT"
+                  fi
             - name: Check release readiness
-              if: startsWith(github.head_ref, 'release-please--')
+              if: steps.scope.outputs.full == 'true'
               run: make security
             - name: Upload release readiness reports
-              if: always() && startsWith(github.head_ref, 'release-please--')
+              if: always() && steps.scope.outputs.full == 'true'
               uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: release-pr-vulnerabilities

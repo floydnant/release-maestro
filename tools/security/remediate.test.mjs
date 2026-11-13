@@ -109,6 +109,37 @@ const checkout = ({
     }
     return { root, report, assertInputsRestored, options: { root, run, fetchJson, now, log: () => {} } }
 }
+const patchedWorkspace =
+    'minimumReleaseAge: 4320\npatchedDependencies:\n    parser@1.0.0: patches/parser@1.0.0.patch\n    other@2.0.0: patches/other@2.0.0.patch\n'
+const exceptionsFile = 'tools/security/exceptions.json'
+const patchArtifacts = [
+    exceptionsFile,
+    'patches/parser@1.0.0.patch',
+    'patches/other@2.0.0.patch',
+    'tools/security-patches/parser.test.mjs',
+    'tools/security-patches/other.test.mjs',
+]
+// Adds patch-bound allowances for parser@1.0.0 and other@2.0.0, with their patch files and tests.
+const withPatchArtifacts = repository => {
+    const allowance = (name, version) => ({
+        ecosystem: 'npm',
+        name,
+        version,
+        id: `GHSA-${name}`,
+        patch: {
+            path: `patches/${name}@${version}.patch`,
+            tests: [`tools/security-patches/${name}.test.mjs`],
+        },
+    })
+    for (const directory of ['patches', 'tools/security-patches', 'tools/security'])
+        mkdirSync(join(repository.root, directory), { recursive: true })
+    for (const file of patchArtifacts.slice(1)) writeFileSync(join(repository.root, file), file)
+    writeFileSync(
+        join(repository.root, exceptionsFile),
+        JSON.stringify([allowance('parser', '1.0.0'), allowance('other', '2.0.0')]),
+    )
+    return repository
+}
 const byName = report => Object.fromEntries(report.packages.map(item => [item.name, item]))
 const reportFiles = ['remediation.json', 'remediation-pr.md', 'findings.json', 'osv.json']
 
@@ -226,6 +257,60 @@ test('an update to a version the planner did not vet falls back to the vetted ov
     const { parser } = byName(await remediate('apply', options))
     assert.equal(parser.method, 'scoped override')
     assert.deepEqual(parser.resolvedVersions, ['1.1.0'])
+})
+
+test.each([
+    ['lockfile update', {}],
+    ['scoped override', { update: { 'parser@1.0.0': 'parser@1.3.0' } }],
+    ['scoped override', { update: {} }],
+])(
+    'a %s fix removes the local patch, its tests and allowance for the replaced version',
+    async (method, fixture) => {
+        const { root, options, report } = withPatchArtifacts(
+            checkout({ ...fixture, workspace: patchedWorkspace }),
+        )
+        const result = await remediate('apply', options)
+        const { parser } = byName(result)
+        assert.equal(parser.method, method)
+        assert.deepEqual(parser.removedPatches, ['parser@1.0.0'])
+        const workspace = parse(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8'))
+        assert.deepEqual(workspace.patchedDependencies, { 'other@2.0.0': 'patches/other@2.0.0.patch' })
+        assert.deepEqual(result.removedAllowances, ['parser@1.0.0 GHSA-parser'])
+        assert.deepEqual(result.removedFiles, [
+            'patches/parser@1.0.0.patch',
+            'tools/security-patches/parser.test.mjs',
+        ])
+        for (const file of result.removedFiles) assert(!existsSync(join(root, file)), file)
+        for (const file of ['patches/other@2.0.0.patch', 'tools/security-patches/other.test.mjs'])
+            assert(existsSync(join(root, file)), file)
+        assert.deepEqual(
+            JSON.parse(readFileSync(join(root, exceptionsFile), 'utf8')).map(item => item.name),
+            ['other'],
+        )
+        assert.match(report(), /Unregistered local patches: parser@1\.0\.0/)
+        assert.match(report(), /- `tools\/security-patches\/parser\.test\.mjs`/)
+    },
+)
+
+test('a replaced patch without an allowance removes only its patch file', async () => {
+    const { root, options } = checkout({ workspace: patchedWorkspace })
+    mkdirSync(join(root, 'patches'))
+    for (const file of ['patches/parser@1.0.0.patch', 'patches/other@2.0.0.patch'])
+        writeFileSync(join(root, file), file)
+    const result = await remediate('apply', options)
+    assert.deepEqual(result.removedAllowances, [])
+    assert.deepEqual(result.removedFiles, ['patches/parser@1.0.0.patch'])
+    assert(existsSync(join(root, 'patches/other@2.0.0.patch')))
+})
+
+test('a failed final scan restores the removed allowance, patch file and tests', async () => {
+    const { root, options } = withPatchArtifacts(checkout({ workspace: patchedWorkspace, failScans: [3] }))
+    const before = Object.fromEntries(
+        patchArtifacts.map(file => [file, readFileSync(join(root, file), 'utf8')]),
+    )
+    await assert.rejects(remediate('apply', options), /restored/)
+    for (const [file, contents] of Object.entries(before))
+        assert.equal(readFileSync(join(root, file), 'utf8'), contents, file)
 })
 
 test('a finding that an earlier fix already removed is not attempted again', async () => {

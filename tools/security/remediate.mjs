@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { parseAllDocuments, parseDocument } from 'yaml'
+import { parse, parseAllDocuments, parseDocument } from 'yaml'
 import { planNodeSecurityUpdate } from '../node-runtime.mjs'
 import {
     applyFirstEligibleFix,
@@ -20,7 +20,11 @@ import {
     scopedOverrides,
     targetsGroup,
     verifiedRemediation,
+    withoutPatchArtifacts,
+    withoutPatches,
 } from './remediation.mjs'
+
+const exceptionsPath = 'tools/security/exceptions.json'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -80,6 +84,26 @@ export const remediate = async (
         for (const [file, bytes] of inputs) writeFileSync(join(root, file), bytes)
     }
     const snapshot = () => new Map(dependencyInputs.map(path => [path, read(path)]))
+    // Removes the allowances, patch files and tests that only the unregistered patches owned. Each
+    // rollback snapshot first records their bytes, so restoring it brings them back.
+    const removePatchArtifacts = (replaced, workspaceBefore, workspaceAfter, snapshots) => {
+        const registrations = source => parse(source)?.patchedDependencies ?? {}
+        const cleanup = withoutPatchArtifacts(
+            existsSync(join(root, exceptionsPath)) ? json(join(root, exceptionsPath)) : [],
+            replaced,
+            registrations(workspaceBefore),
+            registrations(workspaceAfter),
+        )
+        const changed = [...(cleanup.allowances.length ? [exceptionsPath] : []), ...cleanup.files]
+        for (const file of changed.filter(file => existsSync(join(root, file))))
+            for (const inputs of snapshots) if (!inputs.has(file)) inputs.set(file, read(file))
+        if (cleanup.allowances.length) {
+            writeFileSync(join(root, exceptionsPath), `${JSON.stringify(cleanup.exceptions, null, 4)}\n`)
+            run('pnpm', ['exec', 'prettier', '--write', exceptionsPath])
+        }
+        for (const file of cleanup.files) rmSync(join(root, file), { force: true })
+        return cleanup
+    }
     const lockedVersions = name => lockVersions(documents(read('pnpm-lock.yaml', 'utf8')), name)
     const gh = (path, ...args) => run('gh', ['api', ...args, `repos/${process.env.GH_REPO}/${path}`])
     // A new run or a rollback invalidates reports describing the previous dependency inputs.
@@ -258,13 +282,48 @@ export const remediate = async (
             apply: target => {
                 log(`ATTEMPT ${group.name}@${target}`)
                 if (mode === 'plan') return {}
-                return applyVerifiedFix(currentFindings, group, {
-                    update: () => updateLockfile(group, target),
-                    override: () => overrideVersions(group, target),
+                // Each strategy starts from restored inputs, so each one unregisters the replaced patches and
+                // removes what they owned: the allowance, the patch file and its regression tests. Every scan
+                // then verifies that nothing they owned lingers.
+                let removed = []
+                let artifacts = { allowances: [], files: [] }
+                const unregisterPatches = () => {
+                    const source = read('pnpm-workspace.yaml', 'utf8')
+                    const result = withoutPatches(source, group)
+                    removed = result.removed
+                    if (!removed.length) return
+                    writeFileSync(join(root, 'pnpm-workspace.yaml'), result.source)
+                    artifacts = removePatchArtifacts(removed, source, result.source, [before, originalInputs])
+                }
+                const fix = applyVerifiedFix(currentFindings, group, {
+                    update: () => {
+                        unregisterPatches()
+                        updateLockfile(group, target)
+                        // A retained version without its patch fails patch verification instead of the rescan.
+                        if (
+                            removed.length &&
+                            lockedVersions(group.name).some(v => group.versions.includes(v))
+                        )
+                            throw new RejectedFix(
+                                'pnpm update retained a version whose patch was unregistered',
+                            )
+                    },
+                    override: () => {
+                        unregisterPatches()
+                        overrideVersions(group, target)
+                    },
                     scan,
                     restore: () => restore(before),
                     policy: checkPolicy,
                 })
+                return removed.length
+                    ? {
+                          ...fix,
+                          removedPatches: removed,
+                          removedAllowances: artifacts.allowances,
+                          removedFiles: artifacts.files,
+                      }
+                    : fix
             },
             // A rejected attempt has already restored the inputs that `currentFindings` describes.
             rejected: (target, error) => {
@@ -306,6 +365,8 @@ export const remediate = async (
 
             const finalLock = documents(read('pnpm-lock.yaml', 'utf8'))
             for (const item of fixed) item.resolvedVersions = lockVersions(finalLock, item.name)
+            report.removedAllowances = fixed.flatMap(item => item.removedAllowances ?? [])
+            report.removedFiles = fixed.flatMap(item => item.removedFiles ?? []).sort()
         }
 
         // Runtime updates share the same rollback, report and bot PR as npm fixes.

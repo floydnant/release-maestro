@@ -126,6 +126,9 @@ export const remediationBody = report => {
             return [
                 `- \`${item.name}\`: ${item.versions.join(', ')} ${outcome}. Method: ${item.method}.`,
                 `  Advisories: ${item.ids.join(', ')}.`,
+                ...(item.removedPatches?.length
+                    ? [`  Unregistered local patches: ${item.removedPatches.join(', ')}.`]
+                    : []),
             ]
         })
     const unresolved = [
@@ -145,6 +148,14 @@ export const remediationBody = report => {
         'Each npm fix removes its targeted advisories and adds no other vulnerability findings.',
         'npm releases satisfy the repository freshness and provenance policy. Node security releases do not wait for the npm age delay.',
         ...(fixed.length ? ['', ...fixed] : []),
+        ...(report.removedAllowances?.length || report.removedFiles?.length
+            ? [
+                  '',
+                  'The replaced versions no longer need their local patches, so this PR also removes them:',
+                  ...(report.removedAllowances ?? []).map(item => `- Allowance \`${item}\``),
+                  ...(report.removedFiles ?? []).map(file => `- \`${file}\``),
+              ]
+            : []),
         '',
         '## Notes',
         '',
@@ -213,6 +224,42 @@ export const applyFirstEligibleFix = async (candidates, actions) => {
 
 // A PR branch can only cover a finding if it already contains main. Otherwise its lockfile is stale.
 export const currentPrContainsMain = comparison => ['ahead', 'identical'].includes(comparison.status)
+
+// A fix replaces the vulnerable versions, so their local patches no longer apply and pnpm would reject them as
+// unused. Returns the workspace without those registrations and the keys removed.
+export const withoutPatches = (source, group) => {
+    const workspace = parseDocument(source)
+    if (workspace.errors.length) throw workspace.errors[0]
+
+    const removed = group.versions
+        .map(version => `${group.name}@${version}`)
+        .filter(key => workspace.hasIn(['patchedDependencies', key]))
+    for (const key of removed) workspace.deleteIn(['patchedDependencies', key])
+    if (removed.length && !workspace.get('patchedDependencies')?.items.length)
+        workspace.delete('patchedDependencies')
+    return { source: workspace.toString({ indent: 4, lineWidth: 0, singleQuote: true }), removed }
+}
+
+// A replaced patched version leaves its allowance, patch file and regression tests behind. Returns the
+// exceptions without allowances for the replaced keys, and the files that no remaining registration or
+// allowance owns. `registered` maps the original `patchedDependencies`; `kept` is what is still registered.
+export const withoutPatchArtifacts = (exceptions, replaced, registered, kept) => {
+    const replacedKey = item => item.patch && replaced.includes(`${item.name}@${item.version}`)
+    const remaining = exceptions.filter(item => !replacedKey(item))
+    const owned = new Set([
+        ...Object.values(kept),
+        ...remaining.flatMap(item => (item.patch ? [item.patch.path, ...(item.patch.tests ?? [])] : [])),
+    ])
+    const candidates = [
+        ...replaced.flatMap(key => (registered[key] ? [registered[key]] : [])),
+        ...exceptions.filter(replacedKey).flatMap(item => [item.patch.path, ...(item.patch.tests ?? [])]),
+    ]
+    return {
+        exceptions: remaining,
+        allowances: exceptions.filter(replacedKey).map(item => `${item.name}@${item.version} ${item.id}`),
+        files: [...new Set(candidates)].filter(file => !owned.has(file)).sort(),
+    }
+}
 
 // Pins each vulnerable installed version to the target, leaving other versions of the package alone.
 // An existing override for the same key is never replaced, because a maintainer added it on purpose.

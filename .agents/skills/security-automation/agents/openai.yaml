@@ -1,0 +1,5 @@
+interface:
+    display_name: 'Security Automation'
+    short_description: 'Investigate security alerts, fix them in PRs, and merge eligible fixes'
+policy:
+    allow_implicit_invocation: false
