@@ -30,6 +30,11 @@ executable, prepared by its packaging dependency. Renderer E2E needs no Electron
 Both application E2E layers live in `apps/maestro-e2e/`. Do not use renderer E2E for routing smoke tests or happy
 paths that need real IPC, files, database state, or the sidecar.
 
+The browser-based renderer suite is an automated test harness with mocked IPC. It does not make
+the renderer a standalone web app. For live UI inspection, screenshots, or manual reproduction,
+attach to the Electron window using
+[`inspect-running-app`](../.agents/skills/inspect-running-app/SKILL.md).
+
 ### Renderer scenario harness
 
 `apps/maestro-e2e/src/renderer/scenario-harness.ts` installs a browser-side Electron IPC fake before
