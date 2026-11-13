@@ -202,6 +202,37 @@ describe('LibraryScanService', () => {
         expect(backend.scan).toHaveBeenLastCalledWith(['/music'], expect.anything(), false, [])
     })
 
+    it('counts artwork failures separately before and after deep read and persists their aggregate', async () => {
+        const status = await service.startScan('manual', ['/music'])
+        updates$.next({ phase: 'coverError', path: '/cache/a.png', error: 'inspection blocked' })
+        updates$.next({ phase: 'started', total: 1, refreshTotal: 0 })
+        updates$.next({
+            phase: 'item',
+            metadata: fromPartial({
+                coverPath: '/cache/b.png',
+                coverError: { path: '/cache/b.png', message: 'write blocked' },
+            }),
+        })
+        updates$.next({ phase: 'coverError', path: '/cache/b.png', error: 'write blocked' })
+        updates$.next({ phase: 'progress', done: 1, total: 1 })
+        updates$.next({ phase: 'completed', count: 1, total: 1, errors: 0 })
+        updates$.complete()
+        expect(status).toMatchObject({ imported: 1, failedFiles: 0, coverFailureCount: 2 })
+        expect(status.terminal).toMatchObject({
+            imported: 1,
+            discoveryFailureCount: 0,
+            readFailureCount: 0,
+            coverFailureCount: 2,
+            failuresTruncated: false,
+            failures: [
+                { stage: 'cover', path: '/cache/a.png', message: 'inspection blocked' },
+                { stage: 'cover', path: '/cache/b.png', message: 'write blocked' },
+            ],
+        })
+        expect(stateStore.get('lastScan')).toMatchObject({ count: 1, errors: 0, coverFailureCount: 2 })
+        expect(service.getSnapshot().albums).toEqual([])
+    })
+
     it('publishes the final classification after discovery paths reconcile as moves', async () => {
         const status = await service.startScan('manual', ['/music'])
         updates$.next({ phase: 'discovery', discovered: 2, new: 1, changed: 0, unchanged: 1 })

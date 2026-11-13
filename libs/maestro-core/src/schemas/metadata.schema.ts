@@ -39,6 +39,8 @@ export interface SongMetadata {
     albumArtist: string | null
     /** Absolute filesystem path to cached/extracted cover art, or null. */
     coverPath: string | null
+    /** Cache write failed; tags and contentHash remain valid. The cover needs retry. */
+    coverError?: { path: string; message: string }
     year: number | null
     track: number | null
     discNumber: number | null

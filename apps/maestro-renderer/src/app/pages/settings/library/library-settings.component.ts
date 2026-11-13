@@ -87,6 +87,10 @@ export class LibrarySettingsComponent {
         if (terminal.refreshTotal) parts.push(`${terminal.refreshTotal} selected for metadata refresh`)
         if (terminal.missing) parts.push(`${terminal.missing} missing`)
         if (failed) parts.push(`${failed} failed`)
+        if (terminal.coverFailureCount)
+            parts.push(
+                `${terminal.coverFailureCount} artwork cache failure${terminal.coverFailureCount === 1 ? '' : 's'}`,
+            )
         if (terminal.normalizationIssues) {
             parts.push(`${terminal.normalizationIssues} with tag issues`)
         }
@@ -106,6 +110,10 @@ export class LibrarySettingsComponent {
         if (lastScan.changed) parts.push(`${lastScan.changed} changed`)
         if (lastScan.missing) parts.push(`${lastScan.missing} missing`)
         if (lastScan.errors) parts.push(`${lastScan.errors} failed`)
+        if (lastScan.coverFailureCount)
+            parts.push(
+                `${lastScan.coverFailureCount} artwork cache failure${lastScan.coverFailureCount === 1 ? '' : 's'}`,
+            )
         if (lastScan.normalizationIssues) parts.push(`${lastScan.normalizationIssues} tag issues`)
         return `${formatDateRelative(new Date(lastScan.finishedAt))} · ${parts.join(', ')}`
     })

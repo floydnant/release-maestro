@@ -1126,6 +1126,7 @@ test.describe('selection against a moving list', () => {
             readTotal: 3,
             imported: 3,
             failedFiles: 0,
+            coverFailureCount: 0,
             normalizationIssues: 0,
             terminal: null,
         }) satisfies LibraryScanStatus
@@ -1230,6 +1231,7 @@ test.describe('live updates during a scan', () => {
             readTotal: 3,
             imported: 3,
             failedFiles: 0,
+            coverFailureCount: 0,
             normalizationIssues: 0,
             terminal: null,
         }) satisfies LibraryScanStatus

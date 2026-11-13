@@ -192,10 +192,16 @@ export class LibraryScanService {
                             break
                         case 'item':
                             status.imported += 1
-                            this.collectAlbumPreview(update.metadata)
+                            if (!update.metadata.coverError) this.collectAlbumPreview(update.metadata)
                             break
                         case 'normalization':
                             status.normalizationIssues = update.normalizationIssues
+                            break
+                        case 'coverError':
+                            status.coverFailureCount += 1
+                            if (failures.length < FAILURE_DETAIL_LIMIT) {
+                                failures.push({ stage: 'cover', path: update.path, message: update.error })
+                            }
                             break
                         case 'itemError':
                             if (failureStage === 'discovery') discoveryFailureCount += 1
@@ -224,6 +230,7 @@ export class LibraryScanService {
                             })
                             this.stateStore.set('lastScan', {
                                 refreshTotal: status.refreshTotal,
+                                coverFailureCount: status.coverFailureCount,
                                 count: update.count,
                                 total: update.total,
                                 unchanged: update.unchanged,
@@ -316,6 +323,7 @@ export class LibraryScanService {
             refreshTotal: 0,
             imported: 0,
             failedFiles: 0,
+            coverFailureCount: 0,
             normalizationIssues: 0,
             terminal: null,
         }
@@ -353,9 +361,11 @@ export class LibraryScanService {
             imported: status.imported,
             discoveryFailureCount: details.discoveryFailureCount,
             readFailureCount: details.readFailureCount,
+            coverFailureCount: status.coverFailureCount,
             failures: details.failures,
             failuresTruncated:
-                details.discoveryFailureCount + details.readFailureCount > details.failures.length,
+                details.discoveryFailureCount + details.readFailureCount + status.coverFailureCount >
+                details.failures.length,
             normalizationIssues: status.normalizationIssues,
             error: details.error,
         }
