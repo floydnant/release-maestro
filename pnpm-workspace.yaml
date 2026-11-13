@@ -42,6 +42,7 @@ savePrefix: ''
 # These exact versions were accepted before their three-day quarantine expired. No later version is
 # exempt.
 minimumReleaseAgeExclude:
+    - electron@45.3.2
     - '@jest/console@30.5.2'
     - '@jest/core@30.5.2'
     - '@jest/environment-jsdom-abstract@30.5.2'
