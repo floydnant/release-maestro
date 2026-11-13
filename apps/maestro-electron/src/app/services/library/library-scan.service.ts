@@ -170,95 +170,81 @@ export class LibraryScanService {
 
         // A cancelled first scan leaves discovery rows behind. Only a completed
         // scan ends the initial import, even if it took several attempts.
-        this.library.scan(scannedFolders, signal, this.stateStore.get('lastScan') == null).subscribe({
-            next: update => {
-                switch (update.phase) {
-                    case 'discovery':
-                        status.discovered = update.discovered
-                        status.new = update.new
-                        status.changed = update.changed
-                        status.unchanged = update.unchanged
-                        break
-                    case 'started':
-                        failureStage = 'read'
-                        status.phase = 'reading'
-                        status.readTotal = update.total
-                        status.refreshTotal = update.refreshTotal
-                        break
-                    case 'progress':
-                        status.readDone = update.done
-                        break
-                    case 'item':
-                        status.imported += 1
-                        this.collectAlbumPreview(update.metadata)
-                        break
-                    case 'normalization':
-                        status.normalizationIssues = update.normalizationIssues
-                        break
-                    case 'itemError':
-                        if (failureStage === 'discovery') discoveryFailureCount += 1
-                        else readFailureCount += 1
-                        status.failedFiles += 1
-                        if (failures.length < FAILURE_DETAIL_LIMIT) {
-                            failures.push({
-                                stage: failureStage,
-                                path: update.path,
-                                ...(update.code !== undefined ? { code: update.code } : {}),
-                                message: update.error,
+        this.library
+            .scan(scannedFolders, signal, this.stateStore.get('lastScan') == null, status.unavailableFolders)
+            .subscribe({
+                next: update => {
+                    switch (update.phase) {
+                        case 'discovery':
+                            status.discovered = update.discovered
+                            status.new = update.new
+                            status.changed = update.changed
+                            status.unchanged = update.unchanged
+                            break
+                        case 'started':
+                            failureStage = 'read'
+                            status.phase = 'reading'
+                            status.readTotal = update.total
+                            status.refreshTotal = update.refreshTotal
+                            break
+                        case 'progress':
+                            status.readDone = update.done
+                            break
+                        case 'item':
+                            status.imported += 1
+                            this.collectAlbumPreview(update.metadata)
+                            break
+                        case 'normalization':
+                            status.normalizationIssues = update.normalizationIssues
+                            break
+                        case 'itemError':
+                            if (failureStage === 'discovery') discoveryFailureCount += 1
+                            else readFailureCount += 1
+                            status.failedFiles += 1
+                            if (failures.length < FAILURE_DETAIL_LIMIT) {
+                                failures.push({
+                                    stage: failureStage,
+                                    path: update.path,
+                                    ...(update.code !== undefined ? { code: update.code } : {}),
+                                    message: update.error,
+                                })
+                            }
+                            break
+                        case 'completed': {
+                            // Move matching can reclassify newly discovered paths after deep read.
+                            status.new = update.new ?? status.new
+                            status.changed = update.changed ?? status.changed
+                            status.unchanged = update.unchanged ?? status.unchanged
+                            this.finishScan(status, 'completed', {
+                                failures,
+                                discoveryFailureCount,
+                                readFailureCount,
+                                missing: update.missing ?? 0,
+                                error: null,
                             })
+                            this.stateStore.set('lastScan', {
+                                refreshTotal: status.refreshTotal,
+                                count: update.count,
+                                total: update.total,
+                                unchanged: update.unchanged,
+                                changed: update.changed,
+                                new: update.new,
+                                missing: update.missing,
+                                errors: status.failedFiles,
+                                finishedAt: status.finishedAt as number,
+                                scannedFolders: status.scannedFolders,
+                                normalizationIssues: status.normalizationIssues,
+                            })
+                            break
                         }
-                        break
-                    case 'completed': {
-                        this.finishScan(status, 'completed', {
-                            failures,
-                            discoveryFailureCount,
-                            readFailureCount,
-                            missing: update.missing ?? 0,
-                            error: null,
-                        })
-                        this.stateStore.set('lastScan', {
-                            refreshTotal: status.refreshTotal,
-                            count: update.count,
-                            total: update.total,
-                            unchanged: update.unchanged,
-                            changed: update.changed,
-                            new: update.new,
-                            missing: update.missing,
-                            errors: status.failedFiles,
-                            finishedAt: status.finishedAt as number,
-                            scannedFolders: status.scannedFolders,
-                            normalizationIssues: status.normalizationIssues,
-                        })
-                        break
+                        case 'error':
+                            // Stream-level error update; the observable terminates right after.
+                            break
                     }
-                    case 'error':
-                        // Stream-level error update; the observable terminates right after.
-                        break
-                }
-                this.touch(status)
-            },
-            error: err => {
-                // An aborted deep read surfaces as a stream error — report it as a cancellation.
-                const outcome: LibraryScanOutcome = signal.aborted ? 'cancelled' : 'failed'
-                this.finishScan(status, outcome, {
-                    failures,
-                    discoveryFailureCount,
-                    readFailureCount,
-                    missing: 0,
-                    error:
-                        outcome === 'failed'
-                            ? {
-                                  code: 'SCAN_ERROR',
-                                  message: err instanceof Error ? err.message : String(err),
-                              }
-                            : null,
-                })
-                this.finishBroadcasting()
-                markSettled()
-            },
-            complete: () => {
-                // An aborted scan completes without a `completed` update.
-                if (status.terminal === null) {
+                    this.touch(status)
+                },
+                error: err => {
+                    // An aborted deep read surfaces as a stream error — report it as a cancellation.
                     const outcome: LibraryScanOutcome = signal.aborted ? 'cancelled' : 'failed'
                     this.finishScan(status, outcome, {
                         failures,
@@ -267,14 +253,34 @@ export class LibraryScanService {
                         missing: 0,
                         error:
                             outcome === 'failed'
-                                ? { code: 'SCAN_ERROR', message: 'The scan ended unexpectedly' }
+                                ? {
+                                      code: 'SCAN_ERROR',
+                                      message: err instanceof Error ? err.message : String(err),
+                                  }
                                 : null,
                     })
-                }
-                this.finishBroadcasting()
-                markSettled()
-            },
-        })
+                    this.finishBroadcasting()
+                    markSettled()
+                },
+                complete: () => {
+                    // An aborted scan completes without a `completed` update.
+                    if (status.terminal === null) {
+                        const outcome: LibraryScanOutcome = signal.aborted ? 'cancelled' : 'failed'
+                        this.finishScan(status, outcome, {
+                            failures,
+                            discoveryFailureCount,
+                            readFailureCount,
+                            missing: 0,
+                            error:
+                                outcome === 'failed'
+                                    ? { code: 'SCAN_ERROR', message: 'The scan ended unexpectedly' }
+                                    : null,
+                        })
+                    }
+                    this.finishBroadcasting()
+                    markSettled()
+                },
+            })
 
         return status
     }
