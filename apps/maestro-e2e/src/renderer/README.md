@@ -107,9 +107,9 @@ Current track list presets:
 
 Track list builders:
 
-- `.songs(rows, { total?, offset? })` serves **one fixed window** whatever is asked for. The
+- `.songs(rows, { total?, offset?, metadata? })` serves **one fixed window** whatever is asked for. The
   `total` is what sizes the scrollbar, so passing one far larger than `rows` is how a test
-  asserts that scrolling asks for a _different_ window.
+  asserts that scrolling asks for a _different_ window. `metadata` carries disc boundaries for grouped albums.
 - `.songCatalog(page, total)` serves whatever window is asked for — see
   [Computed Answers](#computed-answers).
 
