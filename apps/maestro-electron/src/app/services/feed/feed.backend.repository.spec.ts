@@ -132,6 +132,45 @@ describe('FeedBackendRepository album purchases', () => {
         },
     )
 
+    it.each([
+        ['the next single', 'https://test.bandcamp.com/track/second-single'],
+        ['the album', 'https://test.bandcamp.com/album/upcoming'],
+    ])('makes a viewed single unviewed again when %s is announced', async (_name, releaseUrl) => {
+        const database = createMigratedTestDatabase()
+        try {
+            const repository = new FeedBackendRepository(database.client)
+            const albumUrl = 'https://test.bandcamp.com/album/upcoming'
+            // Announced tracks are saved under their parent album.
+            const announcement = (id: string, url: string, eventDate: Date): FeedItemWithPurchases => {
+                const item = bandcampFeedItem(id, eventDate)
+                if (item.source.type !== 'EMAIL.BANDCAMP_NEW_RELEASE')
+                    throw new Error('Expected an announcement')
+                return {
+                    ...item,
+                    dedupeIdentifier: albumUrl,
+                    data: { tralbumUrl: albumUrl, tralbumType: 'album' },
+                    source: { ...item.source, releaseUrl: url },
+                }
+            }
+            const firstSingleUrl = 'https://test.bandcamp.com/track/first-single'
+            await repository.ingestFeedItems([announcement('single', firstSingleUrl, new Date('2026-10-01'))])
+            await repository.markFeedItemViewed('single', 'BANDCAMP.TRALBUM', true)
+
+            // The import re-reads recent emails, so the same announcement arrives again.
+            await repository.ingestFeedItems([announcement('reread', firstSingleUrl, new Date('2026-10-01'))])
+            expect(database.db.select().from(feedItemsTable).all()).toMatchObject([
+                { id: 'single', lastViewedAt: expect.any(Date), isSnoozed: true },
+            ])
+
+            await repository.ingestFeedItems([announcement('next', releaseUrl, new Date('2026-10-15'))])
+            expect(database.db.select().from(feedItemsTable).all()).toMatchObject([
+                { id: 'single', lastViewedAt: null, isSnoozed: false, eventDate: new Date('2026-10-15') },
+            ])
+        } finally {
+            database.sqlite.close()
+        }
+    })
+
     it('merges fans across notifications and reimports using their profile identity', async () => {
         const database = createMigratedTestDatabase()
         try {

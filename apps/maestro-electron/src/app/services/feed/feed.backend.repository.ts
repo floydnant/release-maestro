@@ -27,6 +27,9 @@ const FEED_VIEW_HISTORY_THROTTLE_TIME_MS = 1000 * 60 * 3
 
 const normalizeUrl = (url: string) => normalizeBandcampReleaseUrl(url) ?? url
 
+/** Timestamps are stored to the second, so compare a stored date with an incoming one at that precision. */
+const storedSeconds = (date: Date) => Math.floor(date.getTime() / 1000)
+
 /** The release URLs an item answers to: its own, its announcement's, and every URL bought through it. */
 const releaseUrlsOf = (item: FeedItemWithPurchases): string[] => [
     ...new Set(
@@ -68,6 +71,8 @@ export class FeedBackendRepository {
      * Saves imported items. An item that shares a release URL with stored items merges into the
      * oldest of them, which keeps its ID, source, viewed and snoozed state. The others are deleted
      * after their URLs and view history move to it, and their IDs stay addressable as aliases.
+     * An announcement received after the item's event date makes it unviewed again and becomes its
+     * event date.
      */
     async ingestFeedItems(feedItemsToIngest: FeedItemWithPurchases[]) {
         if (feedItemsToIngest.length == 0) return
@@ -121,6 +126,11 @@ export class FeedBackendRepository {
             tx.insert(feedItemsTable).values(incoming).run()
             return incoming.id
         }
+        // The next single or the album itself, announced after an earlier single was viewed. A reread
+        // of the same announcement carries the same date, so it leaves the viewed state alone.
+        const isNewerAnnouncement =
+            incoming.source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' &&
+            storedSeconds(incoming.eventDate) > storedSeconds(retained.eventDate)
 
         const absorbedIds = absorbed.map(item => item.id)
         if (absorbedIds.length > 0) {
@@ -137,7 +147,15 @@ export class FeedBackendRepository {
         }
         const release = releaseAfterMerge([retained, ...absorbed], incoming)
         tx.update(feedItemsTable)
-            .set({ dedupeIdentifier: release.dedupeIdentifier, data: release.data })
+            .set({
+                dedupeIdentifier: release.dedupeIdentifier,
+                data: release.data,
+                ...(isNewerAnnouncement && {
+                    lastViewedAt: null,
+                    isSnoozed: false,
+                    eventDate: incoming.eventDate,
+                }),
+            })
             .where(eq(feedItemsTable.id, retained.id))
             .run()
         return retained.id

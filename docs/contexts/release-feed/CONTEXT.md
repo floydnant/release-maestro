@@ -204,8 +204,9 @@ unique per feed item type in the database. Bandcamp notifications about the same
 across both notification types. Album tracks use the parent album URL. Purchases merge into that
 item even when a release announcement supplied its source. When track entries collapse into an
 album, the first imported entry keeps its identity, source, viewed state and snooze state. The view
-history from every merged entry follows that identity. The same URL with a different feed item
-type would not collapse.
+history from every merged entry follows that identity. An announcement received after the feed
+item's event date, such as the album after one of its singles, makes the item unviewed again and
+becomes its event date. The same URL with a different feed item type would not collapse.
 **Release URLs** are every URL a feed item answers to: its own release, its announcement's release,
 and each URL bought through it. Each release URL belongs to one feed item. Import finds an existing
 item through any of them, so a reimported track whose page has become unavailable still reaches its
