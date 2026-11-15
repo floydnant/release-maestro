@@ -4,12 +4,7 @@ import { HydratedFeedItem } from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { IconComponent } from '../../shared/components/icon/icon.component'
 import { ProgressRingComponent } from '../../shared/components/progress-ring/progress-ring.component'
-
-/**
- * How a release that failed to load gets back: it is loading now, it waits for a scheduled automatic
- * reload, it reloads once scrolled into view, or the user retries it.
- */
-export type ReleaseRecovery = 'reloading' | 'scheduled' | 'when-in-view' | 'manual'
+import { ReleaseRecovery } from './feed-state'
 
 /**
  * Why a release could not load and how it gets back. A rate limit (an error with `retryAt`) is

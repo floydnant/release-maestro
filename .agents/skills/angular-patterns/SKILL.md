@@ -31,8 +31,14 @@ template can read it. State in, stream in the middle, signal out.
 
 The worked example is `pages/feed/feed.component.ts`: scrolling, retries and timers become typed
 actions, merged into `toSignal(merge(...actions).pipe(mergeScan(..., 1)))` so one action changes the
-state at a time. The pure transitions live beside it in `pages/feed/feed-state.ts`. Read both before
-writing a new pipeline in a component.
+state at a time. The pure transitions live beside it in `pages/feed/feed-state.ts`. They take the
+clock as an argument; the component reads it. Read both before writing a new pipeline in a component.
+
+One action source reads the pipeline's own output: `automaticReload` is a `computed` over
+`feedState`, and its `toObservable` schedules reload actions. Such a loop must settle. Here a
+release's deadline counts as tried once its reload starts, so the next state yields no new action for
+it, and `computed`'s `equal` keeps an unchanged schedule from re-emitting. Give any new loop a
+stopping rule like this, or it reloads forever.
 
 **Do not subscribe in order to `set()` a signal.** That is the anti-pattern this rule exists to
 prevent, and it is the most common way the convention gets broken — it reintroduces the imperative

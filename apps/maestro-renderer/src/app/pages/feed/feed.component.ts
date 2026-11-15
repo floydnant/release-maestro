@@ -65,10 +65,11 @@ import {
     isSameAutomaticReload,
     nextAutomaticReload,
     recoveryOfRelease,
+    ReleaseRecovery,
     releasesToReload,
     startReloading,
 } from './feed-state'
-import { ReleaseLoadStatusComponent, ReleaseRecovery } from './release-load-status.component'
+import { ReleaseLoadStatusComponent } from './release-load-status.component'
 
 const NUM_PREFETCH_ITEMS = 5
 const SEEK_BY_SECONDS = 30
@@ -284,7 +285,7 @@ export class FeedComponent {
     }
 
     releaseRecovery(state: FeedState, item: HydratedFeedItem, index: number): ReleaseRecovery {
-        return recoveryOfRelease(state, item, index, this.currentFeedIndex())
+        return recoveryOfRelease(state, item, index, this.currentFeedIndex(), Date.now())
     }
 
     /**

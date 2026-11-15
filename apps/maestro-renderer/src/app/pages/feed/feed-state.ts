@@ -1,5 +1,4 @@
 import { HydratedFeedItem } from '@release-maestro/core'
-import { ReleaseRecovery } from './release-load-status.component'
 
 /** Releases that failed on a rate limit reload on their own when current or among the next five. */
 const AUTO_RETRY_WINDOW = 6
@@ -7,6 +6,12 @@ const AUTO_RETRY_WINDOW = 6
 const MAX_RELOAD_BATCH = 20
 
 export type PageFailure = { message: string }
+
+/**
+ * How a release that failed to load gets back: it is loading now, it waits for a scheduled automatic
+ * reload, it reloads once scrolled into view, or the user retries it.
+ */
+export type ReleaseRecovery = 'reloading' | 'scheduled' | 'when-in-view' | 'manual'
 
 /** What the feed page shows. Only the feed's serial action pipeline produces a new state. */
 export type FeedState = {
@@ -141,11 +146,12 @@ export const recoveryOfRelease = (
     item: HydratedFeedItem,
     index: number,
     currentIndex: number,
+    now: number,
 ): ReleaseRecovery => {
     if (state.reloadingIds.has(item.id)) return 'reloading'
     const deadline = untriedDeadline(state, item)
     if (deadline === null) return 'manual'
     if (!isInAutoRetryWindow(index, currentIndex)) return 'when-in-view'
     // A passed deadline in the window reloads at once; say so rather than show a time already gone.
-    return deadline > Date.now() ? 'scheduled' : 'reloading'
+    return deadline > now ? 'scheduled' : 'reloading'
 }
