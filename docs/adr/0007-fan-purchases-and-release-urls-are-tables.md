@@ -8,8 +8,8 @@ had to load and parse every feed item in TypeScript; with tables they are indexe
 
 Purchases reference the bought URL, not a feed item. A purchase reaches its item through
 `feed_release_urls`, so merging tracks into their album repoints URL rows and never moves purchases.
-Each URL belongs to one item. The migration folds items that already share a URL into the oldest of
-them, as an import would merge them.
+Each URL belongs to one item. The migration indexes the URLs of existing items, and the oldest item
+that names a URL keeps it.
 
 ## Considered Options
 
