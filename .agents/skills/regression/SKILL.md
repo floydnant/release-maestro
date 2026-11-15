@@ -66,9 +66,10 @@ For changed files, check:
   `mergeMap` where `exhaustMap` belonged permits concurrent triggers (ADR 0001 allows exactly one scan
   app-wide), and `switchMap` where `concatMap` belonged silently drops work that used to complete.
   Also: a `Subject` that no longer completes, a subscription that lost its `takeUntilDestroyed`, a
-  `bufferCount`/batching change that breaks ordering, `materialize` removed from a stream that crosses
-  IPC so errors no longer survive the hop, and an `AbortSignal` no longer wired to tear down the
-  resource a stream owns. See `.agents/skills/rxjs-streams/SKILL.md`.
+  batching change that breaks ordering, a stream that crosses IPC now ending in a raw error rather
+  than a terminal progress update, `materialize`/`dematerialize` removed from around ordered saves so
+  an error overtakes earlier saves, and an `AbortSignal` no longer wired to tear down the resource a
+  stream owns. See `.agents/skills/rxjs-streams/SKILL.md`.
 - **Paradigm drift.** A `.subscribe()` added to `set()` a signal where `toSignal` was the pattern, or
   a `computed` replaced by an `effect` that writes. These may preserve behavior while violating
   `.agents/skills/angular-patterns/SKILL.md`.

@@ -38,6 +38,9 @@ make dev-reallocate
 ```
 
 `RELEASE_MAESTRO_APP_DATA_DIR` selects a different writable app-data directory.
+`RELEASE_MAESTRO_BANDCAMP_DIAGNOSTICS=1` logs every Bandcamp request to the main-process console:
+its URL without the query, purpose, status, timings and request gate state. A Bandcamp rate limit
+always logs request counts and the last 20 requests.
 
 ## Lifecycle and claims
 

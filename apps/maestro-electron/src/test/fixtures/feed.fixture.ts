@@ -1,6 +1,6 @@
-import { BandcampFeedItem, ScrapedTralbumInfo } from '@release-maestro/core'
+import { FeedItemWithPurchases, ScrapedTralbumInfo } from '@release-maestro/core'
 
-export const bandcampFeedItem = (id: string, eventDate: Date): BandcampFeedItem => ({
+export const bandcampFeedItem = (id: string, eventDate: Date): FeedItemWithPurchases => ({
     id,
     type: 'BANDCAMP.TRALBUM',
     dedupeIdentifier: `https://test.bandcamp.com/album/${id}`,
@@ -9,6 +9,7 @@ export const bandcampFeedItem = (id: string, eventDate: Date): BandcampFeedItem 
     isSnoozed: false,
     lastViewedAt: null,
     data: { tralbumUrl: `https://test.bandcamp.com/album/${id}`, tralbumType: 'album' },
+    purchases: [],
     source: {
         type: 'EMAIL.BANDCAMP_NEW_RELEASE',
         messageId: `<${id}@example.com>`,
@@ -30,6 +31,7 @@ export const scrapedRelease = (streamUrls: (string | null)[]): ScrapedTralbumInf
     artist: 'Test artist',
     releaseDate: null,
     type: 'album',
+    parentAlbumUrl: null,
     id: 1,
     artworkUrl: null,
     about: '',
