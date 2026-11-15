@@ -153,7 +153,9 @@ export class EmailImportPass {
         )
 
         return concat(
-            merge(this.exportProgress(emails$), this.saveProgress(emails$)),
+            // One export feeds both progress streams. connect subscribes them before the export
+            // starts, so a cold source would not run twice.
+            emails$.pipe(connect(shared$ => merge(this.exportProgress(shared$), this.saveProgress(shared$)))),
             defer(() => this.finish()),
         )
     }
@@ -214,7 +216,7 @@ export class EmailImportPass {
         return emails$.pipe(
             // Each exported email joins the queue, and names the tracks that need a lookup.
             map(({ email }) => this.queue.enqueue(email && parseBandcampEmail(email))),
-            // Share the export between the queue, the lookups, and the end of the export.
+            // Share each email's track lookups between the queue, the lookups, and the end of the export.
             connect(trackLookups$ =>
                 merge(
                     trackLookups$.pipe(map((): QueueChange => 'email-queued')),

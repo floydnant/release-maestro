@@ -1,4 +1,4 @@
-import { lastValueFrom, Subject, tap, toArray } from 'rxjs'
+import { defer, lastValueFrom, of, Subject, tap, toArray } from 'rxjs'
 import { fromPartial } from '@total-typescript/shoehorn'
 import {
     DEFAULT_FEED_SNOOZE_HOURS,
@@ -988,6 +988,26 @@ describe('FeedBackendService email import', () => {
             jest.useRealTimers()
             jest.restoreAllMocks()
         }
+    })
+
+    it('runs the export once when the email source is cold', async () => {
+        let exports = 0
+        loadEmails.mockImplementation(async () =>
+            defer(() => {
+                exports++
+                return of(packet('2026-09-30T08:15:00', 1, 2), packet('2026-10-01T21:40:12', 2, 2))
+            }),
+        )
+        const { updates } = await runImport()
+
+        await expect(updates).resolves.toEqual([
+            expect.objectContaining({ phase: 'processing', current: 1 }),
+            expect.objectContaining({ phase: 'processing', current: 2 }),
+            { phase: 'finishing', current: 0, total: 2 },
+            { phase: 'finishing', current: 2, total: 2 },
+            expect.objectContaining({ phase: 'completed' }),
+        ])
+        expect(exports).toBe(1)
     })
 
     it('reads the whole mailbox on the first import and checkpoints the newest email', async () => {
