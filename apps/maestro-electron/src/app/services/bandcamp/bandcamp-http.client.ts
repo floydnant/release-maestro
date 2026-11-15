@@ -13,6 +13,9 @@ export type { BandcampRequestPurpose } from './bandcamp-request-gate'
 const REQUEST_TIMEOUT_MS = 15_000
 const PREVIEW_TIMEOUT_MS = 5000
 const MAX_REDIRECTS = 10
+// Bandcamp serves bots directly on its own host. Unidentified clients can loop between
+// that host and a custom domain which redirects back to Bandcamp.
+const BANDCAMP_USER_AGENT = 'ReleaseMaestroBot (+https://github.com/floydnant/release-maestro)'
 
 type PageRequest = BandcampRequestDetails & { signal: AbortSignal }
 type PageResult = { kind: 'page'; page: Page } | { kind: 'redirect'; url: string }
@@ -199,7 +202,11 @@ export class BandcampHttpClient {
         const entry = viaBandcamp ? this.journal.start(request, this.gate.state) : null
         let failure: string | undefined
         try {
-            response = await fetch(url, { signal: requestSignal, redirect: 'manual' })
+            response = await fetch(url, {
+                signal: requestSignal,
+                redirect: 'manual',
+                headers: viaBandcamp ? { 'User-Agent': BANDCAMP_USER_AGENT } : undefined,
+            })
             if (entry) this.journal.response(entry, response)
             if (viaBandcamp && response.status === 429) {
                 const cooldownUntil = this.gate.rateLimited(

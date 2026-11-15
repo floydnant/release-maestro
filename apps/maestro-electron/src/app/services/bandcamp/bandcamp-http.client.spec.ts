@@ -69,11 +69,13 @@ describe('BandcampHttpClient', () => {
         fetchMock.mockImplementation(
             async url =>
                 new Response(null, {
-                    status: 302,
+                    status: url === firstUrl ? 301 : 303,
                     headers: { Location: url === firstUrl ? customUrl : firstUrl },
                 }),
         )
-        await expect(client.get(firstUrl)).rejects.toThrow()
+        await expect(client.get(firstUrl)).rejects.toThrow(
+            `Page redirect loop for ${firstUrl} (last redirect: ${customUrl} -> ${firstUrl})`,
+        )
         expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
@@ -606,6 +608,24 @@ describe('BandcampHttpClient', () => {
         expect(fetchMock.mock.calls.every(([_url, init]) => init?.redirect === 'manual')).toBe(true)
     })
 
+    it('identifies a preview as a bot only after it reaches Bandcamp', async () => {
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: firstUrl } }))
+
+        await expect(
+            client.get('https://artist.example/music', { purpose: 'preview' }),
+        ).resolves.toMatchObject({
+            html: 'OK',
+        })
+
+        const userAgents = fetchMock.mock.calls.map(([_url, init]) =>
+            new Headers(init?.headers).get('User-Agent'),
+        )
+        expect(userAgents).toEqual([
+            null,
+            'ReleaseMaestroBot (+https://github.com/floydnant/release-maestro)',
+        ])
+    })
+
     it('identifies the requested release and last redirect when the redirect limit is reached', async () => {
         let redirect = 0
         fetchMock.mockImplementation(
@@ -652,6 +672,11 @@ describe('BandcampHttpClient', () => {
         await expect(result).resolves.toMatchObject({ url: customUrl, html: 'OK' })
         await client.get(customUrl, { purpose: 'preview' })
         expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([firstUrl, customUrl, customUrl])
+        expect(
+            fetchMock.mock.calls.every(([_url, init]) =>
+                /ReleaseMaestroBot/.test(new Headers(init?.headers).get('User-Agent') ?? ''),
+            ),
+        ).toBe(true)
     })
 
     it('recognizes direct custom-domain release lookups and remembers their ownership after cache expiry', async () => {

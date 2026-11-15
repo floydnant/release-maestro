@@ -5,7 +5,7 @@ import {
     BandcampApiMalformedTralbumDataException,
     BandcampApiRateLimitedException,
 } from './bandcamp-api.exceptions'
-import { BandcampHttpClient } from './bandcamp-http.client'
+import { BandcampHttpClient, BandcampRequestPurpose } from './bandcamp-http.client'
 import { WebScrapingService } from '../web-scraping/web-scraping.service'
 
 const releaseData = {
@@ -134,6 +134,46 @@ describe('BandcampApiBackendService release links', () => {
     })
 
     afterEach(() => jest.restoreAllMocks())
+
+    it.each<Exclude<BandcampRequestPurpose, 'preview'>>(['feed', 'import'])(
+        'hydrates a release whose custom domain loops for unidentified %s requests',
+        async purpose => {
+            const url = 'https://malingenie.bandcamp.com/track/hedonic-setpoint-85'
+            const customUrl = 'https://malingenie.net/track/hedonic-setpoint-85'
+            const tralbum = {
+                album_url: '/album/hedonic-setpoint-ix',
+                current: { title: 'Hedonic Setpoint 85', type: 'track', id: 85 },
+                trackinfo: [
+                    {
+                        title: 'Hedonic Setpoint 85',
+                        duration: 300,
+                        album_preorder: false,
+                        file: { 'mp3-128': 'https://audio.example/85.mp3' },
+                    },
+                ],
+            }
+            // Bandcamp serves bots directly; other clients get a 301 to the custom domain,
+            // which sends a 303 back to Bandcamp. Replaying that pair must still hydrate.
+            const fetchMock = jest
+                .spyOn(globalThis, 'fetch')
+                .mockImplementation(async (requestedUrl, init) => {
+                    if (requestedUrl === customUrl)
+                        return new Response(null, { status: 303, headers: { Location: url } })
+                    if (!/bot/i.test(new Headers(init?.headers).get('User-Agent') ?? ''))
+                        return new Response(null, { status: 301, headers: { Location: customUrl } })
+                    return new Response(`<div data-tralbum='${JSON.stringify(tralbum)}'></div>`)
+                })
+            const service = new BandcampApiBackendService(new BandcampHttpClient())
+
+            await expect(service.scrapeTralbumInfo(url, undefined, purpose)).resolves.toMatchObject({
+                title: 'Hedonic Setpoint 85',
+                type: 'track',
+                parentAlbumUrl: 'https://malingenie.bandcamp.com/album/hedonic-setpoint-ix',
+                tracks: [{ streamUrl: 'https://audio.example/85.mp3' }],
+            })
+            expect(fetchMock).toHaveBeenCalledTimes(1)
+        },
+    )
 
     it('fetches a recovered release on Retry instead of reusing malformed cached HTML', async () => {
         const html = `<div data-tralbum='${JSON.stringify({
