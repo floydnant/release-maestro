@@ -13,7 +13,19 @@ const validateEmail = (data: unknown): Email | null => {
     return result.success ? result.data : null
 }
 
-/** Mail exports the raw MIME source, including transfer-encoded HTML. */
+/** Decodes with the MIME charset, or as UTF-8 when the runtime lacks it: Bandcamp links are ASCII. */
+const decoderFor = (charset: string): TextDecoder => {
+    try {
+        return new TextDecoder(charset)
+    } catch {
+        return new TextDecoder()
+    }
+}
+
+/**
+ * Mail exports the raw MIME source, including transfer-encoded HTML. Decoding never throws: an email
+ * it cannot decode would block the import checkpoint on every later import.
+ */
 const decodeAppleMailHtml = (source: string): string => {
     const lines = source.replace(/\r\n/g, '\n').split('\n')
     const logicalLines: { text: string; start: number }[] = []
@@ -32,7 +44,7 @@ const decodeAppleMailHtml = (source: string): string => {
     let headersStart = htmlHeaderIndex
     while (headersStart > 0 && lines[headersStart - 1] !== '') headersStart--
     const headersEnd = lines.findIndex((line, index) => index > htmlHeaderIndex && line === '')
-    if (headersEnd === -1) throw new Error('Incomplete HTML MIME headers')
+    if (headersEnd === -1) return source.trim()
     const headers = logicalLines
         .filter(line => line.start >= headersStart && line.start < headersEnd)
         .map(line => line.text)
@@ -51,7 +63,7 @@ const decodeAppleMailHtml = (source: string): string => {
     const charset = headers.match(/charset="?([^";\s]+)/i)?.[1] ?? 'utf-8'
 
     if (encoding === 'base64') {
-        return new TextDecoder(charset).decode(Buffer.from(body, 'base64')).trim()
+        return decoderFor(charset).decode(Buffer.from(body, 'base64')).trim()
     }
     if (encoding === 'quoted-printable') {
         // Latin-1 preserves each decoded =XX byte until TextDecoder applies the MIME charset.
@@ -61,7 +73,7 @@ const decodeAppleMailHtml = (source: string): string => {
                 .replace(/=([\da-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16))),
             'latin1',
         )
-        return new TextDecoder(charset).decode(bytes).trim()
+        return decoderFor(charset).decode(bytes).trim()
     }
     return body.trim()
 }

@@ -229,6 +229,38 @@ describe('AppleMailRepository', () => {
         },
     )
 
+    it.each([
+        {
+            name: 'an unsupported charset',
+            mime: [
+                'Content-Type: text/html; charset="utf-7"',
+                'Content-Transfer-Encoding: base64',
+                '',
+                Buffer.from('<a href="https://test.bandcamp.com/album/first">First</a>').toString('base64'),
+            ].join('\n'),
+            htmlBody: '<a href="https://test.bandcamp.com/album/first">First</a>',
+        },
+        {
+            name: 'HTML headers without a body',
+            mime: 'Content-Type: text/html; charset="utf-8"',
+            htmlBody: 'Content-Type: text/html; charset="utf-8"',
+        },
+    ])('imports an email whose HTML has $name instead of skipping it', async ({ mime, htmlBody }) => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const filePath = join(exportPath, 'email-1.txt')
+        await writeEmail(filePath, dataFile('New release from Test Artist', '2026-10-01T08:00:00'), mime)
+
+        osascript.log(`Processed email 1/1: ${filePath}\n`)
+        await osascript.exit(0)
+
+        await expect(result).resolves.toEqual([
+            { current: 1, total: 1, email: expect.objectContaining({ htmlBody }) },
+        ])
+    })
+
     it("fails with Mail's own error message when the export fails", async () => {
         const osascript = fakeExport()
         const result = loadAll()
