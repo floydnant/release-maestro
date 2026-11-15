@@ -35,7 +35,7 @@ const openFeed = async (page: Page, release: HydratedFeedItem) => {
 const timestamp = (page: Page, spoken: string) => page.getByRole('time').filter({ hasText: spoken })
 
 /** The paragraph that holds the release's timestamps. */
-const timestampLine = (page: Page) => page.locator('.text-column p').filter({ has: page.getByRole('time') })
+const timestampLine = (page: Page) => page.getByRole('paragraph').filter({ has: page.getByRole('time') })
 
 /** The line as it reads on screen, without the full dates only assistive technology hears. */
 const visibleText = (line: Locator) =>
@@ -142,15 +142,15 @@ test.describe('release feed timestamps', () => {
         await page.setViewportSize({ width: 800, height: 700 })
         await openFeed(page, releaseWith('2025-03-05', new Date('2026-10-03T08:00:00Z')))
 
+        // The line is a block that fills the text column, so parts inside it stay inside the column.
         const line = timestampLine(page)
-        const columnRight = await page
-            .locator('.text-column')
-            .evaluate(column => column.getBoundingClientRect().right)
+        const lineRight = await line.evaluate(element => element.getBoundingClientRect().right)
         const partRights = await line
-            .locator('.artist, time')
+            .getByText('by Shiva Chandra', { exact: true })
+            .or(line.getByRole('time'))
             .evaluateAll(parts => parts.map(part => part.getBoundingClientRect().right))
         expect(partRights).toHaveLength(3)
-        for (const right of partRights) expect(right).toBeLessThanOrEqual(columnRight + 0.5)
+        for (const right of partRights) expect(right).toBeLessThanOrEqual(lineRight + 0.5)
         expect(await line.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
     })
 

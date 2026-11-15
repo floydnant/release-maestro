@@ -77,6 +77,8 @@
             }
             @for (feedItem of feedState.items; track feedItem.id) {
                 <div
+                    role="article"
+                    [attr.aria-label]="feedItem.data.releaseName"
                     class="feed-entry | my-32 flex max-h-(--max-feed-item-height) min-h-[45vh] snap-center items-center py-[calc(var(--feed-item-padding-y)/2)] transition-all duration-slow ease-standard"
                     [ngClass]="{ 'opacity-30 blur-xs': currentFeedIndex() != $index }"
                     #feedEntry

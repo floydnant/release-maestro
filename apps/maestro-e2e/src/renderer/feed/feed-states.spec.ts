@@ -100,17 +100,13 @@ test.describe('release feed scenario states', () => {
         // Visit both cards, then leave them: only the healthy release should be marked viewed.
         // The observer watches the whole card, so seeing its title alone is not enough.
         const retry = page.getByRole('button', { name: 'Retry loading Failed release' })
-        const failedCard = page.locator('.feed-entry').filter({ has: retry })
+        const failedCard = page.getByRole('article', { name: 'Failed release', exact: true })
         await failedCard.scrollIntoViewIfNeeded()
         await expect(failedCard).toBeInViewport({ ratio: 1 })
-        const second = page.locator('.feed-entry').filter({
-            has: page.getByRole('link', { name: 'Second release', exact: true }),
-        })
+        const second = page.getByRole('article', { name: 'Second release', exact: true })
         await second.scrollIntoViewIfNeeded()
         await expect(second).toBeInViewport({ ratio: 1 })
-        const fourth = page.locator('.feed-entry').filter({
-            has: page.getByRole('link', { name: 'Fourth release', exact: true }),
-        })
+        const fourth = page.getByRole('article', { name: 'Fourth release', exact: true })
         await fourth.scrollIntoViewIfNeeded()
         await expect(fourth).toBeInViewport({ ratio: 1 })
         await expect(second).not.toBeInViewport()

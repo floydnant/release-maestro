@@ -40,7 +40,10 @@ const openFeed = async (page: Page, release: HydratedFeedItem) => {
 }
 
 const trackRow = (page: Page, index: number) => page.locator(`.track[data-track-index="${index}"]`)
-const releaseStack = (page: Page) => page.locator('.text-column .fan-avatar-stack')
+/** The sentence naming a release's buyers; the track stacks show avatars alone. */
+const buyerSentence = (page: Page) => page.getByText(/^Bought by /)
+/** The release's buyer line: decorative avatars beside the buyer sentence. */
+const releaseStack = (page: Page) => page.getByRole('paragraph').filter({ has: buyerSentence(page) })
 const fanLink = (page: Page, fan: BandcampFan) =>
     releaseStack(page).getByRole('link', { name: fan.name, exact: true })
 
@@ -48,7 +51,7 @@ test.describe('release feed fan purchases', () => {
     test('credits a fan who bought the whole album on the release and every track', async ({ page }) => {
         await openFeed(page, createPurchasedAlbum([[adam], [adam], [adam]]))
 
-        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pits')
+        await expect(buyerSentence(page)).toHaveText('Bought by Adam Pits')
         await expect(fanLink(page, adam)).toHaveAttribute('href', adam.profileUrl)
         await expect(page.getByRole('img', { name: 'Bought by Adam Pits', exact: true })).toHaveCount(3)
         for (const index of [0, 1, 2]) {
@@ -65,7 +68,7 @@ test.describe('release feed fan purchases', () => {
     test('shows each track’s own buyers and keeps durations aligned', async ({ page }) => {
         await openFeed(page, createPurchasedAlbum([[adam, maya], [], [adam, river]]))
 
-        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pits, Maya, and River & Rain')
+        await expect(buyerSentence(page)).toHaveText('Bought by Adam Pits, Maya, and River & Rain')
         for (const fan of [adam, maya, river]) {
             await expect(fanLink(page, fan)).toHaveAttribute('href', fan.profileUrl)
             await expect(fanLink(page, fan)).toHaveAttribute('target', '_blank')
@@ -158,9 +161,7 @@ test.describe('release feed fan purchases', () => {
         await expect(trackRow(page, 1).locator('[data-slot="avatar-group-count"]')).toHaveText('+2')
         await expect(trackRow(page, 2).locator('[data-slot="avatar"]')).toHaveCount(3)
         await expect(trackRow(page, 2).locator('[data-slot="avatar-group-count"]')).toHaveCount(0)
-        await expect(page.locator('.fan-summary')).toHaveText(
-            'Bought by Ada, Ben, Cyrus, Dee, Eve, Fay, Gus, and Hal',
-        )
+        await expect(buyerSentence(page)).toHaveText('Bought by Ada, Ben, Cyrus, Dee, Eve, Fay, Gus, and Hal')
         await expect(releaseStack(page).getByRole('link')).toHaveCount(names.length)
 
         await trackRow(page, 0).getByRole('img').focus()
@@ -178,7 +179,7 @@ test.describe('release feed fan purchases', () => {
             const longFan = createBandcampFan(longName)
             await openFeed(page, createPurchasedAlbum([[longFan], [], []]))
 
-            const summary = page.locator('.fan-summary')
+            const summary = buyerSentence(page)
             await expect(summary).toHaveText(`Bought by ${longName}`)
             await expect(fanLink(page, longFan)).toBeVisible()
             const fit = await summary.evaluate(element => {
@@ -208,14 +209,15 @@ test.describe('release feed fan purchases', () => {
             createPurchasedAlbum([[maya], [], []], { sourceType: 'EMAIL.BANDCAMP_NEW_RELEASE' }),
         )
 
-        await expect(page.locator('.fan-summary')).toHaveText('Bought by Maya')
+        await expect(buyerSentence(page)).toHaveText('Bought by Maya')
         await expect(trackRow(page, 0).getByRole('img', { name: 'Bought by Maya' })).toBeVisible()
     })
 
     test('shows no fan stack on a release nobody bought', async ({ page }) => {
         await openFeed(page, createHydratedRelease())
 
-        await expect(page.locator('.fan-avatar-stack')).toHaveCount(0)
+        await expect(buyerSentence(page)).toHaveCount(0)
+        await expect(page.getByRole('img', { name: /^Bought by / })).toHaveCount(0)
     })
 
     test('keeps the buyers and release link when hydration fails', async ({ page }) => {
@@ -235,7 +237,7 @@ test.describe('release feed fan purchases', () => {
         })
         await openFeed(page, release)
 
-        await expect(page.locator('.fan-summary')).toHaveText('Bought by Adam Pits')
+        await expect(buyerSentence(page)).toHaveText('Bought by Adam Pits')
         await expect(page.getByText('The Bandcamp track or album could not be found')).toBeVisible()
         await expect(page.getByRole('link', { name: release.data.releaseUrl, exact: true })).toHaveAttribute(
             'href',
