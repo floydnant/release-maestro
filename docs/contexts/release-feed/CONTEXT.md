@@ -114,27 +114,32 @@ through merges.
 
 **Parent album**:
 The Bandcamp album containing a track. Import reads the track page to resolve its parent album
-before choosing the feed item's identity. A genuine standalone track keeps its own release URL.
-A missing or malformed track page keeps the original track URL because its album is unknown.
-If an earlier import already found that track's album, reimport retains the album and its view state.
-Network failures leave the import checkpoint unchanged so the next pass can retry.
-Import schedules parent lookups continuously across emails. The shared request gate limits active
-Bandcamp requests. Network and server failures get two retries.
-Bandcamp page requests share the app-wide cooldown described below. A
-processing failure stops the remaining export before the import reports its final error.
+before choosing the feed item's identity. A genuine standalone track keeps its own release URL. A
+missing, malformed or refused track page keeps the original track URL because its album is unknown.
+Refused means any client error except a timeout or a rate limit. If an earlier import already found
+that track's album, reimport retains the album and its view state. Network failures leave the import
+checkpoint unchanged so the next pass can retry. Import schedules parent lookups continuously across
+emails. The Bandcamp request gate limits active Bandcamp requests. Network and server failures get
+two retries. Bandcamp page requests share the app-wide cooldown described below. A processing
+failure stops the remaining export before the import reports its final error.
+
+**Bandcamp request gate**:
+The one place every Bandcamp request is admitted. It starts feed requests at once and lets
+background work (imports and link previews) wait for free slots, spacing and request budgets. During
+a cooldown it refuses feed and preview requests and holds imports.
 
 **Bandcamp request cooldown**:
-A temporary pause after Bandcamp rejects excessive requests. Imports and feed hydration share the
-same pause across Bandcamp pages. Imports can wait and retry; the feed reports unavailable data
-while retaining the release link and purchase attribution. Visible releases retry after the pause
-and keep their position in the feed. Link previews share the same cooldown, so loading them cannot
-bypass a pause. Background imports and previews yield while the feed hydrates and slow down after
-rate limiting. An import can remain paused until Bandcamp allows requests again; cancellation
-remains available. Feed loading runs concurrently and does not wait behind background work.
-Background work follows short and sustained request budgets. Feed requests count against them but
-never wait for them. Rate limiting lowers the sustained background allowance for the rest of the
-app session. Consecutive rejected retries extend the recovery pause without lowering that allowance
-again. A longer pause requested by the server always takes precedence.
+A time without Bandcamp requests after Bandcamp rejects excessive requests. Imports and feed
+hydration share the same cooldown across Bandcamp pages. Imports can wait and retry; the feed
+reports unavailable data while retaining the release link and purchase attribution. Visible releases
+retry after the cooldown and keep their position in the feed. Link previews share the same cooldown,
+so loading them cannot bypass it. Background imports and previews yield while the feed hydrates and
+slow down after rate limiting. An import can wait out a cooldown until Bandcamp allows requests
+again; cancellation remains available. Feed loading runs concurrently and does not wait behind
+background work. Background work follows short and sustained request budgets. Feed requests count
+against them but never wait for them. Rate limiting lowers the sustained background allowance for
+the rest of the app session. Consecutive rejected retries extend the cooldown without lowering that
+allowance again. A longer cooldown requested by the server always takes precedence.
 
 **Link preview**:
 The title and favicon shown for a link from a notification. Previews load after the release appears
@@ -211,7 +216,7 @@ becomes its event date. The same URL with a different feed item type would not c
 and each URL bought through it. Each release URL belongs to one feed item. Import finds an existing
 item through any of them, so a reimported track whose page has become unavailable still reaches its
 known album.
-Bandcamp release URLs use HTTPS and omit tracking queries, fragments and trailing slashes. Links
+Bandcamp release URLs use HTTPS and omit queries, fragments and trailing slashes. Links
 served through a custom domain retain their original Bandcamp host for release and track identities.
 Open windows can still mark a merged track as viewed or snoozed through its original ID until they close.
 
