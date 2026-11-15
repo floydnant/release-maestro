@@ -717,7 +717,13 @@ describe('FeedBackendService email import', () => {
     })
 
     it.each([
-        new BandcampApiFailedToFetchTralbumException('https://other.bandcamp.com/track/second', 404),
+        ...[403, 404, 410, 451].map(
+            status =>
+                new BandcampApiFailedToFetchTralbumException(
+                    'https://other.bandcamp.com/track/second',
+                    status,
+                ),
+        ),
         new BandcampApiRedirectException('https://other.bandcamp.com/track/second', 'Redirect loop'),
         new BandcampApiMalformedTralbumDataException(
             'https://other.bandcamp.com/track/second',

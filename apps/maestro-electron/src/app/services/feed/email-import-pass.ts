@@ -45,19 +45,30 @@ const EMAIL_IMPORT_CHECKPOINT_OVERLAP_MS = 1000 * 60 * 60 * 24
 const MAX_PARENT_ALBUM_LOOKUPS = 8
 const PARENT_ALBUM_LOOKUP_RETRY_MS = [250, 1000]
 
-/** The track page cannot name its album: it is gone, malformed, or its redirects fail. */
+/** Client errors that a later request can answer differently. */
+const RETRYABLE_CLIENT_STATUSES = [408, 429]
+
+/**
+ * The track page cannot name its album: it is malformed, its redirects fail, or Bandcamp refuses it
+ * (gone, forbidden, unavailable here). Rethrowing would stop every later import at the same email.
+ */
 const parentAlbumIsUnknowable = (error: unknown) =>
     error instanceof BandcampApiRedirectException ||
     error instanceof BandcampApiMalformedTralbumDataException ||
-    (error instanceof BandcampApiFailedToFetchTralbumException && [404, 410].includes(error.status))
+    (error instanceof BandcampApiFailedToFetchTralbumException &&
+        error.status >= 400 &&
+        error.status < 500 &&
+        !RETRYABLE_CLIENT_STATUSES.includes(error.status))
 
 /**
- * Worth another attempt: the network or Bandcamp's servers failed. A rate limit is not retried
+ * Worth another attempt: the network or Bandcamp's servers failed. A failure that outlasts the
+ * retries fails the import, and the next import retries it. Bandcamp's own rate limit is not retried
  * here, because the HTTP client already waits out cooldowns for imports.
  */
 const isTransientFailure = (error: unknown) =>
     error instanceof FetchFailedException ||
-    (error instanceof BandcampApiFailedToFetchTralbumException && [500, 502, 503, 504].includes(error.status))
+    (error instanceof BandcampApiFailedToFetchTralbumException &&
+        (error.status >= 500 || RETRYABLE_CLIENT_STATUSES.includes(error.status)))
 
 /** A track's parent album, or the track itself when it is standalone or its page cannot say. */
 const findParentAlbum = async (
