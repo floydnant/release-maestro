@@ -1,6 +1,7 @@
 import { BandcampRequestGate, BandcampRequestPurpose } from './bandcamp-request-gate'
 
-const MAX_ENTRIES = 1000
+/** The requests a snapshot lists, newest last. */
+const RECENT_ENTRIES = 20
 const WINDOW_SECONDS = 300
 const emptyCounts = () => ({
     feed: { requests: 0, rateLimited: 0 },
@@ -74,7 +75,7 @@ export class BandcampRequestJournal {
         this.seconds.set(second, counts)
         this.prune(entry.startedAt)
         this.entries.push(entry)
-        if (this.entries.length > MAX_ENTRIES) this.entries.shift()
+        if (this.entries.length > RECENT_ENTRIES) this.entries.shift()
         return entry
     }
 
@@ -97,7 +98,7 @@ export class BandcampRequestJournal {
     finish(entry: RequestEntry, error?: string): void {
         entry.durationMs = Date.now() - entry.startedAt
         if (error) entry.error = error
-        if (process.env.MAESTRO_BANDCAMP_DIAGNOSTICS === '1')
+        if (process.env.RELEASE_MAESTRO_BANDCAMP_DIAGNOSTICS === '1')
             console.info('[Bandcamp request]', JSON.stringify(entry))
     }
 
@@ -119,7 +120,7 @@ export class BandcampRequestJournal {
             cacheHits: this.cacheHits,
             lastMinute: counts(60_000),
             lastFiveMinutes: counts(300_000),
-            recent: this.entries.slice(-20).map(entry => ({ ...entry })),
+            recent: this.entries.map(entry => ({ ...entry })),
         }
     }
 
