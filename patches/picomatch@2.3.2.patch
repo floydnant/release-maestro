@@ -1,0 +1,21 @@
+diff --git a/lib/parse.js b/lib/parse.js
+index caa2b86aa5a567df33cef4bda3c7a97794f439f8..ce5a7b767d73bf6aba3958ef9e00bc86b8e82730 100644
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -512,6 +512,16 @@ const parse = (input, options) => {
+     const body = input.slice(token.startIndex + 2, state.index);
+     const analysis = analyzeRepeatedExtglob(body, opts);
+ 
++    // A wildcard inside a single repeated branch nests unbounded quantifiers.
++    // Use parsed tokens so escaped, quoted and bracketed stars stay literal.
++    if (splitTopLevel(body).length === 1 && tokens.slice(token.tokensIndex + 1).some((part, index, parts) =>
++      (part.type === 'star' || part.type === 'globstar') &&
++      !(parts[index + 1]?.extglob === true && parts[index + 1].value === '(')
++    )) {
++      analysis.risky = true;
++      delete analysis.safeOutput;
++    }
++
+     if ((token.type === 'plus' || token.type === 'star') && analysis.risky) {
+       const safeOutput = analysis.safeOutput
+         ? (token.output ? '' : ONE_CHAR) + (opts.capture ? `(${analysis.safeOutput})` : analysis.safeOutput)
