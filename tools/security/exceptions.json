@@ -1,1 +1,50 @@
-[]
+[
+    {
+        "ecosystem": "npm",
+        "name": "picomatch",
+        "version": "2.3.2",
+        "id": "GHSA-fc5q-39xc-vjpf",
+        "reviewed": "2026-11-17",
+        "expires": "2026-12-01",
+        "reason": "Local patch literalizes single-branch repeated extglobs containing wildcard star tokens before regex compilation. Installed-package regression tests cover every installed consumer. No upstream fixed release exists. Replace with an upstream fix and remove this patch, its registration, tests and allowance together. Shipped exposure remains unknown.",
+        "patch": {
+            "path": "patches/picomatch@2.3.2.patch",
+            "sha256": "55abe71fcf013e80dcdc8c544f0a2beb367bade30ed287b3ec9127c561b69ec9",
+            "since": "2026-11-17",
+            "advisoryModified": "2026-11-17T16:00:03.999173557Z",
+            "tests": ["tools/security-patches/picomatch.test.mjs"]
+        }
+    },
+    {
+        "ecosystem": "npm",
+        "name": "picomatch",
+        "version": "4.0.4",
+        "id": "GHSA-fc5q-39xc-vjpf",
+        "reviewed": "2026-11-17",
+        "expires": "2026-12-01",
+        "reason": "Local patch literalizes single-branch repeated extglobs containing wildcard star tokens before regex compilation. Installed-package regression tests cover every installed consumer. No upstream fixed release exists. Replace with an upstream fix and remove this patch, its registration, tests and allowance together. Shipped exposure remains unknown.",
+        "patch": {
+            "path": "patches/picomatch@4.0.4.patch",
+            "sha256": "553c35cb55ef9150613f11bc153d4ac307ddc646fcc603b8e0e85fe46a223338",
+            "since": "2026-11-17",
+            "advisoryModified": "2026-11-17T16:00:03.999173557Z",
+            "tests": ["tools/security-patches/picomatch.test.mjs"]
+        }
+    },
+    {
+        "ecosystem": "npm",
+        "name": "picomatch",
+        "version": "4.0.7",
+        "id": "GHSA-fc5q-39xc-vjpf",
+        "reviewed": "2026-11-17",
+        "expires": "2026-12-01",
+        "reason": "Local patch literalizes single-branch repeated extglobs containing wildcard star tokens before regex compilation. Installed-package regression tests cover every installed consumer. No upstream fixed release exists. Replace with an upstream fix and remove this patch, its registration, tests and allowance together. Shipped exposure remains unknown.",
+        "patch": {
+            "path": "patches/picomatch@4.0.7.patch",
+            "sha256": "674e16a81c377632c4639f3b789281f340c59f78970bfa44e40dd16f5c2fec70",
+            "since": "2026-11-17",
+            "advisoryModified": "2026-11-17T16:00:03.999173557Z",
+            "tests": ["tools/security-patches/picomatch.test.mjs"]
+        }
+    }
+]

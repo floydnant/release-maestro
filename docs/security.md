@@ -81,7 +81,8 @@ uses v12. Recent Dependabot PRs have updated the lockfile successfully, but that
 complete remediation coverage. Dependency submission fills graph coverage; it cannot guarantee that
 Dependabot can resolve a compatible fix.
 
-`tools/security/exceptions.json` contains no allowances.
+`tools/security/exceptions.json` contains patch-bound allowances for picomatch 2.3.2, 4.0.4 and
+4.0.7 under GHSA-fc5q-39xc-vjpf, expiring December 1, 2026 at 00:00 UTC.
 Exceptions require ecosystem, package, exact version, advisory ID, reason, review date (`reviewed`) and
 UTC expiry date. The expiry may be at most 30 days after the review date, and the review date cannot be
 in the future. `make security-policy-check` enforces both. Exceptions expire at the start of the
@@ -99,15 +100,31 @@ Minimatch 9 and 10 use exact-version overrides to 11.0.1. Legacy versions 3 and 
 on their upstream ranges because overriding them produced an empty fixture archive.
 Remove an override when upstream uses a fixed version.
 
-The Rust `paste` 1.0.15 maintenance notice, RUSTSEC-2024-0436, remains informational.
+| Package                       | Advisory            | Remediation                                                                                               |
+| ----------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
+| picomatch 2.3.2, 4.0.4, 4.0.7 | GHSA-fc5q-39xc-vjpf | Local pnpm patches literalize repeated wildcard extglobs; patch-bound allowances expire December 1, 2026. |
+
+The picomatch patches address [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf).
+No upstream fixed release is available. Each package ships one parser, shared by its entrypoints.
+The patches use parsed tokens to literalize single-branch repeated extglobs containing a wildcard star,
+including when the caller disables the existing recursion limit. Escaped, quoted and bracketed stars
+retain their meaning. These patterns now match their literal spelling rather than compiling nested
+unbounded regex quantifiers. Ordinary globs and safe extglobs retain their behavior.
+`tools/security-patches/picomatch.test.mjs` checks the installed parser and public entrypoints through
+every installed consumer, using small inputs rather than executing a ReDoS payload.
+This is a mitigation for the reported pattern family. It does not establish that every possible
+picomatch expression is safe or that published installers expose attacker-controlled globs.
+The scanner still reports these exact package versions as accepted while the allowances remain valid.
+Remove all three patches, registrations and allowances with a verified upstream fix; remove the shared
+test when no remaining allowance owns it.
 
 GitHub [withdrew GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)
 because it does not describe a security vulnerability. The deepmerge 4.3.1 patch, its regression
 tests and its allowance are removed together. The package remains on its upstream release.
 This withdrawal does not establish which packages or binaries shipped in earlier installers.
 
-Before scanning a patch-bound allowance, the gate verifies the patch SHA-256, workspace registration,
-lockfile patch hash, and every locked snapshot for that package version. Missing, changed or unregistered patches fail closed. Frozen
+Before scanning a patch-bound allowance, the gate verifies the patch SHA-256, workspace registration, lockfile patch hash, and every locked
+snapshot for that package version. Missing, changed or unregistered patches fail closed. Frozen
 installation and installed-package regression tests verify application and behavior in CI.
 The PR comparison still uses no exceptions, so new vulnerabilities remain blocked.
 
@@ -120,12 +137,14 @@ file in `patches/` or `tools/security-patches/` that no registration or allowanc
 cannot leave its patch or tests behind. An allowance whose version is neither locked nor registered is
 stale and accepts nothing; remove it with its patch file and tests.
 
-A patch-bound allowance records a reviewed mitigation, not an upstream fix. Remove the patch and
-allowance together after an upstream fix passes the full scan and affected tooling checks. Expiry blocks the advisory again
+A patch-bound allowance records a reviewed mitigation, not an upstream fix. Remove the patch and allowance together after
+an upstream fix passes the full scan and affected tooling checks. Expiry blocks the advisory again
 at midnight UTC. Renewals follow the
 [security-automation skill](../.agents/skills/security-automation/SKILL.md): agents may renew an
 unchanged patch for up to 90 days after `patch.since`; later renewals are maintainer decisions. The
 expiring gate triggers follow-up without keeping a mitigation ticket open.
+The Rust `paste` 1.0.15
+maintenance notice, RUSTSEC-2024-0436, remains informational.
 
 Release-please checks main before creating a release. The Release workflow checks the immutable
 tag commit before building or publishing installers, including manual publications and retries.
