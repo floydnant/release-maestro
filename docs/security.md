@@ -99,8 +99,7 @@ Minimatch 9 and 10 use exact-version overrides to 11.0.1. Legacy versions 3 and 
 on their upstream ranges because overriding them produced an empty fixture archive.
 Remove an override when upstream uses a fixed version.
 
-The full scan reports no blocking or accepted findings. The Rust `paste` 1.0.15 maintenance
-notice, RUSTSEC-2024-0436, remains informational.
+The Rust `paste` 1.0.15 maintenance notice, RUSTSEC-2024-0436, remains informational.
 
 GitHub [withdrew GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)
 because it does not describe a security vulnerability. The deepmerge 4.3.1 patch, its regression
