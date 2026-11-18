@@ -4,7 +4,7 @@
     "version": "0.1.0",
     "main": "main.js",
     "private": true,
-    "packageManager": "pnpm@12.20.0",
+    "packageManager": "pnpm@12.21.0",
     "scripts": {
         "postinstall": "electron-builder install-app-deps",
         "list-project-dev-scripts": "echo 'ALWAYS USE MAKEFILE SCRIPTS' && make help",
@@ -24,7 +24,7 @@
         "@ng-icons/octicons": "36.1.0",
         "@ng-icons/solar-icons": "36.1.0",
         "@spartan-ng/brain": "1.9.0",
-        "better-sqlite3": "13.1.1",
+        "better-sqlite3": "13.2.0",
         "cheerio": "1.2.0",
         "class-variance-authority": "0.7.1",
         "clsx": "2.1.1",
@@ -85,7 +85,7 @@
         "electron-builder": "26.18.1",
         "electron-debug": "5.0.0",
         "electron-reloader": "2.0.0",
-        "eslint": "10.14.0",
+        "eslint": "10.15.0",
         "eslint-config-prettier": "10.1.8",
         "eslint-plugin-jsdoc": "65.4.7",
         "eslint-plugin-playwright": "2.12.2",
@@ -115,7 +115,7 @@
     },
     "engines": {
         "node": ">= 22.23.4 < 23 || >= 24.22.3 < 25",
-        "pnpm": "12.20.0",
+        "pnpm": "12.21.0",
         "typescript": ">= 6.0.0 < 6.1.0"
     },
     "browserslist": [
