@@ -83,9 +83,6 @@ Dependabot can resolve a compatible fix.
 
 `tools/security/exceptions.json` contains patch-bound allowances for picomatch 2.3.2, 4.0.4 and
 4.0.7 under GHSA-fc5q-39xc-vjpf, expiring December 1, 2026 at 00:00 UTC.
-It also retains the allowance for deepmerge 4.3.1 and
-GHSA-gcqx-w48m-w2h4, expiring November 24, 2026 at 00:00 UTC. Floyd Haremsa owns the upstream
-replacement and removal, recorded in [MAE-181](https://linear.app/floyd-haremsa/issue/MAE-181).
 Exceptions require ecosystem, package, exact version, advisory ID, reason, review date (`reviewed`) and
 UTC expiry date. The expiry may be at most 30 days after the review date, and the review date cannot be
 in the future. `make security-policy-check` enforces both. Exceptions expire at the start of the
@@ -103,13 +100,8 @@ Minimatch 9 and 10 use exact-version overrides to 11.0.1. Legacy versions 3 and 
 on their upstream ranges because overriding them produced an empty fixture archive.
 Remove an override when upstream uses a fixed version.
 
-The full scan reports three accepted picomatch findings and no blocked findings.
-The withdrawn deepmerge advisory no longer appears in the scan; its patch and allowance remain pending separate removal.
-Removing bandcamp-fetch also removed extract-zip and both of its findings. The scan reports no minimatch findings.
-
 | Package                       | Advisory            | Remediation                                                                                               |
 | ----------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| deepmerge 4.3.1               | GHSA-gcqx-w48m-w2h4 | Local pnpm patch blocks `__proto__` copying; patch-bound allowance expires November 24, 2026.             |
 | picomatch 2.3.2, 4.0.4, 4.0.7 | GHSA-fc5q-39xc-vjpf | Local pnpm patches literalize repeated wildcard extglobs; patch-bound allowances expire December 1, 2026. |
 
 The picomatch patches address [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf).
@@ -126,13 +118,12 @@ The scanner still reports these exact package versions as accepted while the all
 Remove all three patches, registrations and allowances with a verified upstream fix; remove the shared
 test when no remaining allowance owns it.
 
-The local `patches/deepmerge@4.3.1.patch` rejects `__proto__` in both target and source
-copy loops, in the source and both distributed builds. Regression tests in
-`tools/security-patches/deepmerge.test.mjs` exercise the installed package through Jest and
-fork-ts-checker-webpack-plugin dependency resolution. This mitigates the
-reported returned-object prototype poisoning. It does not establish packaged/shipped exposure.
-The advisory is now withdrawn and no longer reported by the scanner. Before scanning,
-the gate verifies the patch SHA-256, workspace registration, lockfile patch hash, and every locked
+GitHub [withdrew GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)
+because it does not describe a security vulnerability. The deepmerge 4.3.1 patch, its regression
+tests and its allowance are removed together. The package remains on its upstream release.
+This withdrawal does not establish which packages or binaries shipped in earlier installers.
+
+Before scanning a patch-bound allowance, the gate verifies the patch SHA-256, workspace registration, lockfile patch hash, and every locked
 snapshot for that package version. Missing, changed or unregistered patches fail closed. Frozen
 installation and installed-package regression tests verify application and behavior in CI.
 The PR comparison still uses no exceptions, so new vulnerabilities remain blocked.
@@ -146,13 +137,12 @@ file in `patches/` or `tools/security-patches/` that no registration or allowanc
 cannot leave its patch or tests behind. An allowance whose version is neither locked nor registered is
 stale and accepts nothing; remove it with its patch file and tests.
 
-This is a reviewed mitigation, not an upstream fix. Remove the patch and allowance together after
+A patch-bound allowance records a reviewed mitigation, not an upstream fix. Remove the patch and allowance together after
 an upstream fix passes the full scan and affected tooling checks. Expiry blocks the advisory again
 at midnight UTC. Renewals follow the
 [security-automation skill](../.agents/skills/security-automation/SKILL.md): agents may renew an
 unchanged patch for up to 90 days after `patch.since`; later renewals are maintainer decisions. The
-expiring gate triggers follow-up without keeping a mitigation ticket open. MAE-181 records the patch
-and the unresolved applicability or shipped-exposure limitations.
+expiring gate triggers follow-up without keeping a mitigation ticket open.
 The Rust `paste` 1.0.15
 maintenance notice, RUSTSEC-2024-0436, remains informational.
 

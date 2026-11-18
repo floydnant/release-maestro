@@ -182,7 +182,6 @@ overrides:
 
 patchedDependencies:
   '@spartan-ng/brain@1.9.0': 2f6af9b84cca39b4b1aee34272c0d29f3ec902883568b64f59105257e48d24f2
-  deepmerge@4.3.1: a502f744ddf4e378b546e9aa607bb91b859bece527fdea5b90266633479b65c6
   picomatch@2.3.2: 55abe71fcf013e80dcdc8c544f0a2beb367bade30ed287b3ec9127c561b69ec9
   picomatch@4.0.4: 553c35cb55ef9150613f11bc153d4ac307ddc646fcc603b8e0e85fe46a223338
   picomatch@4.0.7: 674e16a81c377632c4639f3b789281f340c59f78970bfa44e40dd16f5c2fec70
@@ -12130,7 +12129,7 @@ snapshots:
 
   deep-is@0.1.4: {}
 
-  deepmerge@4.3.1(patch_hash=a502f744ddf4e378b546e9aa607bb91b859bece527fdea5b90266633479b65c6): {}
+  deepmerge@4.3.1: {}
 
   default-browser-id@5.0.0: {}
 
@@ -12754,7 +12753,7 @@ snapshots:
       chalk: 4.1.2
       chokidar: 4.0.3
       cosmiconfig: 8.3.6(typescript@6.0.3)
-      deepmerge: 4.3.1(patch_hash=a502f744ddf4e378b546e9aa607bb91b859bece527fdea5b90266633479b65c6)
+      deepmerge: 4.3.1
       fs-extra: 10.1.0
       memfs: 3.5.3
       minimatch: 3.1.5
@@ -13281,7 +13280,7 @@ snapshots:
       babel-jest: 30.5.2(@babel/core@7.29.13(supports-color@8.1.1))(supports-color@8.1.1)
       chalk: 4.1.2
       ci-info: 4.4.0
-      deepmerge: 4.3.1(patch_hash=a502f744ddf4e378b546e9aa607bb91b859bece527fdea5b90266633479b65c6)
+      deepmerge: 4.3.1
       glob: 14.0.2
       graceful-fs: 4.2.11
       jest-circus: 30.5.2(babel-plugin-macros@3.1.0)(supports-color@8.1.1)
