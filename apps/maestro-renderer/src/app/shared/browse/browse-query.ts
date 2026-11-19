@@ -38,14 +38,8 @@ import {
 
 export type BrowseStatus = 'loading' | 'ready' | 'error'
 
-export interface BrowseResult<TRow> {
+export interface BrowseResult<TRow, TMetadata = unknown> extends BrowseWindowResult<TRow, TMetadata> {
     status: BrowseStatus
-    /** Index of `rows[0]` within the full ordering. */
-    offset: number
-    /** Only the rows for the current window — never the whole result set. */
-    rows: TRow[]
-    /** Row count of the whole query, which is what gives the scrollbar its height. */
-    total: number
     error: string | null
     /**
      * False until the first window has landed at all. It stays true across later
@@ -54,12 +48,12 @@ export interface BrowseResult<TRow> {
     loaded: boolean
 }
 
-export interface BrowseQueryOptions<TQuery, TRow> {
+export interface BrowseQueryOptions<TQuery, TRow, TMetadata = unknown> {
     /** The filter + sort + search currently in force. */
     query: Signal<TQuery>
     /** The slice the viewport wants. Changes constantly while scrolling. */
     viewport: Signal<BrowseWindow>
-    fetchWindow: (query: TQuery, window: BrowseWindow) => Promise<BrowseWindowResult<TRow>>
+    fetchWindow: (query: TQuery, window: BrowseWindow) => Promise<BrowseWindowResult<TRow, TMetadata>>
     /**
      * Refetch triggers that are not user input — throttled scan progress, most of
      * all. Browse views deliberately refetch while a scan ingests songs.
@@ -80,15 +74,15 @@ export interface BrowseQueryOptions<TQuery, TRow> {
     entityLabel?: string
 }
 
-export interface BrowseQuery<TRow> {
-    result: Signal<BrowseResult<TRow>>
+export interface BrowseQuery<TRow, TMetadata = unknown> {
+    result: Signal<BrowseResult<TRow, TMetadata>>
     /** The row at an absolute index, or `undefined` when it is outside the window. */
     rowAt: (index: number) => TRow | undefined
     /** Re-run the current window after a failure. */
     retry: () => void
 }
 
-const initialResult = <TRow>(): BrowseResult<TRow> => ({
+const initialResult = <TRow, TMetadata>(): BrowseResult<TRow, TMetadata> => ({
     status: 'loading',
     offset: 0,
     rows: [],
@@ -97,9 +91,9 @@ const initialResult = <TRow>(): BrowseResult<TRow> => ({
     loaded: false,
 })
 
-export const createBrowseQuery = <TQuery, TRow>(
-    options: BrowseQueryOptions<TQuery, TRow>,
-): BrowseQuery<TRow> => {
+export const createBrowseQuery = <TQuery, TRow, TMetadata = unknown>(
+    options: BrowseQueryOptions<TQuery, TRow, TMetadata>,
+): BrowseQuery<TRow, TMetadata> => {
     const sameQuery = options.sameQuery ?? Object.is
     const retry$ = new Subject<void>()
 
@@ -117,16 +111,14 @@ export const createBrowseQuery = <TQuery, TRow>(
         ]).pipe(
             switchMap(([query, window]) =>
                 defer(() => fetchWindowWithinResult(options, query, window)).pipe(
-                    map((response): BrowseReducer<TRow> => () => ({
+                    map((response): BrowseReducer<TRow, TMetadata> => () => ({
                         status: 'ready',
-                        offset: response.offset,
-                        rows: response.rows,
-                        total: response.total,
+                        ...response,
                         error: null,
                         loaded: true,
                     })),
                     catchError(error =>
-                        of((previous: BrowseResult<TRow>): BrowseResult<TRow> => ({
+                        of((previous: BrowseResult<TRow, TMetadata>): BrowseResult<TRow, TMetadata> => ({
                             ...previous,
                             status: 'error',
                             error: browseErrorMessage(error, options.entityLabel ?? 'results'),
@@ -139,16 +131,16 @@ export const createBrowseQuery = <TQuery, TRow>(
                     // the previous question. It also makes the table flash a loading
                     // state on every keystroke of a search, which is far worse to use
                     // than a moment of slightly stale rows under a busy indicator.
-                    startWith((previous: BrowseResult<TRow>): BrowseResult<TRow> => ({
+                    startWith((previous: BrowseResult<TRow, TMetadata>): BrowseResult<TRow, TMetadata> => ({
                         ...previous,
                         status: 'loading',
                         error: null,
                     })),
                 ),
             ),
-            scan((previous, reducer) => reducer(previous), initialResult<TRow>()),
+            scan((previous, reducer) => reducer(previous), initialResult<TRow, TMetadata>()),
         ),
-        { initialValue: initialResult<TRow>() },
+        { initialValue: initialResult<TRow, TMetadata>() },
     )
 
     return {
@@ -162,7 +154,9 @@ export const createBrowseQuery = <TQuery, TRow>(
 }
 
 /** How one pipeline emission folds into the visible result. */
-type BrowseReducer<TRow> = (previous: BrowseResult<TRow>) => BrowseResult<TRow>
+type BrowseReducer<TRow, TMetadata> = (
+    previous: BrowseResult<TRow, TMetadata>,
+) => BrowseResult<TRow, TMetadata>
 
 /**
  * Keep a requested window inside what the main process will serve. An over-scrolled
@@ -188,11 +182,11 @@ const clampWindow = (window: BrowseWindow): BrowseWindow => ({
  * It retries at most once, and only when the response proves both that the set is not
  * empty and that the requested offset is outside it.
  */
-const fetchWindowWithinResult = async <TQuery, TRow>(
-    options: BrowseQueryOptions<TQuery, TRow>,
+const fetchWindowWithinResult = async <TQuery, TRow, TMetadata>(
+    options: BrowseQueryOptions<TQuery, TRow, TMetadata>,
     query: TQuery,
     window: BrowseWindow,
-): Promise<BrowseWindowResult<TRow>> => {
+): Promise<BrowseWindowResult<TRow, TMetadata>> => {
     const response = await options.fetchWindow(query, window)
     const isPastNonemptyResult =
         window.limit > 0 &&

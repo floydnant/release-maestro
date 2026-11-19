@@ -263,7 +263,7 @@ test.describe('search', () => {
         const search = page.getByRole('searchbox', { name: 'Search tracks' })
         await controller.setHandler('library:query-songs', {
             kind: 'resolve',
-            value: { rows: [], offset: 0, total: 0 },
+            value: { metadata: { discGroups: [] }, rows: [], offset: 0, total: 0 },
         })
 
         await search.fill('ambient')
@@ -320,7 +320,7 @@ test.describe('search', () => {
 
         await controller.setHandler('library:query-songs', {
             kind: 'resolve',
-            value: { rows: [], offset: 0, total: 0 },
+            value: { metadata: { discGroups: [] }, rows: [], offset: 0, total: 0 },
         })
         await page.getByRole('searchbox', { name: 'Search tracks' }).fill('nothing matches this')
 
@@ -455,6 +455,7 @@ test.describe('virtual scrolling', () => {
         // Wait for the first request to actually be in flight before settling it.
         await expect(page.getByText('Loading tracks…')).toBeVisible()
         await controller.resolveAllPending('library:query-songs', {
+            metadata: { discGroups: [] },
             rows: createSongRows(),
             offset: 0,
             total: 20_000,
@@ -499,7 +500,7 @@ test.describe('virtual scrolling', () => {
 
         await controller.setHandler('library:query-songs', {
             kind: 'resolve',
-            value: { rows: createSongRows(), offset: 0, total: 3 },
+            value: { metadata: { discGroups: [] }, rows: createSongRows(), offset: 0, total: 3 },
         })
         await page.getByRole('searchbox', { name: 'Search tracks' }).fill('dawn')
 
@@ -1140,7 +1141,7 @@ test.describe('selection against a moving list', () => {
         const shifted = [createSongRow({ id: 'song-new', title: 'Zenith' }), ...createSongRows()]
         await controller.setHandler('library:query-songs', {
             kind: 'resolve',
-            value: { rows: shifted, offset: 0, total: shifted.length },
+            value: { metadata: { discGroups: [] }, rows: shifted, offset: 0, total: shifted.length },
         })
         await controller.emit('library:scan-status', {
             status: scanStatus('completed', 2),
@@ -1193,7 +1194,7 @@ test.describe('selection against a moving list', () => {
         const grown = [...createSongRows(), createSongRow({ id: 'song-4', title: 'Zenith' })]
         await controller.setHandler('library:query-songs', {
             kind: 'resolve',
-            value: { rows: grown, offset: 0, total: grown.length },
+            value: { metadata: { discGroups: [] }, rows: grown, offset: 0, total: grown.length },
         })
         await controller.emit('library:scan-status', {
             status: scanStatus('completed', 2),
@@ -1245,7 +1246,7 @@ test.describe('live updates during a scan', () => {
         const grown = [...createSongRows(), createSongRow({ id: 'song-4', title: 'Zenith' })]
         await controller.setHandler('library:query-songs', {
             kind: 'resolve',
-            value: { rows: grown, offset: 0, total: grown.length },
+            value: { metadata: { discGroups: [] }, rows: grown, offset: 0, total: grown.length },
         })
         for (let tick = 0; tick < 5; tick++) {
             await controller.emit('library:scan-status', {
@@ -1290,6 +1291,7 @@ test.describe('loading, empty and error states', () => {
         // The table asks twice on mount — once for a guessed window, then for the one
         // it measured — and switchMap abandons the first.
         await controller.resolveAllPending('library:query-songs', {
+            metadata: { discGroups: [] },
             rows: createSongRows(),
             offset: 0,
             total: 3,
@@ -1313,7 +1315,7 @@ test.describe('loading, empty and error states', () => {
 
         await controller.setHandler('library:query-songs', {
             kind: 'resolve',
-            value: { rows: createSongRows(), offset: 0, total: 3 },
+            value: { metadata: { discGroups: [] }, rows: createSongRows(), offset: 0, total: 3 },
         })
         await page.getByRole('button', { name: 'Try again' }).click()
 

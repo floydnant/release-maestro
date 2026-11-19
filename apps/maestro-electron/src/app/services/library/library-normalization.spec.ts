@@ -56,6 +56,14 @@ describe('library normalization', () => {
         expect(metadataHash(first)).not.toBe(metadataHash(second))
     })
 
+    it('hashes disc tags without changing album identity', () => {
+        const first = newSongFixture({ albumTitle: 'Double', artist: 'Artist' })
+        const second = newSongFixture({ ...first, discNumber: 2, discTotal: 2, trackTotal: 8 })
+
+        expect(metadataHash(second)).not.toBe(metadataHash(first))
+        expect(albumIdentityKey(second)).toBe(albumIdentityKey(first))
+    })
+
     it('canonicalizes supported external reference tag names', () => {
         expect(
             extractExternalRefs(

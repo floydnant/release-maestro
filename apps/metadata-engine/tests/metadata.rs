@@ -1,5 +1,6 @@
 mod support;
 
+use lofty::tag::ItemKey;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -31,6 +32,9 @@ enum MetadataField {
     AlbumArtist,
     Genre,
     Track,
+    DiscNumber,
+    DiscTotal,
+    TrackTotal,
     Comment,
     Lyrics,
     MusicalKey,
@@ -76,6 +80,20 @@ impl AliasField {
 
 fn cases() -> Vec<Fixture> {
     serde_json::from_slice(&std::fs::read(fixtures().join("cases.json")).unwrap()).unwrap()
+}
+
+#[test]
+fn reads_vorbis_slash_pairs() {
+    let library = Library::new();
+    let mut engine = Engine::new();
+    for extension in ["flac", "ogg", "opus"] {
+        let path = library.copy(&format!("numbers-pairs.{extension}"));
+        let metadata = engine.request("read_file", library.params(&path));
+        assert_eq!(metadata["track"], 3, "{extension}");
+        assert_eq!(metadata["trackTotal"], 12, "{extension}");
+        assert_eq!(metadata["discNumber"], 1, "{extension}");
+        assert_eq!(metadata["discTotal"], 2, "{extension}");
+    }
 }
 
 fn assert_fields(actual: &Value, expected: &Value, context: &str) {

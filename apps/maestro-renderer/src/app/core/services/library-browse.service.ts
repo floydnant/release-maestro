@@ -131,7 +131,12 @@ export class LibraryBrowseService {
 
     querySongs(query: SongQuery, window: BrowseWindow): Promise<SongWindowResult> {
         if (!this.electronService.isElectron) {
-            return Promise.resolve({ rows: [], offset: window.offset, total: 0 })
+            return Promise.resolve({
+                rows: [],
+                offset: window.offset,
+                total: 0,
+                metadata: { discGroups: [] },
+            })
         }
 
         return this.electronService.ipcRenderer.invoke(LibraryBrowseIpcChannel.querySongs, {
