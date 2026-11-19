@@ -3,6 +3,15 @@
 Nx monorepo: Electron main process, Angular renderer, a Rust metadata-engine sidecar, and a shared
 core lib. See [README.md](README.md) for the stack and project layout.
 
+## Inspect the Electron app
+
+Inspect the running app only inside its Electron window. Use `inspect-running-app` to attach to
+the worktree's Electron CDP endpoint after `make dev-status`; start `make dev` if needed.
+Never open the renderer dev-server URL in an external browser or browser preview. The renderer
+requires Electron APIs and IPC, so that page cannot represent the working app. If attachment fails,
+fix the Electron connection rather than switching to a browser. Renderer E2E with mocked IPC is a
+separate automated test workflow, documented in [docs/testing.md](docs/testing.md).
+
 ## What to read
 
 Load guidance for the task at hand; do not load every document by default.
@@ -12,7 +21,7 @@ Load guidance for the task at hand; do not load every document by default.
 | Product behavior or domain language | [CONTEXT-MAP.md](CONTEXT-MAP.md), then the relevant context glossary                         |
 | Architectural behavior              | [ADR index](docs/adr/README.md), then only relevant ADRs                                     |
 | Tests or verification               | [docs/testing.md](docs/testing.md) and the verification skill                                |
-| Inspecting the running dev app      | `inspect-running-app`, then `profiling` for CPU, traces, or memory                           |
+| Inspecting or capturing the app UI  | `inspect-running-app` for the Electron window, then `profiling` for CPU, traces, or memory   |
 | Renderer TypeScript or templates    | `angular-patterns`; add `frontend-design` for user-facing UI                                 |
 | Async pipelines in either process   | `rxjs-streams`                                                                               |
 | Linear issues or PRDs               | [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) and the relevant workflow skill |
