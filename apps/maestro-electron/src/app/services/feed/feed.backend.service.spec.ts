@@ -685,6 +685,41 @@ describe('FeedBackendService email import', () => {
         ])
     })
 
+    it('answers a reimported track from its stored album, but asks Bandcamp again for a stored track', async () => {
+        const trackUrl = (index: number) => `https://test.bandcamp.com/track/reimported-${index}`
+        const albumUrl = 'https://test.bandcamp.com/album/first'
+        scrapeTralbumInfo.mockImplementation(async url => ({
+            ...scrapedGroupedAlbum,
+            type: url.includes('/track/') ? 'track' : 'album',
+            parentAlbumUrl: url === trackUrl(1) ? albumUrl : null,
+        }))
+        const importEmails = async (...emails: EmailImportStreamPacket[]) => {
+            emails$ = new Subject()
+            const { updates } = await runImport()
+            for (const email of emails) emails$.next(email)
+            emails$.complete()
+            expect((await updates).at(-1)?.phase).toBe('completed')
+        }
+        const emails = [
+            releasePacket('2026-10-01T21:40:12', trackUrl(1)),
+            releasePacket('2026-10-02T21:40:12', trackUrl(2)),
+        ]
+
+        await importEmails(...emails)
+        expect(scrapeTralbumInfo).toHaveBeenCalledTimes(2)
+
+        scrapeTralbumInfo.mockClear()
+        await importEmails(...emails)
+        // The album answers for the first track; the standalone second track could since have gained one.
+        expect(scrapeTralbumInfo.mock.calls.map(([url]) => url)).toEqual([trackUrl(2)])
+        const stored = await feedRepository.listFeedItems({
+            index: 0,
+            count: 10,
+            snoozeHours: DEFAULT_FEED_SNOOZE_HOURS,
+        })
+        expect(stored.map(item => item.data.tralbumUrl).sort()).toEqual([albumUrl, trackUrl(2)])
+    })
+
     it('leaves an offline album lookup uncovered so the next import can retry it', async () => {
         scrapeTralbumInfo.mockRejectedValueOnce(new Error('Offline'))
         const { updates } = await runImport()

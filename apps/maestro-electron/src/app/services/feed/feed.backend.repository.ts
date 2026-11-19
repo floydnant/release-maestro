@@ -295,6 +295,21 @@ export class FeedBackendRepository {
         })
     }
 
+    /**
+     * The album of the stored album item that owns a URL, or null. A track item may still gain its
+     * album, so only an album answers.
+     */
+    async findStoredAlbumUrl(url: string): Promise<string | null> {
+        const [row] = await this.db.db
+            .select({ item: feedItemsTable })
+            .from(feedReleaseUrlsTable)
+            .innerJoin(feedItemsTable, eq(feedItemsTable.id, feedReleaseUrlsTable.feedItemId))
+            .where(eq(feedReleaseUrlsTable.url, normalizeUrl(url)))
+        if (!row) return null
+        const { data } = feedItemMasterSchema.parse(row.item)
+        return data.tralbumType === 'album' ? data.tralbumUrl : null
+    }
+
     async countItemsIngestedAfterDate(date: Date): Promise<number> {
         const count_ = await this.db.db
             .select({ count: count(feedItemsTable.id) })

@@ -236,7 +236,11 @@ export class EmailImportPass {
     }
 
     private async resolveTrack(trackUrl: string): Promise<void> {
-        this.queue.resolveTrack(trackUrl, await findParentAlbum(this.bandcampApi, trackUrl, this.signal))
+        // Reimports and the checkpoint overlap reread tracks whose album is already stored.
+        const releaseUrl =
+            (await this.feedRepository.findStoredAlbumUrl(trackUrl)) ??
+            (await findParentAlbum(this.bandcampApi, trackUrl, this.signal))
+        this.queue.resolveTrack(trackUrl, releaseUrl)
     }
 
     private async save({ emailCount, feedItems }: EmailSaveBatch): Promise<void> {

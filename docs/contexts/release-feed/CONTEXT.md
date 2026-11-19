@@ -116,12 +116,14 @@ through merges.
 The Bandcamp album containing a track. Import reads the track page to resolve its parent album
 before choosing the feed item's identity. A genuine standalone track keeps its own release URL. A
 missing, malformed or refused track page keeps the original track URL because its album is unknown.
-Refused means any client error except a timeout or a rate limit. If an earlier import already found
-that track's album, reimport retains the album and its view state. Network failures leave the import
-checkpoint unchanged so the next pass can retry. Import schedules parent lookups continuously across
-emails. The Bandcamp request gate limits active Bandcamp requests. Network and server failures get
-two retries. Bandcamp page requests share the app-wide cooldown described below. A processing
-failure stops the remaining export before the import reports its final error.
+Refused means any client error except a timeout or a rate limit. When a stored album item already
+owns the track, import uses that album without reading the page; a stored track item is read again,
+because it may have gained an album since. Reimport retains the album and its view state. Network
+failures leave the import checkpoint unchanged so the next pass can retry. Import schedules parent
+lookups continuously across emails. The Bandcamp request gate limits active Bandcamp requests.
+Network and server failures get two retries. Bandcamp page requests share the app-wide cooldown
+described below. A processing failure stops the remaining export before the import reports its final
+error.
 
 **Bandcamp request gate**:
 The one place every Bandcamp request is admitted. It starts feed requests at once and lets
