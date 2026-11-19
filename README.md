@@ -50,7 +50,7 @@ launch or Electron test run needs network access or a populated Electron downloa
 version on the supported Node.js 24 LTS line. `package.json` declares the supported range and project
 pnpm release. Use `pnpm` normally; pnpm downloads and runs the project's declared release when necessary.
 If an older pnpm fails to switch versions with `ENOEXEC` on macOS, install the declared release
-with `npm install --global --allow-scripts=pnpm pnpm@12.18.0`, then retry. `make install`
+with `npm install --global --allow-scripts=pnpm pnpm@12.21.0`, then retry. `make install`
 installs the root package from the lockfile, fetches the locked Rust crates, and installs Playwright
 Chromium with its system dependencies. Linux system dependencies may require sudo. Chromium
 requires an OS supported by the installed Playwright version.
