@@ -1,0 +1,1 @@
+ALTER TABLE `songs` ADD `extractor_version` text;
