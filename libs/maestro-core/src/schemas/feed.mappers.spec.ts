@@ -55,7 +55,6 @@ const hydrate = (plainBody: string, links: string[] = [], about?: string) =>
         release(plainBody, links),
         about === undefined ? null : tralbum(about),
         null,
-        null,
     ).data
 
 it('classifies parsed HTTP URLs instead of matching hostnames inside paths or credentials', () => {
@@ -115,7 +114,7 @@ it('escapes email text and URL attributes before rendering generated HTML', () =
     expect(item.about).not.toContain('<img')
     const source = release('Check it out here')
     source.data.tralbumUrl = 'javascript:alert(1)'
-    expect(mapBandcampReleaseFeedItemToHydratedFeedItem(source, null, null, null).data.about).toBe(
+    expect(mapBandcampReleaseFeedItemToHydratedFeedItem(source, null, null).data.about).toBe(
         'Check it out here',
     )
 })
@@ -134,7 +133,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
                 { tralbumUrl: 'https://test.bandcamp.com/track/second-track', title: null, fans: [mayaFan] },
             ],
         }
-        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedGroupedAlbum, null, null)
+        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(item, scrapedGroupedAlbum, null)
 
         expect(result.data.fans).toEqual([adamFan, mayaFan, riverFan])
         expect(result.data.tracks.map(track => track.fans)).toEqual([
@@ -147,7 +146,6 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
         const result = mapBandcampReleaseFeedItemToHydratedFeedItem(
             fansBoughtMusicFeedItem,
             scrapedBandcampAlbum,
-            null,
             null,
         )
 
@@ -190,7 +188,6 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
             trackItem,
             { ...scrapedBandcampAlbum, type: 'track' },
             null,
-            null,
         )
 
         expect(result.data.releaseType).toBe('track')
@@ -199,7 +196,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
     })
 
     it('keeps a fan purchase usable when hydration fails', () => {
-        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(fansBoughtMusicFeedItem, null, null, {
+        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(fansBoughtMusicFeedItem, null, {
             userFacingMessage: 'The Bandcamp track or album could not be found',
         })
 
@@ -226,7 +223,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
             purchases: [],
         }
 
-        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(unattributedItem, null, null, null)
+        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(unattributedItem, null, null)
 
         expect(result.sourceType).toBe('EMAIL.BANDCAMP_FANS_BOUGHT_MUSIC')
         expect(result.data.fans).toEqual([])
@@ -245,20 +242,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
                 links: [website, website, unsubscribeUrl, 'https://f4.bcbits.com/img/a123_9.jpg'],
             },
         }
-        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(
-            newReleaseItem,
-            null,
-            {
-                [website]: {
-                    url: website,
-                    title: 'Artist website',
-                    favicon: 'https://artist.example.com/favicon.ico',
-                    description: null,
-                    image: null,
-                },
-            },
-            null,
-        )
+        const result = mapBandcampReleaseFeedItemToHydratedFeedItem(newReleaseItem, null, null)
 
         expect(result.sourceType).toBe('EMAIL.BANDCAMP_NEW_RELEASE')
         expect(result.data.releaseName).toBe(newReleaseEmail.subject)
@@ -266,9 +250,7 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
             `<a href="${newReleaseItem.data.tralbumUrl}">Check it out here</a>`,
         )
         expect(result.data.about).toContain(`<a href="${unsubscribeUrl}">Unfollow Test Artist</a>`)
-        expect(result.data.links).toEqual([
-            { title: 'Artist website', favicon: 'https://artist.example.com/favicon.ico', url: website },
-        ])
+        expect(result.data.links).toEqual([website])
         expect(result.data.unsubscribeUrl).toBe(unsubscribeUrl)
         expect(result.data.unsubscribeText).toBe('Unfollow Test Artist')
         expect(result.data.imageUrl).toBe('https://f4.bcbits.com/img/a123_16.jpg')
@@ -291,6 +273,6 @@ describe('mapBandcampReleaseFeedItemToHydratedFeedItem', () => {
                 links: [],
             },
         }
-        expect(mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null).data.about).toBe(expected)
+        expect(mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null).data.about).toBe(expected)
     })
 })

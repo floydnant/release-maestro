@@ -308,24 +308,24 @@
 
                                 <!-- @TODO: abstract this into a <link-meta-previews /> -->
                                 <ul class="links | mt-5 flex flex-wrap gap-1 type-body-sm">
-                                    @for (link of feedItem.data.links; track $index) {
-                                        @let preview = linkPreviews()[link.url];
-                                        @let linkTitle = preview?.title || link.title;
-                                        @let favicon = preview?.favicon ?? link.favicon;
+                                    @for (url of feedItem.data.links; track $index) {
+                                        @let preview = linkPreviews()[url];
+                                        @let linkTitle = preview?.title || url;
+                                        @let favicon = preview?.favicon;
                                         <li class="flex w-full">
                                             <ng-template #linkTemplate>
                                                 <div class="type-body-sm">
                                                     {{ linkTitle }}
 
                                                     <p class="mt-0.5 type-body-xs text-content-secondary">
-                                                        {{ link.url }}
+                                                        {{ url }}
                                                     </p>
                                                 </div>
                                             </ng-template>
                                             <a
                                                 hlmBtn
                                                 variant="muted"
-                                                [href]="link.url"
+                                                [href]="url"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 class="max-w-full justify-start gap-1.5 px-2 type-body-sm hover:text-content-primary"

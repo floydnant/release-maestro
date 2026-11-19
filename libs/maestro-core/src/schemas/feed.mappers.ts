@@ -1,6 +1,5 @@
 import { ScrapedTralbumInfo } from './bandcamp-api.schema'
 import { FeedItemWithPurchases, HydratedBandcampReleaseFeedItem } from './feed.schema'
-import { ScrapedLinkMetadata } from './web-scraping.schema'
 import { mergeBandcampFans } from './feed.purchases'
 import { normalizeBandcampReleaseUrl } from '../utils/bandcamp-release-url'
 
@@ -136,7 +135,6 @@ const renderEmailAbout = (plainBody: string, unsubscribeLink: string | null, rel
 export function mapBandcampReleaseFeedItemToHydratedFeedItem(
     { data, source, purchases, ...item }: Extract<FeedItemWithPurchases, { type: 'BANDCAMP.TRALBUM' }>,
     tralbum: ScrapedTralbumInfo | null,
-    linkMetadataMap: Record<string, ScrapedLinkMetadata | null> | null,
     error: { userFacingMessage: string; retryAt?: Date } | null,
 ): HydratedBandcampReleaseFeedItem {
     const newRelease = source.type === 'EMAIL.BANDCAMP_NEW_RELEASE' ? source : null
@@ -174,14 +172,7 @@ export function mapBandcampReleaseFeedItemToHydratedFeedItem(
             about:
                 (tralbum && renderTralbumAbout(tralbum.about)) ||
                 renderEmailAbout(newRelease?.plainBody ?? '', unsubscribeUrl, data.tralbumUrl),
-            links: [...new Set(sourceLinks)].filter(isUsefulUrlFromBandcampEmail).map(url => {
-                const meta = linkMetadataMap?.[url]
-                return {
-                    title: meta?.title || url,
-                    favicon: meta?.favicon,
-                    url: url,
-                }
-            }),
+            links: [...new Set(sourceLinks)].filter(isUsefulUrlFromBandcampEmail),
             unsubscribeUrl,
             unsubscribeText:
                 findUnsubscribeText(newRelease?.plainBody ?? '')?.replaceAll(REPLACEMENT_CHARACTER, '') ||

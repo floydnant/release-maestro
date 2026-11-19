@@ -15,7 +15,7 @@ const LABEL_URL = 'https://label.example/shop'
 
 const withLinks = (release: HydratedFeedItem, urls: string[]): HydratedFeedItem => ({
     ...release,
-    data: { ...release.data, links: urls.map(url => ({ url, title: url, favicon: undefined })) },
+    data: { ...release.data, links: urls },
 })
 
 const createPreview = (url: string, title: string): ScrapedLinkMetadata => ({

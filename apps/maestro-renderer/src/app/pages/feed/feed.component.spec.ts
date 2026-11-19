@@ -26,7 +26,7 @@ const createRelease = (id: string, linkUrls: string[]): HydratedFeedItem => ({
         artist: null,
         releaseType: 'album',
         about: '',
-        links: linkUrls.map(url => ({ url, title: url, favicon: undefined })),
+        links: linkUrls,
         unsubscribeUrl: null,
         unsubscribeText: '',
         imageUrl: undefined,

@@ -155,7 +155,7 @@ const defaultScenario = (): RendererScenario => ({
         'patch-settings': { kind: 'patch-settings' },
         'trigger-email-import': { kind: 'resolve' },
         'load-feed': { kind: 'resolve', value: [] },
-        // No previews: links keep the title and favicon they arrived with.
+        // No previews: links show their URLs.
         'load-link-previews': { kind: 'resolve', value: {} },
         'has-feed': { kind: 'resolve', value: false },
         'mark-feed-item-viewed': { kind: 'resolve' },

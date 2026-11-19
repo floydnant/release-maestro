@@ -62,14 +62,14 @@ export class FeedBackendService {
         const { tralbumUrl } = item.data
         if (!tralbumUrl) {
             console.warn('No tralbum link found:', item)
-            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, null)
+            return mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null)
         }
         const tralbum = await this.bandcampApiService
             .scrapeTralbumInfo(tralbumUrl)
             .catch((error: unknown) => toHydrationError(tralbumUrl, error))
         return tralbum instanceof Error
-            ? mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, null, tralbum)
-            : mapBandcampReleaseFeedItemToHydratedFeedItem(item, tralbum, null, null)
+            ? mapBandcampReleaseFeedItemToHydratedFeedItem(item, null, tralbum)
+            : mapBandcampReleaseFeedItemToHydratedFeedItem(item, tralbum, null)
     }
 
     async hydrateFeed(

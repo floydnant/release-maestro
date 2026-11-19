@@ -303,9 +303,7 @@ export class FeedComponent {
                     { requested }: { requested: ReadonlySet<string>; urls: string[] },
                     item: HydratedFeedItem,
                 ) => {
-                    const urls = [...new Set(item.data.links.map(link => link.url))].filter(
-                        url => !requested.has(url),
-                    )
+                    const urls = [...new Set(item.data.links)].filter(url => !requested.has(url))
                     return { requested: new Set([...requested, ...urls]), urls }
                 },
                 { requested: new Set<string>(), urls: [] },

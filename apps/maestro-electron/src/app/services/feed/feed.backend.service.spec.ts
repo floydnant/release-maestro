@@ -1015,7 +1015,7 @@ describe('FeedBackendService email import', () => {
             expect(finished).toHaveBeenCalledTimes(1)
             await expect(hydrated).resolves.toHaveLength(5)
             for (const item of await hydrated) {
-                expect(item.data.links.every(link => link.title === link.url)).toBe(true)
+                expect(item.data.links).toHaveLength(6)
             }
             expect(fetchMock).toHaveBeenCalledTimes(5)
             expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/album/'))).toHaveLength(5)

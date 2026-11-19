@@ -76,7 +76,8 @@ export type HydratedBandcampReleaseFeedItem = {
         artist: string | null
         releaseType: 'album' | 'track'
         about: string
-        links: { title: string; favicon: string | undefined; url: string }[]
+        /** The renderer loads each link's title and favicon as a preview. */
+        links: string[]
         unsubscribeUrl: string | null
         unsubscribeText: string
         imageUrl: string | undefined
