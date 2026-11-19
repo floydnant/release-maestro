@@ -32,6 +32,8 @@ const newRepositoryMock = () => ({
         missing: 2,
         normalizationIssues: null,
     })),
+    listSeenSongCovers: jest.fn(() => []),
+    queueSongsWithMissingCovers: jest.fn(),
     countSongsNeedingMetadata: jest.fn(() => 1),
     countSongsNeedingVersionRefresh: jest.fn(() => 0),
     listSongsNeedingMetadata: jest.fn().mockReturnValueOnce([fact]).mockReturnValueOnce([]),

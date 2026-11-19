@@ -36,6 +36,7 @@
     >
         @if (row().coverPath) {
             <img
+                appRetryCoverAfterScan
                 class="aspect-square h-full rounded-sm object-cover"
                 alt=""
                 [src]="fileUrl(row().coverPath!)"

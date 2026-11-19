@@ -45,7 +45,7 @@ export type LibraryScanPhase = 'idle' | 'discovering' | 'reading' | LibraryScanO
 export type LibraryScanOutcome = 'completed' | 'cancelled' | 'failed'
 
 /** Which pipeline stage a file failed in — kept distinct so counts stay meaningful. */
-export type LibraryScanFailureStage = 'discovery' | 'read'
+export type LibraryScanFailureStage = 'discovery' | 'read' | 'cover'
 
 export interface LibraryScanFileFailure {
     stage: LibraryScanFailureStage
@@ -96,6 +96,8 @@ export interface LibraryScanTerminalResult {
     // from `failures.length` (which is capped) or from `attempted - imported`.
     discoveryFailureCount: number
     readFailureCount: number
+    /** Distinct artwork cache paths that failed, independent of successfully imported audio. */
+    coverFailureCount: number
     /** Per-file details for this session, capped — see `failuresTruncated`. */
     failures: LibraryScanFileFailure[]
     failuresTruncated: boolean
@@ -149,8 +151,10 @@ export interface LibraryScanStatus {
     /** Tracks selected because the normalizer or extractor revision changed. */
     refreshTotal: number
     imported: number
-    /** Files that failed so far (all stages). Details land in `terminal.failures`. */
+    /** Files that failed discovery or audio reads. Details land in `terminal.failures`. */
     failedFiles: number
+    /** Distinct artwork cache paths that failed so far. */
+    coverFailureCount: number
     /** Distinct tracks ingested during this scan that have at least one open normalization issue. */
     normalizationIssues: number
     /** Set exactly once when the scan reaches a terminal phase. */
@@ -159,6 +163,8 @@ export interface LibraryScanStatus {
 
 /** Persisted record of the last successfully completed scan. */
 export interface LibraryLastScanInfo extends ScanResult {
+    /** Absent on completed scans saved by older app versions. */
+    coverFailureCount?: number
     /** Absent on completed scans saved by older app versions. */
     refreshTotal?: number
     finishedAt: number
@@ -193,6 +199,7 @@ export interface StartLibraryScanRequest {
 export type LibraryScanUpdate =
     | Exclude<MetadataScanUpdate, { phase: 'started' }>
     | { phase: 'started'; total: number; refreshTotal: number }
+    | { phase: 'coverError'; path: string; error: string }
     | { phase: 'discovery'; discovered: number; new: number; changed: number; unchanged: number }
     /** Cumulative count of distinct tracks with open normalization issues so far in this scan. */
     | { phase: 'normalization'; normalizationIssues: number }

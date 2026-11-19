@@ -38,6 +38,7 @@ type ScanIndicatorView =
           readTotal: number
           refreshTotal: number
           failedFiles: number
+          coverFailureCount: number
       }
     | {
           phase: 'completed'
@@ -53,6 +54,7 @@ type ScanIndicatorView =
           readableFiles: number
           missingSongs: number
           failedFiles: number
+          coverFailureCount: number
       }
 
 /**
@@ -289,6 +291,7 @@ export class AppComponent {
                     successfulReads: status.terminal.imported,
                     readableFiles: status.terminal.discovered - status.terminal.readFailureCount,
                     failedFiles: status.terminal.discoveryFailureCount + status.terminal.readFailureCount,
+                    coverFailureCount: status.coverFailureCount,
                 },
                 minDwellMs: 0,
             }
@@ -303,6 +306,7 @@ export class AppComponent {
             readTotal: status.readTotal,
             refreshTotal: status.refreshTotal,
             failedFiles: status.failedFiles,
+            coverFailureCount: status.coverFailureCount,
         }
         return {
             key: `${status.scanId}:${status.phase}`,
