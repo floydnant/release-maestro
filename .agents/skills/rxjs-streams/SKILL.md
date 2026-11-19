@@ -58,17 +58,28 @@ bookkeeping.
 `library.service.ts` adapt `ipcRenderer.on` into a stream. Prefer it over a hand-rolled `Subject` when
 the source is already an add/remove listener pair.
 
-**Batching a fast producer.** `feed.backend.service.ts` uses `bufferCount(50)` followed by
-`concatMap` — collect 50, then process batches strictly in order. That pairing is the idiom for a
-producer faster than its consumer where order still matters; `bufferCount` with `mergeMap` would
-silently interleave.
+**Sharing one source between branches.** `feed/email-import-pass.ts` feeds one export to two
+progress streams, and its track lookups to three branches. Both use `connect`, which subscribes every
+branch before it subscribes the source. Subscribing to a cold source twice runs it twice, and
+`share()` does not help with a synchronous one: it completes before the second branch subscribes.
 
-**Carrying errors across a boundary.** The same file uses `materialize()` so completion and error
-become ordinary values that survive the IPC hop, then reconstitutes them on the far side. A raw error
-thrown inside a stream does not cross `ipcRenderer` intact.
+**Parallel preparation, ordered persistence.** In the same pass, each exported email joins the pure
+`EmailImportQueue`, a bounded `mergeMap` runs its parent album lookups, and the queue releases ready
+emails in export order. `concatMap` serializes their saves. `materialize` before that `concatMap` and
+`dematerialize` after it queue the stream's error or completion behind earlier saves.
 
-**Combining independent progress sources.** `merge()` of several materialized branches into one
-progress stream, so the renderer subscribes once.
+**Batching a fast producer.** Batch with `concatMap` over the batches, never `mergeMap`, which
+interleaves them. When the stream already arrives in order, `bufferCount(n)` then `concatMap` is the
+idiom. The import pass cannot use it: an email is ready only once every earlier email's lookups
+resolve. So `EmailImportQueue.takeReady` cuts the ready front into batches of
+`EMAIL_IMPORT_SAVE_BATCH_SIZE` while the export runs, and `concatMap` saves them.
+
+**Carrying errors across a boundary.** The same pass turns a failure into state and an ordinary
+terminal progress update (`completed`, `cancelled` or `error`), so the outcome survives the IPC hop.
+A raw error thrown inside a stream does not cross `ipcRenderer` intact.
+
+**Combining independent progress sources.** The pass `merge()`s its export and save progress into
+one stream, then `concat`s the terminal update after both, so the renderer subscribes once.
 
 ## Cancellation
 

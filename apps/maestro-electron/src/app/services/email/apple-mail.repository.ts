@@ -13,6 +13,71 @@ const validateEmail = (data: unknown): Email | null => {
     return result.success ? result.data : null
 }
 
+/** Decodes with the MIME charset, or as UTF-8 when the runtime lacks it: Bandcamp links are ASCII. */
+const decoderFor = (charset: string): TextDecoder => {
+    try {
+        return new TextDecoder(charset)
+    } catch {
+        return new TextDecoder()
+    }
+}
+
+/**
+ * Mail exports the raw MIME source, including transfer-encoded HTML. Decoding never throws: an email
+ * it cannot decode would block the import checkpoint on every later import.
+ */
+const decodeAppleMailHtml = (source: string): string => {
+    const lines = source.replace(/\r\n/g, '\n').split('\n')
+    const logicalLines: { text: string; start: number }[] = []
+    lines.forEach((line, start) => {
+        const previous = logicalLines.at(-1)
+        if (previous && /^[ \t]/.test(line)) {
+            previous.text += ` ${line.trim()}`
+        } else {
+            logicalLines.push({ text: line, start })
+        }
+    })
+    const htmlHeaderIndex =
+        logicalLines.find(line => /^Content-Type:\s*text\/html\b/i.test(line.text))?.start ?? -1
+    if (htmlHeaderIndex === -1) return source.trim()
+
+    let headersStart = htmlHeaderIndex
+    while (headersStart > 0 && lines[headersStart - 1] !== '') headersStart--
+    const headersEnd = lines.findIndex((line, index) => index > htmlHeaderIndex && line === '')
+    if (headersEnd === -1) return source.trim()
+    const headers = logicalLines
+        .filter(line => line.start >= headersStart && line.start < headersEnd)
+        .map(line => line.text)
+        .join('\n')
+    const boundary = lines
+        .slice(0, htmlHeaderIndex)
+        .reverse()
+        .find(line => line.startsWith('--'))
+    const bodyEnd = boundary
+        ? lines.findIndex(
+              (line, index) => index > headersEnd && (line === boundary || line === `${boundary}--`),
+          )
+        : -1
+    const body = lines.slice(headersEnd + 1, bodyEnd === -1 ? undefined : bodyEnd).join('\n')
+    const encoding = headers.match(/^Content-Transfer-Encoding:\s*(\S+)/im)?.[1]?.toLowerCase()
+    const charset = headers.match(/charset="?([^";\s]+)/i)?.[1] ?? 'utf-8'
+
+    if (encoding === 'base64') {
+        return decoderFor(charset).decode(Buffer.from(body, 'base64')).trim()
+    }
+    if (encoding === 'quoted-printable') {
+        // Latin-1 preserves each decoded =XX byte until TextDecoder applies the MIME charset.
+        const bytes = Buffer.from(
+            body
+                .replace(/=\n/g, '')
+                .replace(/=([\da-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16))),
+            'latin1',
+        )
+        return decoderFor(charset).decode(bytes).trim()
+    }
+    return body.trim()
+}
+
 const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string): Email | null => {
     const data: Record<string, unknown> = {
         vendor: 'APPLE_MAIL',
@@ -21,10 +86,7 @@ const parseAppleMailFile = (dataFileContents: string, htmlFileContents: string):
         '==========================================\n==========================================',
     )
     data.plainBody = plainTextBody?.trim() || ''
-    data.htmlBody = htmlFileContents
-        ?.replace(/^(.|\n)*Content-Type: text\/html; charset=.+\nContent-Transfer-Encoding: .+\n/, '')
-        .replace(/--it_was_only_a_kiss--/g, '') // What the heck is this?
-        .trim()
+    data.htmlBody = decodeAppleMailHtml(htmlFileContents)
 
     for (const line of frontMatter?.trim().split('\n') || []) {
         const key = line.match(/^(\w+): /)?.[1]

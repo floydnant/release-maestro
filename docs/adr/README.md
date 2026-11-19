@@ -15,3 +15,4 @@ ADRs live here at the root rather than per project, because contexts cross proje
 | 0004 | [Browse queries are windowed, and a selection carries a query rather than a list of ids](./0004-browse-queries-are-windowed-and-selections-carry-a-query.md)     | Music library |
 | 0005 | [Album attributes the grid sorts by are denormalized columns, maintained by the write side](./0005-album-attributes-a-grid-sorts-by-are-denormalized-columns.md) | Music library |
 | 0006 | [Only route changes are history steps; filter, sort and search replace the entry](./0006-only-route-changes-are-history-steps.md)                                | Music library |
+| 0007 | [Fan purchases and release URLs are tables, not feed item JSON](./0007-fan-purchases-and-release-urls-are-tables.md)                                             | Release feed  |

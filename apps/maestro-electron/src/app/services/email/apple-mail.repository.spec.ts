@@ -7,6 +7,7 @@ import { basename, join } from 'path'
 import { PassThrough } from 'stream'
 import { lastValueFrom, toArray } from 'rxjs'
 import { AppleMailRepository, formatAppleScriptDate } from './apple-mail.repository'
+import { parseBandcampEmail } from '../bandcamp/bandcamp.email-parser'
 
 const mockSpawn = jest.fn<ChildProcess, [string, string[], { signal: AbortSignal }]>()
 const mockExecFile = jest.fn<void, [string, string[], (error: Error | null, stdout: string) => void]>()
@@ -159,6 +160,104 @@ describe('AppleMailRepository', () => {
         expect(packets.map(({ current, total, email }) => [current, total, email?.subject])).toEqual([
             [1, 2, 'First'],
             [2, 2, 'Second'],
+        ])
+    })
+
+    it.each([
+        ...['7bit', '8bit', 'quoted-printable', 'base64'].map(encoding => ({ encoding, folded: false })),
+        ...['quoted-printable', 'base64'].map(encoding => ({ encoding, folded: true })),
+    ])(
+        'reads buyers and links from $encoding MIME HTML with folded headers: $folded',
+        async ({ encoding, folded }) => {
+            const fanName = encoding === '7bit' ? 'Andr&eacute;' : 'André'
+            const html = `<div class="item-tralbum-text">
+                <a href="https://test.bandcamp.com/album/first?from=fan">First Release</a>
+                <div class="bought-by">Bought by <a href="https://bandcamp.com/andre">${fanName}</a></div>
+            </div>`
+            const encoded =
+                encoding === 'base64'
+                    ? Buffer.from(html).toString('base64')
+                    : encoding === 'quoted-printable'
+                      ? html
+                            .replace(/=/g, '=3D')
+                            .replace(/é/g, '=C3=A9')
+                            .replace('https://test.bandcamp.com', 'https://test.band=\r\ncamp.com')
+                      : html
+            const mime = [
+                'MIME-Version: 1.0',
+                'Content-Type: multipart/alternative; boundary="synthetic-boundary"',
+                '',
+                '--synthetic-boundary',
+                'Content-Type: text/plain; charset=utf-8',
+                '',
+                'First Release: Bought by André.',
+                '--synthetic-boundary',
+                folded
+                    ? 'Content-Type:\r\n text/html;\r\n charset="utf-8"'
+                    : 'Content-Type: text/html; charset="utf-8"',
+                folded
+                    ? `Content-Transfer-Encoding:\r\n ${encoding}`
+                    : `Content-Transfer-Encoding: ${encoding}`,
+                '',
+                encoded,
+                '--synthetic-boundary--',
+                '',
+            ].join('\r\n')
+            const osascript = fakeExport()
+            const result = loadAll()
+            const [, , exportPath] = await osascript.started
+            if (!exportPath) throw new Error('Export path missing from osascript arguments')
+            const filePath = join(exportPath, 'email-1.txt')
+            await writeEmail(
+                filePath,
+                dataFile('Fans you follow bought new music on Bandcamp', '2026-10-01T08:00:00'),
+                mime,
+            )
+
+            osascript.log(`Processed email 1/1: ${filePath}\n`)
+            await osascript.exit(0)
+            const [packet] = await result
+            expect(packet?.email?.htmlBody).toBe(html)
+            expect(packet?.email && parseBandcampEmail(packet.email)).toMatchObject({
+                purchases: [
+                    {
+                        tralbumUrl: 'https://test.bandcamp.com/album/first',
+                        fans: [{ name: 'André', profileUrl: 'https://bandcamp.com/andre', imageUrl: null }],
+                    },
+                ],
+            })
+        },
+    )
+
+    it.each([
+        {
+            name: 'an unsupported charset',
+            mime: [
+                'Content-Type: text/html; charset="utf-7"',
+                'Content-Transfer-Encoding: base64',
+                '',
+                Buffer.from('<a href="https://test.bandcamp.com/album/first">First</a>').toString('base64'),
+            ].join('\n'),
+            htmlBody: '<a href="https://test.bandcamp.com/album/first">First</a>',
+        },
+        {
+            name: 'HTML headers without a body',
+            mime: 'Content-Type: text/html; charset="utf-8"',
+            htmlBody: 'Content-Type: text/html; charset="utf-8"',
+        },
+    ])('imports an email whose HTML has $name instead of skipping it', async ({ mime, htmlBody }) => {
+        const osascript = fakeExport()
+        const result = loadAll()
+        const [, , exportPath] = await osascript.started
+        if (!exportPath) throw new Error('Export path missing from osascript arguments')
+        const filePath = join(exportPath, 'email-1.txt')
+        await writeEmail(filePath, dataFile('New release from Test Artist', '2026-10-01T08:00:00'), mime)
+
+        osascript.log(`Processed email 1/1: ${filePath}\n`)
+        await osascript.exit(0)
+
+        await expect(result).resolves.toEqual([
+            { current: 1, total: 1, email: expect.objectContaining({ htmlBody }) },
         ])
     })
 
