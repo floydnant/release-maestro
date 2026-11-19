@@ -29,3 +29,9 @@ anyway, so a whole library's worth of covers would be dead weight in memory.
 - Scan state persists to its own `conf` file under the _data_ dir, not the config dir: it is derived
   state that belongs with the database, and its own file keeps it out of reach of a renderer
   `set-settings` that replaces the whole settings store.
+- `LibraryBackendService` reports discovery and read outcomes to
+  `LibraryBackendRepository.reconcileScan`. That operation owns availability evidence, pending moves,
+  filesystem proof, identity merges, and absence marking, and returns classification adjustments.
+  Candidate rows and merge ordering stay private. Filesystem comparison is replaceable for tests;
+  production and tests use the same reconciliation operation. Scan serialization also keeps another
+  scan from changing these rows while filesystem probes await.
