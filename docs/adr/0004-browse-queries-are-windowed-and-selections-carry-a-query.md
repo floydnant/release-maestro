@@ -68,9 +68,12 @@ anything enforces a limit — nothing in the types bounds `included`, `excluded`
 - **Virtualisation is hand-rolled, and follows from this.** Angular CDK's `*cdkVirtualFor` needs an
   array as long as the result set to size its scrollbar, which is the one thing this decision exists
   to prevent — a 500k-entry array in the renderer costs the same whether the entries are rows or
-  placeholders. Instead a spacer of `total × rowHeight` gives the scrollbar its range and the loaded
-  window is translated into place. The cost is real and accepted: fixed row height, and scroll
-  mathematics we maintain ourselves.
+  placeholders. Instead a spacer gives the scrollbar its range and the loaded window is translated into place.
+  Songs have a fixed 40px height. Grouped album lists add a fixed 24px heading only at each disc
+  boundary, so the spacer is `total × 40 + groupCount × 24`. Row positions include the preceding
+  headings. Group boundaries remain separate from song indexes and do not expand the loaded window.
+  The cost is real and accepted: fixed song and heading heights, and scroll mathematics we maintain
+  ourselves.
 - **A shift-anchor is an index too.** The rule above clears a ranged selection when the row count
   changes, but the anchor a shift-click extends from is held separately by the surface, and it carries
   the selection it would re-apply. It has no id to fall back on, so it is dropped under exactly the
