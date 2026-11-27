@@ -188,5 +188,44 @@
                 </div>
             </div>
         </section>
+
+        <section hlmCard>
+            <div hlmCardHeader>
+                <h4 hlmCardTitle>Avatars</h4>
+                <p hlmCardDescription>
+                    Profile photos fall back to an initial while loading, when absent, or when the image
+                    fails.
+                </p>
+            </div>
+            <div hlmCardContent class="grid gap-4">
+                <div class="flex items-center gap-3">
+                    @for (size of avatarSizes; track size) {
+                        <hlm-avatar [size]="size">
+                            <img hlmAvatarImage [src]="avatarPhoto" alt="" />
+                            <span hlmAvatarFallback>A</span>
+                        </hlm-avatar>
+                    }
+                </div>
+                <div class="flex items-center gap-3">
+                    <hlm-avatar size="sm">
+                        <span hlmAvatarFallback>M</span>
+                    </hlm-avatar>
+                    <hlm-avatar size="sm">
+                        <img hlmAvatarImage [src]="brokenAvatarPhoto" alt="" />
+                        <span hlmAvatarFallback>R</span>
+                    </hlm-avatar>
+                    <span class="type-body-sm text-content-secondary">No photo, failed photo</span>
+                </div>
+                <div hlmAvatarGroup>
+                    @for (initial of ['A', 'M', 'R']; track initial) {
+                        <hlm-avatar size="sm">
+                            <img hlmAvatarImage [src]="avatarPhoto" alt="" />
+                            <span hlmAvatarFallback>{{ initial }}</span>
+                        </hlm-avatar>
+                    }
+                    <span hlmAvatarGroupCount>+12</span>
+                </div>
+            </div>
+        </section>
     </div>
 </section>

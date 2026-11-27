@@ -12,14 +12,17 @@ import {
 import { EmailImportProgressUpdate } from '@release-maestro/core'
 import { HlmButtonImports } from '@spartan-ng/helm/button'
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip'
+import {
+    emailImportActivity,
+    isEmailImportRunning,
+    RunningEmailImportUpdate,
+} from './core/services/feed.service'
 import { IconComponent } from './shared/components/icon/icon.component'
 import { ProgressRingComponent } from './shared/components/progress-ring/progress-ring.component'
 import { MinDwellPacer } from './shared/utils/min-dwell-pacer'
 
-type EmailImportIndicatorView = Extract<
-    EmailImportProgressUpdate,
-    { phase: 'started' | 'processing' | 'completed' | 'error' }
->
+type EmailImportIndicatorView =
+    RunningEmailImportUpdate | Extract<EmailImportProgressUpdate, { phase: 'completed' | 'error' }>
 
 /** Same pacing as the startup library scan, so a quick auto import does not flash in the title bar. */
 const PHASE_MIN_DWELL_MS = 1000
@@ -45,16 +48,17 @@ export class EmailImportIndicatorComponent {
 
     /** Paced view of {@link update}; written by {@link pacer}. */
     protected readonly view = signal<EmailImportIndicatorView | null>(null)
-    /** The paced view can trail the import by a second; the cancel button must not. */
-    protected readonly isRunning = computed(() => {
-        const update = this.update()
-        return update?.phase === 'started' || update?.phase === 'processing'
-    })
-    protected readonly percent = computed(() => {
+    /** What the title bar shows while the paced view is a running import. */
+    protected readonly activity = computed(() => {
         const view = this.view()
-        if (view?.phase !== 'processing' || view.total === 0) return 0
-        return (view.current / view.total) * 100
+        if (!isEmailImportRunning(view)) return null
+        const activity = emailImportActivity(view)
+        // A counted ring keeps the success colour from the export through processing: the same import
+        const color = activity.ring === 'spinning' ? 'content.secondary' : 'content.success'
+        return { ...activity, color } as const
     })
+    /** The paced view can trail the import by a second; the cancel button must not. */
+    protected readonly isRunning = computed(() => isEmailImportRunning(this.update()))
 
     protected readonly summary = computed(() => {
         const view = this.view()
