@@ -162,6 +162,7 @@ export type MetadataWorkerMessage = MetadataResponse | MetadataEvent
 export interface PingResult {
     protocolVersion: number
     engineVersion: string
+    extractorVersion: string
 }
 
 export interface ReadFileParams {
