@@ -30,6 +30,7 @@ const completedStatus = (
         imported: newSongs + changedSongs + resumedReads - failedFiles,
         discoveryFailureCount: 0,
         readFailureCount: failedFiles,
+        coverFailureCount: 0,
         failures: [],
         failuresTruncated: false,
         normalizationIssues: 0,
@@ -49,6 +50,21 @@ const completedStatus = (
 }
 
 test.describe('startup scan summary', () => {
+    test('keeps successful startup imports separate from artwork failures', async ({ page }) => {
+        const status = completedStatus(1, 0, 'startup', 0, 0, 0, { coverFailureCount: 1 })
+        const scenario = scenarioBuilder()
+            .handler('library:get-scan-status', {
+                kind: 'resolve',
+                value: { status, albums: [], lastScan: null },
+            })
+            .build()
+        await createRendererScenario(page, scenario, '/home')
+        const summary = page.getByRole('status', { name: 'Library scan' })
+        await expect(summary).toContainText('Added 1 track')
+        await expect(summary).toContainText('1 artwork cache failure')
+        await expect(summary).not.toContainText('track failed')
+    })
+
     test('a startup scan can be cancelled from the title bar', async ({ page }) => {
         const reading: LibraryScanStatus = {
             ...completedStatus(0, 1),

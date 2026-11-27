@@ -17,22 +17,9 @@ import type {
     AlbumSortField,
     BrowseWindow,
 } from '@release-maestro/core'
-import {
-    auditTime,
-    catchError,
-    debounceTime,
-    distinctUntilChanged,
-    filter,
-    from,
-    map,
-    merge,
-    of,
-    Subject,
-    switchMap,
-} from 'rxjs'
+import { catchError, debounceTime, filter, from, of, Subject, switchMap } from 'rxjs'
 import { HistoryService } from '../../core/services/history.service'
 import { LibraryBrowseService } from '../../core/services/library-browse.service'
-import { LibraryService } from '../../core/services/library.service'
 import {
     albumQueryFromParams,
     albumQueryToParams,
@@ -41,6 +28,7 @@ import {
     sameAlbumQuery,
 } from '../../shared/browse/album-query-params'
 import { createBrowseQuery } from '../../shared/browse/browse-query'
+import { libraryBrowseRefresh } from '../../shared/browse/library-browse-refresh'
 import {
     BrowseShellComponent,
     type BrowseFilterChip,
@@ -65,9 +53,6 @@ import { AlbumSortBarComponent } from '../../shared/components/album-grid/album-
  * **The URL is the single source of truth for filter, sort and search.** Nothing is
  * mirrored into a component signal, so back and forward simply work.
  */
-
-/** How often a running scan is allowed to refetch the visible window. */
-const SCAN_REFETCH_INTERVAL_MS = 1_500
 
 /** How long typing settles before a search reaches the URL and the read side. */
 const SEARCH_DEBOUNCE_MS = 200
@@ -114,7 +99,6 @@ export class AlbumsComponent {
     private route = inject(ActivatedRoute)
     private router = inject(Router)
     private browseService = inject(LibraryBrowseService)
-    private libraryService = inject(LibraryService)
     private history = inject(HistoryService)
 
     private queryParams = toSignal(this.route.queryParams, { initialValue: {} })
@@ -159,33 +143,12 @@ export class AlbumsComponent {
         }),
     })
 
-    private scanStatus$ = toObservable(this.libraryService.scanStatus)
-
-    /**
-     * Browse views refetch while a scan ingests songs. Audited while it runs, because the
-     * status ticks far faster than a grid needs to move, plus a separate trigger on the
-     * end of a scan — auditing emits the last value of each window, so whatever the scan
-     * commits after its final progress event would otherwise land with nothing to
-     * announce it. See `TracksComponent`, which has the same pair for the same reason.
-     */
-    private scanProgress$ = merge(
-        this.scanStatus$.pipe(
-            filter(status => status?.phase == 'discovering' || status?.phase == 'reading'),
-            auditTime(SCAN_REFETCH_INTERVAL_MS),
-        ),
-        this.scanStatus$.pipe(
-            map(status => status?.phase),
-            distinctUntilChanged(),
-            filter(phase => phase == 'completed' || phase == 'cancelled' || phase == 'failed'),
-        ),
-    )
-
     private browse = createBrowseQuery({
         query: this.query,
         viewport: this.viewport,
         sameQuery: sameAlbumQuery,
         entityLabel: ALBUMS_LABEL,
-        refresh: this.scanProgress$,
+        refresh: libraryBrowseRefresh(),
         fetchWindow: (query, window) => this.browseService.queryAlbums(query, window),
     })
 

@@ -1,0 +1,1 @@
+ALTER TABLE `songs` ADD `cover_needs_refresh` integer DEFAULT false NOT NULL;
